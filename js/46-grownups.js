@@ -757,7 +757,7 @@ function guFinesSide() {
       <span class="gu-line">${escapeHtml(note)}</span></div>`;
   }).join('');
   return `<div class="gu-sidehead">What she sees on Sunday</div>${see}
-    <div class="gu-card gu-plain">It shows under ➖ Taken off on her payday. If she thinks it's wrong, she can dispute it from My money, and it lands in ✅ Approve.</div>`;
+    <div class="gu-card gu-plain">It shows under ➖ Taken off on her payday. If she thinks it's wrong, she can dispute it from My money, and it lands in Parent › Now.</div>`;
 }
 function guLogFine() {
   const f = guFine();
@@ -1209,6 +1209,7 @@ function guWeeksSummary(kid) {
   const y = mrYearToDate(kid);
   const R = mrSundayRules(ctThisWeekKey());
   const target = Number(mrRuleOr(R, 'targets.' + kid + '.annual')) || y.target || 0;
+  const earned = guEarnedThisYear(kid);
   const left = mnyTotalOwing(kid);
   const owed = money2(mnyEnsureDebts(kid).reduce((a, d) => a + (loanBalance(kid, d.id) > 0 ? money2(d.arrears) : 0), 0));
   const rows = mnyLedgerRows(kid).slice(0, 4).map(mnyPassbookRow);
@@ -1216,7 +1217,7 @@ function guWeeksSummary(kid) {
   const kv = (k, v, cls) => `<div class="gu-kv${cls ? ' ' + cls : ''}"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`;
   return `<div class="gu-card gu-weeksum ${'gu-tint--' + kid}">
       <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))}</span></div>
-      ${kv('Earned this year', target > 0 ? `${guMoney$(y.paidTotal)} of ${guMoney$(target)} · ${Math.round(y.paidTotal / target * 100)}%` : guMoney$(y.paidTotal))}
+      ${kv('Earned this year', target > 0 ? `${guMoney$(earned)} of ${guMoney$(target)} · ${Math.round(earned / target * 100)}%` : guMoney$(earned))}
       ${kv('Loan left', guMoney$(left))}
       ${kv('Typical week', guMoney$(guSteady(kid)))}
       ${kv('Loan payments', left <= 0 ? '✓ nothing owed' : owed > 0 ? `📌 ${guMoney$(owed)} still owed` : '✓ on track', owed > 0 ? 'gu-warnline' : '')}
@@ -1224,6 +1225,16 @@ function guWeeksSummary(kid) {
         ? `Saving: ${line.word} — ${line.pct}% of her last ${line.sundays} Sunday${line.sundays === 1 ? '' : 's'} went to Savings, goal jars, Locked away and Companies${line.extra ? '. ' + line.extra.charAt(0).toUpperCase() + line.extra.slice(1) : ''}.`
         : 'Saving: no signed Sundays yet.')}</div>
     </div>`;
+}
+/* "Earned this year" (Plan v17 item 8): the same frozen ledger rows the
+   list under it shows — each Sunday of this calendar year, what she earned
+   after fines (`mnyPassbookRow(r).earned`). It read `mrYearToDate`'s
+   `finalizedWeeks` before, which a typed-in or Grandfather week never
+   touches, so the summary said $40 while the rows below said $215. */
+function guEarnedThisYear(kid) {
+  const year = String(todayKey()).slice(0, 4);
+  return money2(mnyLedgerRows(kid).filter(r => String(sdSundayOf(r.weekKey)).slice(0, 4) === year)
+    .reduce((a, r) => a + mnyPassbookRow(r).earned, 0));
 }
 /* One girl's cell for one Sunday in the list. */
 function guWeekCell(kid, r) {
@@ -1299,14 +1310,17 @@ function guWeekRecord(kid, wk, r) {
   // 💪 Payday, with the working each line kept.
   const comps = mrCompetitions(kid).filter(c => c && (String(ctWeekKeyForDate(c.dayKey)) === String(wk)));
   const deps = mnyDepositsForWeek(kid, wk).filter(d => d && !d.pendingApproval && !d.rejectedAt);
+  const pb = mnyPassbookRow(Object.assign({}, r, { weekKey: wk }));   // the passbook's own reading of the row
   const payday = [
     kv('🧹 Chores', m(r.chores), `${days.length || 7} days · ${r.freeChores || 0} free${r.overflowChores ? ` · ${r.overflowChores} past the cap (XP)` : ''}${r.choresRaw != null && money2(r.choresRaw) !== money2(r.chores) ? ` · graded ${m(r.choresRaw)}` : ''}`),
     Number(r.learning) ? kv('📘 Learning', m(r.learning)) : '',
     kv('🔥 Routine', m(r.streak), `${r.streakDays || 0} days kept`),
     kv('⛸️ Club job', m(r.sessionsPaid), `${r.sessions || 0} session${r.sessions === 1 ? '' : 's'} attended`),
-    kv('🏆 Prizes', m(r.competition), comps.map(c => `${c.name || mnySportLabel(c.sport)} · ${Number(c.points) || 0} pts${(c.placement || {}).group ? ` · group ${rqOrd(c.placement.group)}` : ''} · ${guMoney$(mrCompAward(c))}${c.awardedOverride ? ' (a parent made it ' + guMoney$(c.awardedOverride.value) + ')' : ''}`).join(' | ')),
-    kv('🎁 Given', m(r.deposits != null ? r.deposits : r.outside), deps.map(d => `${d.giver || d.from || 'a gift'} ${guMoney$(d.amount)}`).join(' · ')),
-    kv('🌱 Money made', m(Math.max(0, Number(r.passive) || 0))),
+    kv('🏆 Competitions', m(r.competition), comps.map(c => `${c.name || mnySportLabel(c.sport)} · ${Number(c.points) || 0} pts${(c.placement || {}).group ? ` · group ${rqOrd(c.placement.group)}` : ''} · ${guMoney$(mrCompAward(c))}${c.awardedOverride ? ' (a parent made it ' + guMoney$(c.awardedOverride.value) + ')' : ''}`).join(' | ')),
+    kv('🎁 Given', m(pb.given), deps.filter(d => !sdIsHomeCash(d)).map(d => `${d.giver || d.from || 'a gift'} ${guMoney$(d.amount)}`).join(' · ')),
+    kv('🌱 Money made', m(pb.made)),
+    // Cash from home is her own money, not a gift (Plan v17 item 10).
+    r.groups && Number(r.groups.bank) ? kv('📥 From my bank', m(r.groups.bank), deps.filter(sdIsHomeCash).map(d => `🏠 ${guMoney$(d.amount)}`).join(' · ')) : '',
   ].join('');
   const fines = mrFines(kid).filter(f => f && inDays(f.dayKey))
     .map(f => kv(`📦 ${guFineLabel(f.itemId)}`, '', `${guDayName(f.dayKey)} ${mnyDayMonth(f.dayKey)}${f.who ? ' · ' + f.who : ''}`)).join('');
@@ -1364,7 +1378,7 @@ function guWeekRecord(kid, wk, r) {
       ${stickers ? sec('⭐ Stickers', `<div class="gu-line">${escapeHtml(stickers)}</div>`) : ''}
       ${sec('Verdict', verdict)}
       ${answer ? sec('💬 Her answer', `<div class="gu-line">${escapeHtml(MNY_REFLECT.question)} “${escapeHtml(answer)}”${r.guess != null ? escapeHtml(` · she guessed $${r.guess}`) : ''}</div>`) : ''}
-      <div class="gu-line gu-rec-foot">${escapeHtml(`Signed by ${r.confirmedBy || 'a grown-up'}${signedAt ? ' · ' + new Date(signedAt).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''} · rules ${r.rulesVersion || '—'}${r.rulesEffectiveFrom ? ' (from ' + mnyShortDate(r.rulesEffectiveFrom) + ')' : ''}`)}</div>
+      <div class="gu-line gu-rec-foot">${escapeHtml(`Signed by ${r.confirmedBy || 'a grown-up'}${signedAt ? ' · ' + new Date(signedAt).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''} · ${r.rulesEffectiveFrom ? 'rules of ' + mnyShortDate(r.rulesEffectiveFrom) : 'the rules of that week'}`)}</div>
     </div>`;
 }
 

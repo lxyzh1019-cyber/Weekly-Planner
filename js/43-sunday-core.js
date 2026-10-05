@@ -762,6 +762,45 @@ function sdSavingLine(rows, loanOpen, rules) {
   return { pct, word, sundays: list.length, extra };
 }
 
+/* ── 📉 What I owe vs what I own (Plan v17 §4, Stage 6h) ──────────────
+   The Signed step's line chart. A fixed window — the last 8 Sundays,
+   today's signed point included — so it fits however long the record gets;
+   older Sundays are counted, not drawn. The forecast runs from the signed
+   point with this week's numbers: if the loan is free within 13 Sundays
+   (3 months) it runs to the payoff Sunday ("free by …"), otherwise it shows
+   the next 6 Sundays. At most 8 labels, the signed point and the last one
+   always among them. Rows without both figures are skipped by the reader. */
+const SD_OWE_WINDOW = 8;
+const SD_FREE_WITHIN_SUNDAYS = 13;
+const SD_FORECAST_SUNDAYS = 6;
+const SD_CHART_LABELS = 8;
+function sdOweOwnForecast(owe0, own0, payPerWeek, savePerWeek) {
+  const owe = Math.max(0, sdR2(owe0)), own = sdR2(own0);
+  const pay = Math.max(0, Number(payPerWeek) || 0), gain = Math.max(0, Number(savePerWeek) || 0);
+  const weeks = owe > 0 && pay > 0 ? Math.ceil(sdR2(owe / pay) - 1e-9) : Infinity;
+  const toFree = owe > 0 && weeks <= SD_FREE_WITHIN_SUNDAYS;
+  const n = toFree ? weeks : SD_FORECAST_SUNDAYS;
+  const points = Array.from({ length: n }, (_, i) => [sdR2(Math.max(0, owe - pay * (i + 1))), sdR2(own + gain * (i + 1))]);
+  return { toFree, n, points };
+}
+function sdOweOwnSeries(rows, now, payPerWeek, savePerWeek) {
+  const ok = r => r && Number.isFinite(Number(r.owed)) && r.owed !== null && Number.isFinite(Number(r.owned)) && r.owned !== null;
+  const hist = (rows || []).filter(ok).map(r => ({ weekKey: r.weekKey, owed: sdR2(r.owed), owned: sdR2(r.owned) }));
+  const keep = Math.max(0, SD_OWE_WINDOW - 1);
+  const past = [...hist.slice(Math.max(0, hist.length - keep)), { weekKey: now.weekKey, owed: sdR2(now.owed), owned: sdR2(now.owned) }];
+  return { past, hidden: Math.max(0, hist.length - keep), forecast: sdOweOwnForecast(now.owed, now.owned, payPerWeek, savePerWeek) };
+}
+function sdThinLabels(count, keep, max) {
+  const n = Math.max(0, Math.floor(Number(count) || 0)), m = Math.max(1, Math.floor(Number(max) || SD_CHART_LABELS));
+  if (n <= m) return Array.from({ length: n }, (_, i) => i);
+  const out = new Set((keep || []).filter(i => i >= 0 && i < n));
+  const step = Math.ceil(n / m);
+  for (let i = n - 1; i >= 0 && out.size < m; i -= step) {
+    if ([...out].every(j => Math.abs(j - i) >= step)) out.add(i);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 // Inert in the browser; lets tests/sunday.test.js hold the pure core in Node.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -772,5 +811,6 @@ if (typeof module !== 'undefined' && module.exports) {
     sdCanPlace, sdPlace, sdSetPull, sdSetAdvance, sdPresets, sdStickersFor, sdCheckInOut, sdSign,
     sdVerdicts, sdForecast, sdNewGoal, sdWhole$, sdStreakForgiving, sdStreakClue, sdClues,
     sdImpactWeek, sdImpactWeekly, sdImpact, sdWithAgreed, sdAgreeInto, sdSavingLine,
+    sdOweOwnForecast, sdOweOwnSeries, sdThinLabels, SD_CHART_LABELS,
   };
 }

@@ -583,7 +583,7 @@ const RQ_SKIP_WHY = ['🤒 Sick', '📚 School thing', '🚗 Family trip', 'Some
 const RQ_ADV_WHY = ['School book fair', 'Snack with friends', 'A gift for someone', 'Something else'];
 const RQ_TITLES = { result: '🏆 Tell parents a result', club: '⛸️ My club sessions', goal: '🎯 A new saving goal',
                     adv: '⏪ Draw in advance', list: '⏳ Everything I asked parents',
-                    move: '🔀 Move money', cash: '💵 Cash out', dep: '🏦 Put cash in',
+                    move: '🔀 Move money', cash: '💵 Cash out', dep: '🏦 Put cash in', early: '⏪ Draw early',
                     gift: '🎁 I was given something', prices: '💷 What things pay' };
 const RQ_GIFT_CHIPS = [5, 10, 20, 50];
 // What each home is called on these sheets (handoff §5). The 🧱 wall is no
@@ -608,13 +608,17 @@ function mnyOpenRequestSheet(kind, opts) {
   const o = opts || {};
   const kid = (o.kid === 'jenn' || o.kid === 'jess') ? o.kid
     : (isParent() ? (parentViewing === 'jess' ? 'jess' : 'jenn') : activeProfile());
-  const k = ['result', 'club', 'move', 'adv', 'goal', 'gift', 'prices', 'list'].indexOf(kind) >= 0 ? kind : 'list';
+  /* ⏪ Draw early is a mode of the 🔀 Move · 💵 Cash sheet now (Plan v17 §1):
+     `adv` opens that sheet in that mode. */
+  const asked = kind === 'adv' ? 'move' : kind;
+  const k = ['result', 'club', 'move', 'goal', 'gift', 'prices', 'list'].concat(MNY_INFO_KINDS).indexOf(asked) >= 0 ? asked : 'list';
   rqDraft = { kind: k, kid };
+  if (MNY_INFO_KINDS.indexOf(k) >= 0) rqDraft.id = o.id || null;
   if (k === 'move') {
-    const mode = ['move', 'cash', 'dep'].indexOf(o.mode) >= 0 ? o.mode : 'move';
+    const want = kind === 'adv' ? 'early' : o.mode;
+    const mode = ['move', 'cash', 'dep', 'early'].indexOf(want) >= 0 ? want : 'move';
     Object.assign(rqDraft, { mode, from: 'ready', to: mode === 'cash' ? 'cash' : null, amt: 1, why: '' });
   }
-  if (k === 'adv') Object.assign(rqDraft, { amt: 1, why: '' });
   if (k === 'goal') Object.assign(rqDraft, { name: '', icon: '🎒', amt: 30, keep: 'move', targetDate: '' });
   if (k === 'club') Object.assign(rqDraft, { blockId: null, why: '' });
   if (k === 'result') {
@@ -644,8 +648,8 @@ function rqRow(q, optsHtml) {
 function rqState() {
   const d = rqDraft, kid = d.kid;
   if (d.kind === 'result') return rqResultState(kid, d);
+  if (d.kind === 'move' && d.mode === 'early') return rqAdvState(kid, d);
   if (d.kind === 'move') return rqMoveState(kid, d);
-  if (d.kind === 'adv') return rqAdvState(kid, d);
   if (d.kind === 'goal') return rqGoalState(kid, d);
   if (d.kind === 'club') return rqClubState(kid, d);
   if (d.kind === 'gift') return rqGiftState(kid, d);
@@ -829,14 +833,18 @@ function rqMoveBody(kid, d) {
   const st = rqMoveState(kid, d);
   const gate = (h) => mnyStagePct(evHomeNeed(h));
   const lockWeeks = Number(mrRuleOr(mrRules(), 'pots.lockWeeks')) || 4;
-  const modeRow = rqRow('What do I want to do?', [['move', '🔀 Move'], ['cash', '💵 Cash out'], ['dep', '🏦 Put cash in']]
-    .map(([k, l]) => rqOpt(l, d.mode === k, 'rq-mode', ` data-mny-id="${k}"`)).join(''));
+  const modeRow = rqModeRow(d);
+  if (d.mode === 'early') return modeRow + rqAdvBody(kid, d);
+  /* 🏦 Savings reads as on My money — her goal jars inside it (Plan v17
+     item 2) — while what she can move is the part outside the jars. */
+  const jars = money2(mnyReadyHomeTotal(kid) - mnySavedTotal(kid));
   const fromRow = rqRow('① Take it from', ['ready', 'locked', 'invest'].map(h => {
     const bal = money2(evHomeBalance(kid, h));
+    const shown = h === 'ready' ? `${mnyMoney(money2(bal + jars))}${jars > 0 ? ` · 🎯 ${mnyShort$(jars)} inside stays` : ''}` : mnyMoney(bal);
     const shut = h !== 'ready' && !evHomeOpen(kid, h);
     const why = h === 'locked' ? 'Locked money comes back on its own date.'
       : shut ? mnyNeedLabel(evHomeNeed(h)) : (bal < 1 ? 'Nothing to take out of there yet.' : '');
-    return rqOpt(`${RQ_HOMES[h]} · ${mnyMoney(bal)}${h === 'locked' ? ` · 🔒 ${lockWeeks} weeks` : shut ? ` · 🔒${gate(h)}%` : ''}`,
+    return rqOpt(`${RQ_HOMES[h]} · ${shown}${h === 'locked' ? ` · 🔒 ${lockWeeks} weeks` : shut ? ` · 🔒${gate(h)}%` : ''}`,
       d.from === h, 'rq-from', ` data-mny-id="${h}"`, why);
   }).join(''));
   const amtRow = rqRow(d.mode === 'dep' ? '① How much cash?' : '③ How much?',
@@ -851,7 +859,14 @@ function rqMoveBody(kid, d) {
   return rows.join('') + rqPreviewAndFoot();
 }
 
-/* ⏪ Cash now, off Sunday's payday — up to the rule, less what she drew. */
+/* The four modes of the 🔀 Move · 💵 Cash sheet (Plan v17 §1). */
+function rqModeRow(d) {
+  return rqRow('What do I want to do?', [['move', '🔀 Move'], ['cash', '💵 Cash out'], ['dep', '🏦 Put cash in'], ['early', '⏪ Draw early']]
+    .map(([k, l]) => rqOpt(l, d.mode === k, 'rq-mode', ` data-mny-id="${k}"`)).join(''));
+}
+/* ⏪ Draw early: cash now, off Sunday's payday — up to the rule
+   (`advance.maxPerWeek`), less what she drew. The cap is kept and not shown
+   (Plan v17 §1, owner's answer): + stops at it and says so when pressed. */
 function rqAdvState(kid, d) {
   const wk = ctThisWeekKey();
   const max = money2(Number(mrRuleOr(mrRulesForWeek(wk), 'advance.maxPerWeek')) || 0);
@@ -865,7 +880,7 @@ function rqAdvState(kid, d) {
 }
 function rqAdvBody(kid, d) {
   const st = rqAdvState(kid, d);
-  return rqRow(`① How much? (up to $${st.left} this week)`,
+  return rqRow('① How much?',
       `${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal('$' + st.amt)}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}`)
     + rqRow('② What for?', RQ_ADV_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''))
     + rqPreviewAndFoot();
@@ -975,7 +990,23 @@ function rqStatusText(q) {
 function rqListBody(kid) {
   const rows = mnyRequestsFor(kid).slice().reverse().map(q => `<div class="rq-chip ${'rq-chip--' + (q.status || 'open')}"><span>${escapeHtml(q.icon)} ${escapeHtml(q.text)}</span><b>${escapeHtml(rqStatusText(q))}</b></div>`).join('')
     || `<div class="rq-empty">Nothing asked yet.</div>`;
-  return `${rows}<button type="button" class="rq-done" data-mny-action="rq-close">Done</button>`;
+  return `${rows}${rqGiftsList(kid)}<button type="button" class="rq-done" data-mny-action="rq-close">Done</button>`;
+}
+/* 🎁 The gifts on record, newest first (the last ten): from whom, when, and
+   where each stands. A grown-up taps one to correct it through the Record
+   sheet that recorded it. Cash from home is her bank, not a gift (Plan v17
+   item 10), so it is not listed here. */
+function rqGiftsList(kid) {
+  const all = mnyEnsureDeposits(kid).filter(x => x && !sdIsHomeCash(x))
+    .sort((a, b) => String(b.dayKey || '').localeCompare(String(a.dayKey || ''))).slice(0, 10);
+  if (!all.length) return '';
+  return `<div class="rq-q">🎁 Gifts</div>${all.map(dep => {
+    const inner = `<span>🎁 ${escapeHtml(dep.giver || dep.from || 'A gift')}${dep.giver && dep.from ? ' · ' + escapeHtml(dep.from) : ''} · ${escapeHtml(mnyShortDate(dep.dayKey || dep.weekKey))}</span>
+      <b>${escapeHtml(mnyMoney(dep.amount))} · ${escapeHtml(dep.rejectedAt ? 'not this time' : dep.pendingApproval ? '⏳ waiting' : '✓ counted')}</b>`;
+    return isParent()
+      ? `<button type="button" class="rq-chip rq-chip--tap" data-mny-action="gift-edit" data-mny-dep="${escapeAttr(dep.id)}">${inner}</button>`
+      : `<div class="rq-chip">${inner}</div>`;
+  }).join('')}`;
 }
 
 /* The preview line and the two buttons every asking sheet ends with. */
@@ -994,18 +1025,18 @@ function rqRender() {
   const d = rqDraft, kid = d.kid;
   const title = document.getElementById('rqSheetTitle');
   // The result sheet's line sits beside its title, on one line (M8-2).
-  if (title) title.innerHTML = escapeHtml(d.kind === 'move' ? RQ_TITLES[d.mode] : RQ_TITLES[d.kind])
+  if (title) title.innerHTML = escapeHtml(MNY_INFO_KINDS.indexOf(d.kind) >= 0 ? mnyInfoSheetTitle(d) : d.kind === 'move' ? RQ_TITLES[d.mode] : RQ_TITLES[d.kind])
     + (d.kind === 'result' ? ' <span class="rq-titlesub">The official results sheet decides. A parent checks it before anything pays.</span>' : '');
   const sheet = host.closest('.sheet');
   if (sheet) sheet.setAttribute('data-rq-kind', d.kind);
   let body;
   if (d.kind === 'result') body = rqResultBody(kid, d);
   else if (d.kind === 'move') body = rqMoveBody(kid, d);
-  else if (d.kind === 'adv') body = rqAdvBody(kid, d);
   else if (d.kind === 'goal') body = rqGoalBody(kid, d);
   else if (d.kind === 'club') body = rqClubBody(kid, d);
   else if (d.kind === 'gift') body = rqGiftBody(kid, d);
   else if (d.kind === 'prices') body = rqPricesBody();
+  else if (MNY_INFO_KINDS.indexOf(d.kind) >= 0) body = mnyInfoSheetBody(d);
   else body = rqListBody(kid);
   host.innerHTML = body;
 }
@@ -1065,14 +1096,14 @@ function rqHandleAction(a, el) {
   } else if (a === 'rq-ovr' && pick) { pick.ovr = Number(id) || 0;
   } else if (a === 'rq-pts' && pick) { pick.pts = Math.max(0, (Number(pick.pts) || 0) + step);
   } else if (a === 'rq-mode') {
-    const mode = ['move', 'cash', 'dep'].indexOf(id) >= 0 ? id : 'move';
+    const mode = ['move', 'cash', 'dep', 'early'].indexOf(id) >= 0 ? id : 'move';
     Object.assign(d, { mode, from: 'ready', amt: 1, to: mode === 'cash' ? 'cash' : null, why: '' });
   } else if (a === 'rq-from') {
     d.from = id; d.amt = 1;
     if (d.mode === 'cash') d.to = 'cash'; else if (d.to === id) d.to = null;
   } else if (a === 'rq-to') { d.to = id;
   } else if (a === 'rq-amt') {
-    const cap = d.kind === 'adv' ? rqAdvState(kid, d).left : rqMoveState(kid, d).max;
+    const cap = d.mode === 'early' ? rqAdvState(kid, d).left : rqMoveState(kid, d).max;
     d.amt = Math.max(1, Math.min(Math.max(1, cap), (d.amt || 1) + step));
   } else if (a === 'rq-amtall') { d.amt = Math.max(1, rqMoveState(kid, d).max);
   } else if (a === 'rq-why') { d.why = id;
@@ -1124,16 +1155,16 @@ function rqSend() {
       sport: p.sport, name: String(p.name || '').trim(), dayKey: p.dayKey || todayKey(), races,
       pts: p.sport === 'swim' ? tot : (Number(p.pts) || 0), grp: p.grp, ovr: p.ovr,
       qualified: !!p.qual, provincial: !!p.prov, text: `${String(p.name || '').trim()} · ${sum}` });
+  } else if (d.kind === 'move' && d.mode === 'early') {
+    rec = mnyAddRequest(kid, { kind: 'adv', amount: st.amt, why: d.why,
+      day: new Date().toLocaleDateString('en-US', { weekday: 'short' }),
+      text: `Draw $${st.amt} in advance · ${d.why}` });
   } else if (d.kind === 'move' && d.mode === 'dep') {
     rec = mnyAddRequest(kid, { kind: 'deposit', amount: st.amt, note: 'into ' + rqHomeShort(d.to),
       text: `Put $${st.amt} cash in → ${rqHomeShort(d.to)}` });
   } else if (d.kind === 'move') {
     rec = mnyAddRequest(kid, { kind: 'move', from: d.from, to: d.mode === 'cash' ? 'cash' : d.to,
       amount: st.amt, note: d.why });
-  } else if (d.kind === 'adv') {
-    rec = mnyAddRequest(kid, { kind: 'adv', amount: st.amt, why: d.why,
-      day: new Date().toLocaleDateString('en-US', { weekday: 'short' }),
-      text: `Draw $${st.amt} in advance · ${d.why}` });
   } else if (d.kind === 'goal') {
     const jar = rqGoalJar(kid);
     rec = mnyAddRequest(kid, { kind: 'goal', name: String(d.name || '').trim(), icon: d.icon, target: d.amt || 30,

@@ -242,10 +242,10 @@ function mnyNormalizeHolding(h) {
   if (h.rateAnnual == null) h.rateAnnual = 0;      // 0.015 = 1.5% a year
   if (!h.openedOn) h.openedOn = todayKey();
   if (h.maturesOn == null) h.maturesOn = '';
-  // The last day this holding's growth was worked out, and what it was worth at
-  // the last settled Sunday. Both drive the simulation below.
+  // The last day this holding's growth was worked out — it drives the
+  // simulation below. (What it made since the last settled Sunday is read
+  // from the stream: `mnyPassiveSinceLastMeeting`.)
   if (!h.lastAccruedOn) h.lastAccruedOn = h.openedOn || todayKey();
-  if (h.valueAtLastMeeting == null) h.valueAtLastMeeting = money2(h.units * h.priceNow);
   if (!h.createdAt) h.createdAt = syncNow();
   return h;
 }
@@ -353,15 +353,40 @@ function mnySimCatchUp(kid, opts) {
 /* What her money made on its own since the last settled Sunday — interest
    credited plus any change in what her companies are worth. This is real
    income, it just was not earned by working, and a week's bar that leaves it
-   out does not add up. */
+   out does not add up.
+
+   Read from the stream's value-change lines into (and out of) her pots
+   (`evMirrorValueChange`: from `interest` to Savings, Locked away or
+   Companies), after the baseline — not from the change in each holding's
+   value. A value change also counted every dollar MOVED in or out between
+   Sundays (a move to the wall, cash put into Savings, a goal jar filled), so
+   Payday and the Weeks record of the same Sunday disagreed (Plan v17 item
+   11: $5.00 vs $2.00). One reader now: Payday, the week's bar and the
+   ledger's `passive` at the sign all ask this. A lock's interest comes back
+   as cash and joins her pile, so it is not counted here twice. */
 function mnyPassiveSinceLastMeeting(kid) {
   mnySimCatchUp(kid);
-  return money2(mnyEnsureHoldings(kid)
-    .reduce((s, h) => s + (mnyHoldingValue(h) - money2(h.valueAtLastMeeting)), 0));
+  const since = mnyPassiveBaselineAt(kid);
+  const pots = Object.keys(EV_HOME_FOR_HOLDING).map(k => EV_HOME_FOR_HOLDING[k]);
+  return money2(evList(kid).reduce((s, e) => {
+    if (!e || !(Number(e.at) > since)) return s;
+    if (e.from === 'interest' && pots.indexOf(e.to) >= 0) return s + money2(e.amount);
+    if (e.to === 'interest' && pots.indexOf(e.from) >= 0) return s - money2(e.amount);
+    return s;
+  }, 0));
+}
+/* When the last baseline was stamped: the newest `baselineAt` on her
+   holdings, else her last signed Sunday's ledger row. */
+function mnyPassiveBaselineAt(kid) {
+  const t = Math.max(0, ...mnyEnsureHoldings(kid).map(h => Number(h && h.baselineAt) || 0));
+  if (t) return t;
+  const r = (typeof mnyLedgerRows === 'function') ? mnyLedgerRows(kid)[0] : null;
+  return r ? (Number(r.updatedAt || r.at) || 0) : 0;
 }
 /* Called once the week is settled: this Sunday becomes the new baseline. */
 function mnyStampPassiveBaseline(kid) {
-  mnyEnsureHoldings(kid).forEach(h => { h.valueAtLastMeeting = mnyHoldingValue(h); });
+  const at = syncNow();
+  mnyEnsureHoldings(kid).forEach(h => { h.baselineAt = at; });
   saveAll();
 }
 

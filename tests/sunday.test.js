@@ -665,5 +665,41 @@ function fill(w, k) {
   check('agreed: a later step keeps what she first asked', r.agreed.asked === 5);
 }
 
+/* ── 📉 What I owe vs what I own (Plan v17 §4, Stage 6h) ── */
+{
+  const F = s.sdOweOwnForecast;
+  const soon = F(100, 50, 10, 5);
+  check('forecast: free within 13 Sundays runs to the payoff Sunday', soon.toFree === true && soon.n === 10 && soon.points.length === 10
+    && soon.points[9][0] === 0 && soon.points[9][1] === 100 ? true : JSON.stringify(soon));
+  const edge = F(130, 0, 10, 0);
+  check('forecast: exactly 13 Sundays is still "free by"', edge.toFree === true && edge.n === 13);
+  const far = F(657.45, 56.86, 42.55, 36.86);
+  check('forecast: further than 13 Sundays shows the next 6', far.toFree === false && far.n === 6 && far.points.length === 6
+    && far.points[0][0] === 614.9 && far.points[5][1] === s.sdR2(56.86 + 6 * 36.86) ? true : JSON.stringify(far));
+  const none = F(0, 20, 10, 5);
+  check('forecast: nothing owed is not "free by" — six Sundays, owe stays $0', none.toFree === false && none.n === 6 && none.points.every(p => p[0] === 0));
+  const noPay = F(100, 0, 0, 0);
+  check('forecast: no payment never claims a payoff', noPay.toFree === false && noPay.n === 6 && noPay.points[5][0] === 100);
+  check('forecast: owe never goes below $0', F(25, 0, 10, 0).points.every(p => p[0] >= 0));
+
+  const S = s.sdOweOwnSeries;
+  const rows = Array.from({ length: 12 }, (_, i) => ({ weekKey: 'w' + String(i).padStart(2, '0'), owed: 900 - i * 10, owned: i }));
+  const ser = S(rows, { weekKey: 'now', owed: 700, owned: 30 }, 42, 5);
+  check('series: the last 8 Sundays including today', ser.past.length === 8 && ser.past[7].weekKey === 'now' && ser.past[0].weekKey === 'w05');
+  check('series: older Sundays are counted, not drawn', ser.hidden === 5);
+  check('series: the forecast starts from the signed point', ser.forecast.points[0][0] === 658 && ser.forecast.points[0][1] === 35);
+  const few = S([{ weekKey: 'a', owed: 10, owned: 1 }], { weekKey: 'now', owed: 5, owned: 2 }, 5, 0);
+  check('series: a short history shows what there is', few.past.length === 2 && few.hidden === 0 && few.forecast.toFree === true && few.forecast.n === 1);
+  check('series: rows without the figures are skipped', S([{ weekKey: 'x', owed: null, owned: 3 }, { weekKey: 'y', owed: 4, owned: 1 }], { weekKey: 'now', owed: 3, owned: 1 }, 1, 0).past.map(p => p.weekKey).join() === 'y,now');
+
+  const T = s.sdThinLabels;
+  check('labels: a short chart labels every point', T(6, [3, 5], 8).join() === '0,1,2,3,4,5');
+  for (const n of [9, 14, 21, 30, 61]) {
+    const keep = [7, n - 1];
+    const got = T(n, keep, 8);
+    check(`labels: ${n} points show at most 8, the signed and the last always`, got.length <= 8 && got.length >= 4 && keep.every(k => got.includes(k)) ? true : JSON.stringify(got));
+  }
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach(f => console.log('  - ' + f)); process.exit(1); }

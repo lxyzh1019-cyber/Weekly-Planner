@@ -2784,9 +2784,10 @@ function findChromium() {
   if (want('kidCanOpenMyMoney')) checks.kidCanOpenMyMoney = await page.evaluate(() => {
     openWeekMoney();
     const txt = document.getElementById('mnyPage1Wrap').textContent;
+    // Plan v17 §1: ✅ What I own (Savings, Locked away, Companies) and the 🔀 Move · 💵 Cash button.
     return document.getElementById('screen-mymoney').classList.contains('active')
-        && txt.includes('Everything I have')
-        && txt.includes('Cash') && txt.includes('Locked');   // "Locked", the short form (owner's review M3-3)
+        && txt.includes('What I own')
+        && txt.includes('Cash') && txt.includes('Locked');
   });
   // The rules editor is not on a kid's page at all — there is nothing to hide.
   // pmPriceCards has no edit mode any more: its ✏️ buttons (data-pm-action)
@@ -6400,7 +6401,9 @@ function findChromium() {
           const lines0 = v.querySelectorAll(':scope > div').length;
           if (lines0) bad.push('a verdict shows its working before ▸ Why');
           sdClick('[data-mny-action="sd-verdict"][data-sd-v="income"]');
-          if (!sdBody().querySelector('.sd-verdict').querySelectorAll(':scope > div').length) bad.push('▸ Why did not open the verdict\'s working');
+          // Plan v17 §4: ▸ Why opens the verdict's working in a sheet.
+          if (!document.querySelectorAll('#sundayBody .sd-whylist > div').length) bad.push('▸ Why did not open the verdict\'s working');
+          closeSheet('sundayOverlay');
           const ans = [...sdBody().querySelectorAll('.sd-side .sd-panel')].find(p => /Her answer last week/.test(p.textContent));
           if (!ans || !/Saving for something big/.test(ans.textContent) || !/she guessed \$35/.test(ans.textContent)) bad.push('Dad does not see her answer last week: ' + (ans ? ans.textContent.replace(/\s+/g, ' ') : 'none'));
         } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
@@ -6431,28 +6434,31 @@ function findChromium() {
       const ghosts = coins.length - live;
       if (coins.length !== floors) bad.push(`${coins.length} coins for ${floors} whole dollars in`);
       if (ghosts !== Math.ceil(c.P.advTaken - 0.001) + Math.ceil(-Math.min(0, c.P.income.fine) - 0.001)) bad.push(ghosts + ' ghost coins');
+      // Plan v17 §2: each group's share in % under the pile (earned · given · bank · taken off); the pile's figure in its head.
       const note = (sdBody().querySelector('.sd-pile-note') || {}).textContent || '';
-      const pcts = [...note.matchAll(/\((\d+)%\)/g)].map(m => Number(m[1]));
-      if (!pcts.length || pcts.reduce((a, v) => a + v, 0) !== 100) bad.push('the pile line’s shares do not add to 100: ' + note);
-      if (!note.endsWith(sdM(c.P.tp))) bad.push('the pile line does not end at the pile: ' + note);
+      const pcts = [...note.matchAll(/(?:earned|given|bank) (\d+)%/g)].map(m => Number(m[1]));
+      if (pcts.length !== 3 || pcts.reduce((a, v) => a + v, 0) !== 100) bad.push('the shares under the pile do not add to 100: ' + note);
+      if ((sdBody().querySelector('.sd-pile-head b') || {}).textContent !== sdM(c.P.tp)) bad.push('the pile\'s head is not the pile');
       if (!sdBody().querySelector('.sd-minline')) bad.push('no 📌 must-pay line on the pile');
       const groups = sdBody().textContent;
-      ['💪 Money I earned', '🏠 Home', '⛸️ Club job', '🏆 Prizes', '🎁 Money I was given', '🌱 Money my money made', '🏦 From my bank', '➖ Taken off']
+      ['💪 Money I earned', '🏠 Home', '⛸️ Club job', '🏆 Competitions', '🎁 Money I was given', '🌱 Money my money made', '🏦 From my bank', '➖ Taken off']   // Plan v17: Competitions
         .forEach(t => { if (groups.indexOf(t) < 0) bad.push('payday lacks ' + t); });
       if (!/every week/.test(groups)) bad.push('no "every week" tag on the steady lines');
       // Words stage 2: the group names grow up.
       mrApplyEdits([{ path: 'words.' + kid, value: 2 }], { reason: 'grownups', effectiveFrom: wk });
       renderMeetingMode();
       if (!/Active income/.test(sdBody().textContent) || !/Passive income/.test(sdBody().textContent)) bad.push('words stage 2 does not say Active income / Passive income');
-      // A line unfolds its working; Dad's ✏️ waits for a reason before "Now I choose →".
+      // A line opens its working (Plan v17 §2: in a sheet); Dad's ✏️ waits for a reason before "Now I choose →".
       sdClick('[data-sd-tile="home"][data-mny-action="sd-line"]');
-      if (!sdBody().querySelector('.sd-work')) bad.push('tapping a line does not unfold its working');
-      sdClick('[data-mny-action="sd-edit"][data-sd-tile="home"]');
-      sdClick('[data-mny-action="sd-ov"][data-sd-ch="chores"][data-sd-d="1"]');
+      const inSheet = (sel) => { const el = document.querySelector('#sundayBody ' + sel); if (el) el.click(); return !!el; };
+      if (!document.querySelector('#sundayBody .sd-work')) bad.push('tapping a line does not open its working');
+      inSheet('[data-mny-action="sd-edit"][data-sd-tile="home"]');
+      inSheet('[data-mny-action="sd-ov"][data-sd-ch="chores"][data-sd-d="1"]');
       if (!mnyOverrides(kid, wk).chores) bad.push('Dad’s ✏️ did not change the line through mnySetOverride');
       sdClick('[data-mny-action="sd-tochoose"]');
       if (sdCur().step !== 1) bad.push('"Now I choose →" did not wait for a reason');
-      sdClick('[data-mny-action="sd-reason"]');
+      inSheet('[data-mny-action="sd-reason"]');
+      closeSheet('sundayOverlay'); sdSheet = null;
       sdClick('[data-mny-action="sd-tochoose"]');
       if (sdCur().step !== 2) bad.push('with a reason picked, "Now I choose →" still refused');
       // 📌 Dad's −: carried to next Sunday, never charged.
@@ -6472,13 +6478,20 @@ function findChromium() {
     const bad = [];
     const snap = await page.evaluate(() => sdSnap());
     try {
-      await page.evaluate(() => { window.__sdUnpin = sdPin(3); const wk = sdSeedWeek('jess'); sdReveal('jess');
+      await page.evaluate(() => { window.__sdUnpin = sdPin(3); const wk = sdSeedWeek('jess');
+        // Plan v17: money to place whatever the week's chores came to (the hold needs a pile).
+        mnyAddDeposit('jess', wk, { amount: 30, from: 'A gift', giver: 'Uncle Mike', dayKey: mrWeekDayKeys(wk)[0] }); sdReveal('jess');
         sdClick('[data-mny-action="sd-tochoose"]'); window.__sdUnpin(); return wk; });
       const before = await page.evaluate(() => sdCur().alloc.extra);
       const box = await page.locator('#familyMeetingBody [data-sd-cell="extra"]').boundingBox();
       if (!box) { bad.push('no 🧱 Extra box on screen'); }
       else {
+        // Plan v17 §3: the first tap picks the pot, moving nothing.
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down(); await page.waitForTimeout(80); await page.mouse.up();
+        if (await page.evaluate(() => sdCur().alloc.extra) !== before) bad.push('the first tap moved money instead of picking');
+        const b1 = await page.locator('#familyMeetingBody [data-sd-cell="extra"]').boundingBox();
+        await page.mouse.move(b1.x + b1.width / 2, b1.y + b1.height / 2);
         await page.mouse.down(); await page.waitForTimeout(80); await page.mouse.up();
         const tap = await page.evaluate(() => sdCur().alloc.extra);
         if (tap !== before + 1) bad.push(`a tap made it ${tap}, not ${before + 1}`);
@@ -6492,9 +6505,9 @@ function findChromium() {
         await page.mouse.up();
         const held = await page.evaluate(() => sdCur().alloc.extra);
         if (held !== tap + 5) bad.push(`a 2-second hold made it ${held}, not ${tap + 5}`);
-        // One − per column takes a dollar back.
-        await page.evaluate(() => sdClick('[data-mny-action="sd-less"][data-sd-col="loan"]'));
-        if (await page.evaluate(() => sdCur().alloc.extra) !== held - 1) bad.push('− did not take a dollar back');
+        // Plan v17 §3: "−$1" takes a dollar back from the picked pot.
+        await page.evaluate(() => sdClick('[data-mny-action="sd-minus"]'));
+        if (await page.evaluate(() => sdCur().alloc.extra) !== held - 1) bad.push('−$1 did not take a dollar back');
       }
     } catch (e) { bad.push('threw: ' + e.message); }
     finally { await page.evaluate((s) => { sdRestore(s); mmHide(); }, snap); }
@@ -6571,8 +6584,10 @@ function findChromium() {
       if (!/\$\d/.test((sdBody().querySelector('.sd-say') || {}).textContent || '')) problems.push('no say-it-out-loud line');
       if (!sdBody().querySelector('[data-mny-action="sd-redo"]')) problems.push('no ↺ Redo my plan');
       if ((c.meetingsHeld || {})[wk]) problems.push('one girl signing marked the meeting held');
-      const footer = (document.querySelector('#familyMeetingBody .mm-nav') || {}).textContent || '';
-      if (!/Jenn's money/.test(footer)) problems.push('the footer does not offer her sister: ' + footer.trim());
+      // Plan v17 §0: no bottom bar on the money step; her sister is a picture in the head, and the signed girl has a ✓.
+      if (document.querySelector('#familyMeetingBody .mm-nav')) problems.push('the money step still has a bottom bar');
+      if (!document.querySelector('#familyMeetingBody .sd-av[data-sd-kid="jenn"]')) problems.push('the head does not offer her sister');
+      if (!document.querySelector('#familyMeetingBody .sd-av[data-sd-kid="jess"] .sd-av-ok')) problems.push('the signed girl has no ✓ in the head');
     } catch (e) { problems.push('threw: ' + e.message); }
     finally { unpin(); sdRestore(snap); mmHide(); }
     return problems.length ? problems : true;
@@ -10278,8 +10293,7 @@ function findChromium() {
     const d = mnyDebts(kid)[0];
     d.paid = 336;
     mnyEditDebt(kid, d.id, 'name', 'Skating loan');
-    // Plan v9 §N: the rows sit behind "📋 My N loans" on the wall card.
-    mnyLoanRowsOpen = true;
+    // Plan v17 §1: the two largest loans are rows on the wall card.
     mnyOpenMyMoney(kid);
     const onPage1 = document.getElementById('mnyPage1Wrap').textContent.includes('Skating loan');
     const inConcept = mnyConceptCard('debt', kid).why.indexOf('Skating loan') === -1;  // no {debt} left unreplaced
@@ -10291,7 +10305,6 @@ function findChromium() {
     const both = document.getElementById('mnyPage1Wrap').textContent.includes('Bike loan')
               && document.getElementById('mnyPage1Wrap').textContent.includes('Skating loan');
     delete pd.debts;
-    mnyLoanRowsOpen = false;
     return onPage1 && progressKept && both && typeof inConcept === 'boolean';
   });
 
@@ -10360,9 +10373,10 @@ function findChromium() {
     const earnedBefore = mrWeekBreakdown(wk, kid).chorePaid;
     const wasPaying = mrRules().chores.grade[3];
     mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying + 1 }], { reason: 'family_meeting' });
-    // My Money v2: the price list opens in a sheet from the ☀️ card.
+    // Plan v17 §1: the price list opens from ☀️'s "📊 This week so far ▸" sheet.
     mnyOpenMyMoney(kid);
-    document.querySelector('#mnyPage1Wrap [data-mny-action="prices-sheet"]').click();
+    document.querySelector('#mnyPage1Wrap [data-mny-action="info-week"]').click();
+    document.querySelector('#requestBody [data-mny-action="prices-sheet"]').click();
     const txt = document.getElementById('requestBody').textContent;
     const showsNewPrice = txt.includes('$' + (wasPaying + 1).toFixed(2));
     rqClose();
@@ -10444,7 +10458,7 @@ function findChromium() {
     const h = mnyAddHolding(kid, { kind: 'savings', name: 'Money kept ready', units: 1,
                                    priceNow: 500, costBasis: 500, rateAnnual: 0.05 });
     h.lastAccruedOn = '2026-01-01';
-    h.valueAtLastMeeting = 500;
+    h.baselineAt = 0;
     mnySimCatchUp(kid, { dayKey: '2026-03-01' });
     const passive = mnyPassiveSinceLastMeeting(kid);
     const inBar = mnyIncomeSegments(wk, kid);
@@ -10560,7 +10574,8 @@ function findChromium() {
        through either legacy door (3 or 4). */
     openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
     const body = document.getElementById('familyMeetingBody');
-    const sundayHead = () => !!body.querySelector('.sd-head') && body.querySelectorAll('.sd-stepchip').length === 4
+    // Plan v17 §0: the head's second row carries the four steps and 🗣️ Parent's card.
+    const sundayHead = () => !!body.querySelector('.mm-head--two .mm-head-r2') && body.querySelectorAll('.mm-head-r2 .sd-stepchip').length === 4
       && !!body.querySelector('[data-mny-action="sd-dad"]');
     const onEarned = sundayHead() && body.querySelectorAll('.mny-tab').length === 0;
     mmGoStep(4);
@@ -10604,24 +10619,9 @@ function findChromium() {
   /* Rewritten for Sunday v15 (Stage 4): last week's shape is the purple
      dashed line on Payday's pile — absent on her first Sunday, because a line
      for nothing is just a puzzle. */
-  if (want('ghostBarOnlyWithHistory')) checks.ghostBarOnlyWithHistory = await page.evaluate(() => {
-    const snap = sdSnap(), unpin = sdPin(3);
-    const bad = [];
-    try {
-      const kid = 'jess', wk = sdSeedWeek(kid);
-      const c = state.shared.chore;
-      Object.keys(c.moneyLedger || {}).forEach(w => { if (c.moneyLedger[w]) delete c.moneyLedger[w][kid]; });
-      sdReveal(kid);
-      if (sdBody().querySelector('.sd-lastline')) bad.push('a last-week line on her first Sunday');
-      const prev = sdDayKeyAdd(wk, -7);
-      if (!c.moneyLedger) c.moneyLedger = {};
-      c.moneyLedger[prev] = { [kid]: Object.assign(mrFreezeWeekLedger(prev, kid), { net: 21, chores: 15, streak: 3, sessionsPaid: 3 }) };
-      renderMeetingMode();
-      if (!sdBody().querySelector('.sd-lastline')) bad.push('no last-week line with a Sunday on the record');
-    } catch (e) { bad.push('threw: ' + e.message); }
-    finally { unpin(); sdRestore(snap); mmHide(); }
-    return bad.length ? bad : true;
-  });
+  /* ghostBarOnlyWithHistory — retired on purpose (Plan v17 §2): the
+     approved Payday pile draws the coins, the axis and the 📌 loan-first
+     line only; last week's dashed line is not in the final reference. */
 
   // The walkthrough opens from a ?, pages through, and closes — and is never
   // shown unasked.
@@ -11905,7 +11905,7 @@ function findChromium() {
       return (scr.innerText || '').split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
     };
     const cases = [
-      ['screen-mymoney', () => mnyOpenMyMoney('jenn'), '[data-mny-action="gifts"]'],
+      // Plan v17 §1: My money's 🎁 Gifts toggle is gone — the gifts live in ⏳ Asked parents › see all.
       ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }, '[data-ct-action="ck-privs"]'],
       ['screen-week',    () => { goWeek(); renderWeek(); }, '#weekGlance .week-glance-toggle'],
     ];
@@ -14542,11 +14542,11 @@ function findChromium() {
       const el = document.querySelector(sel + ' .mny-strip .mny-strip-val');
       return el ? el.textContent.trim() : null;
     };
-    // Plan v9 §N: the strip is under ☀️'s "▸ where it goes".
-    mnyWeekBarOpen = true;
+    // Plan v17 §1: the strip is in ☀️'s "📊 This week so far ▸" sheet.
     mnyOpenMyMoney(kid);
-    const onKidPage = firstVal('#screen-mymoney');
-    mnyWeekBarOpen = false;
+    mnyOpenInfoSheet('week');
+    const onKidPage = firstVal('#requestBody');
+    rqClose();
     // The old headline must be gone: a second big number on that card is
     // exactly what could drift away from the strip again.
     const noRogueTotal = !document.querySelector('#mnyPage1Wrap .mny-total.sm');
@@ -16933,14 +16933,14 @@ function findChromium() {
          the picker a parent comes in through. */
       parentViewing = 'jenn'; setParentDest('now');
       take('Parent › Now', ['#screen-parent .parent-bar', '#screen-parent .parent-tab:not(.active)',
-        '#screen-parent .parent-tab.active', '#parentScopePills .pill-btn.active', '#parentScopePills .pill-btn:not(.active)',
+        '#screen-parent .parent-tab.active',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
         '#pnWrap .pn-card', '#pnWrap .pn-day', '#pnWrap .pn-day.now', '#pnWrap .pn-segbtn.on', '#pnWrap .pn-sunkid',
         '#screen-parent .btn-confirm']);
       pnOpenToldSheet(); await wait(300);
       take('Parent › Now › She told me', ['#pnToldBody .pn-day.on', '#pnToldBody .pn-kidbtn.on']);
       pnSheetOpen = false; closeSheet('pnToldOverlay');
       setParentDest('setup');
-      take('Parent › Setup', ['#screen-parent .pn-card', '#screen-parent .pn-row']);
+      take('Parent › Setup', ['#screen-parent .pn-card', '#screen-parent .pn-row', '#parentScopePills .pill-btn.active', '#parentScopePills .pill-btn:not(.active)']);
       const wasHistoryView = parentHistoryView;
       setParentHistoryView('money');   // the view a parent lands on; an earlier check may have left another
       take('Parent › History', ['#screen-parent [data-parent-history].active', '#screen-parent [data-parent-history]:not(.active)', '#screen-parent .ctr-tile']);
@@ -17436,7 +17436,10 @@ function findChromium() {
     const rows = mnyUnpaidWeeks('jenn', 8);
     if (!rows.some(r => r.wk === lastWk)) bad.push('an uncredited week is not counted as unpaid');
     mnyOpenMyMoney('jenn');
-    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    // Plan v17 §1: "still to come" lives in ☀️'s "📊 This week so far ▸" sheet.
+    mnyOpenInfoSheet('week');
+    const txt = document.getElementById('requestBody').textContent;
+    rqClose();
     if (!/still to come/.test(txt)) bad.push('My money does not say the money is still waiting');
     /* Through mnyUnpaidTotal, not by re-summing mnyUnpaidWeeks.
 
@@ -17835,9 +17838,11 @@ function findChromium() {
     debt.monthly = 13; debt.paid = 0; debt.arrears = 0; debt.lastSundayPaidWeek = null;
     ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
 
-    mnyWeekBarOpen = true;   // Plan v9 §N: the strip is under ☀️'s "▸ where it goes"
+    // Plan v17 §1: the strip is in ☀️'s "📊 This week so far ▸" sheet.
     mnyOpenMyMoney(kid);
-    const cells = [...document.querySelectorAll('#mnyPage1Wrap .mny-strip-cell')];
+    mnyOpenInfoSheet('week');
+    const cells = [...document.querySelectorAll('#requestBody .mny-strip-cell')];
+    rqClose();
     const threeCells = cells.length === 3;
     const mineShown = cells[2] && cells[2].textContent.includes(mnyMoney(mnyPool(wk, kid).mine));
     const txt = () => document.getElementById('mnyPage1Wrap').textContent;
@@ -17848,11 +17853,12 @@ function findChromium() {
     // (Sunday v15: the must-pay is weekly, `lastSundayPaidWeek`).
     debt.lastSundayPaidWeek = wk;
     mnyRenderMyMoney();
-    const cells2 = [...document.querySelectorAll('#mnyPage1Wrap .mny-strip-cell')];
+    mnyOpenInfoSheet('week');
+    const cells2 = [...document.querySelectorAll('#requestBody .mny-strip-cell')];
+    rqClose();
     const payZero = cells2[1] && cells2[1].textContent.includes(mnyMoney(0));
 
     delete pd.debts;
-    mnyWeekBarOpen = false;
     const problems = [];
     if (!threeCells) problems.push('the strip does not have three cells');
     if (!mineShown) problems.push('"mine to choose" is not the pool\'s figure');
@@ -17882,7 +17888,7 @@ function findChromium() {
     delete pd.holdings;
     pd.wallet = { cash: 42.20, savings: 180, gics: [], holdings: {}, lastMeetingWeek: null };
 
-    const html = mnyEverythingCard(kid).replace(/\s+/g, ' ');
+    const html = mnyOwnCard(kid).replace(/\s+/g, ' ');   // Plan v17 §1: ✅ What I own
     const legacyZeroed = money2(getProfData(kid).wallet.savings) === 0;
     const migrated = mnySavedTotal(kid) === 180;
     // The Savings tile, and only it, must carry the real figure.
@@ -24452,14 +24458,17 @@ function findChromium() {
         if (!dep || !dep.pendingApproval || dep.amount !== 1 || !/Put \$1 cash in → Savings/.test(dep.text || '')) bad.push('put cash in did not land as a deposit waiting for a yes');
 
         // ⏪ Draw in advance, up to the rule.
+        // Plan v17 §1: ⏪ Draw early is a mode of Move · Cash; the weekly cap holds and is not shown.
         mnyOpenRequestSheet('adv', { kid });
-        if (!/up to \$5 this week/.test(document.getElementById('requestBody').textContent)) bad.push('the advance sheet does not say "up to $5 this week"');
+        if (rqDraft.kind !== 'move' || rqDraft.mode !== 'early') bad.push('the advance sheet did not open as Move · Cash › ⏪ Draw early');
+        if (/up to \$\d+ this week/.test(document.getElementById('requestBody').textContent)) bad.push('Draw early shows its limit');
         press('[data-mny-action="rq-amt"][data-mny-d="1"]'); press('[data-mny-action="rq-amt"][data-mny-d="1"]');
         press('[data-mny-action="rq-why"]');
         press('[data-mny-action="rq-send"]');
         if (!asks().some(q => q.kind === 'adv' && q.amount === 3)) bad.push('the advance did not land as $3');
         mnyOpenRequestSheet('adv', { kid });
-        if (!/up to \$2 this week/.test(document.getElementById('requestBody').textContent)) bad.push('the advance left is not $5 less what she drew');
+        for (let i = 0; i < 6; i++) press('[data-mny-action="rq-amt"][data-mny-d="1"]');
+        if (rqDraft.amt !== 2) bad.push('the advance left is not $5 less what she drew: ' + rqDraft.amt);
         rqClose();
 
         // 🎯 A new goal.
@@ -24724,14 +24733,15 @@ function findChromium() {
         ensureWallet(kid).cash = 0;
         mnyOpenMyMoney(kid);
         const wrap = document.getElementById('mnyPage1Wrap');
-        const tiles = [...wrap.querySelectorAll('.mv2-tile')].map(t => t.getAttribute('data-mny-tile'));
-        if (JSON.stringify(tiles) !== JSON.stringify(['ready', 'gic', 'stock'])) bad.push('Everything I have shows the places ' + JSON.stringify(tiles) + ', not Savings · Locked · Companies');
-        if (/💵 Cash\b/.test(wrap.querySelector('.mv2-have').textContent)) bad.push('Everything I have still names a Cash place');
+        // Plan v17 §1: ✅ What I own, three information boxes.
+        const tiles = [...wrap.querySelectorAll('.mv2-have [data-mny-tile]')].map(t => t.getAttribute('data-mny-tile'));
+        if (JSON.stringify(tiles) !== JSON.stringify(['ready', 'gic', 'stock'])) bad.push('What I own shows the places ' + JSON.stringify(tiles) + ', not Savings · Locked · Companies');
+        if (/💵 Cash\b/.test(wrap.querySelector('.mv2-have').textContent)) bad.push('What I own still names a Cash place');
         if (wrap.querySelector('.mv2-waiting')) bad.push('📥 Waiting for Sunday shows at $0');
         const jars = money2(mnyReadyHomeTotal(kid) - mnySavedTotal(kid));
         const sav = wrap.querySelector('[data-mny-tile="ready"]');
         if (jars > 0) {
-          if (!/of which/.test(sav.textContent)) bad.push('Savings does not show her goal jars inside it');
+          if (!/🎯 \$\d+(\.\d\d)? inside/.test(sav.textContent)) bad.push('Savings does not show her goal jars inside it: ' + sav.textContent);   // Plan v17 §1 wording
           if (sav.querySelector('.mv2-tile-val').textContent.trim() !== mnyMoney(money2(mnySavedTotal(kid) + jars))) bad.push('Savings is not Savings + the jars: ' + sav.querySelector('.mv2-tile-val').textContent);
           if (!(getProfData(kid).holdings || []).some(h => h && h.goalId)) bad.push('the jars stopped being their own holdings');
         } else bad.push('precondition: the seed put nothing in a jar');
@@ -24740,18 +24750,15 @@ function findChromium() {
         const w = wrap.querySelector('.mv2-waiting');
         if (!w || !/📥 Waiting for Sunday/.test(w.textContent) || !/\$7\.00/.test(w.textContent)) bad.push('$7 waiting does not show as one 📥 Waiting for Sunday line');
         ensureWallet(kid).cash = 0;
-        // The passbook: money in by group, above where it went.
+        // The passbook (Plan v17 §1, as the prototype): each Sunday's in-bar by group over where it went.
         const key = (wrap.querySelector('.mv2-bookkey') || {}).textContent || '';
-        if (!/taken off/.test(key)) bad.push('the passbook key lacks ➖ taken off: ' + key);
-        const row = wrap.querySelector('.mv2-bookrow');
-        if (row) { row.click(); const open = wrap.querySelector('.mv2-bookrow.open .mv2-booksplit');
-          if (!open || !/💪/.test(open.textContent) || !/🎁/.test(open.textContent) || !/🌱/.test(open.textContent) || !/➖/.test(open.textContent) || !/went:/.test(open.textContent)) bad.push('a tapped Sunday does not show money in by the four groups and where it went: ' + (open && open.textContent)); }
-        else bad.push('no passbook row');
+        if (!/earned/.test(key) || !/given/.test(key) || !/made/.test(key) || !/went to/.test(key)) bad.push('the passbook key lacks the groups: ' + key);
+        const row = wrap.querySelector('.mv2-bookrow[data-mny-week]');
+        if (!row || !row.querySelector('.mv2-bookbar--in') || !row.querySelector('.mv2-bookbar--out')) bad.push('a Sunday does not show money in above where it went');
         // One row of head: the tabs inside the head.
         if (!wrap.querySelector('.mny-head.mny-head--one .mny-tabs')) bad.push('the My money tabs are not in the head row');
-        // The right pane: the four buttons and Asked parents.
-        const ask = wrap.querySelector('.mv2-ask');
-        if (!ask || ask.querySelectorAll('.mv2-act').length !== 4 || !/Asked parents/.test(ask.textContent)) bad.push('the right pane lacks the four buttons or ⌛ Asked parents');
+        // Plan v17 §1: the four buttons in a row and the ⏳ Asked parents strip.
+        if (wrap.querySelectorAll('.mv2-actions .mv2-act').length !== 4 || !/Asked parents/.test((wrap.querySelector('.mv2-asked') || {}).textContent || '')) bad.push('the four buttons or ⏳ Asked parents are missing');
         if (/Ask Dad|Asked Dad/.test(wrap.textContent)) bad.push('My money still says Dad');
         // A day with nothing on it asks, and a yes opens the planner's add sheet there.
         let asked = null;
@@ -24761,7 +24768,8 @@ function findChromium() {
           const month = String(todayKey()).slice(0, 7);
           const cal = mnyCalendarData(kid, month);
           const busy = new Set(cal.recorded.map(c => String(c.dayKey)).concat(cal.planned.map(p => String(p.dayKey))));
-          const free = [...wrap.querySelectorAll('[data-mny-action="cal-day"]')].find(b => !busy.has(b.getAttribute('data-daykey')));
+          wrap.querySelector('[data-mny-action="info-month"]').click();   // Plan v17 §1: the month opens from 🗓️ Month ▸
+          const free = [...document.querySelectorAll('#requestBody [data-mny-action="cal-day"]')].find(b => !busy.has(b.getAttribute('data-daykey')));
           if (!free) bad.push('no empty calendar day to tap');
           else {
             const dk = free.getAttribute('data-daykey');
@@ -24797,6 +24805,11 @@ function findChromium() {
         mnyAddRequest('jess', { kind: 'adv', amount: 3, why: 'Snack', text: 'Draw $3 early · Snack' });
         profile = 'parent';
         showScreen('parent'); setParentTab('now');
+        // Plan v17 item 6: one girl switch on Now — its own; the portal's hides here and comes back elsewhere.
+        if (getComputedStyle(document.getElementById('parentScopePills')).display !== 'none') bad.push('the portal girl switcher still shows on Now');
+        setParentTab('setup');
+        if (getComputedStyle(document.getElementById('parentScopePills')).display === 'none') bad.push('the portal girl switcher is gone from Setup');
+        setParentTab('now');
         const wrap = document.getElementById('pnWrap');
         const cards = () => [...wrap.querySelectorAll('.gu-req')].map(c => c.querySelector('.gu-kidchip').textContent.trim());
         if (cards().filter(n => n === 'Jenn').length !== 1 || cards().filter(n => n === 'Jess').length !== 1) bad.push('Both does not show both girls\' questions: ' + JSON.stringify(cards()));
@@ -24921,6 +24934,302 @@ function findChromium() {
     await guTeardown();
   }
 
+  /* ══ Plan v17 (Stage 6h) — the four money screens to the final reference ══ */
+
+  /* My money (Plan v17 §1): the one 72px head row (◀ to Today, the tabs,
+     📖, ?, the date) and no second tab row; no kid bottom bar on this
+     screen; the countdown, ⏳ Asked parents, the loan wall with its two
+     largest loans as doors, ✅ What I own with no Cash tile, the goal card
+     with ＋ and ⋯, four action buttons, the passbook, Coming up and the
+     stickers. A loan row opens that loan only; "Details · side by side"
+     opens every loan with an All column; ⋯ picks the goal the card shows
+     (on this device); the Move · Cash sheet has ⏪ Draw early, with no
+     limit shown and the cap still kept. */
+  if (want('myMoneyMatchesFinalReference')) {
+    await page.setViewportSize({ width: 1194, height: 834 });   // the iPad the reference is drawn at
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.myMoneyMatchesFinalReference = await page.evaluate(() => {
+      const bad = [];
+      const wasProfile = profile;
+      try {
+        const kid = 'jenn';
+        const seeded = mv2Seed(kid); if (seeded) bad.push(seeded);
+        profile = kid;
+        mnyOpenMyMoney(kid);
+        tdRenderNav();
+        const wrap = document.getElementById('mnyPage1Wrap');
+        const head = wrap.querySelector('.mny-head.mny-head--big');
+        if (!head) bad.push('no one-row 72px head');
+        else {
+          if (!head.querySelector('[data-mny-action="backtoday"]')) bad.push('◀ does not go back to Today');
+          if (!head.querySelector('.mny-tabs')) bad.push('the tabs are not in the head row');
+          if (!/My money story/.test(head.textContent) || !/How this page works/.test(head.textContent)) bad.push('the head lacks 📖 My money story or ? How this page works');
+          if (!head.querySelector('.mny-head-date')) bad.push('the head lacks the date');
+          const h = head.getBoundingClientRect().height;
+          if (h < 66 || h > 80) bad.push('the head is ' + Math.round(h) + 'px tall, not 72');
+        }
+        if (wrap.querySelectorAll('.mny-tabs').length !== 1) bad.push('a second tab row is on the page');
+        const nav = document.getElementById('kidNav');
+        if (nav && !nav.hidden) bad.push('the kid bottom bar shows on My money');
+        ['.mv2-sun', '.mv2-asked', '.mv2-wall', '.mv2-have', '.mv2-goals', '.mv2-actions', '.mv2-book', '.mv2-coming', '.mv2-stickers']
+          .forEach(sel => { if (!wrap.querySelector(sel)) bad.push('missing ' + sel); });
+        const acts = [...wrap.querySelectorAll('.mv2-actions .mv2-act')].map(b => b.getAttribute('data-mny-action'));
+        if (JSON.stringify(acts) !== JSON.stringify(['act-result', 'act-club', 'act-move', 'gift-add'])) bad.push('the action buttons are ' + JSON.stringify(acts));
+        const tiles = [...wrap.querySelectorAll('.mv2-have [data-mny-tile]')].map(t => t.getAttribute('data-mny-tile'));
+        if (JSON.stringify(tiles) !== JSON.stringify(['ready', 'gic', 'stock'])) bad.push('What I own shows ' + JSON.stringify(tiles));
+        if (/💵 Cash\b/.test(wrap.querySelector('.mv2-have').textContent)) bad.push('a Cash tile is on What I own');
+        const brick = wrap.querySelector('.mv2-brick');
+        if (brick && Math.round(brick.getBoundingClientRect().height) !== 11) bad.push('a brick is ' + brick.getBoundingClientRect().height + 'px, not 11');
+        // The two largest loans as doors, each opening that loan only.
+        const rows = [...wrap.querySelectorAll('.mv2-wall [data-mny-action="info-loan"]')];
+        const open = mnyLoanFacts(kid).rows.filter(r => r.left > 0).sort((a, b) => b.left - a.left);
+        if (rows.length !== Math.min(2, open.length)) bad.push('the wall lists ' + rows.length + ' loans');
+        if (rows[0] && rows[0].getAttribute('data-mny-id') !== open[0].id) bad.push('the first row is not the largest loan');
+        if (rows[0]) {
+          rows[0].click();
+          const t = document.getElementById('rqSheetTitle').textContent;
+          if (t.indexOf(open[0].name) < 0) bad.push('a loan row opened "' + t + '", not that loan');
+          if (!/Interest so far/.test(document.getElementById('requestBody').textContent)) bad.push('the loan sheet lacks interest so far');
+          rqClose();
+        }
+        const det = wrap.querySelector('[data-mny-action="info-loans"]');
+        if (!det || !/Details · side by side/.test(det.textContent)) bad.push('no "Details · side by side" door');
+        else {
+          det.click();
+          const tbl = document.querySelector('#requestBody .mv2-loantable');
+          if (!tbl || !/All/.test(tbl.querySelector('tr').textContent)) bad.push('the side-by-side table has no All column');
+          rqClose();
+        }
+        if (!wrap.querySelector('.mv2-sum .mv2-int')) bad.push('the red interest line is not in the summary');
+        // ⋯ picks which goal the card shows, kept on this device.
+        const goals = mnyGoalsNearestFirst(kid);
+        if (goals.length < 2) bad.push('precondition: two goals');
+        else {
+          wrap.querySelector('[data-mny-action="info-goals"]').click();
+          const pick = document.querySelector(`#requestBody [data-mny-action="goal-show"][data-mny-goal="${goals[1].id}"]`);
+          if (!pick) bad.push('⋯ does not list the goals with "Show on card"');
+          else {
+            pick.click();
+            const name = document.querySelector('#mnyPage1Wrap .mv2-goals .mv2-jarname').textContent;
+            if (name.indexOf(goals[1].name) < 0) bad.push('the card still shows ' + name);
+            if (mnyGoalCardId(kid) !== goals[1].id) bad.push('the pick was not kept on this device');
+          }
+          rqClose();
+          try { localStorage.removeItem('wp_mny_goalcard_' + kid); } catch (e) {}
+        }
+        // ⏪ Draw early is a mode of the Move · Cash sheet; no limit is shown, the cap holds.
+        mnyOpenRequestSheet('move', { kid });
+        const early = document.querySelector('#requestBody [data-mny-action="rq-mode"][data-mny-id="early"]');
+        if (!early) bad.push('the Move · Cash sheet has no ⏪ Draw early');
+        else {
+          early.click();
+          const body = document.getElementById('requestBody').textContent;
+          if (/up to \$|this week\)/.test(body)) bad.push('Draw early shows a limit: ' + body.slice(0, 120));
+          const left = rqAdvState(kid, rqDraft).left;
+          for (let i = 0; i < 20; i++) { const plus = document.querySelector('#requestBody [data-mny-action="rq-amt"][data-mny-d="1"]'); if (plus) plus.click(); }
+          if (rqDraft.amt > Math.max(1, left)) bad.push('Draw early passed the weekly cap: ' + rqDraft.amt + ' > ' + left);
+        }
+        rqClose();
+        mnyOpenRequestSheet('adv', { kid });
+        if (!rqDraft || rqDraft.kind !== 'move' || rqDraft.mode !== 'early') bad.push('the old ⏪ sheet did not open as Move · Cash › Draw early');
+        rqClose();
+      } catch (e) { bad.push('threw: ' + e.message); }
+      finally { profile = wasProfile; tdRenderNav(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+    await page.setViewportSize({ width: 900, height: 1100 });
+  }
+
+  /* Payday (Plan v17 §2): Money in in the four groups with "🏆 Competitions",
+     🏦 From my bank (From Savings · From home) and ➖ Taken off (fine ·
+     drawn early); the pile's y-axis on the right of the coins and each
+     group's share under it; 📊 My last 4 Sundays in exactly the left side's
+     rows, read from the frozen ledger; no Prizes; cash from home is the bank,
+     not a gift (item 10). */
+  if (want('paydayGroupsMatchLastFourSundays')) checks.paydayGroupsMatchLastFourSundays = await page.evaluate(() => {
+    const snap = sdSnap(), unpin = sdPin(6);
+    const bad = [];
+    try {
+      const kid = 'jenn';
+      const wk = sdSeedWeek(kid);
+      const c = state.shared.chore; c.moneyLedger = c.moneyLedger || {};
+      const prev = sdDayKeyAdd(wk, -7);
+      c.moneyLedger[prev] = c.moneyLedger[prev] || {};
+      c.moneyLedger[prev][kid] = { at: 1, weekKey: prev, chores: 12, learning: 0, streak: 3, competition: 7, sessionsPaid: 6, sessions: 1, fines: 1,
+        gross: 28, net: 27, loan: { paid: 16 }, ready: 5, spend: 5, groups: { earned: 28, given: 5, made: 0.03, bank: 4, takenOff: 1 } };
+      sdReveal(kid);
+      const body = sdBody();
+      const groups = [...body.querySelectorAll('.sd-pay-groups .sd-group-head > span:first-child')].map(e => e.textContent.trim());
+      ['💪 Money I earned', '🎁 Money I was given', '🌱 Money my money made', '🏦 From my bank'].forEach(g => { if (groups.indexOf(g) < 0) bad.push('Money in lacks ' + g + ': ' + JSON.stringify(groups)); });
+      const lines = [...body.querySelectorAll('.sd-group--earned .sd-tile')].map(t => t.getAttribute('data-sd-tile'));
+      if (JSON.stringify(lines) !== JSON.stringify(['home', 'club', 'comp'])) bad.push('Money I earned lines are ' + JSON.stringify(lines));
+      if (!/🏆 Competitions/.test(body.querySelector('.sd-group--earned').textContent)) bad.push('the 🏆 line is not "Competitions"');
+      if (!/From Savings/.test(body.textContent) || !/From home/.test(body.textContent)) bad.push('From my bank lacks From Savings / From home');
+      if (!body.querySelector('.sd-box--off .sd-off--adv') || !/Drawn early/.test(body.querySelector('.sd-box--off').textContent)) bad.push('Taken off lacks ⏪ Drawn early');
+      const stack = body.querySelector('.sd-stack'), ruler = body.querySelector('.sd-ruler');
+      const sr = stack && stack.querySelector('.sd-coin') ? [...stack.querySelectorAll('.sd-coin')].reduce((m, e) => Math.max(m, e.getBoundingClientRect().right), 0) : 0;
+      if (!ruler || ruler.getBoundingClientRect().left < sr - 1) bad.push('the y-axis is not on the right of the coins');
+      if (!body.querySelector('.sd-pile-note') || !/%/.test(body.querySelector('.sd-pile-note').textContent)) bad.push('the shares under the pile are not in %');
+      const want = ['💪 Money I earned', '🏠 Home', '⛸️ Club job', '🏆 Competitions', '🎁 Given', '🌱 Made', '📥 From my bank', '➖ Taken off', '= Total'];
+      const rows = [...body.querySelectorAll('.sd-l4 tbody tr')].map(tr => tr.firstElementChild.textContent.trim());
+      if (JSON.stringify(rows) !== JSON.stringify(want)) bad.push('the last 4 Sundays rows are ' + JSON.stringify(rows));
+      const last = [...body.querySelectorAll('.sd-l4 tbody tr')].map(tr => tr.children[4].textContent.trim());
+      if (last[4] !== '$5' || last[6] !== '$4' || last[2] !== '$6') bad.push('"last" does not read the frozen row\'s groups: ' + JSON.stringify(last));
+      if (/Prize/.test(body.textContent)) bad.push('Payday still says Prize');
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally { unpin(); sdRestore(snap); }
+    return bad.length ? bad : true;
+  });
+
+  /* I choose (Plan v17 §3): three waterfall columns of equal width and one
+     legend column of the seven pots with "−$1" on top; the first tap on a
+     pot picks it and moves nothing, the second adds $1, "−$1" takes $1 from
+     the picked pot; the goal card shows the chosen jar's own price (item 4). */
+  if (want('iChooseHasThreeEqualColumnsAndLegend')) checks.iChooseHasThreeEqualColumnsAndLegend = await page.evaluate(() => {
+    const snap = sdSnap(), unpin = sdPin(6);
+    const bad = [];
+    try {
+      const kid = 'jenn';
+      const wk = sdSeedWeek(kid);
+      mnyAddDeposit(kid, wk, { amount: 30, from: 'A gift', giver: 'Uncle Mike', dayKey: mrWeekDayKeys(wk)[0] });   // money to place
+      sdReveal(kid);
+      sdClick('[data-mny-action="sd-tochoose"]');
+      const body = sdBody();
+      const cols = [...body.querySelectorAll('.sd-cols > .sd-col')];
+      if (cols.length !== 4) bad.push(cols.length + ' columns, not 3 + the legend');
+      const w = cols.slice(0, 3).map(c => Math.round(c.getBoundingClientRect().width));
+      if (w.length === 3 && (Math.max(...w) - Math.min(...w) > 1)) bad.push('the three columns are not equal: ' + JSON.stringify(w));
+      const legend = cols[3];
+      if (legend && !legend.classList.contains('sd-col--legend')) bad.push('the fourth column is not the legend');
+      const first = legend && legend.firstElementChild;
+      if (!first || first.getAttribute('data-mny-action') !== 'sd-minus' || first.textContent.trim() !== '−$1') bad.push('"−$1" is not on top of the legend');
+      const cells = legend ? [...legend.querySelectorAll('[data-sd-cell]')].map(e => e.getAttribute('data-sd-cell')) : [];
+      if (JSON.stringify(cells) !== JSON.stringify(['fixed', 'extra', 'spend', 'ready', 'goal', 'gic', 'stock'])) bad.push('the legend is ' + JSON.stringify(cells));
+      if (cols.slice(0, 3).some(c => !c.querySelector('.sd-col-amt .sd-ask-q'))) bad.push('a column\'s ? is not on its amount row');
+      const d = sdCur();
+      d.alloc = sdZero(); sdSave(d); renderMeetingMode();
+      d.pick = null; sdSave(d); renderMeetingMode();
+      sdCellDown('extra'); sdCellUp('extra');
+      if (sdCur().alloc.extra !== 0 || sdCur().pick !== 'extra') bad.push('the first tap did not just pick 🧱 Extra: ' + JSON.stringify(sdCur().alloc));
+      sdCellDown('extra'); sdCellUp('extra');
+      if (sdCur().alloc.extra !== 1) bad.push('the second tap did not add $1: ' + sdCur().alloc.extra);
+      sdClick('[data-mny-action="sd-minus"]');
+      if (sdCur().alloc.extra !== 0) bad.push('"−$1" did not take $1 from the picked pot: ' + sdCur().alloc.extra);
+      const c = sdContext(kid, mmWeekKey());
+      if (c.f.chosen) {
+        const fig = sdBody().querySelector('.sd-goaljar b').textContent;
+        if (fig.indexOf('of ' + sdM(c.f.chosen.target)) < 0) bad.push('the goal card is not the chosen jar\'s own price: ' + fig);
+      }
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally { unpin(); sdRestore(snap); }
+    return bad.length ? bad : true;
+  });
+
+  /* Signed (Plan v17 §4): the owe-vs-own chart's forecast — free within 13
+     Sundays runs to the payoff Sunday ("free by …"), otherwise the next 6
+     Sundays; at most 8 labels; the sign writes `ownedAfter` on the ledger
+     row (no new state.shared key). */
+  if (want('signedForecastRule')) checks.signedForecastRule = await page.evaluate(() => {
+    const snap = sdSnap(), unpin = sdPin(6);
+    const bad = [];
+    try {
+      const run = (paid) => {
+        const kid = 'jenn';
+        const wk = sdSeedWeek(kid, { paid });
+        // Everything she has goes to Savings: the loan takes its must-pay only.
+        const out = sdSignHer(kid, wk, { ready: sdContext(kid, wk).P.hers });
+        if (!out || !out.ok) { bad.push('the sign refused: ' + (out && out.why)); return null; }
+        sdCur().signed = sdSignedFromLedger(kid, wk); sdCur().step = 3; sdSave(sdCur());
+        renderMeetingMode();
+        const row = state.shared.chore.moneyLedger[wk][kid];
+        if (!(row.ownedAfter >= 0)) bad.push('the sign wrote no ownedAfter');
+        const chart = sdBody().querySelector('.sd-nw');
+        if (!chart) { bad.push('no owe-vs-own chart'); return null; }
+        const labels = chart.querySelectorAll('.sd-nw-label').length;
+        if (labels > 8) bad.push(labels + ' labels on the chart');
+        return { f: chart.getAttribute('data-sd-forecast'), text: chart.textContent };
+      };
+      const far = run(336);
+      if (far && far.f !== 'six:6') bad.push('a loan far from free does not show the next 6 Sundays: ' + far.f);
+      sdRestore(snap);
+      const soon = run(850);
+      if (soon && !/^free:\d+$/.test(soon.f)) bad.push('a loan free within 13 Sundays does not run to the payoff: ' + soon.f);
+      if (soon && !/free by/.test(soon.text)) bad.push('the payoff Sunday is not labelled "free by …"');
+      if (soon && Number(soon.f.split(':')[1]) > 13) bad.push('the payoff run is longer than 13 Sundays');
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally { unpin(); sdRestore(snap); }
+    return bad.length ? bad : true;
+  });
+
+  /* The family meeting's head on the money step (Plan v17 §0): two rows —
+     the girls as pictures that switch (✓ when signed), "Family meeting", the
+     1·2·3 pills and the week; then whose money, the four steps, Sound and
+     Parent's card — and no bottom bar on the money step. */
+  if (want('meetingHeaderTwoRowsNoBottomBar')) checks.meetingHeaderTwoRowsNoBottomBar = await page.evaluate(() => {
+    const snap = sdSnap(), unpin = sdPin(6);
+    const bad = [];
+    try {
+      const wk = sdSeedWeek('jenn');
+      const host = sdBody();
+      const head = host.querySelector('.mm-head.mm-head--two');
+      if (!head) bad.push('no two-row head');
+      else {
+        const r1 = head.querySelector('.mm-head-r1'), r2 = head.querySelector('.mm-head-r2');
+        if (!r1 || !r2) bad.push('the head is not two rows');
+        else {
+          if (r1.querySelectorAll('.sd-av').length !== 2) bad.push('row 1 lacks the two girls as pictures');
+          if (r1.querySelectorAll('.mm-step').length !== 3) bad.push('row 1 lacks the 1·2·3 pills');
+          if (!/Week of/.test(r1.textContent)) bad.push('row 1 lacks the week');
+          if (r2.querySelectorAll('.sd-stepchip').length !== 4) bad.push('row 2 lacks the four steps');
+          if (!r2.querySelector('[data-mny-action="sd-sound"]') || !r2.querySelector('[data-mny-action="sd-dad"]')) bad.push('row 2 lacks Sound or Parent\'s card');
+          if (!/The money for Jenn/.test(r2.textContent)) bad.push('row 2 does not say whose money');
+        }
+      }
+      if (host.querySelector('.mm-nav')) bad.push('the money step has a bottom bar');
+      const jess = host.querySelector('.sd-av[data-sd-kid="jess"]');
+      jess.click();
+      if (mnyMeetingKid() !== 'jess') bad.push('tapping Jess did not switch to her');
+      mnySetMeetKid('jenn');
+      const out = sdSignHer('jenn', wk);
+      if (!out || !out.ok) bad.push('the sign refused: ' + (out && out.why));
+      renderMeetingMode();
+      if (!sdBody().querySelector('.sd-av[data-sd-kid="jenn"] .sd-av-ok')) bad.push('the signed girl has no ✓');
+      mmGoTo('week');
+      if (!sdBody().querySelector('.mm-nav')) bad.push('the week step lost its Back / Next bar');
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally { unpin(); sdRestore(snap); }
+    return bad.length ? bad : true;
+  });
+
+  /* "Competitions", never "Prizes", for the 🏆 income group (Plan v17 §0) —
+     Payday, its last 4 Sundays, the Signed chart, and Grown-ups › Weeks'
+     record of a Sunday. */
+  if (want('competitionsNotPrizes')) checks.competitionsNotPrizes = await page.evaluate(() => {
+    const snap = sdSnap(), unpin = sdPin(6);
+    const bad = [];
+    try {
+      const kid = 'jenn';
+      const wk = sdSeedWeek(kid);
+      mrAddCompetition(kid, { sport: 'skate', name: 'Fall Classic', dayKey: mrWeekDayKeys(wk)[2], points: 8, placement: { group: 2 } });
+      sdReveal(kid);
+      const pay = sdBody().textContent;
+      if (/Prize/.test(pay)) bad.push('Payday says Prize');
+      if (!/🏆 Competitions/.test(pay)) bad.push('Payday does not say 🏆 Competitions');
+      const out = sdSignHer(kid, wk);
+      if (!out || !out.ok) bad.push('the sign refused: ' + (out && out.why));
+      sdCur().signed = sdSignedFromLedger(kid, wk); sdCur().step = 3; sdSave(sdCur()); renderMeetingMode();
+      const sig = sdBody().textContent;
+      if (/Prize/.test(sig)) bad.push('Signed says Prize');
+      if (!/Competitions/.test(sig)) bad.push('Signed does not say Competitions');
+      const rec = guWeekRecord(kid, wk, state.shared.chore.moneyLedger[wk][kid]);
+      if (/Prize/.test(rec) || !/Competitions/.test(rec)) bad.push('the Weeks record says Prize or not Competitions');
+      if (sdIncome([{ key: 'comp', amount: 1 }]) && /Prize/.test(JSON.stringify(sdBuildInput(kid, wk).w.lines))) bad.push('a core line is still labelled Prizes');
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally { unpin(); sdRestore(snap); }
+    return bad.length ? bad : true;
+  });
+
   if (want('passbookShowsTheLastFourSundays')) {
     await guSetup(); await page.evaluate(MV2_SEED_SRC);
     checks.passbookShowsTheLastFourSundays = await page.evaluate(() => {
@@ -24934,7 +25243,7 @@ function findChromium() {
         // A flat (Grandma rule) week: earned only, no income bar.
         state.shared.chore.moneyLedger[keys[2]][kid].defaulted = true;
         mnyOpenMyMoney(kid);
-        const rows = [...document.querySelectorAll('#mnyPage1Wrap .mv2-bookrow')];
+        const rows = [...document.querySelectorAll('#mnyPage1Wrap .mv2-bookrow[data-mny-week]')];
         if (rows.length !== 4) bad.push('the passbook shows ' + rows.length + ' rows, not 4');
         const shown = rows.map(r => r.getAttribute('data-mny-week'));
         if (JSON.stringify(shown) !== JSON.stringify(keys.slice(0, 4))) bad.push('not the newest four, newest first: ' + JSON.stringify(shown));
@@ -24945,12 +25254,12 @@ function findChromium() {
         const data = mnyPassbookData(kid);
         const sumIn = money2(data.last4.reduce((a, r) => a + r.inAmt, 0));
         const total = document.querySelector('#mnyPage1Wrap .mv2-booktotal .mv2-bookin');
-        // Plan v9 §N (the mockup): "4 Sundays $X in · <Name> ✓ N signed".
-        if (!total || total.textContent.trim() !== mnyMoney(sumIn) + ' in') bad.push('= Total is not the four rows added: ' + (total && total.textContent));
-        const foot = (document.querySelector('#mnyPage1Wrap .mv2-booktotal') || {}).textContent || '';
-        if (!/4 Sundays/.test(foot) || !/✓ 5 signed/.test(foot)) bad.push('the foot does not say 4 Sundays shown, 5 signed: ' + foot);
+        // Plan v17 §1 (the prototype): "= Total", the summary sentence, "<Name> ✓ · N Sundays signed".
+        if (!total || total.textContent.trim() !== mnyBook$(sumIn)) bad.push('= Total is not the four rows added: ' + (total && total.textContent));
+        const foot = (document.querySelector('#mnyPage1Wrap .mv2-bookline') || {}).textContent || '';
+        if (!/✓ · 5 Sundays signed/.test(foot)) bad.push('the foot does not say 5 Sundays signed: ' + foot);
         const note = [...document.querySelectorAll('#mnyPage1Wrap .mv2-booknote')].map(e => e.textContent).join(' ');
-        if (!/a week/.test(note) || !/steady/.test(note) || !/to the wall/.test(note)) bad.push('the note lacks the average, the steady share or the shares: ' + note);
+        if (!/These 4 Sundays/.test(note) || !/a week/.test(note) || !/to the wall/.test(note)) bad.push('the note lacks the four Sundays, the average or the shares: ' + note);
         const key = (document.querySelector('#mnyPage1Wrap .mv2-bookkey') || {}).textContent || '';
         if (!/earned/.test(key) || !/given/.test(key) || !/made/.test(key) || !document.querySelector('#mnyPage1Wrap .mv2-bookkey .mv2-sw--wall')) bad.push('the key line is not the income groups and the swatches: ' + key);
         const all = document.querySelector('#mnyPage1Wrap .mv2-book [data-mny-action="story"]');
@@ -25015,17 +25324,16 @@ function findChromium() {
         const want = Math.floor(mnyTotalPaid(kid) / mnyTotalPrincipal(kid) * 100);
         if (full !== want) bad.push(`${full} full bricks, ${want} paid`);
         if (!W().querySelector('.mv2-left').textContent.includes(mnyMoney(left))) bad.push('the wall does not say ' + mnyMoney(left) + ' left');
-        // Plan v9 §N: the rows sit behind "📋 My N loans" — open them, read them, put the wall back.
-        mnyLoanRowsOpen = true; mnyRenderMyMoney();
+        // Plan v17 §1: the two largest loans are door rows under the summary, largest first.
         const names = [...W().querySelectorAll('.mv2-loanrow-name')].map(e => e.textContent.trim());
-        const interestLine = /interest added last time/.test(W().textContent);
-        mnyLoanRowsOpen = false; mnyRenderMyMoney();
-        if (JSON.stringify(names) !== JSON.stringify(['⛸️ Skates & boots', '🏆 Fall season entries'])) bad.push('rows are not one per debt, oldest first: ' + JSON.stringify(names));
+        const interestLine = /interest 1% a year · \+\$0\.92 added last time/.test(W().querySelector('.mv2-sum .mv2-int').textContent);
+        if (JSON.stringify(names) !== JSON.stringify(['⛸️ Skates & boots', '🏆 Fall season entries'])) bad.push('rows are not the two largest loans: ' + JSON.stringify(names));
         // Owner's review M2-5: the gate icons are off the wall card.
         if (W().querySelector('.mv2-flag, .mv2-flags')) bad.push('the 🏦 🔒 📈 gate icons are still on the wall card');
-        if (!/Paid off by/.test(W().textContent) || !/Each month/.test(W().textContent) || !/Early bonus earned/.test(W().textContent)) bad.push('the key facts are missing');
+        // Plan v17 §1: the summary — paid, a week, free by, late costs; each loan's own facts are behind its row.
+        if (!/paid/.test(W().textContent) || !/a week/.test(W().textContent) || !/free by/.test(W().textContent)) bad.push('the summary is missing');
         // $0.92 charged and no interest line on the stream: a late cost, in red.
-        if (f.lateCosts !== 0.92 || !W().querySelector('.mv2-facts .mv2-late')) bad.push('a late cost of $0.92 is not shown in red: ' + f.lateCosts);
+        if (f.lateCosts !== 0.92 || !W().querySelector('.mv2-sum .mv2-late')) bad.push('a late cost of $0.92 is not shown in red: ' + f.lateCosts);
         // Owner's review M2-4: late costs are said ONCE, in the key facts.
         const lateSaid = (W().textContent.match(/Late costs/gi) || []).length;
         if (lateSaid !== 1) bad.push('late costs are said ' + lateSaid + ' times on the wall, not once');
@@ -25054,7 +25362,9 @@ function findChromium() {
         mv2Seed(kid);
         const card = () => document.querySelector('#mnyPage1Wrap .mv2-have');
         const val = (k) => (card().querySelector(`[data-mny-tile="${k}"] .mv2-tile-val`) || {}).textContent;
-        if (card().querySelector('.mv2-total').textContent.trim() !== mnyMoney(mnyEverything(kid))) bad.push('the total is not everything she has');
+        // Plan v17 §1: "$X with 🎯" — what she owns (Savings with the jars, Locked away, Companies); what waits for Sunday is not owned yet.
+        const own = money2(mnyReadyHomeTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid));
+        if (card().querySelector('.mv2-total').textContent.trim() !== mnyMoney(own) + ' with 🎯') bad.push('the total is not what she owns: ' + card().querySelector('.mv2-total').textContent);
         // Plan v9 Deviation 37: no Cash place; Savings holds her goal jars ("of which …").
         if (card().querySelector('[data-mny-tile="cash"]')) bad.push('a Cash tile is still drawn');
         const jarsIn = money2(mnyReadyHomeTotal(kid) - mnySavedTotal(kid));
@@ -25062,18 +25372,17 @@ function findChromium() {
         if (val('gic') !== mnyMoney(mnyLockedTotal(kid))) bad.push('Locked away tile ' + val('gic'));
         if (val('stock') !== mnyMoney(mnyInvestedTotal(kid))) bad.push('Companies tile ' + val('stock'));
         const jars = money2(mnyReadyHomeTotal(kid) - mnySavedTotal(kid));
-        if (jars !== 8 || !/of which .*\$8/.test(card().querySelector('[data-mny-tile="ready"]').textContent)) bad.push('the $8 in the goal jar is not named inside Savings: ' + jars);
+        if (jars !== 8 || !/🎯 \$8 inside/.test(card().querySelector('[data-mny-tile="ready"]').textContent)) bad.push('the $8 in the goal jar is not named inside Savings: ' + jars);
         const waiting = mnyCash(kid);
         if (waiting > 0 && !(card().querySelector('.mv2-waiting') || {}).textContent) bad.push('money waiting for Sunday is not shown');
         if (money2(waiting + mnySavedTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid) + jars) !== mnyEverything(kid)) bad.push('the places, the jars and what waits do not add to the total');
         const t = card().textContent;
-        // Owner's review M3-3: short names on one line ("Locked"), with the prototype's hint lines.
-        ['Savings', 'Locked', 'Companies'].forEach(n => { if (!t.includes(n)) bad.push('no ' + n + ' tile'); });
-        [...card().querySelectorAll('.mv2-tile-name')].forEach(e => { if (e.getClientRects().length > 1 || e.offsetHeight > 30) bad.push('a tile name wraps: ' + e.textContent); });
-        if (!/🛟 .* safety \+ .* I can use · .*% a year|🛟 fill to/.test(card().querySelector('[data-mny-tile="ready"]').textContent)) bad.push('Savings has no safety hint');
-        if (!/more bricks/.test(card().querySelector('[data-mny-tile="stock"]').textContent)) bad.push('a shut Companies does not say how many bricks are left');
+        // Plan v17 §1: information boxes (no button look, no ?), names on one line, the reference's hint lines.
+        ['Savings', 'Locked away', 'Companies'].forEach(n => { if (!t.includes(n)) bad.push('no ' + n + ' box'); });
+        [...card().querySelectorAll('.mv2-acct-name')].forEach(e => { if (e.getClientRects().length > 1 || e.offsetHeight > 30) bad.push('a box name wraps: ' + e.textContent); });
+        if (!/% a year/.test(card().querySelector('[data-mny-tile="ready"]').textContent)) bad.push('Savings has no rate hint');
         if (/Kept ready|In companies/.test(document.getElementById('mnyPage1Wrap').textContent)) bad.push('an old name is on her page');
-        if (card().querySelectorAll('.mny-ask').length !== 3) bad.push('not a ? on every tile');
+        if (card().querySelectorAll('.mny-ask, button').length !== (mnyCash(kid) > 0 ? 1 : 0)) bad.push('What I own has buttons other than the 📥 door');
         // 31% paid: Companies (40%) shut, saying when it opens.
         const stock = card().querySelector('[data-mny-tile="stock"]');
         if (!stock.classList.contains('shut') || !/🔒 opens at 40% paid/.test(stock.textContent)) bad.push('a shut Companies does not say when it opens: ' + stock.textContent.trim());
@@ -25099,9 +25408,14 @@ function findChromium() {
         const dated = goals.find(g => g.targetDate), undated = goals.find(g => !g.targetDate);
         const order = mnyGoalsNearestFirst(kid).map(g => g.id);
         if (order[0] !== dated.id || order[1] !== undated.id) bad.push('a dated goal does not come first');
+        // Plan v17 §1: one goal card — the nearest date unless ⋯ picked another — and every goal in ⋯.
         const names = [...document.querySelectorAll('#mnyPage1Wrap .mv2-jarname')].map(e => e.textContent);
-        if (names.length !== 2 || !/skate guards/.test(names[0])) bad.push('the jars are not drawn nearest date first: ' + JSON.stringify(names));
-        if (!/a week to make it by/.test(document.querySelector('#mnyPage1Wrap .mv2-goals').textContent)) bad.push('a dated jar does not say what a week makes it');
+        if (names.length !== 1 || !/skate guards/.test(names[0])) bad.push('the card does not show the nearest-date goal: ' + JSON.stringify(names));
+        if (!/a week · by/.test(document.querySelector('#mnyPage1Wrap .mv2-goals').textContent)) bad.push('a dated jar does not say what a week makes it');
+        mnyOpenInfoSheet('goals');
+        const listed = [...document.querySelectorAll('#requestBody [data-mny-action="goal-show"]')].map(b => b.getAttribute('data-mny-goal'));
+        if (JSON.stringify(listed) !== JSON.stringify(order)) bad.push('⋯ does not list every goal nearest date first');
+        rqClose();
         // Shut: nothing paid.
         mnyDebts(kid).forEach(d => { d.paid = 0; });
         if (mnyIsOpen(kid, 'ready')) bad.push('precondition: Savings still open at 0%');
@@ -25110,7 +25424,7 @@ function findChromium() {
         if (mnyAddToGoal(kid, 3, dated.id) !== false) bad.push('mnyAddToGoal filled a jar while Savings is shut');
         if (mnyCash(kid) !== cash || mnyGoalJarValue(kid, dated) !== jar) bad.push('money moved while the jar was shut');
         mnyRenderMyMoney();
-        const jarEls = [...document.querySelectorAll('#mnyPage1Wrap .mv2-jar')];
+        const jarEls = [...document.querySelectorAll('#mnyPage1Wrap .mv2-goals .mv2-jarpic')];
         if (!jarEls.length || !jarEls.every(j => j.classList.contains('shut')) || !/Goal jars open with Savings, at 20% paid off/.test(document.querySelector('#mnyPage1Wrap .mv2-goals').textContent)) bad.push('a shut jar does not say it waits for Savings');
         // Open: 25% paid; a deposit lands in the jar it names, not the newest.
         mnyDebts(kid)[0].paid = 250;
@@ -25151,10 +25465,12 @@ function findChromium() {
         mrAddCompetition(kid, { dayKey: recDay, sport: 'skate', name: 'Club trials', points: 6 });
         profile = kid;
         mnyOpenMyMoney(kid);
-        const cal = document.querySelector('#mnyPage1Wrap .mv2-cal');
+        // Plan v17 §1: 📅 Coming up on the page; the month behind 🗓️ Month ▸.
+        const coming = [...document.querySelectorAll('#mnyPage1Wrap .mv2-coming .mv2-comingrow')].map(r => r.textContent.replace(/\s+/g, ' ').trim());
+        document.querySelector('#mnyPage1Wrap [data-mny-action="info-month"]').click();
+        let cal = document.querySelector('#requestBody .mv2-cal');
         const rec = cal.querySelector('.mv2-cal-cell.rec');
         if (!rec || !/✓ \$/.test(rec.textContent)) bad.push('a recorded result is not marked ✓ $ on its day');
-        const coming = [...cal.querySelectorAll('.mv2-comingrow')].map(r => r.textContent.replace(/\s+/g, ' ').trim());
         if (!coming.some(t => /Club trials/.test(t) && /✓ \$6/.test(t))) bad.push('this month\'s result is not in Coming up with what it paid: ' + JSON.stringify(coming));
         if (!coming.some(t => /Winter Splash/.test(t))) bad.push('a meet still to come is not in Coming up: ' + JSON.stringify(coming));
         if (!coming.some(t => /Christmas/.test(t) && /parents expect ~\$20/.test(t))) bad.push('money Dad expects is not in Coming up: ' + JSON.stringify(coming));
@@ -25166,8 +25482,12 @@ function findChromium() {
           rqClose();
         }
         // The month moves, and next month carries what Dad expects.
+        mnyOpenInfoSheet('month');
+        cal = document.querySelector('#requestBody .mv2-cal');
         cal.querySelector('[data-mny-action="cal"][data-mny-dir="1"]').click();
-        if (!/parents expect ~\$20/.test(document.querySelector('#mnyPage1Wrap .mv2-cal .mv2-expect') ? document.querySelector('#mnyPage1Wrap .mv2-cal .mv2-expect').textContent : '')) bad.push('next month does not show the money Dad expects');
+        const ex = document.querySelector('#requestBody .mv2-cal .mv2-expect');
+        if (!/parents expect ~\$20/.test(ex ? ex.textContent : '')) bad.push('next month does not show the money Dad expects');
+        rqClose();
         mnyCalMonth = null;
       } catch (e) { bad.push('threw: ' + e.message); }
       return bad.length ? bad : true;
@@ -25274,7 +25594,8 @@ function findChromium() {
           if (/[{}]/.test(x.title + x.what + x.why + x.risk)) bad.push(c.id + ' leaves a token unfilled');
           if (!x.cn) bad.push(c.id + ' has no Chinese line');
         });
-        document.querySelector('#mnyPage1Wrap [data-mny-tile="gic"] [data-mny-action="ask"]').click();
+        // Plan v17 §1: What I own's boxes carry no ? any more; the explainer opened over My money still comes back to it.
+        mnyShowConcept('gic');
         const card = document.getElementById('mnyConceptCard');
         const c = mnyConceptCard('gic', kid);
         if (!card) { bad.push('the ? on Locked away opened nothing'); return bad; }
@@ -25374,7 +25695,8 @@ function findChromium() {
       const head = document.querySelector('#familyMeetingBody .mm-head');
       const nav = document.querySelector('#familyMeetingBody .mm-nav');
       if (!head) bad.push('the week and step header is not its own band');
-      if (!nav) bad.push('there is no navigation band');
+      // Plan v17 §0: the money step has no bottom bar — its own ◀ / → buttons move between its steps.
+      if (nav) bad.push('the money step has a Back/Next bar');
       /* Ordinary flex children, not floated over the content. Sticky or fixed
          here is the bug: both take the band out of the layout. */
       [['header', head], ['Back/Next bar', nav]].forEach(([label, el]) => {

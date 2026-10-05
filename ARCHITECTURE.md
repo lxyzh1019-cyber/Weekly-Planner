@@ -4102,6 +4102,47 @@ sheets, Sunday's four steps, Grown-ups' six tabs, both looks).
 - "Dad" is "parents" in every on-screen sentence (Deviation 38); stored
   `by` values and the fines' "Logged by Mom / Dad" stay.
 
+## Stage 6h — the money screens to the final reference (Plan v17, build 2026-10-04c)
+
+The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
+`mockups-6f9.html` beside it.
+
+- **One font for words and numbers** on My money, the Sunday money step, its
+  head and their sheets: the scoped value `--font-round: var(--font-body)`
+  (the same move as Deviation 35's `--text-scale`), so in Pop every figure is
+  Patrick Hand like the words around it, titles stay Gochi Hand and the
+  handwriting lines Caveat; Calm keeps its own fonts (Lexend everywhere,
+  tabular figures). Patrick Hand has no equal-width digits, so every money
+  column is right-aligned. No new font and no new host: the four Pop fonts
+  were already loaded by `index.html`.
+- **My money is one screen with doors.** No kid bottom bar on it
+  (`TD_NAV_SCREENS`); ◀ goes to Today. Extras open read-only information
+  sheets through the request sheet's chrome (`mnyOpenInfoSheet`,
+  `MNY_INFO_KINDS`, bodies in js/22). Which goal the card shows is
+  device-local (`wp_mny_goalcard_<kid>`). ⏪ Draw early is a mode of the
+  Move · Cash sheet; `mnyOpenRequestSheet('adv')` opens it there; the
+  `advance.maxPerWeek` cap is enforced and not shown.
+- **The meeting's head is two rows** (`mmHead`, js/15; `sdMeetingAvatars` /
+  `sdMeetingStepRow`, js/44) and the money step has **no footer**: the girls
+  switch in the head and 3·Close is a pill. `mmWeekBar` and `mmMoneyFooter`
+  are gone.
+- **The owe-vs-own chart reads the ledger, it stores nothing new in
+  `state.shared`.** The past is each signed row's `debtBalanceAfter` (loan
+  left) and `ownedAfter` (what she owned — a field the sign now writes on the
+  frozen row, which rides the existing ledger merge). A row without both is
+  left out and the chart says so. The forecast rule and the label thinning
+  are pure (`sdOweOwnForecast`, `sdOweOwnSeries`, `sdThinLabels`, js/43, with
+  tests in tests/sunday.test.js).
+- **"Money my money made" has one reader**, `mnyPassiveSinceLastMeeting`:
+  the stream's value-change lines into her pots since the baseline
+  (`baselineAt` on her holdings, stamped by `mnyStampPassiveBaseline`).
+  It used to be the change in each holding's value, which counted every
+  dollar moved in or out between Sundays as "made".
+- **Cash from home is her bank, never a gift** (`sdIsHomeCash`): the sign
+  writes it to `groups.bank`, not `deposits` / `groups.given`.
+- **"Earned this year" is the ledger's** (`guEarnedThisYear`, js/46), the
+  same rows the Weeks list shows; Sunday's earning target reads it too.
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

@@ -464,7 +464,9 @@ function mnyDoCommit(kidArg, wkArg) {
   const c = state.shared.chore;
   const ledger = ((c.moneyLedger || {})[wk] || {})[kid];
   if (ledger) {
-    const given = money2(f.giftsIn + f.homeIn + f.homeCash);
+    // Cash from home is her own money, not a gift (Plan v17 item 10): it is
+    // in 🏦 From my bank (`groups.bank`), never in 🎁 given.
+    const given = money2(f.giftsIn);
     const extraPaid = money2(loanOut.extra + (readyOpen ? 0 : swept));
     Object.assign(ledger, {
       confirmedBy: 'a grown-up',
@@ -481,10 +483,15 @@ function mnyDoCommit(kidArg, wkArg) {
       gic: sg.gic, stock: sg.stock, cents: sg.cents,
       passive, guess: sg.guess, payday: sg.payday, hers: sg.hers, mustPay: sg.mustPay,
       groups: { earned: money2(sg.inSteady + f.compIn), given, made: Math.max(0, passive),
-                bank: money2(sg.inBank - f.homeIn - f.homeCash), takenOff: money2(-sg.outFine + sg.adv) },
+                bank: money2(sg.inBank), takenOff: money2(-sg.outFine + sg.adv) },
       sunday: { signed: sg, after: { left: res.after.left, pots: res.after.pots, loan: res.after.loan },
                 crossed: res.crossed, w: f.lite },
       debtBalanceAfter: mnyTotalOwing(kid),
+      // What she owns after this Sunday (Savings with the goal jars, Locked
+      // away, Companies) — the Signed step's owe-vs-own chart reads it beside
+      // `debtBalanceAfter` (Plan v17 §4). A row signed before it has neither
+      // figure for the chart and is left out there.
+      ownedAfter: money2(mnyReadyHomeTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid)),
       updatedAt: syncNow(),
     });
   }

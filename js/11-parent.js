@@ -163,6 +163,10 @@ function parentRenderLanding(destId) {
 function parentRenderScope() {
   const wrap = document.getElementById('parentScopePills');
   if (!wrap) return;
+  /* Parent › Now has its own Jenn · Jess · Both (`wp_now_scope`, js/32), so
+     the portal's switcher hides there — one girl switch per screen (Plan v17
+     item 6). History and Copy a plan, which read `parentScope`, still show it. */
+  wrap.hidden = parentTab === 'now';
   const opts = [['both', 'Both'], ['jenn', '🐥 Jenn'], ['jess', '🦊 Jess']];
   wrap.innerHTML = opts.map(([id, label]) =>
     `<button type="button" class="pill-btn${parentScope === id ? ' active' : ''}"

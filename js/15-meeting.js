@@ -376,21 +376,6 @@ function mmLastReviewedLine() {
   const text = `Last settled: ${mmWeekLabel(last.wk)} · ${mmWeeksAgoWord(last.weeksAgo)}${gap}`;
   return `<div class="mm-weekbar-last">${escapeHtml(text)}</div>`;
 }
-/* The week this meeting is about, always on screen, with where the family left
-   off underneath it. The sheet's own title is the static "Weekly family
-   meeting", which is true of every week and so identifies none of them. */
-function mmWeekBar(wk) {
-  const late = mrWeeksSince(wk);
-  const label = `Week of ${mmWeekLabel(wk)}`;   // from date tables, no user text
-  const head = late
-    ? `<span class="mm-weekbar-wk">${escapeHtml(label)}</span>
-       <span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
-       <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button>`
-    : `<span class="mm-weekbar-wk">${escapeHtml(label)}</span>
-       <span class="mm-weekbar-now">this week</span>`;
-  return `<div class="mm-weekbar${late ? ' late' : ''}">
-      <div class="mm-weekbar-head">${head}</div>${mmLastReviewedLine()}</div>`;
-}
 /* ── The question, when the meeting is opened to be run ──
    Deliberately not part of openFamilyMeeting. Half of that function's callers
    are deep links — a specific day from the hub's strip, step 3 to show an
@@ -987,23 +972,11 @@ function renderMeetingMode() {
   else body = mmRenderPlan(wk);
 
   const back = mmStep > 1 ? `<button type="button" class="pill-btn" onclick="mmGoIndex(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
-  /* THE MONEY STEP'S FOOTER IS THE COMMIT, not a Next.
-
-     It used to be a bar somewhere in the middle of a long scrolling panel, and
-     the owner's report was that it is not placed well — which on this screen is
-     not a matter of taste. It is the one control in the app that moves real
-     money, and a control you have to go looking for is one that gets missed on
-     a Sunday and one that gets pressed by accident while scrolling past it.
-
-     In the footer it is always visible, always in the same place, and it says
-     what it will do or why it cannot. It is STILL a separate gated act — the
-     merge of "what I earned" and "what I do with it" onto one screen does not
-     make scrolling to the bottom a commit. */
-  const next = (id === 'money')
-    ? mmMoneyFooter(wk)
-    : (mmStep < MM_STEPS.length
-        ? `<button type="button" class="btn-confirm" onclick="mmGoIndex(${mmStep + 1})">Next ▶</button>`
-        : mmFinishButtons(wk));
+  /* Back / Next / Finish on the week and close steps. The money step has no
+     footer (Plan v17 §0): hold to sign is the one sign control. */
+  const next = mmStep < MM_STEPS.length
+    ? `<button type="button" class="btn-confirm" onclick="mmGoIndex(${mmStep + 1})">Next ▶</button>`
+    : mmFinishButtons(wk);
 
   /* One scroller — the sheet — with the week-and-step header pinned to its top
      and Back/Next/Finish pinned to its bottom. A five-step sitting spends most
@@ -1012,13 +985,34 @@ function renderMeetingMode() {
      which step you were on, and the only way to the next one. */
   const host = document.getElementById('familyMeetingBody');
   const restore = mmCaptureUiState(host);
-  host.innerHTML =
-    /* One row (Plan v9 §N "Header space"): the meeting's name, the week and
-       its three steps; the screen's own title hides while this row shows. */
-    `<div class="mm-head mm-head--one"><h2 class="mm-head-title">🧑‍🧑‍🧒 Family meeting</h2>${mmWeekBar(wk)}<div class="mm-stepper">${stepper}</div></div>`
+  host.innerHTML = mmHead(wk, stepper, id)
     + `<div class="mm-body">${body}</div>`
-    + `<div class="mm-nav">${back}${next}</div>`;
+    /* The money step has no bottom bar (Plan v17 §0): its own ◀ / → buttons
+       move between its steps, the girls switch in the head, and 3·Close is
+       a pill in the head. */
+    + (id === 'money' ? '' : `<div class="mm-nav">${back}${next}</div>`);
   restore();
+  if (id === 'money' && typeof sdAfterRender === 'function') sdAfterRender();
+}
+
+/* ── The meeting's head: two rows (Plan v17 §0, Stage 6h) ──
+   Row 1: on the money step the girls as round pictures (js/44,
+   `sdMeetingAvatars`), then the meeting's name, the three steps as pills and
+   the week at the right (with "catching up" and This week ▶ on an older
+   week). Row 2: on the money step whose money it is, the four Sunday steps,
+   🔊 Sound and 🗣️ Parent's card (`sdMeetingStepRow`); on the other steps
+   where the family left off (`mmLastReviewedLine`). The screen's own title
+   hides while the head shows. */
+function mmHead(wk, stepper, id) {
+  const late = mrWeeksSince(wk);
+  const week = `<span class="mm-head-wk">${escapeHtml(`Week of ${mmWeekLabel(wk)}`)}</span>`
+    + (late ? `<span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
+       <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button>` : '');
+  const money = id === 'money' && typeof sdMeetingAvatars === 'function';
+  return `<div class="mm-head mm-head--two${late ? ' late' : ''}">
+      <div class="mm-head-r1">${money ? sdMeetingAvatars(wk) : ''}<h2 class="mm-head-title">👨‍👧‍👧 Family meeting</h2><div class="mm-stepper">${stepper}</div><span class="mm-head-right">${week}</span></div>
+      <div class="mm-head-r2">${money ? sdMeetingStepRow(wk) : mmLastReviewedLine()}</div>
+    </div>`;
 }
 
 /* ── Keeping the meeting usable across a re-render ──
@@ -1570,7 +1564,7 @@ function mmUndoKidState(kid) {
     // The meeting also empties the box, so undo has to put it back.
     boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
     /* The "made on its own since the last meeting" baseline needs no field of
-       its own: mnyStampPassiveBaseline writes valueAtLastMeeting onto each
+       its own: mnyStampPassiveBaseline writes `baselineAt` onto each
        holding, and `holdings` above is a deep copy, so restoring it restores
        the baseline with it. Worth saying out loud — it is not obvious, and an
        undo that missed it would swallow a stretch of interest for good. */
@@ -1967,25 +1961,6 @@ function mmSettledStrip(wk) {
 }
 /* What the last button should say. A family genuinely might stop halfway and
    come back, so this names the gap rather than refusing — and keeps a way out. */
-/* ── THE MONEY STEP'S FOOTER ──────────────────────────────────────
-   Signing is hold-to-sign on Sunday's "I choose" step, so the footer is not
-   where money moves any more (Sunday v15 Stage 4). It never offers to skip a
-   girl: until she is signed it draws nothing — the ritual's own buttons say
-   what Sunday is waiting for, and its hold to sign is the one sign control
-   (Stage 4b: a disabled copy here was a second "hold to sign" that did
-   nothing). Once she is signed it offers her sister, then the close step. */
-function mmMoneyFooter(wk) {
-  const kid = mnyMeetingKid();
-  const other = kid === 'jenn' ? 'jess' : 'jenn';
-  if (mnyIsCommitted(wk, kid)) {
-    if (!mnyIsCommitted(wk, other)) {
-      return `<button type="button" class="btn-confirm"
-        onclick="mnySetMeetKid('${escapeJsAttr(other)}')">${escapeHtml(mnyKidName(other))}'s money ▶</button>`;
-    }
-    return `<button type="button" class="btn-confirm" onclick="mmGoTo('close')">Next ▶</button>`;
-  }
-  return '';
-}
 
 function mmFinishButtons(wk) {
   if (mmAllSettled(wk)) {

@@ -2021,7 +2021,9 @@ const TD_NAV = [
 /* Screens that belong to a child. The nav is hidden everywhere else — a parent
    in the portal does not need a child's bottom bar, and the profile picker is
    where you go to stop being a child. */
-const TD_NAV_SCREENS = ['screen-today', 'screen-week', 'screen-mymoney', 'screen-chore',
+/* Not on 💰 My money (Plan v17 §1): its one-row head has ◀ back to Today and
+   the page needs the height. */
+const TD_NAV_SCREENS = ['screen-today', 'screen-week', 'screen-chore',
                         'screen-day', 'screen-sync', 'screen-moneystory',
                         'screen-moneyschool'];
 
