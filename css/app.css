@@ -4337,6 +4337,9 @@
     /* 44px, the house floor: they were 41px in Pop and 38px in Calm's
        smaller type (parentScreensMeetTheHouseRules, Looks stage 4). */
     min-height: 44px;
+    /* Width floor too: in the one-row bar the tabs can be squeezed below 44px
+       (41px on CI's fonts). */
+    min-width: 44px; text-align: center;
     padding: 0.4rem 0.75rem; font-family: var(--font-text);
     font-size: calc(0.98rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; cursor: pointer; color: var(--ink);
   }
