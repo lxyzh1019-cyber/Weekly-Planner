@@ -724,6 +724,7 @@ The prototype is the starting point; what the app adds must not cost the prototy
 |---|---|
 | Spare room → bigger text | Where a card has height to fill (e.g. Coming up, passbook rows, Weeks), grow the text size within the house limits before adding line spacing; no stretched gaps. |
 | All money requests in Parent › Now, tagged | Audit every request kind (result, club skip, move, cash out, put cash in, draw early, gift, new goal, fine dispute) and make each one appear and be answerable in Now; each card carries a category tag (e.g. 🏆 Result · 🎁 Gift · 🏦 Cash in · 🔀 Move · 💵 Cash out · ⏪ Draw early · 🎯 Goal · ⛸️ Club · 📦 Fine). |
+| Fine dispute entry (owner 2026-10-05: "add the This fine is wrong button") | Each fine in her week view gets "This fine is wrong", sending a `dispute` request (existing kind and writer) that lands in Parent › Now tagged 📦 Fine. |
 | Taken off is negative | Every "Taken off" amount (fines, drawn early, agreed early cash) shows with a minus sign wherever it appears — Payday, Signed, passbook, Weeks, Now. |
 
 ### Risks and known gaps
