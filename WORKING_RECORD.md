@@ -314,7 +314,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression (1 re
 | Stage 6d — build approved redesigns | COMPLETE | `f50503d`, build 2026-10-04b; full npm test green (worker run; sunday 90/0 and merge 128/0 re-run by main session) |
 | Stage 6e — comparison page (prototype · before · after) | COMPLETE | https://claude.ai/artifact/V2BUEwpCQzNryit3bd947t — 18 rows; 12 items flagged that do not yet match the plan/mockup (4 look like number bugs: Weeks earned-this-year, given vs gifts, money made, goal jar "of $85") | |
 | Stage 6f — round-2 mockups (My money, Payday, I choose, Signed) beside the prototype | COMPLETE | https://claude.ai/artifact/47ScVjvCJmyPQDwx6zmgo1 — prototype sample week; 9 open questions |
-| Stage 6g/6h — owner review of round-2 mockups, then build + 6a headers + 12 flagged items | NOT STARTED → in progress: 6g done (Plan v17 approved); 6h build next | Plan v10 section O |
+| Stage 6g/6h — owner review of round-2 mockups, then build + 6a headers + 12 flagged items | PARTIAL — 6g done (Plan v17 approved 2026-10-04); 6h build in progress | Plan v10 section O |
 | Stage 5 — CSS/looks/phone, smoke rewrite, build stamp, full gate | BLOCKED — follows 6d; includes Today's clash-note contrast and a run with the clock after 11 Oct | |
 | Draft PR + FEATURES/ARCHITECTURE | BLOCKED — follows Stage 5 | |
 
