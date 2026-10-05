@@ -701,5 +701,47 @@ function fill(w, k) {
   }
 }
 
+/* ── Plan v18 (Stage 7): the gap label, the request tags, taken off ── */
+{
+  // The free-soon chart from the 6h comparison: the signed point's segment is
+  // steep and narrow, so its middle is not a home for the label.
+  const x = i => 44 + i * 80, y = v => 8 + (1 - v / 400) * 74;
+  const past = [{ x: x(0), owe: y(250), own: y(10) }, { x: x(1), owe: y(220), own: y(20) }, { x: x(2), owe: y(85), own: y(61) }];
+  const lines = [past.map(p => [p.x, p.owe]), past.map(p => [p.x, p.own]),
+    [[x(2), y(85)], [x(3), y(43)], [x(4), y(0)]], [[x(2), y(61)], [x(3), y(80)], [x(4), y(100)]]];
+  const size = { w: 46, h: 12 }, bounds = { l: 44, r: 680, t: 8, b: 82 };
+  const spot = s.sdGapLabelSpot(past, lines, size, bounds);
+  const box = sp => ({ l: sp.x - 25, r: sp.x + 25, t: sp.y - 8, b: sp.y + 8 });
+  const hits = sp => lines.some(L => L.some((p, i) => i > 0 && s.sdSegHitsBox(L[i - 1], p, box(sp))));
+  check('gap label: free-soon chart — a spot is found', !!spot, JSON.stringify(spot));
+  check('gap label: it never touches a line', spot && !hits(spot) ? true : JSON.stringify(spot));
+  check('gap label: it stays inside the chart', spot && spot.x - 23 >= 44 && spot.x + 23 <= 680 && spot.y - 6 >= 8 && spot.y + 6 <= 82 ? true : JSON.stringify(spot));
+  // A wide gap: the newest segment's middle is the first choice.
+  const wide = [{ x: 44, owe: y(390), own: y(5) }, { x: 124, owe: y(380), own: y(10) }];
+  const w1 = s.sdGapLabelSpot(wide, [wide.map(p => [p.x, p.owe]), wide.map(p => [p.x, p.own])], size, bounds);
+  check('gap label: a wide gap puts it in the middle of the newest segment', w1 && w1.x === 84 ? true : JSON.stringify(w1));
+  // Lines everywhere leave no spot rather than a wrong one.
+  const flat = [{ x: 44, owe: y(100), own: y(100) }, { x: 60, owe: y(100), own: y(100) }];
+  const allLines = [[[44, 8], [680, 82]], [[44, 82], [680, 8]], [[44, 45], [680, 45]], [[362, 8], [362, 82]],
+    [[100, 8], [100, 82]], [[200, 8], [200, 82]], [[44, 20], [680, 20]], [[44, 70], [680, 70]]];
+  check('gap label: nowhere free means null, never a spot on a line', s.sdGapLabelSpot(flat, allLines, size, bounds) === null);
+  check('gap label: segment/box hit test', s.sdSegHitsBox([0, 0], [10, 10], { l: 4, r: 6, t: 4, b: 6 }) === true
+    && s.sdSegHitsBox([0, 0], [10, 0], { l: 4, r: 6, t: 4, b: 6 }) === false);
+
+  const T = s.sdRequestTag;
+  const want = { comp: '🏆 Result', skip: '⛸️ Club', move: '🔀 Move', deposit: '🏦 Cash in', adv: '⏪ Draw early',
+                 gift: '🎁 Gift', goal: '🎯 Goal', dispute: '📦 Fine' };
+  check('request tags: every kind has its tag', Object.keys(want).every(k => T(k, 'ready') === want[k]) ? true
+    : JSON.stringify(Object.keys(want).map(k => [k, T(k, 'ready')])));
+  check('request tags: a move to cash is a cash out', T('move', 'cash') === '💵 Cash out' && T('move', 'wall') === '🔀 Move');
+  check('request tags: an unknown kind has none', T('nope') === null);
+
+  const O = s.sdOff$;
+  check('taken off: a positive amount shows with a minus', O(1) === '−$1.00');
+  check('taken off: a negative amount shows with one minus', O(-2.5) === '−$2.50');
+  check('taken off: nothing taken off is $0.00, never −$0.00', O(0) === '$0.00' && O(0.001) === '$0.00');
+  check("taken off: the screen's own format", O(3, v => '$' + v) === '−$3');
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach(f => console.log('  - ' + f)); process.exit(1); }

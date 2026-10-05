@@ -801,6 +801,75 @@ function sdThinLabels(count, keep, max) {
   return [...out].sort((a, b) => a - b);
 }
 
+/* ── 📉 Where the "gap $X" label goes (Plan v18, Stage 7 A15) ──
+   The label never sits on a line. Candidates, in order: inside the shaded
+   gap at the middle of each past segment, newest first (the box must fit
+   between the two lines there); then just left of the signed point; then
+   above, then below, both lines at the signed point. Each box is checked
+   against every segment of every line (past and forecast) and must stay in
+   the chart's bounds. `lines`: [[ [x, y], … ], …] in the chart's own units;
+   `past`: [{ x, owe, own }] — the y of each line at each past point, the
+   last one the signed point. Returns { x, y, anchor } (the text's middle
+   and baseline-free centre) or null when nothing fits. */
+function sdSegHitsBox(a, b, box) {
+  const [x1, y1] = a, [x2, y2] = b;
+  const inside = (x, y) => x >= box.l && x <= box.r && y >= box.t && y <= box.b;
+  if (inside(x1, y1) || inside(x2, y2)) return true;
+  const cross = (p, q, r, s) => {
+    const d = (q[0] - p[0]) * (s[1] - r[1]) - (q[1] - p[1]) * (s[0] - r[0]);
+    if (Math.abs(d) < 1e-9) return false;
+    const u = ((r[0] - p[0]) * (s[1] - r[1]) - (r[1] - p[1]) * (s[0] - r[0])) / d;
+    const v = ((r[0] - p[0]) * (q[1] - p[1]) - (r[1] - p[1]) * (q[0] - p[0])) / d;
+    return u >= 0 && u <= 1 && v >= 0 && v <= 1;
+  };
+  const corners = [[box.l, box.t], [box.r, box.t], [box.r, box.b], [box.l, box.b]];
+  return corners.some((c, i) => cross(a, b, c, corners[(i + 1) % 4]));
+}
+function sdGapLabelSpot(past, lines, size, bounds) {
+  const w = Number(size && size.w) || 0, h = Number(size && size.h) || 0, pad = 2;
+  const B = bounds || { l: -Infinity, r: Infinity, t: -Infinity, b: Infinity };
+  const boxAt = (cx, cy) => ({ l: cx - w / 2 - pad, r: cx + w / 2 + pad, t: cy - h / 2 - pad, b: cy + h / 2 + pad });
+  const fits = (box) => box.l >= B.l && box.r <= B.r && box.t >= B.t && box.b <= B.b
+    && !(lines || []).some(L => L.some((p, i) => i > 0 && sdSegHitsBox(L[i - 1], p, box)));
+  const P = past || [];
+  const n = P.length;
+  if (n < 1) return null;
+  const tries = [];
+  for (let i = n - 1; i >= 1; i--) {
+    const a = P[i - 1], b = P[i];
+    const top = (Math.min(a.owe, a.own) + Math.min(b.owe, b.own)) / 2, bot = (Math.max(a.owe, a.own) + Math.max(b.owe, b.own)) / 2;
+    tries.push({ x: (a.x + b.x) / 2, y: (top + bot) / 2, anchor: 'middle' });
+  }
+  const me = P[n - 1];
+  const hi = Math.min(me.owe, me.own), lo = Math.max(me.owe, me.own);
+  tries.push({ x: me.x - 8 - w / 2, y: (hi + lo) / 2, anchor: 'middle' });
+  tries.push({ x: me.x, y: hi - 8 - h / 2, anchor: 'middle' });
+  tries.push({ x: me.x, y: lo + 8 + h / 2, anchor: 'middle' });
+  return tries.find(t => fits(boxAt(t.x, t.y))) || null;
+}
+
+/* ── Parent › Now: one tag per money request (Plan v18 §W) ──
+   Every kind a girl can send, by its own store's kind (a move to 'cash' is
+   a cash out). The tag is the card's category, the same word everywhere. */
+const SD_REQUEST_TAGS = {
+  comp: '🏆 Result', skip: '⛸️ Club', move: '🔀 Move', cash: '💵 Cash out', deposit: '🏦 Cash in',
+  adv: '⏪ Draw early', gift: '🎁 Gift', goal: '🎯 Goal', dispute: '📦 Fine',
+};
+function sdRequestTag(kind, to) {
+  if (kind === 'move' && to === 'cash') return SD_REQUEST_TAGS.cash;
+  return SD_REQUEST_TAGS[kind] || null;
+}
+
+/* ── Taken off is always negative (Plan v18 §W) ──
+   A fine, money drawn early, agreed early cash: whatever sign the caller
+   holds it in, it is shown with a minus. Nothing is "−$0.00". `fmt` is the
+   screen's own money format (whole dollars or cents). */
+function sdOff$(v, fmt) {
+  const f = typeof fmt === 'function' ? fmt : sdMoney;
+  const a = Math.abs(sdR2(v));
+  return a > 0.004 ? '−' + f(a) : f(0);
+}
+
 // Inert in the browser; lets tests/sunday.test.js hold the pure core in Node.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -812,5 +881,6 @@ if (typeof module !== 'undefined' && module.exports) {
     sdVerdicts, sdForecast, sdNewGoal, sdWhole$, sdStreakForgiving, sdStreakClue, sdClues,
     sdImpactWeek, sdImpactWeekly, sdImpact, sdWithAgreed, sdAgreeInto, sdSavingLine,
     sdOweOwnForecast, sdOweOwnSeries, sdThinLabels, SD_CHART_LABELS,
+    sdSegHitsBox, sdGapLabelSpot, SD_REQUEST_TAGS, sdRequestTag, sdOff$,
   };
 }

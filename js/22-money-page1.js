@@ -402,7 +402,7 @@ function mnyLoanWallCard(kid) {
   const brick = f.principal / 100;
   const bricks = Array.from({ length: 100 }, (_, i) => {
     const fill = Math.max(0, Math.min(1, (f.paid - i * brick) / brick));
-    return `<span class="mv2-brick${fill >= 1 ? ' full' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></span>`;
+    return `<span class="mv2-brick${fill >= 1 ? ' full' : fill > 0 ? ' part' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></span>`;
   }).join('');
   const pct = f.principal > 0 ? (f.paid / f.principal) * 100 : 100;
   const freeBy = f.left <= 0 ? 'paid off 🎉'
@@ -627,7 +627,7 @@ function mnyPassbookCard(kid) {
   const pf = (i, v) => sdPercentLabel(p.shares[i], v);
   const note = `These ${n} Sunday${n === 1 ? '' : 's'}: I earned ${mnyBook$(t.inAmt)}, about ${mnyMoney(t.inAmt / n)} a week.${p.placed > 0 ? ` ${pf(0, t.wall)} to the wall · ${pf(1, t.saved)} saved · ${pf(2, t.cash)} cash.` : ''}`;
   return `<div class="mv2-card mv2-book">${head}${key}
-      <div class="mv2-booktable">
+      <div class="mv2-booktable ${'mv2-booktable--n' + n}">
         <div class="mv2-bookrow mv2-bookhead"><span>Sunday</span><span>💰 in</span><span>${sw('mv2-sw--wall')}wall</span><span>${sw('mv2-sw--saved')}saved</span><span>${sw('mv2-sw--cash')}cash</span></div>
         ${rows}
         <div class="mv2-bookrow mv2-booktotal"><b>= Total</b><b class="mv2-bookin">${escapeHtml(mnyBook$(t.inAmt))}</b><b class="mv2-bookv">${escapeHtml(mnyBook$(t.wall))}</b><b class="mv2-bookv">${escapeHtml(mnyBook$(t.saved))}</b><b class="mv2-bookv">${escapeHtml(mnyBook$(t.cash))}</b></div>
@@ -672,7 +672,7 @@ function mnyComingUp(kid) {
 }
 function mnyComingCard(kid) {
   const coming = mnyComingUp(kid);
-  return `<div class="mv2-card mv2-coming">
+  return `<div class="mv2-card mv2-coming ${'mv2-coming--n' + Math.max(1, coming.length)}">
       <div class="mv2-cardhead"><span class="mv2-title">📅 Coming up</span><button type="button" class="mv2-btn mv2-monthbtn" data-mny-action="info-month">🗓️ Month ▸</button></div>
       ${coming.length ? coming.map(c => `<div class="mv2-comingrow ${'mv2-comingrow--' + c.kind}"><span>${escapeHtml((c.icon ? c.icon + ' ' : '') + c.name)}</span><span>${escapeHtml(c.when)}</span></div>`).join('')
         : '<div class="mv2-line">Nothing on the calendar yet.</div>'}
@@ -817,7 +817,6 @@ function mnyInfoSheetTitle(d) {
 function mnyInfoSheetBody(d) {
   const kid = d.kid;
   const li = (l, r, cls) => `<div class="mv2-li${cls ? ' ' + cls : ''}"><span>${l}</span><b>${r}</b></div>`;
-  const done = `<button type="button" class="rq-done" data-mny-action="rq-close">Done</button>`;
   if (d.kind === 'week') {
     const c = mnyCountdownData(kid), w = mnyWeekSoFar(kid, c);
     const get = k => (w.parts.find(p => p.k === k) || {}).v || 0;
@@ -834,7 +833,7 @@ function mnyInfoSheetBody(d) {
       + (c.unpaid.length ? `<div class="mv2-line">${escapeHtml(`${mnyMoney(unpaidTotal)} still to come · ${c.unpaid.length} week${c.unpaid.length === 1 ? '' : 's'} not settled yet`)}</div>` : '')
       + (w.data.passive < 0 ? `<div class="mv2-line">My companies are worth ${escapeHtml(mnyMoney(-w.data.passive))} less than last Sunday. That happens — it can go back up.</div>` : '')
       + mnyStrip(mnyWeekKey(), kid, -1)
-      + `<button type="button" class="mv2-btn" data-mny-action="prices-sheet">💷 What things pay ▸</button>` + done;
+      + `<button type="button" class="mv2-btn" data-mny-action="prices-sheet">💷 What things pay ▸</button>`;
   }
   if (d.kind === 'loan' || d.kind === 'loans') {
     const f = mnyLoanFacts(kid);
@@ -846,15 +845,15 @@ function mnyInfoSheetBody(d) {
     };
     if (d.kind === 'loan') {
       const r = f.rows.find(x => x.id === d.id);
-      if (!r) return `<div class="mv2-line">That loan is not on the wall any more.</div>${done}`;
+      if (!r) return `<div class="mv2-line">That loan is not on the wall any more.</div>`;
       return li('Left', `${escapeHtml(mnyMoney(r.left))} <span class="mv2-note">of ${escapeHtml(mnyMoney(r.principal))}</span>`)
         + li('Each month', escapeHtml(mnyMoney(r.monthly))) + li('Paid off by', escapeHtml(by(r)))
         + li('Interest so far', escapeHtml(mnyMoney(r.interestAdded))) + li('Early bonus earned', escapeHtml(mnyMoney(r.bonus)))
         + li('Late costs', escapeHtml(mnyMoney(r.lateCosts)), r.lateCosts > 0 ? 'mv2-late' : '')
-        + `<div class="mv2-li"><span class="mv2-bar"><i style="width:${Math.round(r.paidPct)}%"></i></span><b>${Math.round(r.paidPct)}% paid</b></div>`
-        + mnyDoor('info-loans', 'All loans side by side') + done;
+        + `<div class="mv2-li"><span class="mv2-bar"><i style="width:${Math.round(r.paidPct)}%"></i></span><span class="mv2-note">${Math.round(r.paidPct)}% paid</span></div>`
+        + mnyDoor('info-loans', 'All loans side by side');
     }
-    const head = `<tr><th></th>${f.rows.map(r => `<th>${escapeHtml(r.icon + ' ' + r.name)}</th>`).join('')}<th>All</th></tr>`;
+    const head = `<tr><th></th>${f.rows.map(r => `<th><span class="mv2-th-ico">${escapeHtml(r.icon)}</span>${escapeHtml(r.name)}</th>`).join('')}<th>All</th></tr>`;
     const all = { left: f.left, principal: f.principal, monthly: f.monthly, interestAdded: f.interestAdded, bonus: f.bonus, lateCosts: f.lateCosts };
     const freeAll = f.left <= 0 ? 'paid off' : f.freeBy ? formatDayKey(f.freeBy).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
     const rows = [['Left', 'left'], ['Borrowed', 'principal'], ['Each month', 'monthly'], ['Paid off by', null], ['Interest so far', 'interestAdded'], ['Early bonus', 'bonus'], ['Late costs', 'lateCosts']]
@@ -863,7 +862,7 @@ function mnyInfoSheetBody(d) {
     const bars = f.rows.map(r => `<div class="mv2-li"><span>${escapeHtml(r.icon + ' ' + r.name)}</span><span class="mv2-sbar"><i class="mv2-sw--earned" style="width:${(money2(r.principal - Math.max(0, r.left)) / scale * 100).toFixed(1)}%"></i><i class="mv2-sw--wall" style="width:${(Math.max(0, r.left) / scale * 100).toFixed(1)}%"></i></span><b>${escapeHtml(mnyMoney(r.left))}</b></div>`).join('');
     return `<div class="mv2-tablewrap"><table class="mv2-loantable">${head}${rows}</table></div>
       <div class="mv2-title mv2-title--sm">Left and paid on each loan</div>${bars}
-      <div class="mv2-line"><i class="mv2-sw mv2-sw--earned"></i>paid <i class="mv2-sw mv2-sw--wall"></i>left · bars drawn to the same scale (${escapeHtml(mnyShort$(scale))})</div>${done}`;
+      <div class="mv2-line"><i class="mv2-sw mv2-sw--earned"></i>paid <i class="mv2-sw mv2-sw--wall"></i>left · bars drawn to the same scale (${escapeHtml(mnyShort$(scale))})</div>`;
   }
   if (d.kind === 'waiting') {
     const wk = ctThisWeekKey();
@@ -873,7 +872,7 @@ function mnyInfoSheetBody(d) {
     const listed = deps.map(x => li(escapeHtml(`${sdIsHomeCash(x) ? '🏠' : '🎁'} ${x.giver || x.from || 'A gift'}`), escapeHtml(mnyMoney(x.amount))))
       .concat(locks.map(e => li('🔓 A lock came back', escapeHtml(mnyMoney(e.amount))))).join('');
     return `${listed || li('📥 Already in my wallet', escapeHtml(mnyMoney(mnyCash(kid))))}
-      <div class="mv2-line">It is not an account. On Sunday it joins my pile and I decide where every dollar goes.</div>${done}`;
+      <div class="mv2-line">It is not an account. On Sunday it joins my pile and I decide where every dollar goes.</div>`;
   }
   if (d.kind === 'goals') {
     const on = mnyGoalOnCard(kid);
@@ -888,10 +887,10 @@ function mnyInfoSheetBody(d) {
     return (rows || `<div class="mv2-line">No goal yet.</div>`)
       + (asked ? li(escapeHtml(`⏳ asked parents: ${asked.icon || '🎯'} ${asked.name}`), escapeHtml(mnyMoney(asked.target))) : '')
       + `<div class="mv2-line">Goal jars are inside Savings. ＋ asks parents for a new goal.</div>`
-      + `<button type="button" class="mv2-btn" data-mny-action="goal-new">＋ New goal</button>${done}`;
+      + `<button type="button" class="mv2-btn" data-mny-action="goal-new">＋ New goal</button>`;
   }
-  if (d.kind === 'month') return mnyCalendarBody(kid) + done;
-  return done;
+  if (d.kind === 'month') return mnyCalendarBody(kid);
+  return '';
 }
 
 /* What everything pays, straight from the rules — Money school's copy of the

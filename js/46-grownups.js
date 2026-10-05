@@ -317,7 +317,8 @@ function guCardValues(q) {
     ? (q.kind === 'goal' ? 'jar switches Sunday' : q.kind === 'adv' ? 'comes off Sunday' : q.kind === 'move' ? (to === 'wall' ? 'on the wall Sunday' : 'moves before Sunday') : 'in Sunday’s payday')
     : q.status === 'talk' ? 'still blocks payday' : 'she sees “not this time”';
   return { amt, ruleAmt, rulesLine, check, yesLabel, after,
-           amtLabel: q.kind === 'skip' ? '⛸️' : q.kind === 'dispute' && !(amt > 0) ? 'free' : guMoney$(amt),
+           amtLabel: q.kind === 'skip' ? '⛸️' : q.kind === 'dispute' && !(amt > 0) ? 'free'
+             : q.kind === 'adv' || q.kind === 'dispute' ? sdOff$(amt, guMoney$) : guMoney$(amt),
            stamp: { yes: '✓ YES', no: '✗ NO', talk: '💬 TALK' }[q.status] || '' };
 }
 function guApproveCard(q) {
@@ -339,7 +340,7 @@ function guApproveCard(q) {
       <button type="button" class="gu-undo" data-mnyp-action="guundo"${ids}>↺ Undo</button>
     </div>` : '';
   return `<div class="gu-req ${'gu-req--' + st}">
-      <div class="gu-req-top">${guKidChip(q.kid)}<span class="gu-kind">${escapeHtml(GU_KIND_LABEL[q.kind] || q.kind)}</span>
+      <div class="gu-req-top">${guKidChip(q.kid)}<span class="gu-tag" data-gu-tag="${escapeAttr(q.kind === 'move' && (q.record || {}).to === 'cash' ? 'cash' : q.kind)}">${escapeHtml(sdRequestTag(q.kind, (q.record || {}).to) || '❔ Ask')}</span><span class="gu-kind">${escapeHtml(GU_KIND_LABEL[q.kind] || q.kind)}</span>
         <span class="gu-amt">${adj ? `<button type="button" class="gu-step" data-mnyp-action="gupay" data-mnyp-d="-1"${ids} aria-label="One dollar less">−</button>` : ''}<b>${escapeHtml(v.amtLabel)}</b>${adj ? `<button type="button" class="gu-step" data-mnyp-action="gupay" data-mnyp-d="1"${ids} aria-label="One dollar more">+</button>` : ''}</span></div>
       <div class="gu-req-text">${escapeHtml(q.icon)} ${escapeHtml(q.text)}</div>
       <div class="gu-req-rules">${escapeHtml(v.rulesLine)}</div>
@@ -1198,7 +1199,7 @@ function guTypedWeekFields(kid, r) {
   const gap = money2(inTotal - money2(r.fines) - outTotal);
   return `<div class="gu-weekfix">
       ${GU_LED_FIELDS.map(([f, label, step]) => `<div class="gu-ovrow"><span>${escapeHtml(label)}</span>
-        <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="guled"${ids(f, -step)} aria-label="Less">−</button><b class="gu-num">${escapeHtml(mnyMoney(r[f]))}</b><button type="button" class="gu-step" data-mnyp-action="guled"${ids(f, step)} aria-label="More">+</button></span></div>`).join('')}
+        <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="guled"${ids(f, -step)} aria-label="Less">−</button><b class="gu-num">${escapeHtml(f === 'fines' ? sdOff$(r[f], mnyMoney) : mnyMoney(r[f]))}</b><button type="button" class="gu-step" data-mnyp-action="guled"${ids(f, step)} aria-label="More">+</button></span></div>`).join('')}
       <div class="gu-kv"><span>In minus out</span><b>${escapeHtml(mnySigned(gap))}</b></div>
       ${Math.abs(gap) > 0.005 ? `<div class="gu-line gu-warnline">These do not balance yet — ${escapeHtml(mnyMoney(Math.abs(gap)))} is unaccounted for.</div>` : ''}
       <button type="button" class="gu-btn" data-mnyp-action="guleddel" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(r.weekKey)}">Remove this week</button>
@@ -1295,7 +1296,7 @@ function guWeeksMain() {
    version. A row from before the ledger kept these keeps what it kept. */
 function guWeekRecord(kid, wk, r) {
   const head = `<div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))} · Sunday ${escapeHtml(mnyDayMonth(sdSundayOf(wk)))}</span></div>`;
-  if (!r) return `<div class="gu-card gu-record ${'gu-tint--' + kid}">${head}<div class="gu-line">No Sunday on record for this week.</div></div>`;
+  if (!r) return `<div class="gu-card gu-record gu-record--none ${'gu-tint--' + kid}"><div class="gu-line">${escapeHtml(`${mnyKidName(kid)} · no Sunday on record for ${mnyDayMonth(sdSundayOf(wk))}.`)}</div></div>`;
   const kv = (k, v, sub) => `<div class="gu-kv"><span>${escapeHtml(k)}${sub ? `<span class="gu-she">${escapeHtml(sub)}</span>` : ''}</span><b>${escapeHtml(v)}</b></div>`;
   const sec = (title, html) => html ? `<div class="gu-rec-sec"><div class="gu-rec-title">${escapeHtml(title)}</div>${html}</div>` : '';
   const m = (v) => mnyMoney(Number(v) || 0);
@@ -1324,9 +1325,11 @@ function guWeekRecord(kid, wk, r) {
   ].join('');
   const fines = mrFines(kid).filter(f => f && inDays(f.dayKey))
     .map(f => kv(`📦 ${guFineLabel(f.itemId)}`, '', `${guDayName(f.dayKey)} ${mnyDayMonth(f.dayKey)}${f.who ? ' · ' + f.who : ''}`)).join('');
-  const advs = mnyEnsureRequests(kid).filter(q => q && q.kind === 'adv' && q.appliedWeek === wk)
-    .map(q => kv(`⏪ ${q.why || 'Drawn early'}`, m(q.appliedAmount != null ? q.appliedAmount : q.amount),
-      q.agreed && q.agreed.asked != null ? `asked ${guMoney$(q.agreed.asked)} · agreed ${guMoney$(q.agreed.value)}` : '')).join('');
+  const advReqs = mnyEnsureRequests(kid).filter(q => q && q.kind === 'adv' && q.appliedWeek === wk);
+  const advLine = (amt, q) => `<div class="gu-kv gu-advline"><span>${escapeHtml(`⏪ Drawn early ${sdOff$(amt, mnyMoney)}${q && q.why ? ' · ' + q.why : ''}${q && q.agreed && q.agreed.asked != null ? ` (asked ${guMoney$(q.agreed.asked)}, agreed ${guMoney$(q.agreed.value)})` : ''}`)}</span></div>`;
+  const advs = advReqs.length
+    ? advReqs.map(q => advLine(q.appliedAmount != null ? q.appliedAmount : q.amount, q)).join('')
+    : (Number(r.advance) ? advLine(r.advance, null) : '');
   const agreed = mnyRequestsFor(kid).filter(q => q.applied && q.record.appliedWeek === wk && q.asked != null && q.kind !== 'adv')
     .map(q => kv(`💬 ${q.icon} ${q.text}`, `agreed ${guMoney$(q.agreed)}`, `asked ${guMoney$(q.asked)}`)).join('');
   const ov = ((getProfData(kid).earnings || {})[wk] || {}).overrides || {};
@@ -1370,7 +1373,7 @@ function guWeekRecord(kid, wk, r) {
   const signedAt = r.updatedAt || r.at;
   return `<div class="gu-card gu-record ${'gu-tint--' + kid}">${head}
       ${sec('💪 Payday', payday)}
-      ${sec('➖ Taken off', (Number(r.fines) ? kv('📦 Fines', '−' + m(r.fines)) : '') + fines + (Number(r.advance) ? kv('⏪ Drawn early', '−' + m(r.advance)) : '') + advs)}
+      ${sec('➖ Taken off', (Number(r.fines) ? kv('📦 Fines', sdOff$(r.fines, mnyMoney)) : '') + fines + advs)}
       ${sec('✏️ Changed by a grown-up', edits + (r.editReason && !edits ? kv('✏️ Lines changed', (r.edited || []).join(', '), mnyReasonLabel(r.editReason)) : ''))}
       ${sec('💬 Agreed at the meeting', agreed)}
       ${sec('🧱 Loan', loan)}

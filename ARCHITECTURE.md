@@ -4143,6 +4143,48 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
 - **"Earned this year" is the ledger's** (`guEarnedThisYear`, js/46), the
   same rows the Weeks list shows; Sunday's earning target reads it too.
 
+## Stage 7 — the comparison fixes, three rules, Calm and the phone (Plan v18 §W, build 2026-10-05a)
+
+- **Every money question is answered in Parent › Now, with its tag.** Now
+  already read all three stores through the one reader (`mnyRequestsFor` →
+  `guQueue`) and answered through the one answerer (`mnyAnswerRequest`);
+  each card now carries its category tag, `sdRequestTag(kind, to)` (js/43:
+  🏆 Result · ⛸️ Club · 🔀 Move · 💵 Cash out · 🏦 Cash in · ⏪ Draw early ·
+  🎁 Gift · 🎯 Goal · 📦 Fine — a move to `cash` is a cash out). Held by smoke
+  `everyMoneyRequestIsAnsweredInNow` (one of each kind, tag, answered there).
+- **Taken off is always negative.** A fine, money drawn early and early cash
+  agreed at the meeting go through `sdOff$(v, fmt)` (js/43): a minus whatever
+  sign the caller holds, never "−$0.00". Payday, My last 4 Sundays, Signed's
+  money out, the passbook's "This week so far", Weeks' record (one line per
+  early draw: "Drawn early −$1.00 · School book fair (asked $2, agreed $1)"),
+  Now's card and the meeting's agree card. Smoke `takenOffIsAlwaysNegative`.
+- **Spare room → bigger text.** Where a card has height to fill, its rows'
+  text grows first (Coming up by row count `mv2-coming--n*`, the passbook by
+  Sundays `mv2-booktable--n*`), within the house sizes; the passbook keeps
+  the reference's 426px and Coming up takes the rest (≥1100px).
+- **Lines wrap in Calm instead of spilling.** Calm's Lexend is wider than
+  Patrick Hand, so a label that fits in Pop must be allowed to wrap (payday
+  tiles, From Savings / From home, the legend chips, What I own's names, the
+  column notes, Coming up's dates). No look-specific layout rule was added;
+  in Calm the money step can grow past 834px and scrolls in `.mm-body`.
+- **The "gap $X" label is placed, not assumed** (`sdGapLabelSpot` /
+  `sdSegHitsBox`, js/43): in the shaded gap of the newest past segment that
+  fits, else beside or above/below the signed point, box-checked against
+  every line. **The own line is the reference green**, `--sd-own` (#2f7f62).
+- **The request sheet closes with its ×** (`.rq-x`, drawn by `rqRender`
+  inside `#requestBody` so the delegated listener hears it); the doors'
+  sheets have no "Done", the Move · Cash sheet has no "Not now" and one title
+  for its four modes. ⏪ Draw early is the reference's compact body
+  (`rqAdvBody`: one plain line, How much −/+, three reasons).
+- **Clock- and calendar-dependent smoke checks are pinned.**
+  `todayIsWhereTheDayGetsDone` pins `new Date()` to midday (its "always
+  ahead" block was clamped at 11pm, so it failed between 11pm and midnight).
+  `sundaySundayRoutineCounts`, `theFourHouseRulesHold`,
+  `grownupsFinesLogEvenWhenFree` and `anUnfinishedDayIsNeverForgiven` test
+  the Monday–Sunday money week and pin it (`pinMonSunMoneyWeek`, which
+  stands `mrMoneyWeekRuleOn` down for the check): from the week of Sun 11 Oct
+  2026 the current week is Sunday–Saturday and they failed by the date.
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

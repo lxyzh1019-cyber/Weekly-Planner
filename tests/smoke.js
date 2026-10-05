@@ -5564,6 +5564,22 @@ function findChromium() {
       d.alloc = sdAlloc(alloc || { extra: c.P.hers });
       return mnyDoCommit(kid, wk);
     };
+    /* Plan v18 (Stage 7): the checks written for the Monday–Sunday money week
+       (owner decision #93, the house rules' streak, the fines Day row) pin that
+       rule, the way the date checks pin the clock: from Sun 11 Oct 2026 the
+       current week is Sunday–Saturday (Deviation 34), which has its own checks
+       (theMoneyWeekRunsSundayToSaturday, aDayIsNeverPaidTwiceAcrossTheSwitch).
+       Without the pin these four passed or failed by the calendar date.
+       It also stands down the neighbours' frozen days (mrMoneySettledDays):
+       a later Sun–Sat week settled by an earlier check covers this week's
+       Sunday, which then reads "taken" — a switch-week case these checks are
+       not about (aDayIsNeverPaidTwiceAcrossTheSwitch is). */
+    window.pinMonSunMoneyWeek = () => {
+      const real = window.mrMoneyWeekRuleOn, realSettled = window.mrMoneySettledDays;
+      window.mrMoneyWeekRuleOn = () => false;
+      window.mrMoneySettledDays = () => null;
+      return () => { window.mrMoneyWeekRuleOn = real; window.mrMoneySettledDays = realSettled; };
+    };
     window.sdSnap = () => JSON.stringify(state);
     window.sdRestore = (snap) => {
       const s = JSON.parse(snap);
@@ -6838,6 +6854,8 @@ function findChromium() {
   // Owner decision #93: "Did you do your Sunday routine?" — a tick counts the
   // day; Mon–Sat kept and Sunday not ticked still pays the full tier.
   if (want('sundaySundayRoutineCounts')) checks.sundaySundayRoutineCounts = await page.evaluate(() => {
+    const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
+    try { return (() => {
     const snap = sdSnap(), unpin = sdPin(6);           // this week's Sunday, payday
     const bad = [];
     try {
@@ -6859,6 +6877,7 @@ function findChromium() {
     } catch (e) { bad.push('threw: ' + e.message); }
     finally { unpin(); sdRestore(snap); mmHide(); }
     return bad.length ? bad : true;
+    })(); } finally { unpinRule(); }
   });
 
   /* ── THE MONEY STREAM AGREES WITH THE WALLET ──────────────────────
@@ -6958,6 +6977,8 @@ function findChromium() {
      deducting, a streak that gets easier, a denominator that changes. The
      calibration tools hold the money; this holds the behaviour. */
   if (want('theFourHouseRulesHold')) checks.theFourHouseRulesHold = await page.evaluate(() => {
+    const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
+    try { return (() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -7137,6 +7158,7 @@ function findChromium() {
       getProfData(kid).chore.mandatoryByWeek[wk] = savedMand;
     }
     return problems.length ? problems : true;
+    })(); } finally { unpinRule(); }
   });
 
   /* ── THE HOUSE RULES REACH A STORED RULEBOOK ──────────────────────
@@ -14165,6 +14187,20 @@ function findChromium() {
   });
 
   if (want('todayIsWhereTheDayGetsDone')) checks.todayIsWhereTheDayGetsDone = await page.evaluate(async () => {
+    /* Plan v18 (Stage 7): the clock is pinned to midday in Edmonton, today.
+       The windows below are placed relative to now, but "always ahead" was
+       clamped at 11pm (1380), so between 11pm and midnight the piano block was
+       the RUNNING one — the hero owns it and the list showed 1 card ("expected
+       2 quest cards, got 1"). Pinned like pinClockToWeekday: only `new Date()`
+       moves, Date.now stays real for the blast's timers. The invariant is
+       unchanged: the whole day is reachable from Today. */
+    const RealDate = Date;
+    const [py, pm, pdd] = todayKey().split('-').map(Number);
+    const pinned = new RealDate(RealDate.UTC(py, pm - 1, pdd, 19, 0, 0));   // midday in Edmonton
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(pinned); };
+    Date.prototype = RealDate.prototype;
+    Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    try { return await (async () => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
@@ -14293,6 +14329,7 @@ function findChromium() {
     if (!wasLater) tdToggleLater();
     setDayBlocks(key, [], 'jenn');
     return bad.length === 0 || bad;
+    })(); } finally { Date = RealDate; }
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { profile = 'jenn'; goToday(); });
@@ -24000,6 +24037,8 @@ function findChromium() {
   if (want('grownupsFinesLogEvenWhenFree')) {
     await guSetup();
     checks.grownupsFinesLogEvenWhenFree = await page.evaluate(() => {
+      const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
+      try { return (() => {
       const bad = [];
       // Thursday of this week: Mon–Thu can be chosen, Fri–Sun have not happened.
       const unpin = c1.pin(3);
@@ -24042,6 +24081,7 @@ function findChromium() {
         if (mrFines(kid).some(f => f.id === id) || !state.shared.tombstones['fine:' + id]) bad.push('✕ did not remove the fine for good');
       } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); } finally { unpin(); }
       return bad.length ? bad : true;
+      })(); } finally { unpinRule(); }
     });
     await guTeardown();
   }
@@ -24538,6 +24578,8 @@ function findChromium() {
   if (want('anUnfinishedDayIsNeverForgiven')) {
     await guSetup();
     checks.anUnfinishedDayIsNeverForgiven = await page.evaluate(() => {
+      const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
+      try { return (() => {
       const bad = [];
       const kid = 'jenn', wk = getDayKeys(0)[0];
       const setWeek = (week, pattern) => {
@@ -24568,6 +24610,7 @@ function findChromium() {
       } catch (e) { bad.push('threw: ' + e.message); }
       finally { unpin(); }
       return bad.length ? bad : true;
+      })(); } finally { unpinRule(); }
     });
     await guTeardown();
   }
@@ -24870,7 +24913,8 @@ function findChromium() {
         openFamilyMeeting(); mnyMeetKid = kid; mmGoTo('money');
         const side = () => document.querySelector('#familyMeetingBody .sd-askgroup--talk');
         if (!side() || !side().querySelector(`[data-mny-action="sd-agreed"][data-sd-id="${adv.id}"]`)) bad.push('the talk item has no agreed − / + in "Parents answer first"');
-        if (side() && !/asked \$4/.test(side().textContent)) bad.push('the talk item does not say what she asked');
+        // Plan v18 §W: early cash is taken off, so the agree card shows it with a minus.
+        if (side() && !/asked −\$4/.test(side().textContent)) bad.push('the talk item does not say what she asked (with its minus): ' + side().textContent.replace(/\s+/g, ' ').slice(0, 120));
         side().querySelector(`[data-mny-action="sd-agreed"][data-sd-id="${adv.id}"][data-sd-d="-1"]`).click();
         side().querySelector(`[data-mny-action="sd-agreed"][data-sd-id="${adv.id}"][data-sd-d="-1"]`).click();
         const r1 = mnyEnsureRequests(kid).find(x => x.id === adv.id);
@@ -25229,6 +25273,159 @@ function findChromium() {
     finally { unpin(); sdRestore(snap); }
     return bad.length ? bad : true;
   });
+
+  /* ── Plan v18 §W (Stage 7): every money question is answered in Parent ›
+     Now, each card with its category tag. One of every kind a girl can send,
+     in all three stores (`req:` result · club · goal · draw early · fine;
+     `mvq:` move · cash out; `dep:` gift · cash in): each must be a card on
+     Now with the tag sdRequestTag names, and answerable there — the card's
+     own ✗ No (or ✓ for the gift) goes through mnyAnswerRequest and the
+     question stops waiting. */
+  if (want('everyMoneyRequestIsAnsweredInNow')) {
+    await guSetup();
+    checks.everyMoneyRequestIsAnsweredInNow = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn', wk = ctThisWeekKey(), days = mrWeekDayKeys(wk);
+        try { localStorage.removeItem('wp_now_scope'); localStorage.removeItem('wp_now_groupby'); } catch (e) {}
+        const fine = mrAddFine(kid, 'tone', todayKey(), { who: 'Mom' });
+        setDayBlocks(days[3], [...(getDayBlocks(days[3], kid) || []).filter(b => b.id !== 'v18-aj'),
+          { id: 'v18-aj', actId: 'assistant_job', startMin: 17 * 60, durationMin: 90 }], kid);
+        // Half the loan paid, so Savings and Locked away are open to move from and to.
+        sdOneLoan(kid, 100, 10).paid = 50;
+        getProfData(kid).holdings = getProfData(kid).holdings || [];
+        moneyAddCash(kid, 10, { kind: 'gift', from: 'gift', note: 'v18 seed' });
+        moneyDeposit(kid, 10);
+        profile = kid;
+        const made = {
+          comp: mnyAddRequest(kid, { kind: 'comp', sport: 'skate', name: 'V18 meet', dayKey: days[1], pts: 2, grp: 1 }),
+          skip: mnyAddRequest(kid, { kind: 'skip', blockId: 'v18-aj', dayKey: days[3], why: '🤒 Sick' }),
+          goal: mnyAddRequest(kid, { kind: 'goal', name: 'V18 goal', icon: '🎒', target: 20 }),
+          adv: mnyAddRequest(kid, { kind: 'adv', amount: 1, why: 'Treat' }),
+          dispute: fine ? mnyAddRequest(kid, { kind: 'dispute', fineId: fine.id, why: 'not me' }) : null,
+          move: mnyRequestMove(kid, 'ready', 'locked', 1, 'Want it to grow'),
+          cash: mnyRequestMove(kid, 'ready', 'cash', 1, 'Something I want to buy'),
+          deposit: mnyAddRequest(kid, { kind: 'deposit', amount: 2, note: 'into Savings', text: 'Put $2 cash in → Savings' }),
+          gift: mnyAddRequest(kid, { kind: 'gift', amount: 3, from: 'A gift', giver: 'V18 aunt', dayKey: todayKey() }),
+        };
+        profile = 'parent'; parentUnlockedThisSession = true;
+        Object.keys(made).forEach(k => { if (!made[k]) bad.push('could not send a ' + k + ' request: ' + window.__guToasts.slice(-3).join(' | ')); });
+        const wrap = guOpen('approve');
+        const card = (id) => { const b = wrap.querySelector(`[data-mnyp-id="${id}"]`); return b ? b.closest('.gu-req') : null; };
+        Object.keys(made).forEach(k => {
+          const r = made[k];
+          if (!r) return;
+          const want = sdRequestTag(k === 'cash' ? 'move' : k, k === 'cash' ? 'cash' : r.to);
+          const c = card(r.id);
+          if (!c) { bad.push(`${k} is not on Now`); return; }
+          const tag = c.querySelector('.gu-tag');
+          if (!tag || tag.textContent.trim() !== want) bad.push(`${k} carries tag "${tag ? tag.textContent.trim() : 'none'}", not "${want}"`);
+        });
+        // Answer each from its own card: ✓ for the gift, ✗ No for the rest.
+        Object.keys(made).forEach(k => {
+          const r = made[k];
+          if (!r) return;
+          const c = card(r.id);
+          const btn = c && c.querySelector(k === 'gift' ? '[data-mnyp-action="guyes"]' : '[data-mnyp-action="guno"]');
+          if (!btn) { bad.push(`${k} cannot be answered on Now`); return; }
+          btn.click();
+          const q = mnyRequestsFor(kid).find(x => x.id === r.id);
+          if (!q || q.open) bad.push(`${k} is still waiting after its answer on Now (${q ? q.status : 'gone'})`);
+        });
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* ── Plan v18 §W: taken off is always negative ── a fine, money drawn early
+     and early cash agreed at the meeting show with a minus wherever they
+     appear: Payday (its Taken off box and My last 4 Sundays), Signed's money
+     out, the passbook's "This week so far", Grown-ups › Weeks' record, the
+     Now card and the meeting's agree card. Today shows no taken-off amount at
+     all, and must not show one without its minus. */
+  if (want('takenOffIsAlwaysNegative')) {
+    await guSetup();
+    checks.takenOffIsAlwaysNegative = await page.evaluate(() => {
+      const snap = sdSnap(), unpin = sdPin(6);
+      const bad = [];
+      // Every "$x" in this text that is not $0 must carry a minus.
+      const plusIn = (where, text) => {
+        const hits = (String(text).match(/(^|[^−\-\w])\$\d+(\.\d+)?/g) || []).filter(m => !/\$0(\.00)?$/.test(m));
+        if (hits.length) bad.push(`${where}: ${hits.map(h => h.trim()).join(', ')} without a minus in "${String(text).replace(/\s+/g, ' ').trim().slice(0, 90)}"`);
+      };
+      try {
+        const kid = 'jenn';
+        const wk = sdSeedWeek(kid);
+        const day = mrMoneyDayKeys(wk, kid).find(k => k <= todayKey()) || todayKey();
+        mrAddFine(kid, 'box_repeat', day, { who: 'Mom' });
+        const adv = mnyAddRequest(kid, { kind: 'adv', amount: 2, why: 'School book fair', status: 'yes', dayKey: day });
+        if (!adv) bad.push('could not seed an early draw');
+        // 💬 The meeting's agree card: early cash agreed is taken off.
+        const talk = mnyAddRequest(kid, { kind: 'adv', amount: 1, why: 'Treat', dayKey: day });
+        if (talk) {
+          mnyAnswerRequest(kid, talk.id, 'talk');
+          renderMeetingMode();
+          const ag = [...sdBody().querySelectorAll('.sd-agree')].map(e => e.textContent).join(' ');
+          if (!ag) bad.push('the meeting shows no agree card for the early draw');
+          plusIn('meeting agree card', ag);
+          // ✅ Now: the early draw's card amount.
+          showScreen('parent'); setParentTab('now');
+          const c = document.querySelector(`#pnWrap [data-mnyp-id="${talk.id}"]`);
+          const amt = c && c.closest('.gu-req').querySelector('.gu-amt b');
+          if (!amt) bad.push('Now has no card for the early draw');
+          else plusIn('Now card', amt.textContent);
+          mnyAnswerRequest(kid, talk.id, 'no');
+          mnyMeetKid = kid; mmGoTo('money');
+        }
+        sdReveal(kid);
+        const off = sdBody().querySelector('.sd-box--off');
+        if (!off) bad.push('Payday has no Taken off box');
+        else {
+          const amts = [...off.querySelectorAll('b')].map(b => b.textContent).join(' ');
+          if (!/−\$/.test(amts)) bad.push('Payday Taken off shows no minus at all: ' + amts);
+          plusIn('Payday Taken off', amts);
+        }
+        const l4 = [...sdBody().querySelectorAll('.sd-l4 tr')].find(tr => /Taken off/.test(tr.textContent));
+        if (!l4) bad.push('My last 4 Sundays has no Taken off row');
+        else plusIn('My last 4 Sundays', [...l4.querySelectorAll('td')].slice(1).map(td => td.textContent).join(' '));
+        // 📊 The passbook's "This week so far" sheet, read as she sees it.
+        profile = kid; mnyOpenRequestSheet('week', { kid });
+        const li = [...document.querySelectorAll('#requestBody .mv2-li')].find(e => /Taken off/.test(e.textContent));
+        if (!li) bad.push('This week so far has no Taken off line');
+        else plusIn('This week so far', li.querySelector('b').textContent);
+        rqClose(); profile = 'parent';
+        // ✍️ Signed.
+        const out = sdSignHer(kid, wk);
+        if (!out || !out.ok) bad.push('the sign refused: ' + (out && out.why));
+        else {
+          sdCur().signed = sdSignedFromLedger(kid, wk); sdCur().step = 3; sdSave(sdCur()); renderMeetingMode();
+          const rows = [...sdBody().querySelectorAll('.sd-flow')].filter(f => /Fine|Drawn early/.test(f.textContent));
+          if (!rows.length) bad.push('Signed shows neither the fine nor the early draw');
+          rows.forEach(f => plusIn('Signed money out', f.querySelector('b').textContent));
+          // 📒 Weeks: the record's Taken off section.
+          const rec = document.createElement('div');
+          rec.innerHTML = guWeekRecord(kid, wk, state.shared.chore.moneyLedger[wk][kid]);
+          const sec = [...rec.querySelectorAll('.gu-rec-sec')].find(s => /Taken off/.test(s.textContent));
+          if (!sec) bad.push('the Weeks record has no Taken off section');
+          else {
+            plusIn('Weeks record', [...sec.querySelectorAll('.gu-kv')].map(e => e.textContent).join(' '));
+            const advLines = [...sec.querySelectorAll('.gu-kv')].filter(e => /Drawn early|School book fair/.test(e.textContent));
+            if (advLines.length !== 1) bad.push(`the early draw is ${advLines.length} lines in Weeks, not one`);
+          }
+        }
+        // ☀️ Today: no taken-off amount, and never one without its minus.
+        profile = kid; goToday();
+        const today = document.getElementById('tdWrap').textContent;
+        const m = today.match(/Taken off[^$−]{0,20}\$\d/);
+        if (m) bad.push('Today shows a taken-off amount without its minus: ' + m[0]);
+        profile = 'parent';
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      finally { unpin(); sdRestore(snap); mmHide(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
 
   if (want('passbookShowsTheLastFourSundays')) {
     await guSetup(); await page.evaluate(MV2_SEED_SRC);

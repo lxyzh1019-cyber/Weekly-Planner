@@ -580,10 +580,9 @@ const RQ_SWIM_EVENTS = ['50 Free', '100 Free', '200 Free', '50 Back', '100 Back'
 const RQ_GOAL_ICONS = ['🎒', '⛸️', '🛼', '🏊', '📚', '🎧', '🎨', '🧸'];
 const RQ_MOVE_WHY = ['Something I want to buy', 'Saving for my goal', 'Loan gone sooner', 'Want it to grow'];
 const RQ_SKIP_WHY = ['🤒 Sick', '📚 School thing', '🚗 Family trip', 'Something else'];
-const RQ_ADV_WHY = ['School book fair', 'Snack with friends', 'A gift for someone', 'Something else'];
+const RQ_ADV_WHY = [['📚', 'School book fair'], ['🍦', 'Treat'], ['✏️', 'Something else']];
 const RQ_TITLES = { result: '🏆 Tell parents a result', club: '⛸️ My club sessions', goal: '🎯 A new saving goal',
-                    adv: '⏪ Draw in advance', list: '⏳ Everything I asked parents',
-                    move: '🔀 Move money', cash: '💵 Cash out', dep: '🏦 Put cash in', early: '⏪ Draw early',
+                    list: '⏳ Everything I asked parents', move: '🔀 Move · 💵 Cash',
                     gift: '🎁 I was given something', prices: '💷 What things pay' };
 const RQ_GIFT_CHIPS = [5, 10, 20, 50];
 // What each home is called on these sheets (handoff §5). The 🧱 wall is no
@@ -856,7 +855,7 @@ function rqMoveBody(kid, d) {
     return rqOpt(RQ_HOMES[h] + (shut ? ` 🔒${gate(h)}%` : ''), d.to === h, 'rq-to', ` data-mny-id="${h}"`, shut ? mnyNeedLabel(evHomeNeed(h)) : '');
   }).join(''));
   const rows = d.mode === 'dep' ? [modeRow, amtRow, toRow] : d.mode === 'cash' ? [modeRow, fromRow, amtRow, whyRow] : [modeRow, fromRow, toRow, amtRow, whyRow];
-  return rows.join('') + rqPreviewAndFoot();
+  return rows.join('') + rqPreviewAndFoot({ notNow: false });
 }
 
 /* The four modes of the 🔀 Move · 💵 Cash sheet (Plan v17 §1). */
@@ -875,15 +874,18 @@ function rqAdvState(kid, d) {
   const amt = Math.min(d.amt || 1, Math.max(1, left));
   const ready = !!(d.why && left >= 1);
   const preview = left < 1 ? `I already drew ${rqDollars(used)} in advance this week. That's the most.`
-    : `A parent gives me $${amt} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is $${amt} smaller.`;
+    : '⏪ Draw early: money I need before Sunday. It comes off next Sunday’s payday.';
   return { ready, preview, amt, left, need: left < 1 ? preview : 'What is it for?' };
 }
+/* The reference's compact body (Plan v18 B4): one plain line, How much
+   − $ +, three reasons, Send to parents. No step numbers, no "Not now" —
+   the sheet's × closes it. */
 function rqAdvBody(kid, d) {
   const st = rqAdvState(kid, d);
-  return rqRow('① How much?',
-      `${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal('$' + st.amt)}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}`)
-    + rqRow('② What for?', RQ_ADV_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''))
-    + rqPreviewAndFoot();
+  return `<div class="rq-plain" data-rq-preview>${escapeHtml(st.preview)}</div>
+    <div class="rq-amtline"><span class="rq-q">How much</span>${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}<b class="rq-amtval">$${st.amt}</b>${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}</div>
+    <div class="rq-opts">${RQ_ADV_WHY.map(([icon, w]) => rqOpt(icon + ' ' + w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join('')}</div>`
+    + rqPreviewAndFoot({ notNow: false, preview: false });
 }
 
 /* 🎯 A new goal — the jar switches on Sunday once Dad says yes. */
@@ -969,8 +971,7 @@ function rqPricesBody() {
   const r = mrRules();
   const changed = JSON.stringify(r) !== JSON.stringify(mrRulesForWeek(mnyWeekKey()));
   return `${changed ? `<p class="rq-lead">Something changed price this week. These are the new prices, from now on — what I already did this week still pays what it was worth then.</p>` : ''}
-    <div class="mny-prices rq-prices">${pmPriceCards(r, false)}</div>
-    <button type="button" class="rq-done" data-mny-action="rq-close">Done</button>`;
+    <div class="mny-prices rq-prices">${pmPriceCards(r, false)}</div>`;
 }
 
 /* ⏳ What she asked, newest first, with its answer in her words. */
@@ -990,7 +991,7 @@ function rqStatusText(q) {
 function rqListBody(kid) {
   const rows = mnyRequestsFor(kid).slice().reverse().map(q => `<div class="rq-chip ${'rq-chip--' + (q.status || 'open')}"><span>${escapeHtml(q.icon)} ${escapeHtml(q.text)}</span><b>${escapeHtml(rqStatusText(q))}</b></div>`).join('')
     || `<div class="rq-empty">Nothing asked yet.</div>`;
-  return `${rows}${rqGiftsList(kid)}<button type="button" class="rq-done" data-mny-action="rq-close">Done</button>`;
+  return `${rows}${rqGiftsList(kid)}`;
 }
 /* 🎁 The gifts on record, newest first (the last ten): from whom, when, and
    where each stands. A grown-up taps one to correct it through the Record
@@ -1009,12 +1010,15 @@ function rqGiftsList(kid) {
   }).join('')}`;
 }
 
-/* The preview line and the two buttons every asking sheet ends with. */
-function rqPreviewAndFoot() {
+/* The preview line and the buttons every asking sheet ends with. The
+   Move · Cash sheet has no "Not now" — its × closes it, as drawn (Plan v18
+   B4); Draw early says its one line itself (`preview: false`). */
+function rqPreviewAndFoot(o) {
   const st = rqState();
-  return `<div class="rq-preview" data-rq-preview>${escapeHtml(st.preview || '')}</div>
+  const opt = o || {};
+  return `${opt.preview === false ? '' : `<div class="rq-preview" data-rq-preview>${escapeHtml(st.preview || '')}</div>`}
     <div class="rq-foot">
-      <button type="button" class="rq-notnow" data-mny-action="rq-close">Not now</button>
+      ${opt.notNow === false ? '' : '<button type="button" class="rq-notnow" data-mny-action="rq-close">Not now</button>'}
       <button type="button" class="rq-send${st.ready ? ' ready' : ''}" data-mny-action="rq-send">Send to parents →</button>
     </div>`;
 }
@@ -1025,7 +1029,7 @@ function rqRender() {
   const d = rqDraft, kid = d.kid;
   const title = document.getElementById('rqSheetTitle');
   // The result sheet's line sits beside its title, on one line (M8-2).
-  if (title) title.innerHTML = escapeHtml(MNY_INFO_KINDS.indexOf(d.kind) >= 0 ? mnyInfoSheetTitle(d) : d.kind === 'move' ? RQ_TITLES[d.mode] : RQ_TITLES[d.kind])
+  if (title) title.innerHTML = escapeHtml(MNY_INFO_KINDS.indexOf(d.kind) >= 0 ? mnyInfoSheetTitle(d) : RQ_TITLES[d.kind])
     + (d.kind === 'result' ? ' <span class="rq-titlesub">The official results sheet decides. A parent checks it before anything pays.</span>' : '');
   const sheet = host.closest('.sheet');
   if (sheet) sheet.setAttribute('data-rq-kind', d.kind);
@@ -1038,7 +1042,7 @@ function rqRender() {
   else if (d.kind === 'prices') body = rqPricesBody();
   else if (MNY_INFO_KINDS.indexOf(d.kind) >= 0) body = mnyInfoSheetBody(d);
   else body = rqListBody(kid);
-  host.innerHTML = body;
+  host.innerHTML = `<button type="button" class="rq-x" data-mny-action="rq-close" aria-label="Close">✕</button>${body}`;
 }
 
 /* Typing changed something the button and the preview say: update those two,
