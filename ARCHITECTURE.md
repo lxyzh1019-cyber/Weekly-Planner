@@ -4143,7 +4143,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
 - **"Earned this year" is the ledger's** (`guEarnedThisYear`, js/46), the
   same rows the Weeks list shows; Sunday's earning target reads it too.
 
-## Stage 7 — the comparison fixes, three rules, Calm and the phone (Plan v18 §W, build 2026-10-05a)
+## Stage 7 — the comparison fixes, three rules, Calm and the phone (Plan v18 §W, build 2026-10-05b)
 
 - **Every money question is answered in Parent › Now, with its tag.** Now
   already read all three stores through the one reader (`mnyRequestsFor` →
@@ -4176,6 +4176,19 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   sheets have no "Done", the Move · Cash sheet has no "Not now" and one title
   for its four modes. ⏪ Draw early is the reference's compact body
   (`rqAdvBody`: one plain line, How much −/+, three reasons).
+- **Calm's tight labels read a fit factor, not a second layout.** `--mny-fit`
+  (Pop 1, Calm 0.82) multiplies the font size of the money screens' tight
+  labels, always as `max(13px, calc(<size> * var(--mny-fit, 1) *
+  var(--text-scale, 1)))`, so Pop is unchanged, Calm's wider Lexend fits the
+  same boxes and the 13px floor holds. Two widths are look tokens too
+  (`--sd-legend-w`, `--sd-own-name-w`). A new tight label on these screens
+  takes the same form.
+- **Phone heads are two rows; a describing word is `.ph-word`.** Under 768px
+  it hides and the icon, number or picture stays; the control carries its
+  full name in `aria-label`. My money's head breaks into rows with an
+  `::after` row break and `order`.
+- **Now's count has one reader**, `pnOpenCount(kids)` (js/32): the badge and
+  "N open" agree.
 - **Clock- and calendar-dependent smoke checks are pinned.**
   `todayIsWhereTheDayGetsDone` pins `new Date()` to midday (its "always
   ahead" block was clamped at 11pm, so it failed between 11pm and midnight).

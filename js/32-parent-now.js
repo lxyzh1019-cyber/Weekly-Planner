@@ -67,13 +67,18 @@ function pnBacklog() {
 /* The badge on the destination itself: four possible things, counted once,
    and every question the girls asked that is still open (`guWaitingCount`,
    the one number) — they are answered on Now (Deviation 36). */
-function pnWaitingCount() {
+function pnWaitingCount() { return pnOpenCount(['jenn', 'jess']); }
+/* The one count (Plan v18 Stage 7): the badge, and "N open" over ✅ Waiting
+   for you, read the same — one for each line above the cards (a backlog,
+   chores to grade, activities, a note) and one for each open question of the
+   girls in scope (💬 talk-first included: it still blocks payday). */
+function pnOpenCount(kids) {
   const c = pnClaimCounts();
   return (pnBacklog().length ? 1 : 0)
        + (c.total ? 1 : 0)
        + (pnPendingActs().length ? 1 : 0)
        + (pnNoteKids().length ? 1 : 0)
-       + (typeof guWaitingCount === 'function' ? guWaitingCount() : 0);
+       + kids.reduce((n, k) => n + mnyRequestsFor(k).filter(q => q.open).length, 0);
 }
 
 /* ── The queue ──
@@ -522,7 +527,7 @@ function pnRenderNow() {
   /* The queue's backlog line is the only representation of the backlog here
      (the catch-up screen is where that work happens; the meeting hub still
      lists the weeks). */
-  const open = pnScopeKids().reduce((n, k) => n + mnyRequestsFor(k).filter(q => q.open).length, 0);
+  const open = pnOpenCount(pnScopeKids());
   wrap.innerHTML = `<div class="pn-grid">
       <div class="pn-main">
         <div class="pn-wait-head">

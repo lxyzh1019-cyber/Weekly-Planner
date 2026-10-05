@@ -1821,8 +1821,8 @@ function mnyTabBar(cur, opts) {
     const sel = t.id === cur;
     const n = MNY_TABS.indexOf(t) + 1;
     return `<button type="button" class="mny-tab${sel ? ' on' : ''}"${sel ? ' aria-current="page"' : ''}
-        data-mny-action="tab" data-mny-tab="${t.id}">
-        <span>${compact ? '' : n + ' '}${t.icon} ${escapeHtml(t.label)}</span>
+        data-mny-action="tab" data-mny-tab="${t.id}"${compact ? ` aria-label="${escapeAttr(t.label)}"` : ''}>
+        <span>${compact ? `${t.icon}<span class="ph-word"> ${escapeHtml(t.label)}</span>` : `${n} ${t.icon} ${escapeHtml(t.label)}`}</span>
         ${t.who === 'kid' || t.who === 'optional' ? '' : `<span class="mny-tab-tag">${escapeHtml(t.who)}</span>`}
       </button>`;
   }).join('')}</nav>`;

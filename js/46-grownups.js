@@ -59,7 +59,7 @@ const GU_DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const GU_EXPECT_ADDS = [['🎂 Birthday', 20], ['🎄 Christmas', 20], ['🧧 New Year', 50], ['🏆 Meet', 12]];
 const GU_KIND_LABEL = { goal: 'wants a new goal', comp: 'says a result', gift: 'gift came in', move: 'asks to move',
                         dispute: 'disputes a fine', adv: 'wants to draw early', deposit: 'puts cash in',
-                        skip: 'can’t make a session' };
+                        skip: 'can’t make a session', cash: 'asks to cash out' };
 const GU_WORDS_STAGE = { 1: 'earn · save · owe', 2: '+ income · interest · cash flow', 3: '+ assets · debt · net worth' };
 
 /* ⚙️ Rules — the prototype's DEFS, row for row, each on its Plan v3 §C path,
@@ -323,6 +323,7 @@ function guCardValues(q) {
 }
 function guApproveCard(q) {
   const v = guCardValues(q);
+  const tk = q.kind === 'move' && (q.record || {}).to === 'cash' ? 'cash' : q.kind;   // a move to cash is a cash out: its tag and its words
   const st = q.status || 'open';
   const ids = ` data-mnyp-id="${escapeAttr(q.id)}" data-mnyp-kid="${q.kid}"`;
   /* As drawn: ✓ / 💬 / ✗ while nobody has answered; once answered — "let's
@@ -340,7 +341,7 @@ function guApproveCard(q) {
       <button type="button" class="gu-undo" data-mnyp-action="guundo"${ids}>↺ Undo</button>
     </div>` : '';
   return `<div class="gu-req ${'gu-req--' + st}">
-      <div class="gu-req-top">${guKidChip(q.kid)}<span class="gu-tag" data-gu-tag="${escapeAttr(q.kind === 'move' && (q.record || {}).to === 'cash' ? 'cash' : q.kind)}">${escapeHtml(sdRequestTag(q.kind, (q.record || {}).to) || '❔ Ask')}</span><span class="gu-kind">${escapeHtml(GU_KIND_LABEL[q.kind] || q.kind)}</span>
+      <div class="gu-req-top">${guKidChip(q.kid)}<span class="gu-tag" data-gu-tag="${escapeAttr(tk)}">${escapeHtml(sdRequestTag(q.kind, (q.record || {}).to) || '❔ Ask')}</span><span class="gu-kind">${escapeHtml(GU_KIND_LABEL[tk] || q.kind)}</span>
         <span class="gu-amt">${adj ? `<button type="button" class="gu-step" data-mnyp-action="gupay" data-mnyp-d="-1"${ids} aria-label="One dollar less">−</button>` : ''}<b>${escapeHtml(v.amtLabel)}</b>${adj ? `<button type="button" class="gu-step" data-mnyp-action="gupay" data-mnyp-d="1"${ids} aria-label="One dollar more">+</button>` : ''}</span></div>
       <div class="gu-req-text">${escapeHtml(q.icon)} ${escapeHtml(q.text)}</div>
       <div class="gu-req-rules">${escapeHtml(v.rulesLine)}</div>

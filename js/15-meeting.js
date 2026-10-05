@@ -944,7 +944,7 @@ function renderMeetingMode() {
   const stepper = MM_STEPS.map((st, i) => {
     const n = i + 1;
     const cls = n === mmStep ? 'mm-step-cur' : (n < mmStep ? 'mm-step-done' : 'mm-step-up');
-    return `<button type="button" class="mm-step ${cls}" onclick="mmGoIndex(${n})">${n}·${escapeHtml(st.label)}</button>`;
+    return `<button type="button" class="mm-step ${cls}" onclick="mmGoIndex(${n})" aria-label="${escapeAttr(n + ' · ' + st.label)}">${n}<span class="ph-word">·${escapeHtml(st.label)}</span></button>`;
   }).join('');
 
   // Catch-up mode replaces the stepper entirely: a week nobody is going to
@@ -1005,12 +1005,12 @@ function renderMeetingMode() {
    hides while the head shows. */
 function mmHead(wk, stepper, id) {
   const late = mrWeeksSince(wk);
-  const week = `<span class="mm-head-wk">${escapeHtml(`Week of ${mmWeekLabel(wk)}`)}</span>`
+  const week = `<span class="mm-head-wk"><span class="ph-word">Week of </span>${escapeHtml(mmWeekLabel(wk))}</span>`
     + (late ? `<span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
        <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button>` : '');
   const money = id === 'money' && typeof sdMeetingAvatars === 'function';
   return `<div class="mm-head mm-head--two${late ? ' late' : ''}">
-      <div class="mm-head-r1">${money ? sdMeetingAvatars(wk) : ''}<h2 class="mm-head-title">👨‍👧‍👧 Family meeting</h2><div class="mm-stepper">${stepper}</div><span class="mm-head-right">${week}</span></div>
+      <div class="mm-head-r1">${money ? sdMeetingAvatars(wk) : ''}<h2 class="mm-head-title" aria-label="Family meeting">👨‍👧‍👧<span class="ph-word"> Family meeting</span></h2><div class="mm-stepper">${stepper}</div><span class="mm-head-right">${week}</span></div>
       <div class="mm-head-r2">${money ? sdMeetingStepRow(wk) : mmLastReviewedLine()}</div>
     </div>`;
 }

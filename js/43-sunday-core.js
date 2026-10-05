@@ -607,7 +607,9 @@ function sdForecast(res, w, rules, nW) {
     ? `🎉 paid off within ${n === 1 ? 'a week' : n === 4 ? 'a month' : '5 months'}`
     : `free by ${sdMonthYear(x.weekKey, perP > 0 ? Math.ceil(left / perP) : Infinity)}`;
   const toReady = readyOpen ? goalOver : 0;
-  const rows = [['ready', '🏦 Savings'], ['goal', '🎯 ' + gName], ['gic', '🔒 Locked'], ['stock', '📈 Companies']].map(([k, name]) => {
+  // A goal named with its own picture keeps it; only a bare name gets 🎯 (Plan v18: no "🎯 🛼").
+  const goalLabel = /^\p{Extended_Pictographic}/u.test(String(gName)) ? String(gName) : '🎯 ' + gName;
+  const rows = [['ready', '🏦 Savings'], ['goal', goalLabel], ['gic', '🔒 Locked'], ['stock', '📈 Companies']].map(([k, name]) => {
     const bal = after.pots[k] || 0;
     let put = sdR2((sg[k] || 0) * n);
     if (k === 'goal' && goalOver) put = sdR2(Math.max(0, gT - bal));

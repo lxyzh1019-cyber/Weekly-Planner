@@ -23898,7 +23898,9 @@ function findChromium() {
         let wrap = guOpen('approve');
         if (!/Nothing waiting\. When they tap 🏆 or 🔀 on My money, it lands here\./.test(wrap.textContent)) bad.push('the empty queue does not say so');
         // Plan v9 §N (Deviation 36): answered on Parent › Now — "N open" beside ✅ Waiting for you.
-        if (!/0 open/.test((wrap.querySelector('.pn-count') || {}).textContent || '')) bad.push('the tab does not count 0');
+        // Plan v18 Stage 7: "N open" is the one count — the lines above the cards (pnOpenCount([])) plus the questions.
+        const openSays = (k) => new RegExp('^' + (pnOpenCount([]) + k) + ' open$');
+        if (!openSays(0).test(((wrap.querySelector('.pn-count') || {}).textContent || '').trim())) bad.push('the tab does not count 0');
         const days = mrWeekDayKeys(ctThisWeekKey());
         profile = 'jess';
         const comp = mnyAddRequest('jess', { kind: 'comp', sport: 'swim', name: 'Time trial', custom: true, dayKey: days[1],
@@ -23912,7 +23914,7 @@ function findChromium() {
         const cards = () => [...document.querySelectorAll('#pnWrap .gu-req')];
         const card = (txt) => cards().find(c => c.textContent.indexOf(txt) >= 0);
         if (cards().length !== 3) bad.push('expected 3 cards, saw ' + cards().length);
-        if (!/3 open/.test((wrap.querySelector('.pn-count') || {}).textContent || '')) bad.push('the tab does not count 3 waiting');
+        if (!openSays(3).test(((wrap.querySelector('.pn-count') || {}).textContent || '').trim())) bad.push('the tab does not count 3 waiting');
         const c = card('Time trial');
         if (!c) { bad.push('the result card is missing'); return bad; }
         if (!/says a result/.test(c.textContent) || !/\$10/.test(c.querySelector('.gu-amt').textContent)) bad.push('the result card does not show its kind and the rules\' $10: ' + c.textContent);
@@ -23931,7 +23933,7 @@ function findChromium() {
         // 💬 Talk first still waits; ↺ Undo reopens; ✗ No is kept.
         card('Draw $2').querySelector('[data-mnyp-action="gutalk"]').click();
         if (!/💬 TALK/.test(card('Draw $2').textContent) || !/still blocks payday/.test(card('Draw $2').textContent)) bad.push('talk first shows no 💬 TALK stamp');
-        if (!/3 open/.test((document.querySelector('#pnWrap .pn-count') || {}).textContent || '')) bad.push('a "let\'s talk" stopped counting as waiting');
+        if (!openSays(3).test(((document.querySelector('#pnWrap .pn-count') || {}).textContent || '').trim())) bad.push('a "let\'s talk" stopped counting as waiting');
         if (!document.querySelector('#pnWrap .pn-group--talk') || !/Draw \$2/.test(document.querySelector('#pnWrap .pn-group--talk').textContent)) bad.push('talk first did not go to "To talk about on Sunday"');
         card('Draw $2').querySelector('[data-mnyp-action="guundo"]').click();
         card('Draw $2').querySelector('[data-mnyp-action="guno"]').click();
@@ -24559,10 +24561,11 @@ function findChromium() {
         if (guWaitingCount() !== 2) bad.push('guWaitingCount is ' + guWaitingCount() + ', not 2');
         showScreen('parent'); renderParentHome(); setParentTab('now');
         const count = (document.querySelector('#pnWrap .pn-count') || {}).textContent || '';
-        if (count.trim() !== guWaitingCount() + ' open') bad.push('Now does not count both questions: ' + count);
+        // Plan v18 Stage 7: one count — "N open", the badge and pnOpenCount agree, and N holds both questions.
+        if (count.trim() !== pnWaitingCount() + ' open' || pnWaitingCount() < guWaitingCount()) bad.push('Now does not count both questions with the lines above them: ' + count + ' vs ' + pnWaitingCount());
         if (document.querySelectorAll('#pnWrap .gu-req--open').length !== 2) bad.push('Now does not draw both questions as cards');
         const badge = document.getElementById('pnTabBadge');
-        if (!badge || badge.hidden || Number(badge.textContent) < 2) bad.push('the Now tab badge does not carry them: ' + (badge && badge.textContent));
+        if (!badge || badge.hidden || Number(badge.textContent) !== pnWaitingCount()) bad.push('the Now tab badge does not read the same count: ' + (badge && badge.textContent) + ' vs ' + count);
       } catch (e) { bad.push('threw: ' + e.message); }
       return bad.length ? bad : true;
     });
@@ -25422,6 +25425,76 @@ function findChromium() {
         profile = 'parent';
       } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
       finally { unpin(); sdRestore(snap); mmHide(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* ── Plan v18 (owner, 2026-10-05): "This fine is wrong" ── a girl disputes a
+     fine from My money's "📊 This week so far" sheet, where each fine of the
+     week is listed under ➖ Taken off with its own button. It lands in Parent ›
+     Now tagged 📦 Fine; a parent's ✓ takes the fine away (mrRemoveFine, through
+     mnyAnswerRequest). One open question per fine; a free fine says "free". */
+  if (want('aGirlCanDisputeAFine')) {
+    await guSetup();
+    checks.aGirlCanDisputeAFine = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        const keys = mrMoneyDayKeys(mnyWeekKey(), kid);
+        const day = keys.filter(k => k <= todayKey()).pop() || keys[0];
+        getProfData(kid).fines = mrFines(kid).filter(f => keys.indexOf(f.dayKey) < 0);
+        const fine = mrAddFine(kid, 'box_repeat', day, { who: 'Mom' });
+        const free = mrAddFine(kid, 'tone', day, { who: 'Mom' });
+        profile = kid;
+        mnyOpenRequestSheet('week', { kid });
+        const btn = (id) => document.querySelector(`#requestBody [data-mny-action="fine-dispute"][data-mny-id="${id}"]`);
+        const row = (id) => { const b = btn(id); return b ? b.closest('.mv2-fine') : null; };
+        if (!btn(fine.id)) bad.push('the fine has no "This fine is wrong" button in This week so far');
+        else {
+          if (!/−\$/.test(row(fine.id).textContent)) bad.push('the fine row does not show its amount negative: ' + row(fine.id).textContent.replace(/\s+/g, ' '));
+          const r = btn(fine.id).getBoundingClientRect();
+          if (r.height < 44) bad.push('the button is ' + Math.round(r.height) + 'px tall, under 44');
+        }
+        if (!btn(free.id)) bad.push('a free fine cannot be disputed');
+        else if (!/free/.test(row(free.id).textContent)) bad.push('a free fine does not say "free"');
+        btn(fine.id).click();
+        if (!rqDraft || rqDraft.kind !== 'dispute') bad.push('the button did not open the dispute sheet');
+        if (!/This fine is wrong/.test(document.getElementById('rqSheetTitle').textContent)) bad.push('the sheet is not titled "This fine is wrong"');
+        if (!document.querySelector('#requestBody [data-mny-action="rq-close"].rq-x')) bad.push('the sheet has no × to close it');
+        const head = document.querySelector('#requestBody .rq-fine');
+        if (!head || !/−\$/.test(head.textContent)) bad.push('the sheet does not show the fine with its amount negative');
+        const chip = document.querySelector('#requestBody [data-mny-action="rq-why"]');
+        if (chip) chip.click();
+        document.querySelector('#requestBody [data-mny-action="rq-send"]').click();
+        const q = mnyRequestsFor(kid).find(x => x.kind === 'dispute' && x.record.fineId === fine.id);
+        if (!q || !q.open) bad.push('no open dispute request landed for the fine');
+        // One open question per fine.
+        if (mnyAddRequest(kid, { kind: 'dispute', fineId: fine.id, why: 'again' })) bad.push('a second open dispute of the same fine was accepted');
+        mnyOpenRequestSheet('week', { kid });
+        if (btn(fine.id)) bad.push('the button is still there after she asked');
+        if (!/waiting/.test((document.querySelector('#requestBody .mv2-finestate') || {}).textContent || '')) bad.push('the fine does not say it is waiting for parents');
+        rqClose();
+        mnyOpenRequestSheet('list', { kid });
+        if (!/This fine is wrong/.test(document.getElementById('requestBody').textContent)) bad.push('Asked parents · see all does not list it');
+        rqClose();
+        // Parent › Now: tagged 📦 Fine, and a yes takes the fine away.
+        profile = 'parent'; parentUnlockedThisSession = true;
+        const wrap = guOpen('approve');
+        const yes = q && wrap.querySelector(`[data-mnyp-action="guyes"][data-mnyp-id="${q.id}"]`);
+        const card = yes ? yes.closest('.gu-req') : null;
+        if (!card) bad.push('the dispute is not answerable on Now');
+        else {
+          const tag = card.querySelector('.gu-tag');
+          if (!tag || tag.textContent.trim() !== '📦 Fine') bad.push('the Now card is not tagged 📦 Fine: ' + (tag ? tag.textContent : 'no tag'));
+          yes.click();
+          if (mrFines(kid).some(f => f.id === fine.id)) bad.push('a yes on Now did not take the fine away');
+          profile = kid; mnyOpenRequestSheet('week', { kid });
+          if (document.querySelectorAll('#requestBody .mv2-fine').length !== 1) bad.push('the fine is still in her week after the yes (only the free one should be left)');
+          rqClose();
+        }
+        profile = 'parent';
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
       return bad.length ? bad : true;
     });
     await guTeardown();

@@ -306,19 +306,20 @@ function sdMeetingAvatars(wk) {
   return `<span class="sd-avs" role="group" aria-label="Whose Sunday">${['jenn', 'jess'].map(k => {
     const signed = mnyIsCommitted(wk, k);
     return `<button type="button" class="sd-av${k === cur ? ' on' : ''}" data-mny-action="sd-kid" data-sd-kid="${k}" aria-pressed="${k === cur}" aria-label="${escapeAttr(mnyKidName(k) + (signed ? ' ✓ signed' : ''))}">
-        <span class="sd-av-pic" aria-hidden="true">${CT_PROFILE_ICON[k]}</span><span class="sd-av-name">${escapeHtml(mnyKidName(k))}</span>${signed ? '<span class="sd-av-ok" aria-hidden="true">✓</span>' : ''}</button>`;
+        <span class="sd-av-pic" aria-hidden="true">${CT_PROFILE_ICON[k]}</span><span class="sd-av-name ph-word">${escapeHtml(mnyKidName(k))}</span>${signed ? '<span class="sd-av-ok" aria-hidden="true">✓</span>' : ''}</button>`;
   }).join('')}</span>`;
 }
 function sdMeetingStepRow(wk) {
   const kid = mnyMeetingKid();
   const d = sdDraftFor(kid, wk);
   const step = mnyIsCommitted(wk, kid) ? 3 : d.step;
-  const steps = SD_STEP_LABELS.map((l, i) => `<span class="sd-stepchip${i === step ? ' on' : i < step ? ' done' : ''}"${i === step ? ' aria-current="step"' : ''}>${escapeHtml(l)}</span>`).join('');
-  return `<span class="sd-for">2 · The money for ${escapeHtml(mnyKidName(kid))}:</span>
+  // On the phone a step is its number, the words hidden (Plan v18 C).
+  const steps = SD_STEP_LABELS.map((l, i) => `<span class="sd-stepchip${i === step ? ' on' : i < step ? ' done' : ''}"${i === step ? ' aria-current="step"' : ''}>${escapeHtml(l.split(' · ')[0])}<span class="ph-word"> · ${escapeHtml(l.split(' · ')[1] || '')}</span></span>`).join('');
+  return `<span class="sd-for ph-word">2 · The money for ${escapeHtml(mnyKidName(kid))}:</span>
       <span class="sd-steps" aria-label="Sunday steps">${steps}</span>
       <span class="sd-headbtns">
-        <button type="button" class="sd-btn" data-mny-action="sd-sound" aria-pressed="${sdSoundOn()}">${sdSoundOn() ? '🔊 Sound on' : '🔇 Sound off'}</button>
-        <button type="button" class="sd-btn sd-btn--dad" data-mny-action="sd-dad">🗣️ Parent's card</button>
+        <button type="button" class="sd-btn" data-mny-action="sd-sound" aria-pressed="${sdSoundOn()}" aria-label="${sdSoundOn() ? 'Sound on' : 'Sound off'}">${sdSoundOn() ? '🔊' : '🔇'}<span class="ph-word">${sdSoundOn() ? ' Sound on' : ' Sound off'}</span></button>
+        <button type="button" class="sd-btn sd-btn--dad" data-mny-action="sd-dad" aria-label="Parent's card">🗣️<span class="ph-word"> Parent's card</span></button>
       </span>`;
 }
 
@@ -889,7 +890,7 @@ function sdChooseMain(c) {
       : `🏦 $${sdRule(r, 'pots.safety')} safety first`;
     return `<div class="sd-col ${'sd-col--' + id}">
         <div class="sd-col-head"><span class="sd-col-title">${escapeHtml(title)}</span></div>
-        <div class="sd-col-amt"><b>${escapeHtml(sdM(v))}</b><span class="sd-pill">${escapeHtml(sdPercentLabel(pc[i], v))}</span><button type="button" class="sd-ask-q" data-mny-action="sd-help" data-sd-col="${id}" aria-label="What is this?"><span>?</span></button></div>
+        <div class="sd-col-amt"><b>${escapeHtml(sdM(v))}</b><span class="sd-pill">${escapeHtml(sdPercentLabel(pc[i], v))}</span><span class="sd-col-start">starts at ${Math.round(start)}%</span><button type="button" class="sd-ask-q" data-mny-action="sd-help" data-sd-col="${id}" aria-label="What is this?"><span>?</span></button></div>
         <div class="sd-fall"><span class="sd-fall-top" style="bottom:${Math.min(100, start + h).toFixed(2)}%"></span>
           <span class="sd-fall-bar${h >= 1 ? ' edge' : ''}" style="bottom:${start.toFixed(2)}%;height:${h.toFixed(2)}%">${segs}</span></div>
         <div class="sd-colnote">${escapeHtml(note)}</div>

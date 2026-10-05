@@ -165,8 +165,8 @@ function mnyRenderMyMoney() {
 
   wrap.innerHTML =
       `${mnyPageHead('💰 My money', '', [
-          { action: 'story',    label: '📖 My money story' },
-          { action: 'tourkid',  label: '? How this page works' },
+          { action: 'story',    icon: '📖', word: 'My money story' },
+          { action: 'tourkid',  icon: '?', word: 'How this page works' },
         ], { kidSwitch: true, tabs: 'money', date: true, back: 'backtoday', big: true })}
        <div class="mv2">
          <div class="mv2-main">
@@ -214,8 +214,10 @@ function mnyPageHead(title, strap, buttons, opts) {
       ${strap ? `<span class="mny-head-strap">${escapeHtml(strap)}</span>` : ''}
       ${o.tabs ? mnyTabBar(o.tabs, { compact: true }) : ''}
       ${kidSwitch}
-      <span class="mny-head-btns">${(buttons || []).map(b =>
-        `<button type="button" class="mny-btn${b.aria ? ' mny-btn--icon' : ''}" data-mny-action="${escapeAttr(b.action)}"${b.aria ? ` aria-label="${escapeAttr(b.aria)}" title="${escapeAttr(b.aria)}"` : ''}>${escapeHtml(b.label)}</button>`).join('')}</span>
+      <span class="mny-head-btns">${(buttons || []).map(b => b.word
+        // An icon and its words: on the phone only the icon shows (Plan v18 C); the name stays in aria-label.
+        ? `<button type="button" class="mny-btn" data-mny-action="${escapeAttr(b.action)}" aria-label="${escapeAttr(b.word)}">${escapeHtml(b.icon)}<span class="ph-word"> ${escapeHtml(b.word)}</span></button>`
+        : `<button type="button" class="mny-btn${b.aria ? ' mny-btn--icon' : ''}" data-mny-action="${escapeAttr(b.action)}"${b.aria ? ` aria-label="${escapeAttr(b.aria)}" title="${escapeAttr(b.aria)}"` : ''}>${escapeHtml(b.label)}</button>`).join('')}</span>
       ${o.date ? `<span class="mny-head-date">${escapeHtml(mnyTodayLine())}</span>` : ''}
     </div>`;
 }
@@ -554,7 +556,7 @@ function mnyActionRow() {
   return `<div class="mv2-actions">
       ${btn('act-result', 'mv2-act--result', '🏆 Tell a result', 'from my planner')}
       ${btn('act-club', 'mv2-act--club', '⛸️ Club sessions', `${mnyShort$(rate)} each I go to`)}
-      ${btn('act-move', 'mv2-act--move', '🔀 Move · 💵 Cash', 'move · cash out · put in · draw early')}
+      ${btn('act-move', 'mv2-act--move', '🔀 Move · 💵 Cash', 'move · out · in · early')}
       ${btn('gift-add', 'mv2-act--gift', '🎁 I was given', 'a gift or cash')}
     </div>`;
 }
@@ -829,6 +831,7 @@ function mnyInfoSheetBody(d) {
       + li('🎁 Money I was given', escapeHtml(mnyMoney(get('given'))), 'g')
       + li('🌱 Money my money made', escapeHtml(mnyMoney(get('made'))), 'g')
       + li('➖ Taken off', escapeHtml(w.data.fines > 0 ? '−' + mnyMoney(w.data.fines) : '$0.00'), 'g')
+      + mnyFineRows(kid, mnyWeekKey())
       + `<div class="mv2-line mv2-teal">About ${escapeHtml(mnyShort$(w.bySunday))} by Sunday if the rest goes well.${c.routineDays ? ` 🔥 ${c.routineDays} routine day${c.routineDays === 1 ? '' : 's'} kept.` : ''}</div>`
       + (c.unpaid.length ? `<div class="mv2-line">${escapeHtml(`${mnyMoney(unpaidTotal)} still to come · ${c.unpaid.length} week${c.unpaid.length === 1 ? '' : 's'} not settled yet`)}</div>` : '')
       + (w.data.passive < 0 ? `<div class="mv2-line">My companies are worth ${escapeHtml(mnyMoney(-w.data.passive))} less than last Sunday. That happens — it can go back up.</div>` : '')
@@ -891,6 +894,25 @@ function mnyInfoSheetBody(d) {
   }
   if (d.kind === 'month') return mnyCalendarBody(kid);
   return '';
+}
+
+/* 📦 Her fines this money week, one row each under ➖ Taken off, each with
+   "This fine is wrong" (owner, 2026-10-05). The amount is what that fine
+   costs in the week this sheet totals (`mrFinesWeek`), shown negative; a free one
+   (logged, nothing taken off) says "free". A fine she already asked about
+   shows where the question stands instead of the button. */
+function mnyFineRows(kid, weekKey) {
+  const keys = mrMoneyDayKeys(weekKey, kid);
+  const fines = mrFines(kid).filter(f => f && keys.indexOf(f.dayKey) >= 0);
+  const charged = (mrFinesWeek(weekKey, kid, null) || {}).chargeable || {};   // the same week as the ➖ total above
+  return fines.map(f => {
+    const cost = money2(charged[f.id] || 0);
+    const q = mnyFineDispute(kid, f.id);
+    const right = q ? `<span class="mv2-finestate${q.open ? ' wait' : ''}">${escapeHtml(rqStatusText(q))}</span>`
+      : `<button type="button" class="mv2-finebtn" data-mny-action="fine-dispute" data-mny-id="${escapeAttr(f.id)}">📦 This fine is wrong</button>`;
+    return `<div class="mv2-li mv2-fine"><span>&nbsp;&nbsp;📦 ${escapeHtml(guFineLabel(f.itemId))} <span class="mv2-note">${escapeHtml(mnyDayName(f.dayKey))}</span></span>
+        <b class="${cost > 0 ? 'mv2-late' : ''}">${escapeHtml(cost > 0 ? sdOff$(cost, mnyMoney) : 'free')}</b>${right}</div>`;
+  }).join('');
 }
 
 /* What everything pays, straight from the rules — Money school's copy of the
@@ -1134,6 +1156,7 @@ function mnyHandleClick(ev) {
   if (a === 'goal-new') { mnyOpenRequestSheet('goal', { kid: mnyViewKid() }); return; }
   if (a === 'asked-all') { mnyOpenRequestSheet('list', { kid: mnyViewKid() }); return; }
   if (a === 'prices-sheet') { mnyOpenRequestSheet('prices', { kid: mnyViewKid() }); return; }
+  if (a === 'fine-dispute') { mnyOpenRequestSheet('dispute', { kid: mnyViewKid(), id: el.getAttribute('data-mny-id') }); return; }
   // A day on the calendar (Deviation 39): its result, its question, or "add a competition?".
   if (a === 'cal-day') { mnyCalDay(mnyViewKid(), el.getAttribute('data-daykey')); return; }
   // My money's doors (Plan v17 §1): each opens an information sheet.

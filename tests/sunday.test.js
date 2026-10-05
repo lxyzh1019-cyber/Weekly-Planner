@@ -379,6 +379,11 @@ function fill(w, k) {
   check('goal reached: the verdict says so', v.strategy.lines[1].indexOf('goal reached!') >= 0 ? true : v.strategy.lines[1]);
   const f = s.sdForecast(res, Object.assign({}, w, { alloc }), R, 4);
   check('the forecast never fills the jar past its goal', f.fwSave[1].value <= 35 ? true : JSON.stringify(f.fwSave[1]));
+  // Plan v18 Stage 7: a goal named with its own picture is not given a second (🎯 🛼).
+  const pic = s.sdForecast(res, Object.assign({}, w, { alloc, goal: Object.assign({}, w.goal, { name: '🛼 New skate guards' }) }), R, 4);
+  const bare = s.sdForecast(res, Object.assign({}, w, { alloc, goal: Object.assign({}, w.goal, { name: 'skate guards' }) }), R, 4);
+  check("the forecast keeps a goal's own picture and adds 🎯 only to a bare name",
+    pic.fwSave[1].k === '🛼 New skate guards' && bare.fwSave[1].k === '🎯 skate guards' ? true : JSON.stringify([pic.fwSave[1].k, bare.fwSave[1].k]));
 }
 
 // A new goal: the jar's money moves, or goes to Savings.
