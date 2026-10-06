@@ -483,10 +483,11 @@ function loanAccrueBalanceInterest(kid, weekKey) {
    GROWN-UPS › ➕ COMMITMENTS (Plan v3 §D) — a new row on her wall
 
    🆕 A commitment: she pays `sharePct` of what it costs. 10% of her share
-   goes down at once, out of her 🏦 Savings (Savings → cash → the new row, as
-   a `down` payment, two recorded movements); the rest is the new row, paid
-   over `weeks` Sundays — written as the row's own monthly figure
-   (rest ÷ weeks × 52 ÷ 12), so `mnyWeeklyDue` gives back rest ÷ weeks.
+   goes down at once, out of her 🏦 Savings above the 🛟 safety line
+   (Savings → cash → the new row, as a `down` payment, two recorded
+   movements); the rest is the new row, paid over `weeks` Sundays — written
+   as the row's own monthly figure (rest ÷ weeks × 52 ÷ 12), so
+   `mnyWeeklyDue` gives back rest ÷ weeks (`sdCommitPlan`, js/43).
    🌧️ A surprise cost: nobody did anything wrong. Her Savings pays first
    (Savings → cash → spent); whatever Savings cannot cover becomes a row with
    no weekly figure, paid by extra. Each through the owners that already move
@@ -501,16 +502,21 @@ function mnyAddCommitment(kid, fields) {
   const share = Math.max(0, Math.min(100, Number(f.sharePct) || 0));
   const weeks = Math.max(1, Math.round(Number(f.weeks) || 1));
   if (!what) { showToast('What is it for?'); return null; }
-  const her = money2(cost * share / 100);
+  /* The numbers are the core's (`sdCommitPlan`), the ones the affordability
+     card showed: 10% of her share down, out of Savings only above the 🛟
+     safety line; what Savings cannot cover stays on the row and is paid over
+     `weeks` with the rest. Too big for her steady money (under $5 a week, or
+     over 50 % of it) only with the parent's ✓ (`checked`, form state — never
+     stored). */
+  const plan = sdCommitPlan({ cost, sharePct: share, weeks, saved: mnySavedTotal(kid),
+    safety: Number(mrRuleOr(mrRules(), 'pots.safety')) || 0, weeklyNow: guWeeklyLoan(kid), steady: guSteady(kid) });
+  const her = plan.her;
   if (!(her > 0)) { showToast('Her share has to be more than $0'); return null; }
-  const down = Math.round(her * 10) / 100;                 // 10% of her share, to the cent
-  const rest = money2(her - down);
+  if (plan.needsTick && f.checked !== true) { showToast('A parent checks this with her first ✓'); return null; }
   const d = mnyAddDebt(kid, { name: what, icon: '🆕', item: what, principal: her,
-    monthly: money2(rest / weeks * 52 / 12), downPayment: 0, downPaymentDue: '' });
+    monthly: plan.monthly, downPayment: 0, downPaymentDue: '' });
   if (!d) return null;
-  /* The 10% down, out of Savings: what Savings cannot cover stays on the row
-     — the affordability card has already said so ("⚠️ under 🛟"). */
-  const fromSavings = money2(Math.min(down, mnySavedTotal(kid)));
+  const fromSavings = plan.fromSavings;
   if (fromSavings > 0) {
     const w = ensureWallet(kid);
     const before = money2(w.cash);

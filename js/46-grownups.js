@@ -535,21 +535,21 @@ function guCommitKidCard(kid) {
       ${rows || '<div class="gu-line">Nothing on her wall.</div>'}
     </div>`;
 }
+/* The commitment's numbers are the core's (`sdCommitPlan`, js/43) — the same
+   answer `mnyAddCommitment` writes. A 🌧️ surprise is unchanged: the 🛟 pays
+   first, all of Savings if it must (decision 8). The parent's ✓ is form state
+   only, tied to the figures it was given for (`guCommitTickKey`). */
+function guCommitTickKey(c) { return [c.kid, c.cost, c.share, c.weeks].join('|'); }
 function guCommitMath() {
   const c = guCommit(), kid = c.kid;
   const sur = c.type === 'surprise';
   const safety = money2(mrRuleOr(mrRules(), 'pots.safety'));
-  const her = money2(c.cost * c.share / 100);
-  const down = Math.round(her * 10) / 100;
-  const added = money2(her - down);
-  const p0 = guWeeklyLoan(kid), p1 = money2(p0 + added / c.weeks);
-  const steady = guSteady(kid);
-  const r0 = steady > 0 ? p0 / steady * 100 : Infinity, r1 = steady > 0 ? p1 / steady * 100 : Infinity;
-  const leftNow = mnyTotalOwing(kid);
   const sav = mnySavedTotal(kid);
+  const plan = sdCommitPlan({ cost: c.cost, sharePct: c.share, weeks: c.weeks, saved: sav, safety,
+                              weeklyNow: guWeeklyLoan(kid), steady: guSteady(kid) });
+  const leftNow = mnyTotalOwing(kid);
   const fromSafe = money2(Math.min(c.cost, sav)), borrow = money2(c.cost - fromSafe);
-  return { c, kid, sur, safety, her, down, added, p0, p1, r0, r1, leftNow, sav, fromSafe, borrow,
-           okAff: r1 <= 50, okDown: sav - down >= safety };
+  return { c, kid, sur, safety, plan, leftNow, sav, fromSafe, borrow, ticked: c.tickFor === guCommitTickKey(c) };
 }
 function guPct(v) { return isFinite(v) ? Math.round(v) + '%' : '—'; }
 function guCommitMain() {
@@ -580,40 +580,47 @@ function guCommitMain() {
     ${guOneOffCard()}`;
 }
 function guCommitSide() {
-  const m = guCommitMath();
+  const m = guCommitMath(), P = m.plan;
   const lines = m.sur
     ? [['Cost', mnyMoney(m.c.cost)], ['Her 🛟 Savings now', mnyMoney(m.sav)], ['Paid from Savings', mnyMoney(m.fromSafe)], ['New row on her wall', mnyMoney(m.borrow)]]
-    : [['Her share', mnyMoney(m.her)],
-       ['10% down from her Savings', mnyMoney(m.down) + (m.okDown ? '' : ` ⚠️ under 🛟 ${guMoney$(m.safety)}`)],
-       ['New row on her wall', mnyMoney(m.added)],
-       ['Weekly loan payment', `${mnyMoney(m.p0)} → ${mnyMoney(m.p1)}`],
-       ['Of her steady income', `${guPct(m.r0)} → ${guPct(m.r1)}`],
-       ['Free by', `${guFreeBy(m.leftNow, m.p0)} → ${guFreeBy(m.leftNow + m.added, m.p1)}`]];
+    : [['Her share', mnyMoney(P.her)],
+       P.toWall > 0 ? ['10% down', `${mnyMoney(P.fromSavings)} from Savings, ${mnyMoney(P.toWall)} added to the wall`]
+         : ['10% down from her Savings', mnyMoney(P.down)],
+       ['New row on her wall', mnyMoney(P.added)],
+       ['Weekly loan payment', `${mnyMoney(P.p0)} → ${mnyMoney(P.p1)}`],
+       ['Of her steady income', P.lowSteady ? 'not enough steady money yet' : `${guPct(P.r0)} → ${guPct(P.r1)}`],
+       ['Free by', `${guFreeBy(m.leftNow, P.p0)} → ${guFreeBy(m.leftNow + P.added, P.p1)}`]];
   const verdict = m.sur
     ? (m.borrow ? `🛟 Not quite enough. ${mnyMoney(m.borrow)} goes on her wall.` : '✅ Her safety money covers it. That is what it is for.')
-    : m.okAff ? '✅ Fits under the 50% limit.' : '⚠️ Over the 50% limit. Try a smaller share, a longer time, or wait for row 1 to finish.';
-  const good = m.sur ? !m.borrow : m.okAff;
-  const can = !!String(m.c.what || '').trim();
+    : P.lowSteady ? '⚠️ Not enough steady money yet to judge it. Check it with her first.'
+    : P.over ? '⚠️ Over the 50% limit. Try a smaller share, a longer time, or wait for row 1 to finish — or check it with her first.'
+    : '✅ Fits under the 50% limit.';
+  const good = m.sur ? !m.borrow : !P.needsTick;
+  const tick = !m.sur && P.needsTick;
+  const can = !!String(m.c.what || '').trim() && (!tick || m.ticked);
   return `<div class="gu-sidehead">${m.sur ? 'Is her safety money enough?' : 'Can she afford it?'}</div>
     <div class="gu-card gu-afford ${good ? 'gu-afford--ok' : 'gu-afford--warn'}">
       ${lines.map(([k, v]) => `<div class="gu-kv"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('')}
       <div class="gu-verdict">${escapeHtml(verdict)}</div>
+      ${tick ? `<button type="button" class="gu-btn" role="checkbox" aria-checked="${m.ticked}" data-mnyp-action="gucmtick">${m.ticked ? '✅' : '⬜'} I checked this with her</button>` : ''}
       <button type="button" class="gu-save${can ? ' ready' : ''}" data-mnyp-action="gucmsave">${m.sur ? 'Send her the 🌧️ card' : 'Add to her wall'}</button>
       <div class="gu-line">${m.sur ? 'Not a fine: nobody did anything wrong. 🛟 Savings pays first; the rest becomes a row on her wall. Savings refills first after.'
-        : 'Her weekly payment goes up from next Sunday. Her 10% down comes out of Savings.'}</div>
+        : `Her weekly payment goes up from next Sunday. Her 10% down comes out of Savings above the 🛟 ${escapeHtml(guMoney$(m.safety))}; the rest joins the new row.`}</div>
     </div>`;
 }
 function guSaveCommit() {
   const c = guCommit();
   if (!String(c.what || '').trim()) { showToast(c.type === 'surprise' ? 'What happened?' : 'What is it for?'); return; }
+  const m = guCommitMath();
+  if (c.type !== 'surprise' && m.plan.needsTick && !m.ticked) { showToast('Tick “I checked this with her” first'); return; }
   const rec = c.type === 'surprise'
     ? mnyAddSurprise(c.kid, { what: c.what, cost: c.cost })
-    : mnyAddCommitment(c.kid, { what: c.what, cost: c.cost, sharePct: c.share, weeks: c.weeks });
+    : mnyAddCommitment(c.kid, { what: c.what, cost: c.cost, sharePct: c.share, weeks: c.weeks, checked: m.ticked });
   if (!rec) return;
   showToast(c.type === 'surprise'
     ? (rec.covered ? '🛟 Her Savings covered it' : `🌧️ ${mnyMoney(rec.principal)} on ${mnyKidName(c.kid)}'s wall`)
     : `🆕 On ${mnyKidName(c.kid)}'s wall`);
-  c.what = '';
+  c.what = ''; c.tickFor = null;
 }
 /* 🧾 The club pays the assistant job twice a year; this is what it owes Dad
    (mnyClubOwes, derived), and "✓ Club paid" moves the date it is paid
@@ -1270,7 +1277,7 @@ function guWeeksMain() {
   const list = weeks.map(wk => {
     const on = guWeekDay === wk;
     return `<div class="gu-weekline${on ? ' on' : ''}">
-        <button type="button" class="gu-weekday" data-mnyp-action="guweekday" data-mnyp-id="${escapeAttr(wk)}" aria-expanded="${on}">${escapeHtml(mnyDayMonth(sdSundayOf(wk)))}</button>
+        <button type="button" class="gu-weekday" data-mnyp-action="guweekday" data-mnyp-id="${escapeAttr(wk)}" aria-expanded="${on}">${escapeHtml(mrMoneyWeekLabel(wk))}</button>
         ${GU_KIDS.map(k => guWeekCell(k, rowsBy[k][wk])).join('')}
       </div>
       ${on ? `<div class="gu-weekdetail">${GU_KIDS.map(k => guWeekRecord(k, wk, rowsBy[k][wk])).join('')}</div>` : ''}`;
@@ -1289,7 +1296,7 @@ function guWeeksMain() {
     <div class="gu-weekkey"><span><i class="mv2-sw mv2-sw--wall"></i>to the wall</span><span><i class="mv2-sw mv2-sw--saved"></i>saved</span><span><i class="mv2-sw mv2-sw--cash"></i>cash</span>
       <span>✓ signed on Sunday, frozen · ✏️ typed in from memory, fixable · 👴 Grandfather flat rule, read-only</span></div>
     <div class="gu-card gu-weeks">
-      <div class="gu-weekline gu-weekhead"><span>Sunday</span>${GU_KIDS.map(k => `<span>${guKidChip(k)} in · where it went</span>`).join('')}</div>
+      <div class="gu-weekline gu-weekhead"><span>Money week</span>${GU_KIDS.map(k => `<span>${guKidChip(k)} in · where it went</span>`).join('')}</div>
       ${weeks.length ? list : '<div class="gu-line">No Sundays on record yet.</div>'}
       <div class="gu-weekline"><span></span>${GU_KIDS.map(k => `<button type="button" class="gu-btn gu-addweek" data-mnyp-action="guaddweek" data-mnyp-kid="${k}">＋ Add a week before ${escapeHtml(mnyDayMonth(sdSundayOf(earliest(k))))}</button>`).join('')}</div>
       <div class="gu-weekline gu-weekfoot"><b>${weeks.length} Sunday${weeks.length === 1 ? '' : 's'}</b>${foot}</div>
@@ -1543,6 +1550,7 @@ function guAction(a, el) {
   } else if (a === 'gucmshareset') { guCommit().share = Number(id) || 50;
   } else if (a === 'gucmweeks') { guCommit().weeks = Math.max(1, Math.min(104, guCommit().weeks + d));
   } else if (a === 'gucmweeksset') { guCommit().weeks = Number(id) || 26;
+  } else if (a === 'gucmtick') { const c = guCommit(), key = guCommitTickKey(c); c.tickFor = c.tickFor === key ? null : key;
   } else if (a === 'gucmsave') { guSaveCommit();
   } else if (a === 'guclubpaid') { guClubPaid(kid);
   } else if (a === 'gufixloan') { guOpenSheet('loan', kid, id); return;

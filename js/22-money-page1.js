@@ -1092,7 +1092,7 @@ function mnyStoryWeek(kid, r) {
   const edited = (r.edited || []).length;
   return `<div class="mny-card">
       <div class="mny-week-head">
-        <span class="mny-label">Week of ${escapeHtml(mnyShortDate(r.weekKey))}</span>
+        <span class="mny-label">Week of ${escapeHtml(mrMoneyWeekLabel(r.weekKey, kid))}</span>
         <b>${mnyMoney(r.net)}</b>
       </div>
       ${r.confirmedBy ? `<div class="mny-note">Agreed with ${escapeHtml(r.confirmedBy)}${plan.label ? ' · ' + escapeHtml(plan.label) : ''}</div>` : ''}

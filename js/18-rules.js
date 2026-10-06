@@ -1390,6 +1390,26 @@ function mrMoneySettledDays(weekKey, kid) {
 function mrMoneyDays(weekKey, kid) {
   return mrMoneyDaysPure(weekKey, mrMoneyWeekIsSunday, wk => mrMoneySettledDays(wk, kid));
 }
+/* The money week's name on the money surfaces (the meeting's head while the
+   money step is on, Signed, the passbook's week card, Grown-ups › 📒 Weeks):
+   its first and last day — "Sun 11 – Sat 17 Oct", "Sun 27 Sep – Sat 3 Oct",
+   "Mon 28 Sep – Sun 4 Oct" before the dated rule. The planner's weeks keep
+   `mmWeekLabel` (Mon–Sun). */
+function mrMoneyWeekLabelPure(weekKey, isSunday, settledDays) {
+  // The switch Sunday is named by both weeks; while this week is open it
+  // belongs to the old one (which normally settles it first — Deviation 34),
+  // so the first Sun–Sat week reads "Mon 5 – Sat 10 Oct".
+  const open = !settledDays(weekKey), oldBefore = !isSunday(mrDayKeyAdd(weekKey, -7));
+  let days = mrMoneyDaysPure(weekKey, isSunday, settledDays).filter(x => !x.taken && !(open && oldBefore && x.wk !== weekKey));
+  if (!days.length) days = mrMoneyDayRefs(weekKey, isSunday(weekKey));
+  const D = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const a = mrDayKeyDate(days[0].dayKey), b = mrDayKeyDate(days[days.length - 1].dayKey);
+  return `${D[a.getDay()]} ${a.getDate()}${a.getMonth() === b.getMonth() ? '' : ' ' + M[a.getMonth()]} – ${D[b.getDay()]} ${b.getDate()} ${M[b.getMonth()]}`;
+}
+function mrMoneyWeekLabel(weekKey, kid) {
+  return mrMoneyWeekLabelPure(weekKey, mrMoneyWeekIsSunday, kid ? (wk => mrMoneySettledDays(wk, kid)) : (() => null));
+}
 function mrMoneyDayKeys(weekKey, kid) {
   return mrMoneyDays(weekKey, kid).filter(x => !x.taken).map(x => x.dayKey);
 }
@@ -2621,5 +2641,5 @@ function mrWeeksElapsed() {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { MR_DEFAULT_RULES, MR_REASONS, MR_DEFAULT_REASON,
     MR_HOUSEHOLD_CHORES, MR_PERSONAL_CHORES, mrGetPath, mrSetPath, mrApplyCap,
-    mrDayKeyAdd, mrMoneyWeekRuleOn, mrMoneyDayRefs, mrMoneyDaysPure };
+    mrDayKeyAdd, mrMoneyWeekRuleOn, mrMoneyDayRefs, mrMoneyDaysPure, mrMoneyWeekLabelPure };
 }

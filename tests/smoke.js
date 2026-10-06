@@ -23985,6 +23985,8 @@ function findChromium() {
           if (side.replace(/\s+/g, '').indexOf(line.replace(/\s+/g, '')) < 0) bad.push('the affordability card misses "' + line + '"');
         });
         if (!/Can she afford it\?/.test(wrap.textContent)) bad.push('no "Can she afford it?"');
+        // Money fit and logic L5: a share her steady money cannot judge needs the parent's ✓ first.
+        guPress('[data-mnyp-action="gucmtick"]');
         guPress('[data-mnyp-action="gucmsave"]');
         const d = mnyEnsureDebts(kid).find(x => x.name === 'Winter Invitational entry');
         if (!d || d.principal !== 30 || d.paid !== 3 || d.monthly !== money2(27 / 26 * 52 / 12)) bad.push('the new row is not her share, 10% down and the rest over 26 weeks: ' + JSON.stringify(d && [d.principal, d.paid, d.monthly]));
@@ -25425,6 +25427,184 @@ function findChromium() {
         profile = 'parent';
       } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
       finally { unpin(); sdRestore(snap); mmHide(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* ── Money fit and logic, PR 1 (2026-10-05) ── L1: one pile figure. Payday's
+     💰 My pile shows the pile once the coins are in — and at once under
+     prefers-reduced-motion, even when the step is drawn again before they
+     ran; I choose's chip shows the same figure with "$X left" beside it;
+     Signed's money in less what was taken off, and My last 4 Sundays' total
+     of the signed row, are that figure too. */
+  if (want('onePileFigureOnEveryStep')) {
+    await guSetup();
+    checks.onePileFigureOnEveryStep = await page.evaluate(() => {
+      const snap = sdSnap(), unpin = sdPin(6), realRM = window.sdReducedMotion;
+      const bad = [];
+      try {
+        const kid = 'jenn', wk = sdSeedWeek(kid);
+        mnyAddDeposit(kid, wk, { amount: 30, from: 'A gift', giver: 'Uncle Mike', dayKey: mrWeekDayKeys(wk)[0] });   // dollars to place
+        sdReveal(kid);
+        const P = sdContext(kid, wk).P;
+        const head = () => (sdBody().querySelector('.sd-pile-head b') || {}).textContent;
+        if (head() !== sdM(P.tp)) bad.push(`coins in: the pile reads ${head()}, not ${sdM(P.tp)}`);
+        window.sdReducedMotion = () => true;
+        sdCur().shown = 0; sdSave(sdCur()); renderMeetingMode();
+        if (head() !== sdM(P.tp)) bad.push(`reduced motion, drawn again before the coins ran: the pile reads ${head()}, not ${sdM(P.tp)}`);
+        window.sdReducedMotion = realRM;
+        sdCur().shown = 6; sdSave(sdCur()); renderMeetingMode();
+        sdClick('[data-mny-action="sd-tochoose"]');
+        if (sdCur().step !== 2) bad.push('did not reach I choose');
+        sdClick('[data-mny-action="sd-clear"]');   // ↺ All back: the whole pile to place
+        const P2 = sdContext(kid, wk).P;
+        if (!(P2.pile > 0) || P2.tp !== P.tp) bad.push(`precondition: after All back the pile is ${P2.pile} of ${P2.tp}`);
+        const chip = sdBody().querySelector('.sd-pilechip');
+        const chipFig = chip && (chip.querySelector('b') || {}).textContent;
+        const left = chip && (chip.querySelector('.sd-note') || {}).textContent;
+        if (chipFig !== sdM(P.tp)) bad.push(`I choose's chip reads ${chipFig}, not the pile ${sdM(P.tp)}`);
+        if (left !== `$${P2.pile} left`) bad.push(`no "$${P2.pile} left" beside the chip: ${left}`);
+        const out = sdSignHer(kid, wk);
+        if (!out || !out.ok) bad.push('the sign refused: ' + (out && out.why));
+        else {
+          const row = state.shared.chore.moneyLedger[wk][kid];
+          const sg = row.sunday.signed, io = sdCheckInOut(sg);
+          const tp = money2(io.in - (-sg.outFine + sg.adv));
+          if (tp !== P.tp) bad.push(`Signed's money in less taken off is ${tp}, not the pile ${P.tp}`);
+          if (sdHistGroups({ row }).total !== P.tp) bad.push(`My last 4 Sundays' total for the row is ${sdHistGroups({ row }).total}, not the pile ${P.tp}`);
+          // L4: Signed names the money week.
+          sdCur().signed = sdSignedFromLedger(kid, wk); sdCur().step = 3; sdSave(sdCur()); renderMeetingMode();
+          const note = [...sdBody().querySelectorAll('.sd-sighead .sd-note')].map(e => e.textContent).join(' ');
+          if (note.indexOf('money week ' + mrMoneyWeekLabel(wk, kid)) < 0) bad.push('Signed does not name the money week: ' + note);
+        }
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      finally { window.sdReducedMotion = realRM; unpin(); sdRestore(snap); mmHide(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* L2: 🏦 From my bank adds up. Its lines — From Savings, From home and
+     "📥 Waiting for Sunday" (money that came in this week, which joins the
+     pile on its own, Deviation 37) — sum to the box's total, and the waiting
+     figure shows once. */
+  if (want('fromMyBankAddsUp')) {
+    await guSetup();
+    checks.fromMyBankAddsUp = await page.evaluate(() => {
+      const snap = sdSnap(), unpin = sdPin(6);
+      const bad = [];
+      try {
+        const kid = 'jenn', wk = sdSeedWeek(kid);
+        moneyAddCash(kid, 3, { kind: 'gift', from: 'gift', note: 'fixture' });   // already in her wallet
+        sdReveal(kid);
+        sdClick('[data-mny-action="sd-pull"][data-sd-k="cash"][data-sd-d="1"]');
+        const c = sdContext(kid, wk);
+        const box = sdBody().querySelector('.sd-bank');
+        const num = t => Number(String(t || '').replace(/[^0-9.]/g, '')) || 0;
+        const lines = [...box.querySelectorAll('.sd-pull')].map(p => [p.querySelector('.sd-nowrap').textContent, num(p.querySelector(':scope > b').textContent)]);
+        const sum = money2(lines.reduce((a, [, v]) => a + v, 0));
+        const total = box.querySelector('.sd-group-head b').textContent;
+        if (total !== sdM(c.P.pullTot)) bad.push(`the box total ${total} is not the pile's ${sdM(c.P.pullTot)}`);
+        if (sum !== c.P.pullTot) bad.push(`the lines ${JSON.stringify(lines)} add to ${sum}, not ${c.P.pullTot}`);
+        const wait = money2(c.f.carry + c.f.homeIn);
+        if (!(wait > 0)) bad.push('precondition: nothing waiting');
+        if (!lines.some(([n, v]) => /Waiting for Sunday/.test(n) && v === wait)) bad.push(`no "📥 Waiting for Sunday ${sdM(wait)}" line`);
+        if ((box.textContent.match(/waiting/gi) || []).length !== 1) bad.push('the waiting money shows more than once: ' + box.textContent.replace(/\s+/g, ' ').trim());
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      finally { unpin(); sdRestore(snap); mmHide(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* L4: the money week has one name on the money surfaces — the meeting's
+     head while the money step is on, the passbook's week card and Grown-ups ›
+     📒 Weeks — its first and last day. With the clock at Sun 11 Oct 2026 the
+     head reads "Mon 5 – Sat 10 Oct" (the switch week); at Sun 18 Oct, "Sun 11
+     – Sat 17 Oct". The planner's steps keep the Mon–Sun week. */
+  if (want('theMoneyHeadNamesTheMoneyWeek')) {
+    await guSetup();
+    checks.theMoneyHeadNamesTheMoneyWeek = await page.evaluate(() => {
+      const bad = [];
+      const RealDate = Date;
+      const pinAt = (y, m, d) => {
+        const when = new RealDate(RealDate.UTC(y, m, d, 19, 0, 0));   // midday in Edmonton
+        Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+        Date.prototype = RealDate.prototype; Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      };
+      const snap = sdSnap();
+      try {
+        [[11, 'Mon 5 – Sat 10 Oct'], [18, 'Sun 11 – Sat 17 Oct']].forEach(([day, want]) => {
+          pinAt(2026, 9, day);
+          const wk = ctThisWeekKey();
+          const money = mmHead(wk, '', 'money'), other = mmHead(wk, '', 'reflect');
+          if (money.indexOf(want) < 0) bad.push(`Sun ${day} Oct: the money head does not read "${want}": ${(money.match(/mm-head-wk[^<]*<span[^>]*>[^<]*<\/span>([^<]*)/) || [])[1]}`);
+          if (other.indexOf(mmWeekLabel(wk)) < 0) bad.push(`Sun ${day} Oct: a planner step lost its Mon–Sun week`);
+          Date = RealDate;
+        });
+        // The meeting's own head, drawn, on the money step.
+        const kid = 'jenn', wk = sdSeedWeek(kid);
+        const shown = (document.querySelector('.mm-head-wk') || {}).textContent || '';
+        if (shown.indexOf(mrMoneyWeekLabel(mmWeekKey())) < 0) bad.push('the drawn money head does not name the money week: ' + shown);
+        // The passbook's week card and Grown-ups › 📒 Weeks name it the same way.
+        sdSignHer(kid, wk);
+        const row = mnyLedgerRows(kid).find(r => r.weekKey === wk);
+        if (!row) bad.push('precondition: no signed row');
+        else if (mnyStoryWeek(kid, row).indexOf('Week of ' + escapeHtml(mrMoneyWeekLabel(wk, kid))) < 0) bad.push('the passbook week card does not name the money week');
+        if (guWeeksMain().indexOf('>' + escapeHtml(mrMoneyWeekLabel(wk)) + '</button>') < 0) bad.push('Grown-ups › Weeks does not name the money week');
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      finally { Date = RealDate; sdRestore(snap); mmHide(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* L5 / L6: a commitment that is too big for her steady money (under $5 a
+     week, or over 50 % of it) is saved only with a parent's ✓ "I checked this
+     with her" — form state, never stored; the 10 % down comes out of Savings
+     only above the 🛟 $10, and the rest joins the new row. */
+  if (want('aBigCommitmentNeedsAParentTick')) {
+    await guSetup();
+    checks.aBigCommitmentNeedsAParentTick = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jess', p = getProfData(kid);
+        p.debts = [{ id: 'd-b', name: 'Swim club fees', icon: '🏊', principal: 500, paid: 140, monthly: 56, createdAt: 1, bonusRate: 10, payments: [] }];
+        mnyEnsureDebts(kid);
+        p.holdings = []; p.events = []; ensureWallet(kid).cash = 0;
+        moneyAddCash(kid, 12, { kind: 'gift', from: 'gift', note: 'fixture' });
+        moneyDeposit(kid, 12);
+        const L = state.shared.chore.moneyLedger || {};
+        Object.keys(L).forEach(wk => { if (L[wk]) delete L[wk][kid]; });   // no steady money on record
+        const wrap = guOpen('commit');
+        guPress('[data-mnyp-action="gucmkid"][data-mnyp-id="jess"]');
+        guPress('[data-mnyp-action="gucmshareset"][data-mnyp-id="50"]');
+        guPress('[data-mnyp-action="gucmweeksset"][data-mnyp-id="26"]');
+        const input = wrap.querySelector('[data-mnyp-action="gucmwhat"]');
+        input.value = 'Spring camp'; input.dispatchEvent(new Event('input', { bubbles: true }));
+        mnyRenderRulesTab();
+        const side = () => wrap.querySelector('.gu-afford').textContent.replace(/\s+/g, ' ');
+        const steadyRow = [...wrap.querySelectorAll('.gu-afford .gu-kv')].find(e => /Of her steady income/.test(e.textContent));
+        if (!steadyRow || steadyRow.querySelector('b').textContent !== 'not enough steady money yet') bad.push('steady $0 still shows a share: ' + (steadyRow && steadyRow.textContent));
+        if (!/\$2\.00 from Savings, \$1\.00 added to the wall/.test(side())) bad.push('the down payment does not say "$2.00 from Savings, $1.00 added to the wall": ' + side());
+        if (!/New row on her wall ?\$28\.00/.test(side())) bad.push('the new row is not $28.00: ' + side());
+        const tick = () => wrap.querySelector('[data-mnyp-action="gucmtick"]');
+        if (!tick()) bad.push('no "I checked this with her" ✓');
+        const n0 = mnyEnsureDebts(kid).length;
+        guPress('[data-mnyp-action="gucmsave"]');
+        if (mnyEnsureDebts(kid).length !== n0) bad.push('saved without the parent\'s ✓');
+        if (mnyAddCommitment(kid, { what: 'Direct', cost: 60, sharePct: 50, weeks: 26 })) bad.push('mnyAddCommitment took a too-big commitment without the ✓');
+        guPress('[data-mnyp-action="gucmtick"]');
+        if (!tick() || tick().getAttribute('aria-checked') !== 'true') bad.push('the ✓ did not tick');
+        guPress('[data-mnyp-action="gucmsave"]');
+        const d = mnyEnsureDebts(kid).find(x => x.name === 'Spring camp');
+        if (!d || d.principal !== 30 || d.paid !== 2 || d.monthly !== money2(28 / 26 * 52 / 12)) bad.push('the row is not $30, $2 down from Savings and $28 over 26 weeks: ' + JSON.stringify(d && [d.principal, d.paid, d.monthly]));
+        if (mnySavedTotal(kid) !== 10) bad.push('the down payment went under the 🛟 $10: Savings ' + mnySavedTotal(kid));
+        if (d && Object.keys(d).some(k => /tick|check/i.test(k))) bad.push('the ✓ was stored on the row: ' + Object.keys(d).join(','));
+        if (JSON.stringify(state.shared).indexOf('checkedWithHer') >= 0) bad.push('the ✓ reached state.shared');
+        if (evShadowDrift(kid).length) bad.push('drift after the commitment: ' + evShadowDrift(kid).join(', '));
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
       return bad.length ? bad : true;
     });
     await guTeardown();

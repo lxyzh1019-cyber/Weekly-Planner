@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v28 — 2026-10-05, v27 + Sunday v15 Stage 7: the post-6h comparison fixes, the owner's 10 answers, the three rules (spare room → bigger text; every money request answered in Now with a tag; taken off always negative), Calm and the phone on the money screens, and the clock-dependent smoke checks pinned (Plan v18 §W, build 2026-10-05c) (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v29 — 2026-10-05, v28 + Money fit and logic — PR 1: one pile figure, From my bank adds up, the money week named Sun–Sat, a too-big commitment needs a parent's tick, the down payment leaves the 🛟 $10, a 20-Sunday run per girl (build 2026-10-05d) (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -522,6 +522,27 @@ No screen reads these yet; Stages 2–4 build Grown-ups, My money v2 and the Sun
 - 🧮 Core (js/43): `sdSegHitsBox`, `sdGapLabelSpot`, `SD_REQUEST_TAGS`, `sdRequestTag`, `sdOff$` (tests/sunday.test.js: 13 new checks).
 - Smoke — new: `everyMoneyRequestIsAnsweredInNow`, `takenOffIsAlwaysNegative`, `aGirlCanDisputeAFine`. Pinned (each marked "Plan v18"): `todayIsWhereTheDayGetsDone` (clock at midday), `sundaySundayRoutineCounts`, `theFourHouseRulesHold`, `grownupsFinesLogEvenWhenFree`, `anUnfinishedDayIsNeverForgiven` (the Mon–Sun money week, `pinMonSunMoneyWeek`).
 - **Retired** (deleted): `.rq-done` and every "Done" on #requestOverlay; RQ_TITLES' `adv` / `cash` / `dep` / `early`; the goal picker under I choose's jar (`goalPicker`); `.sd-l4-g` bold rows; the 1100px nowrap on My money's action subtitles.
+
+### Money fit and logic — PR 1: money rules (manifested 2026-10-05, plan "Money fit and logic", build 2026-10-05d)
+- 💰 **One pile figure**: Payday's 💰 My pile shows the pile once the coins are in, and at once under prefers-reduced-motion (also when the step is drawn again before they ran); I choose's chip shows the same figure with "$X left" beside it; Signed's money in less taken off and My last 4 Sundays' total are the same figure (`sdPile().tp`; `sdHistGroups` moved to js/43).
+- 🏦 **From my bank adds up**: a "📥 Waiting for Sunday $X" line (money that came in this week; it still joins the pile on its own, Deviation 37) beside From Savings and From home; the box note no longer repeats it. The lines sum to the box total.
+- 🧱 **I choose's "what I owe → after"** is what the sign leaves (`sdOweAfterPlan` over `sdLoanPlan`, the sign's own arithmetic): the jar's overflow below the Savings gate is counted too.
+- 🔢 **"Loan per month" rescale** puts the rounding cent on the last row, so the rows add up to the new figure exactly (`sdRescaleMonthly`).
+- 📅 **The money week's name** (`mrMoneyWeekLabel`): the meeting's head on the money step, Signed's header, the story's week card and Grown-ups › 📒 Weeks rows (column "Money week") read "Sun 11 – Sat 17 Oct" (the switch week "Mon 5 – Sat 10 Oct"; Mon–Sun before 11 Oct 2026). The planner's weeks keep their Mon–Sun label.
+- 🆕 **Commitments** (`sdCommitPlan`): steady money under $5 a week shows "not enough steady money yet" instead of a share; that, or a share over 50 %, is saved only with the parent's "I checked this with her" ✓ (form state only, never stored; `mnyAddCommitment` refuses without it). The 10 % down comes out of Savings only above the 🛟 safety line; the card says "$X from Savings, $Y added to the wall" and the rest joins the new row. The new weekly payment follows the loan's rule (monthly × 12 ÷ 52): $16.15 → $17.19 for $27 over 26 weeks. 🌧️ Surprise costs unchanged (the 🛟 pays first).
+- 🧪 tests/sunday.test.js: rescale, commitment plan, money week label, owe after plan, and a 20-Sunday run per girl (In = Out, one pile figure, cents, interest on Sundays 4/8/12/16/20, locks back after 4, goal capped, each approval applied once by its `appliedWeek`, Redo re-sign identical, passbook total); optional `SUNDAY_REPLAY=<export>` replay. Smoke — new: `onePileFigureOnEveryStep`, `fromMyBankAddsUp`, `theMoneyHeadNamesTheMoneyWeek`, `aBigCommitmentNeedsAParentTick`; `grownupsCommitmentsAddARow` ticks the ✓.
+
+| Feature | v28 → v29 | Note |
+|---|---|---|
+| Sunday ritual: Payday, I choose, Signed, the sign, In = Out, cents rule | kept | `sdSign` now reads its loan part from `sdLoanPlan`; same figures (the 8–20 Sunday random run unchanged and passing) |
+| Payday pile figure, I choose chip | kept, changed | pile shows under reduced motion; chip shows the pile + "$X left" |
+| From my bank box | kept, changed | waiting money is a line, not part of the note |
+| Money week Sun–Sat (Deviation 34), `mmWeekLabel` for the planner | kept | new `mrMoneyWeekLabel` only on the four money surfaces |
+| Commitments and 🌧️ surprise costs | kept, changed | parent's ✓ for a too-big commitment; down payment above the 🛟 only; surprise unchanged |
+| "Loan per month" rescale | kept, changed | residual cent on the last row |
+| One pile figure, bank lines, money week label, commitment tick, 20-Sunday run | added | tests and smoke listed above |
+| "📥 $X waiting" in the From my bank note | intentionally removed | shown once, as its own line (plan L2) |
+| — | missing: none | |
 
 ## Regression table format (paste at the end of every edit)
 | Feature | v<old> → v<new> | Note |
