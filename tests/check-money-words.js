@@ -79,14 +79,7 @@ const ALLOW = [
 
 /* Known hits a later PR fixes — each goes when its words change. */
 const EXEMPT = [
-  { file: 'js/21-money-data.js', text: "title: 'Locking money away' }", word: 'locking money', why: 'PR 4 (MNY_STAGES titles)' },
-  { file: 'js/21-money-data.js', text: "title: 'Trying it with stocks' }", word: 'stocks', why: 'PR 4 (MNY_STAGES titles)' },
-  { file: 'js/21-money-data.js', text: "title: 'Locking money away for {lockWeeks} weeks'", word: 'locking money', why: 'PR 4 (Money school concept titles)' },
-  { file: 'js/21-money-data.js', text: "where: 'Everything I have'", word: 'everything i have', why: 'PR 4 (the tour: "What I own")' },
-  { file: 'js/06-quests.js', text: '<span>Everything I have</span>', word: 'everything i have', why: 'PR 4 (mnyQuestSummary is removed)' },
-  { file: 'js/42-flow.js', text: 'in cash right now.', word: 'cash as a place', why: 'PR 4 (the Flow\'s sentences → 📥 Waiting for Sunday)' },
-  { file: 'js/24-money-parent.js', text: 'To correct a meet, change the meet itself.', word: 'meet', why: 'PR 4 (found by this check: the defaulted-row refusal → "competition")' },
-  { file: 'js/45-requests.js', text: "showToast('Which meet was it?')", word: 'meet', why: 'PR 4 (found by this check: the competition request\'s toast → "Which competition was it?")' },
+  // PR 4 part B (build 2026-10-06b) cleared the last eight.
 ];
 
 // ── The lexer: a copy of check-dead-actions.js's ──

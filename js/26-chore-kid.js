@@ -823,7 +823,8 @@ function ckBuildKidTab(kid) {
       <div class="ck-main">${main}</div>
       ${ckRail(kid)}
     </div>
-  </div>`;
+  </div>
+  ${ctMoneyDoor(kid)}`;
 }
 
 /* ── Actions ──

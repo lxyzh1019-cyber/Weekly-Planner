@@ -3995,6 +3995,10 @@ above; this is the index.
 
 ## The money week runs Sunday to Saturday — Plan v6 Deviation 34 (2026-10-04)
 
+**Withdrawn 2026-10-06 by decision 15 (Money fit and logic, Plan v2):** the money week is Monday–Sunday everywhere; the Sunday routine is counted as kept at the meeting; the Sun–Sat mapping code stays for the record and is tested with explicit rules only. `MR_DEFAULT_RULES.week` is `{ startsOn: 'monday' }` (no `from`); `mrMoneyWeekRuleOn` reads the STORED rules only (no default fallback), so only a stored `week.startsOn: 'sunday'` with a stored `week.from` could turn the mapping on. The pending-rule card (`mrMoneyWeekRulePending` / `mrApplyMoneyWeekRule`, `MR_MONEY_WEEK_NOTE`, Grown-ups `guMoneyWeekCard`) is removed, and so are the smoke checks `theMoneyWeekRunsSundayToSaturday` and `aDayIsNeverPaidTwiceAcrossTheSwitch`. The pre-mark (replacing owner decision #93) is one pure rule, `mrStreakRunPure` (js/18, read by `mrStreakWeek`): in a week not yet settled, its meeting Sunday (day 6) counts as kept once it has come; a settled week is read whole as before. The text below is the record of the withdrawn rule.
+
+The exact withdrawn pair (`startsOn: 'sunday'`, `from: '2026-10-11'`), copied into rulebooks seeded on builds 2026-10-04a–05f, is ignored by `mrMoneyWeekRuleOn`; any other stored sunday + `from` pair still counts.
+
 The owner's answer to S1-6 was "Money week only": from the meeting of
 **Sun 11 Oct 2026** the meeting pays the seven FINISHED days before it —
 Sun..Sat — for chores, the routine streak, fines and club sessions. The
@@ -4198,9 +4202,9 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   ahead" block was clamped at 11pm, so it failed between 11pm and midnight).
   `sundaySundayRoutineCounts`, `theFourHouseRulesHold`,
   `grownupsFinesLogEvenWhenFree` and `anUnfinishedDayIsNeverForgiven` test
-  the Monday–Sunday money week and pin it (`pinMonSunMoneyWeek`, which
-  stands `mrMoneyWeekRuleOn` down for the check): from the week of Sun 11 Oct
-  2026 the current week is Sunday–Saturday and they failed by the date.
+  the Monday–Sunday money week. They pinned it with `pinMonSunMoneyWeek`
+  while the Sun–Sat switch was planned; decision 15 (2026-10-06) made every
+  week Monday–Sunday, so the pin is removed.
 
 ### Money fit and logic, PR 1 — money rules (build 2026-10-05d)
 
@@ -4212,6 +4216,9 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   dated rule. Used ONLY by the meeting's head while the money step is on
   (`mmHead`), Signed's header, the story's week card and Grown-ups › 📒 Weeks
   rows. `mmWeekLabel` and its planner callers stay Mon–Sun — do not swap them.
+  **Decision 15 (2026-10-06):** with the Sun–Sat switch withdrawn, `mrMoneyWeekLabel`
+  reads Monday–Sunday for every week — "Mon 5 – Sun 11 Oct" for the week of
+  5 Oct; the Sun–Sat labels above are tested only with explicit rules.
 - **A too-big commitment needs the parent's tick.** `sdCommitPlan` (js/43) is
   the one answer for a commitment's numbers, read by the "Can she afford it?"
   card and by `mnyAddCommitment`: steady money under $5 a week shows no share,
@@ -4271,6 +4278,28 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   `guRulesMain(secs)`; each still builds its own when called alone
   (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
   counts one build per render.
+
+### Money fit and logic, PR 4 part B — the old money pages read the new rules (build 2026-10-06b)
+
+- **Two tabs, two doors (decision 14).** A kid's money head has two tabs, 💰 My
+  money and 🎓 Money school (`mnyTabBar`, icons and names, no numbers; a
+  grown-up still gets the whole tagged rail from `mnyTabsFor`). The money story
+  page and its head button are gone. 📒 My passbook has two doors, each a full
+  page under My money's head (`mnyMoneyHead`, ◀ back to My money) on
+  `#screen-moneystory`: the 📖 icon (`sundays`) opens **📖 All my Sundays**
+  (`mnySundaysPage` — every settled Sunday from the frozen ledger row through
+  `sdHistGroups`, labelled with `mrMoneyWeekLabel`) and **📊 By month ▸**
+  (`bymonth`) opens the Flow (`flRenderFlow`, js/42). `mnyRenderHistory` draws
+  whichever is open. No bottom bar on any money page (`TD_NAV_SCREENS`).
+- **One explainer table.** An idea's words live only in `MNY_CONCEPTS` (js/21).
+  The idea sheet (`mnyOpenInfoSheet('idea', {id})`, kind in `MNY_INFO_KINDS`),
+  Money school's 💡 rows, the '?' card (`mnyShowConcept`) and 📥 Waiting for
+  Sunday's sheet all read it; `mnyIdeaBody` is the one body. Rule numbers in an
+  idea are `mnyConceptSwap` tokens — `{lockWeeks}` (`mnyLockWeeks`) and
+  `{stockDrop}` (`mnyStockDrop`, the Companies chart's own fall).
+- **The old pages wear the new look.** Money school (`.mv2-school`) and the
+  two passbook pages (`.mv2-hist`, `.mv2-flow`) are `.mv2-card`s inside the
+  `money-tokens` markers, the Flow's `.fl-*` rules included.
 
 ## Known trip hazards
 

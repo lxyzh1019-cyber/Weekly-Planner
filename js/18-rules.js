@@ -114,18 +114,13 @@ const MR_DEFAULT_RULES = {
   streak: { tiers: [{ days: 3, bonus: 1 }, { days: 5, bonus: 2 }, { days: 7, bonus: 3 }],
             highestOnly: true, resetsOn: 'sunday', graceDays: 1, graceCounts: true },
 
-  /* ── THE MONEY WEEK RUNS SUNDAY TO SATURDAY (Plan v6 Deviation 34, owner
-     2026-10-04: "Money week only") ──
-     From the meeting of `from` (a Sunday) on, the meeting pays the seven
-     FINISHED days before it — Sun..Sat — for chores, the routine streak,
-     fines and club sessions. Weeks whose meeting is before `from` keep
-     Mon..Sun. The planner stays Monday–Sunday and so does every stored
-     `weekKey`: the money week keyed by Monday W is Sun(W−1)..Sat(W+5), the
-     Sunday read from the previous planner week's day 6 (`mrMoneyDays`). A
-     version without the path reads these defaults (`mrRuleOr`), and every
-     week lived before `from` is unchanged either way. Delivered to a stored
-     rulebook as one dated version by `mrApplyMoneyWeekRule`. */
-  week: { startsOn: 'sunday', from: '2026-10-11' },
+  /* ── THE MONEY WEEK RUNS MONDAY TO SUNDAY (decision 15, 2026-10-06) ──
+     The Sunday–Saturday switch of Plan v6 Deviation 34 (from the meeting of
+     11 Oct 2026) was withdrawn before it started. No `from`: the default
+     never turns the Sun–Sat mapping on — `mrMoneyWeekRuleOn` reads only a
+     STORED `week.startsOn: 'sunday'` with a `week.from`. The mapping code
+     (`mrMoneyDays`) stays for the record and is tested with explicit rules. */
+  week: { startsOn: 'monday' },
 
   competition: {
     // No caps on points, by decision — the dance test is the one exception.
@@ -762,38 +757,6 @@ function mrApplySundayRules() {
     { reason: MR_DEFAULT_REASON, note: MR_SUNDAY_RULES_NOTE, effectiveFrom: from });
 }
 
-/* ── THE SUNDAY–SATURDAY MONEY WEEK, FOR A RULEBOOK ALREADY ON FILE ──
-   (Plan v6 Deviation 34.) The Sunday rules' mechanism with its own marker:
-   `week.startsOn` and `week.from` arrive where absent, as one dated version
-   from this week's Monday (`mrHouseRulesFrom`), so the change log says when
-   the family's money week turned. Until it is applied the readers fall back
-   to MR_DEFAULT_RULES per key (`mrRuleOr`) — the same answer — and a week
-   whose meeting is before `from` is Mon–Sun either way. Applied once. */
-const MR_MONEY_WEEK_NOTE = 'Money week Sunday–Saturday (4 Oct)';
-const MR_MONEY_WEEK_RULES = [
-  { path: 'week.startsOn', item: '📅 Money week', field: 'starts on' },
-  { path: 'week.from',     item: '📅 Money week', field: 'first Sunday paid this way' },
-];
-function mrMoneyWeekRulePending() {
-  const r = mrRules();
-  return MR_MONEY_WEEK_RULES.filter(rule => mrGetPath(r, rule.path) == null).map(rule => ({
-    path: rule.path, value: mrGetPath(MR_DEFAULT_RULES, rule.path), from: null, item: rule.item, field: rule.field,
-    label: MR_MONEY_WEEK_NOTE + ' — ' + rule.item + ': ' + rule.field }));
-}
-function mrMoneyWeekRuleApplied() {
-  return mrLogEntries().some(e => String((e && e.note) || '').indexOf(MR_MONEY_WEEK_NOTE) === 0);
-}
-function mrApplyMoneyWeekRule() {
-  if (!isParent()) { showToast('Only parents can change the money rules 🔒'); return null; }
-  if (mrMoneyWeekRuleApplied()) return null;
-  const changes = mrMoneyWeekRulePending();
-  if (!changes.length) return null;
-  const from = mrHouseRulesFrom();
-  if (!from) { showToast('A rules change is already scheduled — this can go in once it starts'); return null; }
-  return mrApplyEdits(changes.map(c => ({ path: c.path, value: c.value, label: c.label })),
-    { reason: MR_DEFAULT_REASON, note: MR_MONEY_WEEK_NOTE, effectiveFrom: from });
-}
-
 /* A rule value, or the shipped default for that path when the stored version
    predates it — the per-key fallback `mnyStagePct` already uses. */
 function mrRuleOr(rules, path) {
@@ -1309,6 +1272,9 @@ function mrToggleSick(kid, weekKey, dayIdx) {
 
 /* ════════════════════════════════════════════════════════════════
    THE MONEY WEEK (Plan v6 Deviation 34) — which days a meeting pays
+   Decision 15 (2026-10-06): withdrawn before it started — the money week is
+   Monday–Sunday. The mapping below stays for the record; only a stored
+   `week.startsOn: 'sunday'` with a `week.from` would turn it on.
    ════════════════════════════════════════════════════════════════
    Storage and sync keep the planner's identity: every per-day record lives
    at (weekKey = its planner Monday, dayIdx 0 = Mon … 6 = Sun). The money
@@ -1340,9 +1306,15 @@ function mrDayKeyAdd(key, n) {
 }
 function mrDayKeyDate(key) { const p = String(key).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
 /* Is the week keyed by Monday `weekKey` a Sunday–Saturday money week under
-   `rules` (that week's own rules)? */
+   `rules` (that week's own rules)? Decision 15 (2026-10-06): read from the
+   STORED rules only — no default fallback — so only a stored
+   `week.startsOn: 'sunday'` WITH a stored `week.from` turns it on; the
+   shipped rulebook (Monday, no `from`) never does. */
 function mrMoneyWeekRuleOn(rules, weekKey) {
-  const starts = mrRuleOr(rules, 'week.startsOn'), from = mrRuleOr(rules, 'week.from');
+  const starts = mrGetPath(rules || {}, 'week.startsOn'), from = mrGetPath(rules || {}, 'week.from');
+  // The withdrawn shipped pair, copied into rulebooks seeded on builds
+  // 2026-10-04a–05f and never chosen by a parent, does not count.
+  if (starts === 'sunday' && String(from) === '2026-10-11') return false;
   return starts === 'sunday' && !!from && mrDayKeyAdd(weekKey, 6) >= String(from);
 }
 /* The week's nominal days, in order, as storage refs. */
@@ -1677,9 +1649,14 @@ function mrStreakDayDone(weekKey, kid, dayIdx) {
   if (!asked.length) return false;
   return asked.every(s => ctGetMandatory(weekKey, dayIdx, s, kid));
 }
-function mrStreakWeek(weekKey, kid) {
-  const r = mrRulesForWeek(weekKey);
-  const st = r.streak || {};
+/* ── THE WEEK'S RUN, PURE (tests/sunday.test.js runs it in Node) ──
+   `days`: the week's countable days in order — days still ahead, paid by
+   another settled week, sick, or asking no routine already left out by
+   mrStreakWeek — each `{ kept, today, meetingSunday }`. `st`: THIS week's
+   `streak` rules. `live`: the week is not settled yet. Returns
+   `{ days, bonus, tier }` (bonus unrounded; mrStreakWeek rounds it). */
+function mrStreakRunPure(days, st, live) {
+  st = st || {};
   const tiers = (st.tiers || []).slice().sort((a, b) => a.days - b.days);
   /* ── ONE GRACE DAY ──
      An off day is a valid state, and a streak with no rest state is the
@@ -1694,41 +1671,22 @@ function mrStreakWeek(weekKey, kid) {
      `graceCounts` is read from THIS week's rules and is false when absent, so
      a week lived before the rule keeps the pay it had. */
   const counts = st.graceCounts === true;
-  /* ── AN UNFINISHED DAY IS NEVER FORGIVEN (Plan v5 Deviation 32) ──
-     In a week not yet settled, a day still ahead has not happened, and today
-     is not over until its routine is done — neither is kept, and neither is
-     missed, so the live run stops at the first of them. Otherwise a Wednesday
-     not done yet read as "forgiven" and the count ran a day ahead of her. A
-     settled week is read whole, exactly as before. */
-  const today = (typeof todayKey === 'function') ? String(todayKey()) : null;
-  const live = !!today && !(typeof mnyWeekSettled === 'function' && mnyWeekSettled(weekKey, kid));
-  /* The money week's days (Deviation 34): Mon..Sun before the switch,
-     Sun..Sat after it. A day another settled week already paid is paused —
-     neither kept nor missed — so it is never counted twice. */
-  const sundayWeek = mrMoneyWeekIsSunday(weekKey);
   // The week's countable days, in order: true kept, false missed.
   const marks = [];
-  for (const ref of mrMoneyDays(weekKey, kid)) {
-    if (live && String(ref.dayKey) > today) break;       // still ahead
-    if (ref.taken) continue;                              // paid elsewhere
-    if (mrIsSick(kid, ref.wk, ref.d)) continue;           // paused, not broken
-    /* Asked ONCE per day and reused. Going through mrStreakDayDone here would
-       resolve the same day's sessions a second time, and this loop already sits
-       under mrWeekBreakdown, which plenty of renders call. */
-    const asked = mrRoutineSessionsFor(ref.wk, kid, ref.d);
-    // A day the plan asked no routine of is paused too: nothing was kept and
-    // nothing was missed. Under the day-type default this cannot arise; it is a
-    // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
-    if (!asked.length) continue;
-    const kept = asked.every(s => ctGetMandatory(ref.wk, ref.d, s, kid));
-    /* Today, not done yet — except, in a Mon–Sun week, the week's own
-       Sunday, which is payday: owner decision #93 ("Sunday counts if ticked
-       by then"). Sunday's step 1 asks "Did you do your Sunday routine?" and
-       a tick keeps the day; left unticked it is a miss the forgiving day may
-       cover, so Mon–Sat kept still pays the full tier at the meeting. A
-       Sun–Sat week (Deviation 34) has no such day: its meeting comes after
-       its last day, so that special case is gone for it. */
-    if (live && !kept && String(ref.dayKey) === today && (sundayWeek || ref.d !== 6)) break;
+  for (const day of days) {
+    /* ── THE MEETING SUNDAY IS PRE-MARKED (decision 15, 2026-10-06;
+       replaces owner decision #93 "Sunday counts if ticked by then") ──
+       In a week not yet settled, the Sunday its meeting falls on counts as
+       kept once it has come, ticked or not: she still does the routine that
+       evening, and the meeting freezes the week, so a later untick changes
+       no money. A settled week is read whole, exactly as before. */
+    const kept = !!day.kept || (!!live && !!day.meetingSunday);
+    /* ── AN UNFINISHED DAY IS NEVER FORGIVEN (Plan v5 Deviation 32) ──
+       In a week not yet settled, today is not over until its routine is
+       done — not kept and not missed — so the live run stops there.
+       Otherwise a Wednesday not done yet read as "forgiven" and the count
+       ran a day ahead of her. */
+    if (live && !kept && day.today) break;
     marks.push(kept);
   }
   let best = 0;
@@ -1757,7 +1715,40 @@ function mrStreakWeek(weekKey, kid) {
   }
   let bonus = 0, tier = 0;
   tiers.forEach(t => { if (best >= t.days) { bonus = Number(t.bonus) || 0; tier = t.days; } });
-  return { days: best, bonus: money2(bonus), tier };
+  return { days: best, bonus, tier };
+}
+function mrStreakWeek(weekKey, kid) {
+  const st = mrRulesForWeek(weekKey).streak || {};
+  /* A day still ahead has not happened: the live run stops before it (Plan
+     v5 Deviation 32). A settled week is read whole. */
+  const today = (typeof todayKey === 'function') ? String(todayKey()) : null;
+  const live = !!today && !(typeof mnyWeekSettled === 'function' && mnyWeekSettled(weekKey, kid));
+  /* The money week's days (Monday–Sunday; the Sun–Sat mapping of Deviation 34
+     stays for a stored rule only). A day another settled week already paid is
+     paused — neither kept nor missed — so it is never counted twice. */
+  const sundayWeek = mrMoneyWeekIsSunday(weekKey);
+  const days = [];
+  for (const ref of mrMoneyDays(weekKey, kid)) {
+    if (live && String(ref.dayKey) > today) break;       // still ahead
+    if (ref.taken) continue;                              // paid elsewhere
+    if (mrIsSick(kid, ref.wk, ref.d)) continue;           // paused, not broken
+    /* Asked ONCE per day and reused. Going through mrStreakDayDone here would
+       resolve the same day's sessions a second time, and this loop already sits
+       under mrWeekBreakdown, which plenty of renders call. */
+    const asked = mrRoutineSessionsFor(ref.wk, kid, ref.d);
+    // A day the plan asked no routine of is paused too: nothing was kept and
+    // nothing was missed. Under the day-type default this cannot arise; it is a
+    // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
+    if (!asked.length) continue;
+    days.push({
+      kept: asked.every(s => ctGetMandatory(ref.wk, ref.d, s, kid)),
+      today: String(ref.dayKey) === today,
+      // The meeting's own Sunday: day 6 of a Mon–Sun week (decision 15).
+      meetingSunday: !sundayWeek && ref.wk === weekKey && ref.d === 6,
+    });
+  }
+  const run = mrStreakRunPure(days, st, live);
+  return { days: run.days, bonus: money2(run.bonus), tier: run.tier };
 }
 
 /* ── COMPETITION ───────────────────────────────────────────────────
@@ -2641,5 +2632,5 @@ function mrWeeksElapsed() {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { MR_DEFAULT_RULES, MR_REASONS, MR_DEFAULT_REASON,
     MR_HOUSEHOLD_CHORES, MR_PERSONAL_CHORES, mrGetPath, mrSetPath, mrApplyCap,
-    mrDayKeyAdd, mrMoneyWeekRuleOn, mrMoneyDayRefs, mrMoneyDaysPure, mrMoneyWeekLabelPure };
+    mrDayKeyAdd, mrMoneyWeekRuleOn, mrMoneyDayRefs, mrMoneyDaysPure, mrMoneyWeekLabelPure, mrStreakRunPure };
 }

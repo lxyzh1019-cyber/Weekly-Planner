@@ -699,7 +699,7 @@ function refreshCurrentScreen() {
   else if (active.id === 'screen-sync') renderSync();
   else if (active.id === 'screen-parent') renderParentHome();
   else if (active.id === 'screen-mymoney' && typeof mnyRenderMyMoney === 'function') mnyRenderMyMoney();
-  else if (active.id === 'screen-moneystory' && typeof mnyRenderStory === 'function') mnyRenderStory();
+  else if (active.id === 'screen-moneystory' && typeof mnyRenderHistory === 'function') mnyRenderHistory();
   else if (active.id === 'screen-moneyschool' && typeof mnyRenderSchool === 'function') mnyRenderSchool();
 }
 

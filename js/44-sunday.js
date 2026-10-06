@@ -349,11 +349,14 @@ function sdCats(c) {
   ];
 }
 function sdSundayRoutine(c) {
-  // A Sun–Sat money week (Deviation 34) ends on Saturday: its meeting Sunday
-  // is next week's first day, so there is no Sunday routine to ask about.
+  // A Sun–Sat money week (Deviation 34, withdrawn by decision 15 — a stored
+  // rule only) ends on Saturday: no Sunday routine to ask about.
   if (mrMoneyWeekIsSunday(c.wk)) return { asked: 0, done: false };
+  /* Decision 15 (2026-10-06, replaces owner decision #93): the meeting's own
+     Sunday (day 6 of the week being settled) is pre-marked — counted as kept
+     without the tick (mrStreakRunPure). She still does it that evening. */
   const asked = routineSessionsForDay(c.kid, c.wk, 6);
-  return { asked: asked.length, done: asked.length > 0 && asked.every(s => ctGetMandatory(c.wk, 6, s, c.kid)) };
+  return { asked: asked.length, done: true, premarked: true };
 }
 function sdGuessMain(c) {
   const d = c.d, s = mrSessionsWeek(c.wk, c.kid);
@@ -371,8 +374,8 @@ function sdGuessMain(c) {
         <span class="sd-cat-icon">${icon}</span><span>${escapeHtml(name)}</span>
         <b class="sd-pill">${v == null ? '? tap' : v ? '💰 yes' : '🚫 none'}</b></button>`;
     if (k !== 'streak' || !sun.asked) return tile;
-    // Owner decision #93: "Did you do your Sunday routine?" — a tick counts the day.
-    return `<div class="sd-catwrap">${tile}<button type="button" class="sd-sunroutine${sun.done ? ' on' : ''}" data-mny-action="sd-sunroutine">${sun.done ? '✓ Sunday routine done' : '☀️ Sunday routine? tick'}</button></div>`;
+    // Decision 15: the meeting Sunday's routine is pre-marked (counted without the tick).
+    return `<div class="sd-catwrap">${tile}<button type="button" class="sd-sunroutine${sun.done ? ' on' : ''}" data-mny-action="sd-sunroutine">${sun.premarked ? '✓ Sunday routine — marked for you' : sun.done ? '✓ Sunday routine done' : '☀️ Sunday routine? tick'}</button></div>`;
   }).join('');
   const u = sdUnsettled(c.kid, c.wk);
   const hist = c.f.hist;
@@ -1334,7 +1337,7 @@ function sdDadScript(c) {
   const lastWeek = hist.length ? Math.round(hist[hist.length - 1].inAmt) : 0;
   const avg = hist.length ? hist.reduce((a, r) => a + r.inAmt, 0) / hist.length : 0;
   return [
-    [...(sdSundayRoutine(c).asked ? [['ASK', 'Did you do your Sunday routine? Tick it on the 🔥 Routine tile — it counts the day.']] : []),
+    [...(sdSundayRoutine(c).asked ? [['ASK', "Tonight's routine still counts — it is marked for you."]] : []),
      ['ASK', 'Tick your club sessions first. That is your biggest money. Then tap the rest.'],
      ['SAY', 'Only what parents said yes to counts today. Anything still waiting stays out of your guess.'],
      ['ASK', hist.length ? `Last week was $${lastWeek}. More or less this week? Why?` : 'More or less than you think? Why?']],
@@ -1368,7 +1371,7 @@ function sdOpenDad() {
   if (title) title.innerHTML = `<span class="sd-nowrap">🗣️ Parent's card</span> <span class="sd-dadstep">${escapeHtml(['Step 1 · Guess', 'Step 2 · Payday', 'Step 3 · Choose', 'Step 4 · Sign'][step])}</span>`;
   body.innerHTML = `<div class="sd-dadcard">
       ${sdDadScript(c).map(([k, v]) => `<div class="sd-script-line ${'sd-script-line--' + k.toLowerCase()}"><b>${k}</b>${escapeHtml(v)}</div>`).join('')}
-      ${step === 0 && sun.asked ? `<div class="sd-note">${sun.done ? '✓ Sunday routine ticked' : '○ Sunday routine not ticked yet'}</div>` : ''}
+      ${step === 0 && sun.asked ? `<div class="sd-note">${sun.premarked ? '✓ Sunday routine marked for her' : sun.done ? '✓ Sunday routine ticked' : '○ Sunday routine not ticked yet'}</div>` : ''}
       <div class="sd-teal">${escapeHtml(check)}</div>
       <button type="button" class="sd-go" data-mny-action="sd-dadclose">Back to her</button>
     </div>`;

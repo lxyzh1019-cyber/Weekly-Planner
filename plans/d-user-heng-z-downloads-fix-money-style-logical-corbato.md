@@ -1,52 +1,43 @@
-# Plan v1 — Money fit and logic — Approved 2026-10-05
+# Plan v2 — Money fit and logic — Approved 2026-10-06
 
 | Summary |
 |---|
-| What changes for you: the money numbers add up the same on every screen, the money week reads Sun–Sat wherever money is shown, Savings keeps its $10 safety, a too-big commitment needs your tick, no "Meets" or "cash" as a place, the kept old pages match the new My money, and no money screen spills text. Five pull requests, in order. |
-| What changed from the last version and why: you agreed with all eight decisions and asked which old money-tab parts are worth keeping, with a side-by-side view before deciding. Both are in: my call per part, a comparison page before PR 4, and the kept parts updated in PR 4. |
-| What I need to do: answer decisions 9–11, then approve; mark the side-by-side page before PR 4. After each pull request: merge, read the build. |
+| What changes for you: the money numbers add up on every screen; 🟩 Rev 2 — the money week is Monday to Sunday everywhere (the Sunday–Saturday switch is withdrawn) and the Sunday evening routine counts as kept at the meeting; Savings keeps its $10 safety; a too-big commitment needs your tick; no "Meets" or "cash" as a place; the kept old pages match the new My money under two tabs; no money screen spills text. Five pull requests, three merged. |
+| What changed from the last version and why: 🟩 Rev 2 — your answers of 2026-10-06: the twelve keep-or-retire marks as made; two tabs with the Story as doors (decision 14); the money week back to Monday–Sunday with the Sunday routine pre-marked (decision 15). PR 4 now carries the week change too. |
+| What I need to do: 🟩 Rev 2 — approve this version; then merge PR 4 and PR 5 and read the build. |
 
 Changes in this version
 ```diff
-+ 🟦 Rev 1 — Decisions 1–8 agreed; decisions 9–12 added (12 = the keep list)
-+ 🟦 Rev 1 — "What is worth keeping": a keep-or-retire call per old part
-+ 🟦 Rev 1 — Before PR 4, a side-by-side page (old part today · proposed new look) for your marks
-+ 🟦 Rev 1 — New PR 4: the kept parts updated to the current rules and look; fit moves to PR 5; 13 stages
-- 🟦 Rev 1 — "Money school and Story are kept as they are"
++ 🟩 Rev 2 — Decision 14 agreed: two tabs (My money · Money school); the Story's Flow and "All my Sundays" become doors off the passbook; the head's Story button goes
++ 🟩 Rev 2 — Decision 15: the money week is Monday–Sunday everywhere; the Sunday–Saturday rule of 11 Oct is withdrawn before it starts; the Sunday evening routine is counted as kept at the meeting, with a reminder line
++ 🟩 Rev 2 — PR 4 gains a first part "money week Mon–Sun"; row 8 (club money in the Sunday bars) and row 10 (the checklist names its days) land in PR 4
++ 🟩 Rev 2 — Decisions 12–15 recorded; stages unchanged (13)
+- 🟩 Rev 2 — "the money week reads Sun–Sat wherever money is shown"
 ```
 
 ## What I found
 
-Audit findings: **14 real**, **6 wrong**, **6 against your own decisions** (1–8, agreed). Grading below.
-
-🟦 Rev 1 — **The old money tab: what is worth keeping.** Nothing is broken; all of it carries old words. My call:
-- **🎓 Money school — keep as the one teaching page:** the ladder, the ten ideas with their lock, the Companies chart, "Just part of being here", "What money buys". Retire the cash idea. Merge the ideas with My money's "?" sheets: one text per thing.
-- **📖 My money story — keep the long view, drop the short one:** the Flow (months) stays; "week by week" becomes the passbook's "all my Sundays" page (a door the spec names, empty today). Retire "Your last 8 weeks": the passbook and 📒 Weeks show it.
-- **Survivors — keep, reword:** the price list, the week checklist, the tour. **Retire:** the Chores-tab 💰 card (decision 9), four dead helpers; archive the old handoff (11).
+Audit findings: 14 real, 6 wrong, 6 against your own decisions. The keep-or-retire call per old part is agreed as marked. Both are under Technical details.
 
 ## The five pull requests
 
-**PR 1 — Money rules.** One pile figure on every screen; "From my bank" adds up; one Sun–Sat money-week label; a too-big commitment needs a parent tick; a down payment leaves the $10 safety alone; a 20-Sunday test run per girl.
+**PR 1 — Money rules.** Merged (#115): one pile figure, From my bank adds up, the parent tick, the $10 safety, the 20-Sunday test run.
 
-**PR 2 — Words and small fixes.** "Competitions" wherever it is read (Swim meet stays); no "Dad" on the price card; the lock-weeks chip reads the rule; an unsigned Signed step says so; Grown-ups figures in the look's font; Story colours match My money.
+**PR 2 — Words and small fixes.** Merged (#116): Competitions wording, the price card, the lock-weeks chip, Grown-ups figures in the look's font, Story colours, "Settled without a sign".
 
-**PR 3 — Shared values and checks, money screens.** Corners, borders, shadows, the selected fill and the main button read shared values (shadow colour per look); one check fails the build on a typed value there, a second on banned kid words and a raw "{…}".
+**PR 3 — Shared values and checks.** Merged (#117): every money-screen size on a token, the size check, the words check, Rules tab builds once.
 
-🟦 Rev 1 — **PR 4 — Old pages join the new look** (the parts you keep on the side-by-side page). Money school and the Story get the My money head, cards, fonts and spacing, filling the iPad screen; their content follows the current rules (stage names, no cash, the four income groups, money weeks, rates read live). The survivors say the current words; the manifest is corrected.
+🟩 Rev 2 — **PR 4 — The money week, then the old pages.** First: the money week is Monday to Sunday everywhere; the Sunday–Saturday switch planned for 11 Oct is withdrawn before it starts (nothing was paid under it); at the Sunday meeting the Sunday evening routine counts as kept, with the line "tonight's routine still counts"; the "Money week" card on Grown-ups › Rules goes. Second, the twelve marks as made: Money school's five parts in the new look under the My money head (two tabs), its ideas sharing one text with the "?" sheets; the Story page goes — its Flow becomes "📊 By month" and its week-by-week "📖 All my Sundays", doors off the passbook, each Sunday in the four income groups (club money included); "Your last 8 weeks" retires; the Chores-tab card becomes one door; the week checklist names its seven days; the tour and the price list say the current words; the old handoff is archived.
 
-**PR 5 — Fit and same look.** The money fit check grows (every money screen and sheet, both looks, phone and iPad, long names, 4-digit amounts: nothing clipped or overlapping); it fails first, then fixes follow your Stage 7 rules, then wording or a box that grows — never a cut. Same thing, same look: totals, columns, main button, − / +, borders, solid sheets. Every pull request bumps the build and passes the full test chain in both looks.
+**PR 5 — Fit and same look.** The money fit check grows (every money screen and sheet, both looks, phone and iPad, long names, 4-digit amounts); it fails first, then fixes follow your Stage 7 rules, then wording or a box that grows — never a cut. Same thing, same look: totals, columns, main button, − / +, borders, solid sheets. Every pull request bumps the build and passes the full test chain in both looks.
 
 ## Decisions
-Decisions 1–8 agreed 2026-10-05 (listed under Technical details).
-
-🟦 Rev 1 — New (my recommendation first):
-9. **The 💰 card on the Chores tab** — one door "💰 My money ▸". Or keep it, rewritten.
-10. **The Story's weeks** — money weeks, Sun–Sat. Or planner weeks.
-11. **The old handoff file at the root** — move to the archive folder with a note. Or leave it.
-12. **Keep list** — you mark the side-by-side page (stage 8) before PR 4; my call above is the starting mark.
+Decisions 1–15 agreed (listed under Technical details). 🟩 Rev 2 — the two that change the build:
+14. **Two tabs and doors** — My money · Money school; the Story's two parts are doors off the passbook; the Story button leaves the head.
+15. **Money week Monday–Sunday, Sunday routine pre-marked** — "all will be Monday to Sunday"; the meeting counts Sunday's routine as kept ("counted as done automatically"); she still does it that evening; a later untick changes no money.
 
 ## Stages to finish
-13 stages: 7 build steps by Claude, then 6 checks (merges, iPad reads, one page review).
+13 stages: 7 build steps by Claude, then 6 checks.
 1. Records: ledger, hotspot row, plan file · Claude · Build (main session)
 2. PR 1 Money rules · Claude · Build · opus-worker · Level: Complex
 3. Merge PR 1, read the build on the iPad · You · Check
@@ -54,18 +45,29 @@ Decisions 1–8 agreed 2026-10-05 (listed under Technical details).
 5. Merge PR 2 · You · Check
 6. PR 3 Shared values and checks · Claude · Build · opus-worker · Level: Complex
 7. Merge PR 3 · You · Check
-8. 🟦 Rev 1 — Side-by-side page: each old part today beside its new look · Claude · Build · opus-worker · Level: Complex
-9. 🟦 Rev 1 — Your keep-or-retire marks on that page (decision 12) · You · Check
-10. 🟦 Rev 1 — PR 4 Old pages join the new look · Claude · Build · opus-worker · Level: Complex
-11. 🟦 Rev 1 — Merge PR 4, read the build · You · Check
+8. Side-by-side page: each old part today beside its new look · Claude · Build · opus-worker · Level: Complex
+9. Your keep-or-retire marks on that page (decision 12) · You · Check
+10. 🟩 Rev 2 — PR 4 Old pages join the new look (money week Mon–Sun first) · Claude · Build · opus-worker · Level: Complex
+11. Merge PR 4, read the build · You · Check
 12. PR 5 Fit and same look · Claude · Build · opus-worker · Level: Complex
 13. Merge PR 5, iPad walk-through in both looks · You · Check
 
-Checked against: Pocket money hotspot row (6 rounds, 2 recurrences, 1 regression; rewrite chosen 2026-10-03 — round 7 repairs it); Looks — Calm meaning row; ledger #96, #98, #91/#92, #87, #102; Plan v18 §W; Stage 7 fit rule; R11 looks rules. No stored field added.
+Checked against: Pocket money hotspot row (7 rounds, 2 recurrences, 1 regression; rewrite chosen 2026-10-03); Looks — Calm meaning row; ledger #96, #98, #91/#92, #87, #102; 🟩 Rev 2 — #93 (Sunday counted if ticked — now counted without the tick), Deviation 34 (withdrawn by decision 15 before its first week); Plan v18 §W; Stage 7 fit rule; R11 looks rules. No stored field added; the week rule returns to its old default, no migration.
 
-Removes/consolidates: the Mon–Sun label on money surfaces; the Story's own colours; the double rule-section build; literal corner, shadow and border values on the money screens; the raw chip title; the twice-shown waiting figure; 🟦 Rev 1 — the cash idea, the 8-weeks chart, two explainer tables into one, the old card look, the Chores-tab card, four dead helpers, the old handoff.
+Removes/consolidates: 🟩 Rev 2 — the Sun–Sat dated rule, its Grown-ups card and the two switch smoke checks; the Story page and the head's Story button; (done in PRs 1–3: the old week label, the Story's colours, the double rule build, literal sizes, the raw chip title, the twice-shown waiting figure); the cash idea, the 8-weeks chart, two explainer tables into one, the old card look, the Chores-tab card, four dead helpers, the old handoff.
 
 ## Technical details
+
+**Decisions 9–15 (agreed):** 9 the Chores-tab 💰 card → one door "💰 My money ▸" · 10 the Story's weeks on the money week (now Mon–Sun by 15) · 11 the old handoff archived with a note · 12 the twelve keep-or-retire rows as marked (keep 1, 3, 4, 5, 6, 10, 11; merge 2, 8; retire 7, 9; archive 12) · 13 the checklist names its days (moot by 15) · 14 two tabs and doors · 15 money week Mon–Sun, Sunday routine pre-marked.
+
+**Earlier record — Audit findings: **14 real**, **6 wrong**, **6 against your own decisions** (1–8, agreed). Grading below.
+
+**The old money tab: what is worth keeping.** Nothing is broken; all of it carries old words. My call:
+- **🎓 Money school — keep as the one teaching page:** the ladder, the ten ideas with their lock, the Companies chart, "Just part of being here", "What money buys". Retire the cash idea. Merge the ideas with My money's "?" sheets: one text per thing.
+- **📖 My money story — keep the long view, drop the short one:** the Flow (months) stays; "week by week" becomes the passbook's "all my Sundays" page (a door the spec names, empty today). Retire "Your last 8 weeks": the passbook and 📒 Weeks show it.
+- **Survivors — keep, reword:** the price list, the week checklist, the tour. **Retire:** the Chores-tab 💰 card (decision 9), four dead helpers; archive the old handoff (11).
+
+
 
 Planned on Fable 5.1 (the planner hook reports the account default, Opus 5.5).
 
@@ -103,9 +105,15 @@ Planned on Fable 5.1 (the planner hook reports the account default, Opus 5.5).
 - `tests/check-money-words.js` (added to `npm run check`, `package.json` and `.github/workflows/ci.yml`): scans **string literals** in `js/` and text in `index.html`, case-insensitive: `dad` (outside the fines `who` list and comments), `\bmeets?\b` (outside "swim meet" and an identifier allow-list), `prizes`, `stocks`, `locking money`, `everything i have`, `in cash` / `cash right now` (cash as a place; "Cash out", "Put cash in", "Cash from home" allowed), and a `{word}` placeholder not preceded by `$` (template `${x}` excluded) outside `swap`'s own source. Planted failures proven, as the existing checks were.
 - B5: `guRuleSections()` (`js/46-grownups.js:958–971`) built once per `guRender('rules')` and handed to `guRuleIndex` and `guRulesMain`; smoke counts one build per render (no millisecond assertion).
 
-🟦 Rev 1 — **Stage 8 — side-by-side page (`opus-worker`, Complex).** One private artifact page, like the earlier comparison pages: a row per old part (ladder, ideas, Companies chart, Just part of being here, What money buys, price list, Flow, last 8 weeks, week by week, Chores-tab card, week checklist, tour), each with a screenshot of today's build at 1194 (Pop) on the left and a mockup of the proposed new-look version on the right (or "retire" with the reason and where the information already lives), my mark (keep / merge / retire) and a box for the owner's answer. Screenshots from the smoke harness; mockups as static HTML on the My money tokens. Nothing in the repo changes.
+**Stage 8 — side-by-side page (`opus-worker`, Complex).** One private artifact page, like the earlier comparison pages: a row per old part (ladder, ideas, Companies chart, Just part of being here, What money buys, price list, Flow, last 8 weeks, week by week, Chores-tab card, week checklist, tour), each with a screenshot of today's build at 1194 (Pop) on the left and a mockup of the proposed new-look version on the right (or "retire" with the reason and where the information already lives), my mark (keep / merge / retire) and a box for the owner's answer. Screenshots from the smoke harness; mockups as static HTML on the My money tokens. Nothing in the repo changes.
 
-🟦 Rev 1 — **PR 4 — Old pages join the new look (`opus-worker`, Complex; Explore map first: the inventory report of 2026-10-05 and the owner's marks on the stage 8 page, repeated in the hand-over).**
+🟩 Rev 2 — **PR 4 part A — money week Monday–Sunday (`opus-worker`, Complex; same hand-over as part B, first commit).**
+- `MR_DEFAULT_RULES.week` (`js/18-rules.js:128`) → `{ startsOn: 'monday' }` with no `from`; `mrMoneyWeekRuleOn` (:1344) must read BOTH values from the stored rules only (not the default fallback) so a stray stored `sunday` cannot turn the switch back on; `mrMoneyDays`/`mrMoneyDayRefs`/`mrMoneyWeekOf`/`mrMoneyWeekLabel` stay (tested, now always Mon–Sun). Remove the pending-rule card: `MR_MONEY_WEEK_NOTE`, `MR_MONEY_WEEK_RULES`, `mrMoneyWeekRulePending`, `mrMoneyWeekRuleApplied`, `mrApplyMoneyWeekRule` (:772–800), `guMoneyWeekCard` (`js/46-grownups.js:1069`) and its action; the Rules tab section list drops it.
+- Sunday routine pre-marked: `sdSundayRoutine` (`js/44-sunday.js:351`) returns `{ asked, done: true, premarked: true }` for the meeting's own Sunday; the streak reader used by `sdBuildInput` (`mrStreakWeek`) counts day 6 as kept on a meeting Sunday — one pure rule in js/43 with a unit test (6 kept + meeting Sunday = the 7-day tier); the ASK line (:1337) becomes "Tonight's routine still counts — it is marked for you". A later untick changes no money (settled weeks are frozen).
+- Smoke: retire `theMoneyWeekRunsSundayToSaturday` (tests/smoke.js:24641) and `aDayIsNeverPaidTwiceAcrossTheSwitch` (:24702) with a comment naming decision 15; rewrite `theMoneyHeadNamesTheMoneyWeek` (:25537) to expect "Mon 5 – Sun 11 Oct" with the clock pinned to Sun 11 Oct; `sundaySundayRoutineCounts` (:6856) asserts the pre-mark; the `pinMonSunMoneyWeek` helper becomes a no-op and goes. tests/sunday.test.js keeps the pure mapping tests for both rules and adds the pre-mark test.
+- Docs: the constraints doc's "The money week runs Sunday to Saturday — Plan v6 Deviation 34" section gets a first line "Withdrawn 2026-10-06 by decision 15 (Money fit and logic, Plan v2): the money week is Monday–Sunday; the mapping code stays"; BUILD-SPEC §5's "Money week" line and the Signed sample text updated; FEATURES v32 regression table marks the Sun–Sat rule "intentionally removed".
+
+🟩 Rev 2 — **PR 4 part B — Old pages join the new look (`opus-worker`, Complex; Explore map first: the inventory report of 2026-10-05, the stage 8 page and its five findings, repeated in the hand-over).** Decision 14: two tabs only — the head's "📖 My money story" button (`js/22-money-page1.js:168`) and the `story` action go; `mnyOpenStory`/`mnyRenderStory` become two doors off the passbook card: the 📖 icon (`:612`) opens "📖 All my Sundays" (a full page under the My money head, ◀ back to My money) and a new door "📊 By month ▸" opens the Flow the same way; `TD_NAV_SCREENS` hides the bottom bar on both. Row 8: each Sunday's bars read `sdHistGroups` (club money included). Row 10: the `MNY_CHECKS` line reads "Chores graded for every day, Mon 5 – Sun 11 Oct" via `mrMoneyWeekLabel`.
 - **Head and tabs.** `mnyRenderSchool` (`js/25-money-school.js:62–80`) and `mnyRenderStory` (`js/22-money-page1.js:999–1114`) use `mnyPageHead` with `big` and the compact `mnyTabBar` as My money (`js/22-money-page1.js:215`); the numbered bar and "The five money pages" label (`js/21-money-data.js:1825`) are retired; `tests/smoke.js:14531` ("tab 5") rewritten. Kid bottom bar hidden as on My money (`TD_NAV_SCREENS`).
 - **Look.** Both pages' cards move from `.mny-card`/`.mny-cols.school` (`css/app.css:5872`, `:6114`, fixed `340px 1fr 320px`) to `.mv2-card` and a 1194×834-filling grid (spec §0: 2.5 px ink border, 14 px radius, card shadow, Gochi titles, Patrick Hand body, no empty bands); the `--font-round` rule (`:8535`) covers them; phone stacks one column. `.mny-*` rules that become unused are removed (the dead-CSS check will name them).
 - **Money school content.** `MNY_STAGES` (`js/21-money-data.js:41–45`): "🎿 What I owe, and what I keep" → "🧱 My loan"; ready "🏦 Savings"; locked "🔒 Locked away"; stock "📈 Companies"; mix "🎉 All paid off" (decision 3). `MNY_CONCEPTS` (`:165–169` cash concept) → "📥 Waiting for Sunday" concept and `MNY_ASK.cash` (`:213`) reworded; `:225` "Money kept ready" → "Savings"; stock story `:203` ("a third in six months") made to agree with `mnyStockChart` (`js/23-money-meeting.js:264`, "X% in three months"); `:58` "4 weeks" and the tour's `:1842` read `mrRules()` lock weeks; `MNY_UNPAID` (`:138`) kept, wording checked; `mnyWeekKey` (`:1885`) in `js/25-money-school.js:182` → the current money week (`mrMoneyWeekOf(today)`); `mnyHomeLabel` (`js/24-money-parent.js:128` "Cash / Kept ready / In companies") → Waiting for Sunday / Savings / Locked away / Companies.

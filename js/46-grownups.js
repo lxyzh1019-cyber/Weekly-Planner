@@ -967,7 +967,7 @@ function guRuleSummary(title, R) {
 function guRuleSections() {
   const R = guPendingRules();
   const rows = guRuleRows();
-  const once = [mnyHouseRulesCard(), guSundayRulesCard(), guMoneyWeekCard(), guQuarterlyCard()].join('');
+  const once = [mnyHouseRulesCard(), guSundayRulesCard(), guQuarterlyCard()].join('');
   const log = guRuleLog();
   return rows.map(sec => ({ kind: 'rules', title: sec.title, sec,
       line: guRuleSummary(sec.title, R),
@@ -1062,19 +1062,6 @@ function guSundayRulesCard() {
       ${pending.map(p => `<div class="gu-kv"><span>${escapeHtml(p.item)} — ${escapeHtml(p.field)}</span><b>${escapeHtml(guRuleWord(p.from))} → ${escapeHtml(guRuleWord(p.value))}</b></div>`).join('')}
       <div class="gu-line">Added as one dated change from this week's Monday. Nothing already lived is re-priced, and the family's own figures stay.</div>
       <button type="button" class="gu-save ready" data-mnyp-action="gusundayrules">Put ${pending.length === 1 ? 'it' : 'them'} into the rulebook</button>
-    </div>`;
-}
-/* 📅 The money week turns Sunday–Saturday (Deviation 34): offered once, as
-   one dated change, the Sunday rules' way (mrApplyMoneyWeekRule). */
-function guMoneyWeekCard() {
-  if (mrMoneyWeekRuleApplied()) return '';
-  const pending = mrMoneyWeekRulePending();
-  if (!pending.length) return '';
-  const from = String(mrRuleOr(mrRules(), 'week.from'));
-  return `<div class="gu-card gu-plain">
-      <div class="gu-cardtitle">📅 The money week runs Sunday to Saturday</div>
-      <div class="gu-line">From the meeting on ${escapeHtml(mnyDayLabel(from))}, a meeting pays the seven finished days before it — Sunday to Saturday — for chores, the routine streak, fines and club sessions. The planner stays Monday to Sunday. A day already paid is never paid again.</div>
-      <button type="button" class="gu-save ready" data-mnyp-action="gumoneyweek">Put it into the rulebook</button>
     </div>`;
 }
 /* A typical week for the impact preview: her last 4 settled weeks, averaged —
@@ -1591,8 +1578,6 @@ function guAction(a, el) {
   } else if (a === 'guquarter') { mrMarkQuarterReviewed(); showToast('📅 Quarterly review recorded — rates unchanged');
   } else if (a === 'gusundayrules') {
     if (mrApplySundayRules()) showToast('✅ The Sunday rules are in the rulebook');
-  } else if (a === 'gumoneyweek') {
-    if (mrApplyMoneyWeekRule()) showToast('✅ The money week is in the rulebook');
   // 📒 Weeks
   } else if (a === 'guweekday') { guWeekDay = guWeekDay === id ? null : id;
   } else if (a === 'guweekopen') { const same = guWeekOpen === id && guWeeksKid === kid; guWeeksKid = kid === 'jess' ? 'jess' : 'jenn'; guWeekOpen = same ? null : id;

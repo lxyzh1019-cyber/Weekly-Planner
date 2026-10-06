@@ -54,7 +54,7 @@ Approved in round 7 and changed only by the font pass.
    - 🌞 "Sunday is today!" (Gochi 30) with "payday guessing game, together on the iPad" under it.
    - The **M…S day circles** (32 px, ✓ or ·, "$3" or "—" under) start right after the title block and spread across the rest of the card, so there is no gap.
    - Bottom line: door "📊 This week so far $48.00 ▸" (sheet: 💪 earned with 🏠/⛸️/🏆 lines, 🎁 given, 🌱 made, ➖ taken off), and on the right "🧹 about $18.00 of chores so far. The guess is on Sunday."
-   - Data: the money week Sun–Sat (Deviation 34), chores and routine streak, pending requests.
+   - Data: the money week Mon–Sun (Deviation 34 withdrawn 2026-10-06), chores and routine streak, pending requests.
 2. **Asked parents strip** (800 × 48, `#fffdf5`, thin border).
    - "⏳ Asked parents", then up to two request chips (44 px; waiting = dashed, done = mint).
    - "+N more · see all" button opens a sheet with every request, gift requests included.
@@ -160,7 +160,7 @@ The prototype's **waterfall**. The only change from the prototype: the pot boxes
 
 **Main card** (796 × 716)
 1. **Step header** (84 px, **no fill**).
-   - ✍️ "Signed. This is my plan." (Gochi 30), 🐥 Jenn ✓ signed Sun 4 Oct · 4:12 pm, money week Sun 27 Sep – Sat 3 Oct · Week 1.
+   - ✍️ "Signed. This is my plan." (Gochi 30), 🐥 Jenn ✓ signed Sun 4 Oct · 4:12 pm, money week Mon 28 Sep – Sun 4 Oct · Week 1.
    - **MY PLAN** stamp (rotated, red border).
    - "⭐ Sticker: …" (information), **↺ Redo my plan** (undoes this girl only).
    - No bottom row: "Jenn ✓" and "Next Sunday →" would repeat the header.
@@ -193,7 +193,7 @@ The prototype's **waterfall**. The only change from the prototype: the pot boxes
 
 - **Words:** "parents", never "Dad"; "Competitions"; "📥 Waiting for Sunday" instead of a cash account (Deviation 37).
 - **Talk first:** shows an agreed amount at the meeting (Deviation 41).
-- **Money week:** runs Sunday–Saturday (Deviation 34).
+- **Money week:** runs Monday–Sunday (Deviation 34 withdrawn 2026-10-06).
 - **Gates:** Savings opens at 20% paid; Companies at 40%.
 - **Drawing early:** cap kept in the rules, not shown on My money.
 - **Gift requests:** live in Asked parents / see all; the entry point is the 🎁 I was given button.

@@ -241,27 +241,51 @@ function mnyChecklist(wk, kid) {
       🧭 Before we start — ${done} of ${MNY_CHECKS.length} ready ▸</button>`;
   }
   return `<div class="mny-card">
-      <div class="mny-week-head"><span class="mny-label">🧭 Before we start</span>
+      <div class="mny-week-head"><span class="mny-checks-title">🧭 Before we start</span>
         <button type="button" class="mny-chip" onclick="mnyToggleChecks()">Hide ▾</button></div>
       <div class="mny-checks">${MNY_CHECKS.map(c =>
-        `<button type="button" class="mny-chip ${checks[c.id] ? 'on' : ''}" onclick="mnyTickCheck('${escapeJsAttr(c.id)}')">${checks[c.id] ? '✓' : '○'} ${escapeHtml(c.label)}</button>`).join('')}</div>
+        `<button type="button" class="mny-chip ${checks[c.id] ? 'on' : ''}" onclick="mnyTickCheck('${escapeJsAttr(c.id)}')">${checks[c.id] ? '✓' : '○'} ${escapeHtml(mnyCheckLabel(c, wk, kid))}</button>`).join('')}</div>
     </div>`;
 }
 
+/* A check's words. The chores check names the days its money week pays —
+   "Chores graded for every day, Mon 5 – Sun 11 Oct" (`mrMoneyWeekLabel`). */
+function mnyCheckLabel(c, wk, kid) {
+  return c.id === 'c1' ? `${c.label}, ${mrMoneyWeekLabel(wk, kid)}` : c.label;
+}
+
 /* One real year, drawn from real prices. A company that only ever goes up is
-   not a lesson about companies. */
+   not a lesson about companies. `mnyStockDrop` is the fall the chart's note
+   names, from the chart's own prices — the 📈 idea's text reads the same
+   number (`{stockDrop}`), so the two cannot drift. */
+function mnyStockDrop() {
+  const series = STOCKS_2023.TSLA.prices;
+  return Math.abs(Math.round(((Math.min(...series.slice(2, 5)) - series[2]) / series[2]) * 100));
+}
+/* 📈 Money school's Companies card: the chart, the sentence, and a door to
+   the idea behind it (the same sheet every idea opens). */
 function mnyStockChart() {
   const series = STOCKS_2023.TSLA.prices;
   const lo = Math.min(...series), hi = Math.max(...series);
-  const pts = series.map((v, i) =>
-    `${(i / (series.length - 1)) * 100},${30 - ((v - lo) / (hi - lo)) * 26}`).join(' ');
-  const drop = Math.round(((Math.min(...series.slice(2, 5)) - series[2]) / series[2]) * 100);
-  return `<div class="mny-card">
-      <div class="mny-label">📈 Companies go down too</div>
-      <svg viewBox="0 0 100 32" preserveAspectRatio="none" class="mny-spark" role="img" aria-label="One company's price through 2023">
-        <polyline points="${pts}" fill="none" style="stroke:var(--mny-spark-line)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
-      </svg>
-      <div class="mny-note">This really happened, back in 2023. One company fell ${Math.abs(drop)}% in three months, then went back up. Nobody knew it would. ${mnyAskBtn('stock')}</div>
+  const x = i => (i / (series.length - 1)) * 100;
+  const y = v => 8 + (1 - (v - lo) / (hi - lo)) * 84;      // % from the top, 8% room each side
+  const pts = series.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+  /* The fall the note names (`mnyStockDrop`): its top and its bottom get a
+     dot, and the bottom says by how much — as the stage 8 drawing marks it. */
+  const top = 2, low = series.slice(2, 5).indexOf(Math.min(...series.slice(2, 5))) + 2;
+  const dot = (i, label) => `<i class="mv2-chart-dot" style="left:${x(i)}%;top:${y(series[i])}%"></i>${label
+    ? `<span class="mv2-chart-mark" style="left:${x(i)}%;top:${y(series[i])}%">${label}</span>` : ''}`;
+  return `<div class="mv2-card mv2-school-chart">
+      <div class="mv2-cardhead"><span class="mv2-title">📈 Companies go down too</span></div>
+      <div class="mv2-chart" role="img" aria-label="One company's price through 2023: down ${mnyStockDrop()}% in three months, then back up">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="mv2-spark" aria-hidden="true">
+          <polyline points="${pts}" fill="none" style="stroke:var(--mny-spark-line)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+        </svg>
+        ${dot(top)}${dot(low, '−' + mnyStockDrop() + '%')}
+      </div>
+      <div class="mv2-chart-months" aria-hidden="true"><span>Jan</span><span>Jun</span><span>Dec</span></div>
+      <div class="mv2-line">This really happened, in 2023. One company fell ${mnyStockDrop()}% in three months, then went back up. Nobody knew it would.</div>
+      ${mnyDoor('idea', '📈 Owning a bit of a company', ' data-mny-concept="stock"')}
     </div>`;
 }
 

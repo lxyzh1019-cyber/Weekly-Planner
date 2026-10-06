@@ -23,19 +23,12 @@
 
 let mnyKid = 'jess';          // which kid a parent is looking at
 let mnyCalMonth = null;       // 'YYYY-MM' for the 🗓️ month sheet
-/* The price list's remembered toggle — Money school's card (`mnyPricesCard`)
-   still carries it. My money opens the same list in a sheet from the ☀️ card
-   ("💷 what things pay ▸"). */
-const MNY_PRICES_LS_KEY = 'wp_mny_prices_open';
-function mnyPricesOpen() {
-  try { return localStorage.getItem(MNY_PRICES_LS_KEY) === '1'; } catch (e) { return false; }
-}
-function mnySetPricesOpen(open) {
-  try { localStorage.setItem(MNY_PRICES_LS_KEY, open ? '1' : '0'); } catch (e) {}
-}
 
-let mnyStoryMode = 'week';    // the money story: 'week' | 'month'
-let mnyStoryMonth = null;     // 'YYYY-MM'
+/* The passbook's two pages (decision 14), on #screen-moneystory: which one
+   is showing, and 📖 All my Sundays' By week / By month view. Device-local. */
+let mnyHistPage = 'sundays';  // 'sundays' (📖 All my Sundays) | 'month' (📊 By month, the Flow)
+let mnySundaysMode = 'week';  // 'week' | 'month'
+let mnySundaysMonth = null;   // 'YYYY-MM'
 
 /* Kids see their own money. A parent sees whichever kid is selected. */
 function mnyViewKid() {
@@ -59,30 +52,10 @@ function mnyRerenderMoney() {
   if (document.getElementById('screen-mymoney') &&
       document.getElementById('screen-mymoney').classList.contains('active')) mnyRenderMyMoney();
   if (document.getElementById('screen-moneystory') &&
-      document.getElementById('screen-moneystory').classList.contains('active')) mnyRenderStory();
+      document.getElementById('screen-moneystory').classList.contains('active')) mnyRenderHistory();
   if (document.getElementById('screen-moneyschool') &&
       document.getElementById('screen-moneyschool').classList.contains('active') &&
       typeof mnyRenderSchool === 'function') mnyRenderSchool();
-}
-
-/* ── The stacked bar ──
-   One row of coloured segments, a legend under it with the dollars spelled
-   out, and fines on their own red line below. A bar cannot go backwards, so a
-   fine is never a negative segment — pretending otherwise is how a chart
-   starts lying to a child about what happened. */
-function mnyBarHtml(data, opts) {
-  const o = opts || {};
-  if (!data.segs.length) {
-    return `<div class="mny-bar-empty">${escapeHtml(o.empty || 'Nothing yet this week')}</div>`;
-  }
-  const bar = data.segs.map(s =>
-    `<div class="mny-seg" style="width:${s.w};background:${s.color}" title="${escapeAttr(s.label + ' ' + mnyMoney(s.value))}"></div>`).join('');
-  const legend = data.segs.map(s =>
-    `<span class="mny-key"><i style="background:${s.color}"></i>${escapeHtml(s.label)} <b>${mnyMoney(s.value)}</b></span>`).join('');
-  const fines = (data.fines > 0)
-    ? `<div class="mny-fineline">⚖️ Taken off: −${mnyMoney(data.fines).slice(1)}</div>` : '';
-  return `<div class="mny-bar" role="img" aria-label="${escapeAttr(data.segs.map(s => s.label + ' ' + mnyMoney(s.value)).join(', '))}">${bar}</div>
-    <div class="mny-legend">${legend}</div>${fines}`;
 }
 
 /* A `?` that opens the idea behind whatever it sits beside. */
@@ -109,6 +82,12 @@ function mnyTourGo(d) {
   mnyTourStep = next;
   mnyDrawTour();
 }
+/* A tour page's words, escaped, with **bold** where the stage 8 drawing
+   bolds them ("what you own", "the loans door"). Escaped first, so only the
+   two asterisks become markup. */
+function mnyTourWords(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
 function mnyDrawTour() {
   const steps = MNY_TOURS[mnyTourWho] || [];
   const s = steps[mnyTourStep];
@@ -132,7 +111,7 @@ function mnyDrawTour() {
   el.innerHTML = `<div class="mny-tour" role="dialog" aria-modal="true" aria-label="${escapeAttr(s.title)}">
       <div class="mny-tour-where">${escapeHtml(s.where)}</div>
       <div class="mny-tour-title">${escapeHtml(s.icon + ' ' + s.title)}</div>
-      <p>${escapeHtml(s.body)}</p>
+      <p>${mnyTourWords(typeof s.body === 'function' ? s.body() : s.body)}</p>
       <div class="mny-tour-foot">
         <button type="button" class="mny-btn" data-tour="-1">${mnyTourStep ? '◀ Back' : 'Close'}</button>
         <div class="mny-dots">${steps.map((_, i) =>
@@ -164,10 +143,7 @@ function mnyRenderMyMoney() {
   mnySimCatchUp(kid);
 
   wrap.innerHTML =
-      `${mnyPageHead('💰 My money', '', [
-          { action: 'story',    icon: '📖', word: 'My money story' },
-          { action: 'tourkid',  icon: '?', word: 'How this page works' },
-        ], { kidSwitch: true, tabs: 'money', date: true, back: 'backtoday', big: true })}
+      `${mnyMoneyHead('backtoday')}
        <div class="mv2">
          <div class="mv2-main">
            ${mnyCountdownCard(kid)}
@@ -188,6 +164,15 @@ function mnyRenderMyMoney() {
          </div>
        </div>`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
+}
+
+/* My money's head, which the passbook's two pages wear too (decision 14):
+   ◀, 💰 My money, the two tabs, ? and the date. `back` is where ◀ goes —
+   Today from My money, My money from the two pages. */
+function mnyMoneyHead(back) {
+  return mnyPageHead('💰 My money', '', [
+      { action: 'tourkid',  icon: '?', word: 'How this page works' },
+    ], { kidSwitch: true, tabs: 'money', date: true, back: back, big: true });
 }
 
 /* "Wed 7 Oct" — the day, in the head's right corner (the mockup's date). */
@@ -212,7 +197,7 @@ function mnyPageHead(title, strap, buttons, opts) {
       ${o.back === false ? '' : `<button type="button" class="mny-back" data-mny-action="${escapeAttr(o.back || 'backplanner')}" aria-label="Back">◀</button>`}
       <h2 class="mny-head-title">${escapeHtml(title)}</h2>
       ${strap ? `<span class="mny-head-strap">${escapeHtml(strap)}</span>` : ''}
-      ${o.tabs ? mnyTabBar(o.tabs, { compact: true }) : ''}
+      ${o.tabs ? mnyTabBar(o.tabs) : ''}
       ${kidSwitch}
       <span class="mny-head-btns">${(buttons || []).map(b => b.word
         // An icon and its words: on the phone only the icon shows (Plan v18 C); the name stays in aria-label.
@@ -568,8 +553,9 @@ function mnyActionRow() {
    🌱 made — and its "out" bar by wall · saved · cash. 💰 in = what she
    earned after fines + what she was given (cash from home is her bank, not
    a gift — Plan v17 item 10). Then = Total, a summary sentence, "<Name> ✓ ·
-   N Sundays signed" and 📖 "all my Sundays" (My money story). A row from
-   before the split shows what came in only. */
+   N Sundays signed". Two doors in its head (decision 14): 📖 opens
+   "📖 All my Sundays" and "📊 By month ▸" the Flow, each a full page under
+   this head. A row from before the split shows what came in only. */
 function mnyPassbookRow(r) {
   const n = (v) => money2(Number(v) || 0);
   const G = r.groups || null;
@@ -609,7 +595,7 @@ function mnyPassbookCard(kid) {
   const p = mnyPassbookData(kid);
   const sw = (cls) => `<i class="mv2-sw ${cls}"></i>`;
   const key = `<div class="mv2-bookkey"><span><b>💰 in</b> ${sw('mv2-sw--earned')}earned ${sw('mv2-sw--given')}given ${sw('mv2-sw--made')}made</span><span><b>went to</b> ${sw('mv2-sw--wall')}wall ${sw('mv2-sw--saved')}saved ${sw('mv2-sw--cash')}cash</span></div>`;
-  const head = `<div class="mv2-cardhead"><span class="mv2-title">📒 My passbook</span><button type="button" class="mv2-q mv2-bookall" data-mny-action="story" aria-label="All my Sundays" title="All my Sundays"><span>📖</span></button></div>`;
+  const head = `<div class="mv2-cardhead"><span class="mv2-title">📒 My passbook</span>${mnyDoor('bymonth', '📊 By month')}<button type="button" class="mv2-q mv2-bookall" data-mny-action="sundays" aria-label="All my Sundays" title="All my Sundays"><span>📖</span></button></div>`;
   if (!p.last4.length) {
     return `<div class="mv2-card mv2-book">${head}${key}
         <div class="mv2-line">Every Sunday I sign gets written here — what came in, and where it went.</div>
@@ -803,8 +789,14 @@ function mnyStickersCard(kid) {
    `mnyOpenInfoSheet(kind, {id})` opens one through the request sheet's own
    chrome (`mnyOpenRequestSheet`, js/45), which asks `mnyInfoSheetTitle` /
    `mnyInfoSheetBody` for these kinds. Nothing here moves money.
+
+   ONE EXPLAINER TABLE. An idea's words live in MNY_CONCEPTS (js/21) and
+   nowhere else: kind 'idea' ({id} = the idea) draws it here, Money school's
+   💡 rows open it, the '?' card (`mnyShowConcept`) draws the same body
+   (`mnyIdeaBody`), and 📥 Waiting for Sunday's sheet says what that money is
+   in the 'waiting' idea's own words.
    ════════════════════════════════════════════════════════════════ */
-const MNY_INFO_KINDS = ['week', 'loan', 'loans', 'waiting', 'goals', 'month'];
+const MNY_INFO_KINDS = ['week', 'loan', 'loans', 'waiting', 'goals', 'month', 'idea'];
 function mnyOpenInfoSheet(kind, opts) {
   mnyOpenRequestSheet(kind, Object.assign({ kid: mnyViewKid() }, opts || {}));
 }
@@ -812,6 +804,10 @@ function mnyInfoSheetTitle(d) {
   if (d.kind === 'loan') {
     const r = mnyLoanFacts(d.kid).rows.find(x => x.id === d.id);
     return r ? `${r.icon} ${r.name}` : '🧱 A loan';
+  }
+  if (d.kind === 'idea') {
+    const c = mnyConceptCard(d.id, d.kid);
+    return c ? `${c.icon} ${c.title}` : '💡 An idea';
   }
   return { week: '📊 This week so far', loans: '🧱 All my loans · side by side', waiting: '📥 Waiting for Sunday',
            goals: '🎯 My goals · pick one for the card', month: '🗓️ My month' }[d.kind] || '';
@@ -875,8 +871,13 @@ function mnyInfoSheetBody(d) {
     const locks = evList(kid).filter(e => e && e.from === 'locked' && e.to === 'cash' && String(e.dayKey || '') >= prevSun);
     const listed = deps.map(x => li(escapeHtml(`${sdIsHomeCash(x) ? '🏠' : '🎁'} ${x.giver || x.from || 'A gift'}`), escapeHtml(mnyMoney(x.amount))))
       .concat(locks.map(e => li('🔓 A lock came back', escapeHtml(mnyMoney(e.amount))))).join('');
-    return `${listed || li('📥 Already in my wallet', escapeHtml(mnyMoney(mnyCash(kid))))}
-      <div class="mv2-line">It is not an account. On Sunday it joins my pile and I decide where every dollar goes.</div>`;
+    const idea = mnyConceptCard('waiting', kid);
+    return `${listed || li('📥 Waiting for Sunday', escapeHtml(mnyMoney(mnyCash(kid))))}
+      <div class="mv2-line">${escapeHtml(idea ? idea.risk + ' ' + idea.why : '')}</div>`;
+  }
+  if (d.kind === 'idea') {
+    const c = mnyConceptCard(d.id, kid);
+    return c ? mnyIdeaBody(c, kid) : '';
   }
   if (d.kind === 'goals') {
     const on = mnyGoalOnCard(kid);
@@ -925,33 +926,33 @@ function mnyFineFloorNote(kid, f, weekKey) {
   return day ? sdFineFloorNote(day.raw, day.applied, mnyMoney) : '';
 }
 
-/* What everything pays, straight from the rules — Money school's copy of the
-   list (My money opens the same list in a sheet). Collapsed by default: this
-   is reference, not news. TODAY's prices; what was already earned this week
-   keeps the price live when it was done, and the note says so. */
-function mnyPricesCard(wk) {
-  const r = mrRules();
-  const weekRules = mrRulesForWeek(wk);
-  const changedMidWeek = JSON.stringify(r) !== JSON.stringify(weekRules);
-  const open = mnyPricesOpen();
-  return `<div class="mny-card">
-      <button type="button" class="mny-acc" data-mny-action="prices" aria-expanded="${open}">
-        <span class="mny-label">💷 What things pay</span><span>${open ? 'Hide ▾' : 'Show ▸'}</span>
-      </button>
-      ${open ? `${changedMidWeek
-          ? `<div class="mny-note">Something changed price this week. These are the new prices, from now on — what you already did this week still pays what it was worth then.</div>` : ''}
-        <div class="mny-prices">${pmPriceCards(r, false)}</div>` : ''}
-    </div>`;
+/* An idea's body — What / Why / Watch, the Chinese line, and what opens it
+   if it is not open yet. One body for the idea sheet and the '?' card. */
+function mnyIdeaBody(c, kid) {
+  const toGo = money2(Math.max(0, (mnyStagePct(c.stage) / 100) * mnyTotalPrincipal(kid) - mnyTotalPaid(kid)));
+  return `<div class="mv2-idea-grid">
+        <b class="mv2-idea-what">What</b><span>${escapeHtml(c.what)}</span>
+        <b class="mv2-idea-why">Why</b><span>${escapeHtml(c.why)}</span>
+        <b class="mv2-idea-watch">Watch</b><span>${escapeHtml(c.risk)}</span>
+      </div>
+      ${c.cn ? `<div class="mv2-idea-cn" lang="zh">${escapeHtml(c.cn)}</div>` : ''}
+      ${c.open ? '' : `<div class="mv2-idea-lock">🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.${toGo > 0 ? ` Pay off ${escapeHtml(mnyMoney(toGo))} more and this one opens.` : ''}</div>`}`;
 }
 
 /* ════════════════════════════════════════════════════════════════
-   MY MONEY STORY
+   THE PASSBOOK'S TWO PAGES (decision 14, 2026-10-06)
 
-   Every week that was settled, as far back as it goes. A second screen rather
-   than a section on page 1: the history is the densest thing in the system and
-   page 1 has to stay a page she opens without being asked.
+   The money story page is gone; its long view lives on as two doors off 📒 My
+   passbook, each a full page under My money's own head (◀ back to My money,
+   no bottom bar), on #screen-moneystory:
+     📖 All my Sundays — every settled Sunday, newest first, read from the
+        FROZEN ledger row through `sdHistGroups` (js/43, the same reader as
+        the meeting's "My last 4 Sundays"), so a Sunday reads what it paid then.
+     📊 By month — the Flow (js/42-flow.js), the same frozen rows added up
+        by the month their Sunday falls in (build 2026-10-06c).
    ════════════════════════════════════════════════════════════════ */
-function mnyOpenStory() { showScreen('moneystory'); mnyRenderStory(); }
+function mnyOpenSundays() { mnyHistPage = 'sundays'; showScreen('moneystory'); mnyRenderHistory(); }
+function mnyOpenByMonth() { mnyHistPage = 'month'; showScreen('moneystory'); mnyRenderHistory(); }
 
 function mnyLedgerRows(kid) {
   ctEnsureShared();
@@ -961,156 +962,99 @@ function mnyLedgerRows(kid) {
     .map(wk => Object.assign({ weekKey: wk }, led[wk][kid]));
 }
 
-/* The Flow leads this screen and the settled weeks follow it (js/42-flow.js).
-
-   The order is the point. The week list reads the FROZEN LEDGER, so it can
-   only show weeks a meeting settled — a gift that arrived on a Tuesday, a
-   spend, a move between pots are all invisible to it. The Flow reads the
-   stream, which holds every one of them. Leading with the narrower answer is
-   how a child comes to believe the money she was given is not part of her
-   money story.
-
-   Both stay: the ledger rows are the week-by-week record a parent checks
-   against a meeting, and the Flow cannot replace a record of what each
-   settlement paid. */
-/* ── Your last 8 weeks (R5 §5 C2, row 12) ──
-   The chore tab rail's eight bars — what each week earned, this one still
-   going — from its own reader, ckEightWeeks, so the bars and their labels are
-   the rail's. Scaled to her own best week of the eight. It sits after the Flow
-   and before the week-by-week record, which lists settled weeks only and is
-   not repeated here. Read-only. */
-function mnyEightWeeksCard(kid) {
-  const { weeks, peak } = ckEightWeeks(kid, ctThisWeekKey());
-  const best = weeks.reduce((a, w) => (w.money > a.money ? w : a), weeks[0]);
-  const bars = weeks.map(w => `<span class="mny-wk8-bar${w.now ? ' now' : ''}" title="${escapeAttr(w.title)}">
-        <span class="mny-wk8-fill" style="height:${Math.max(4, Math.round(w.money / peak * 80))}px"></span>
-      </span>`).join('');
-  const first = weeks[0].d;
-  return `<div class="mny-card mny-weeks8">
-      <div class="mny-label">📊 Your last 8 weeks</div>
-      <div class="mny-wk8-row" role="img" aria-label="${escapeAttr(weeks.map(w => w.title).join('; '))}">${bars}</div>
-      <div class="mny-wk8-axis"><span>${escapeHtml(`${MONTH_SHORT[first.getMonth()]} ${first.getDate()}`)}</span><span>this week</span></div>
-      <div class="mny-note">${best.money > 0
-        ? escapeHtml(`Best of the eight: ${mnyMoney(best.money)}, the week of ${MONTH_SHORT[best.d.getMonth()]} ${best.d.getDate()}. This week is still going.`)
-        : 'Nothing earned in these eight weeks yet. This week is still going.'}</div>
-    </div>`;
-}
-
-function mnyRenderStory() {
+function mnyRenderHistory() {
   const wrap = document.getElementById('mnyStoryWrap');
   if (!wrap) return;
   const kid = mnyViewKid();
-  const all = mnyLedgerRows(kid);
-  const flow = (typeof flRenderFlow === 'function') ? flRenderFlow(kid) : '';
-  const weeks8 = mnyEightWeeksCard(kid);
-
-  if (!all.length) {
-    wrap.innerHTML = `${mnyPageHead('🌊 My money story', '', [], { back: 'backmoney' })}
-      ${mnyTabBar('money')}
-      ${flow}
-      ${weeks8}
-      <div class="mny-card"><div class="mny-label">📖 Week by week</div>
-      <div class="mny-note">Every Sunday you settle a week, it gets written down here — what came in, where it went, and how much of your loan was left. Nothing settled yet.</div></div>`;
-    if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
-    return;
-  }
-
-  const months = Array.from(new Set(all.map(r => r.weekKey.slice(0, 7)))).sort().reverse();
-  if (!mnyStoryMonth || months.indexOf(mnyStoryMonth) < 0) mnyStoryMonth = months[0];
-  const rows = (mnyStoryMode === 'month')
-    ? all.filter(r => r.weekKey.slice(0, 7) === mnyStoryMonth)
-    : all.slice(0, 12);
-
-  const modeBtns = [['week', 'By week'], ['month', 'By month']].map(([id, label]) =>
-    `<button type="button" class="mny-chip ${mnyStoryMode === id ? 'on' : ''}" data-mny-action="storymode" data-mny-mode="${id}">${label}</button>`).join('');
-  const monthNav = (mnyStoryMode === 'month')
-    ? `<div class="mny-month-nav">
-         <button type="button" class="mny-step" data-mny-action="storymonth" data-mny-dir="-1" aria-label="Earlier">‹</button>
-         <span class="mny-label">${escapeHtml(mnyStoryMonthLabel(mnyStoryMonth))}</span>
-         <button type="button" class="mny-step" data-mny-action="storymonth" data-mny-dir="1" aria-label="Later">›</button>
-       </div>` : '';
-
-  // Totals for whatever period is showing, so the header is never just decoration.
-  const sum = (f) => money2(rows.reduce((s, r) => s + money2(r[f]), 0));
-  /* `outside` was missing, while the per-week bar directly below this listed
-     "From outside" as a row — so every gift was under-reported in the one
-     figure that claims to be everything that came in. */
-  const inTotal = money2(sum('chores') + sum('learning') + sum('streak')
-    + sum('competition') + sum('outside')
-    + rows.reduce((s, r) => s + (r.defaulted ? money2(r.gross) : 0), 0));
-
-  wrap.innerHTML =
-      `${mnyPageHead('🌊 My money story', 'Where it comes from and where it goes', [], { back: 'backmoney' })}
-       ${mnyTabBar('money')}
-       ${flow}
-       ${weeks8}
-       <div class="mny-card">
-         <div class="mny-label">📖 Week by week</div>
-         <div class="mny-chiprow">${modeBtns}</div>
-         ${monthNav}
-         <div class="mny-rows">
-           <div class="mny-row"><span>Money that came in</span><b>${mnyMoney(inTotal)}</b></div>
-           <div class="mny-row"><span>Taken off</span><b>${sum('fines') > 0 ? '−' + mnyMoney(sum('fines')).slice(1) : 'nothing'}</b></div>
-           <div class="mny-row total"><span>Kept</span><b>${mnyMoney(sum('net'))}</b></div>
-         </div>
-       </div>
-       ${rows.map(r => mnyStoryWeek(kid, r)).join('')}`;
+  wrap.innerHTML = `${mnyMoneyHead('backmoney')}
+    ${mnyHistPage === 'month' ? flRenderFlow(kid) : mnySundaysPage(kid)}`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
-function mnyStoryMonthLabel(m) {
+
+/* One settled Sunday in the four groups (`sdHistGroups`): 💪 earned, split
+   🏠 Home / ⛸️ Club job / 🏆 Competitions where the row has the split, 🎁
+   given, 🌱 made, 📥 from my bank, ➖ taken off. */
+function mnySundayGroups(row) {
+  return sdHistGroups(Object.assign(mnyPassbookRow(row), { row }));
+}
+function mnySundaysPage(kid) {
+  const all = mnyLedgerRows(kid);
+  if (!all.length) {
+    return `<div class="mv2-hist mv2-hist--empty"><div class="mv2-card mv2-hist-list">
+        <div class="mv2-cardhead"><span class="mv2-title">📖 All my Sundays</span></div>
+        <div class="mv2-line">Every Sunday I sign gets written here: what came in, what was taken off, and where it went. Nothing signed yet.</div>
+      </div></div>`;
+  }
+  /* A Sunday's month is the month of its Sunday (`flSundayMonth`, js/42) —
+     the same month 📊 By month puts it in. */
+  const months = Array.from(new Set(all.map(r => flSundayMonth(r.weekKey)))).sort().reverse();
+  if (!mnySundaysMonth || months.indexOf(mnySundaysMonth) < 0) mnySundaysMonth = months[0];
+  const rows = (mnySundaysMode === 'month')
+    ? all.filter(r => flSundayMonth(r.weekKey) === mnySundaysMonth)
+    : all.slice(0, 12);
+  const groups = rows.map(r => ({ r, g: mnySundayGroups(r) }));
+
+  const modeBtns = [['week', 'By Sunday'], ['month', 'By month']].map(([id, label]) =>
+    `<button type="button" class="mv2-btn${mnySundaysMode === id ? ' on' : ''}" data-mny-action="sundaysmode" data-mny-mode="${id}" aria-pressed="${mnySundaysMode === id}">${label}</button>`).join('');
+  const monthNav = (mnySundaysMode === 'month')
+    ? `<div class="mv2-hist-nav">
+         <button type="button" class="mv2-step" data-mny-action="sundaysmonth" data-mny-dir="-1" aria-label="Earlier">‹</button>
+         <b>${escapeHtml(mnySundaysMonthLabel(mnySundaysMonth))}</b>
+         <button type="button" class="mv2-step" data-mny-action="sundaysmonth" data-mny-dir="1" aria-label="Later">›</button>
+       </div>` : '';
+
+  // One scale for every bar on the page: the biggest Sunday shown.
+  const peak = Math.max(1, ...groups.map(x => Math.max(0, x.g.earned) + Math.max(0, x.g.given) + Math.max(0, x.g.made || 0)));
+  const seg = (cls, v, label) => v > 0
+    ? `<i class="${cls}" style="width:${(v / peak * 100).toFixed(1)}%" title="${escapeAttr(label + ' ' + mnyMoney(v))}"></i>` : '';
+  const list = groups.map(({ r, g }) => {
+    const earnedSegs = g.home != null
+      ? seg('mv2-sw--earned', g.home, '🏠 Home') + seg('mv2-sw--earned', g.club, '⛸️ Club job') + seg('mv2-sw--earned', g.comp, '🏆 Competitions')
+      : seg('mv2-sw--earned', g.earned, '💪 Money I earned');
+    /* The four groups on every Sunday, ➖ included when nothing was taken
+       off; 💪 with its 🏠 / ⛸️ / 🏆 split where the row kept it (as drawn). */
+    const earnedLine = `💪 ${mnyMoney(g.earned)}` + (g.home != null
+      ? ` (🏠 ${mnyMoney(g.home)} · ⛸️ ${mnyMoney(g.club)} · 🏆 ${mnyMoney(g.comp)})` : '');
+    const restLine = [`🎁 ${mnyMoney(g.given)}`, `🌱 ${mnyMoney(g.made || 0)}`,
+      `➖ ${g.off < 0 ? sdOff$(-g.off, mnyMoney) : mnyMoney(0)}`].join(' · ');
+    const words = earnedLine + ' · ' + restLine;
+    const note = r.defaulted
+      ? (r.defaultReason === 'grandma' ? '👴 Grandfather rule: every week got the same amount.' : '🕰️ Nobody sat down for this week, so it got a flat amount.')
+      : (r.weeksLate ? `🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after it finished.` : '');
+    return `<div class="mv2-hist-row" data-mny-week="${escapeAttr(r.weekKey)}">
+        <span class="mv2-hist-week">Week of ${escapeHtml(mrMoneyWeekLabel(r.weekKey, kid))}</span>
+        <b class="mv2-hist-amt">${escapeHtml(mnyMoney(g.total))}</b>
+        <span class="mv2-histbar" role="img" aria-label="${escapeAttr(words)}">${earnedSegs}${seg('mv2-sw--given', g.given, '🎁 given')}${seg('mv2-sw--made', g.made || 0, '🌱 made')}</span>
+        <span class="mv2-hist-words"><span>${escapeHtml(earnedLine)}</span><span>${escapeHtml(restLine)}</span></span>
+        ${note ? `<span class="mv2-note mv2-hist-note">${escapeHtml(note)}</span>` : ''}
+      </div>`;
+  }).join('');
+
+  /* The summary on top of the one card, as drawn: what came in across the
+     Sundays shown, then what was taken off. Came in + 📥 from my bank −
+     taken off is the Sundays' own totals added. */
+  const sum = k => money2(groups.reduce((a, x) => a + (Number(x.g[k]) || 0), 0));
+  const came = money2(sum('earned') + sum('given')), bank = sum('bank'), off = sum('off');
+  const period = mnySundaysMode === 'month' ? mnySundaysMonthLabel(mnySundaysMonth)
+    : `${groups.length} Sunday${groups.length === 1 ? '' : 's'}`;
+  const li = (l, v, cls) => `<div class="mv2-li ${cls}"><span>${escapeHtml(l)}</span><b>${escapeHtml(v)}</b></div>`;
+  return `<div class="mv2-hist">
+      <div class="mv2-card mv2-hist-list">
+        <div class="mv2-cardhead"><span class="mv2-title">📖 All my Sundays</span><span class="mv2-hist-modes">${modeBtns}</span></div>
+        ${monthNav}
+        <div class="mv2-hist-sums">
+          ${li('Came in, ' + period, mnyMoney(came), 'mv2-hist-came')}
+          ${bank > 0 ? li('📥 From my bank', mnyMoney(bank), 'mv2-hist-bank') : ''}
+          ${li('➖ Taken off', off < 0 ? sdOff$(-off, mnyMoney) : mnyMoney(0), 'mv2-hist-off')}
+        </div>
+        <div class="mv2-hist-rows">${list}</div>
+        <div class="mv2-note">Each Sunday as it was signed: what it paid then, not what today's prices would pay.</div>
+      </div>
+    </div>`;
+}
+function mnySundaysMonthLabel(m) {
   const [y, mm] = String(m).split('-').map(Number);
   return ['January','February','March','April','May','June','July','August','September','October','November','December'][mm - 1] + ' ' + y;
-}
-
-/* One settled week: what came in, where it went, and what was still owed at
-   the end of it. Both bars use the frozen ledger, never a recomputation — the
-   history has to be a record of what happened, not what today's rules would
-   have paid. */
-function mnyStoryWeek(kid, r) {
-  const inBar = mnySegments([
-    { label: 'Jobs',         value: r.chores,      color: 'var(--mny-chores)' },
-    { label: 'Learning',     value: r.learning,    color: 'var(--mny-learning)' },
-    { label: 'Clean days',   value: r.streak,      color: 'var(--mny-streak)' },
-    { label: 'Competitions', value: r.competition, color: 'var(--mny-comp)' },
-    { label: 'From outside', value: r.outside,     color: 'var(--mny-outside)' },
-    /* A week credited at a flat amount carries it in no channel, so without
-       this row its bar read "Nothing came in" beside a total of $3. A meet
-       paid on top is already the Competitions segment, so it is not counted
-       here a second time. */
-    { label: r.defaultReason === 'grandma' ? 'Grandfather rule' : 'A flat amount',
-      value: r.defaulted ? money2(money2(r.gross) - money2(r.competition)) : 0, color: 'var(--mny-flat)' },
-  ]);
-  inBar.fines = money2(r.fines);
-  const plan = r.plan || {};
-  const outBar = mnySegments([
-    { label: 'Loan payment', value: (r.loan || {}).paid, color: 'var(--mny-out-loan)' },
-    { label: 'Paid off early', value: r.debtExtra,       color: 'var(--mny-out-extra)' },
-    { label: 'Savings',      value: r.ready,             color: 'var(--mny-out-ready)' },
-    { label: 'Locked away',  value: r.gic,               color: 'var(--mny-out-locked)' },
-    { label: 'Companies',    value: r.stock,             color: 'var(--mny-out-stock)' },
-  ]);
-  const edited = (r.edited || []).length;
-  return `<div class="mny-card">
-      <div class="mny-week-head">
-        <span class="mny-label">Week of ${escapeHtml(mrMoneyWeekLabel(r.weekKey, kid))}</span>
-        <b>${mnyMoney(r.net)}</b>
-      </div>
-      ${r.confirmedBy ? `<div class="mny-note">Agreed with ${escapeHtml(r.confirmedBy)}${plan.label ? ' · ' + escapeHtml(plan.label) : ''}</div>` : ''}
-      ${/* A week agreed weeks after it ended was put together from what everyone
-            remembered. She is entitled to know which of her weeks those are —
-            same honesty as the parent side marking a typed-in week. */''}
-      ${r.defaulted ? `<div class="mny-note">${r.defaultReason === 'grandma'
-          ? '👴 Grandfather rule — before we started counting, every week got the same amount.'
-          : '🕰️ Nobody sat down for this week, so it got a flat amount.'}</div>` : ''}
-      ${r.weeksLate ? `<div class="mny-note">🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after this one finished, from what everyone remembered.</div>` : ''}
-      ${edited ? `<div class="mny-note">${edited} thing${edited > 1 ? 's were' : ' was'} changed at the meeting${r.editReason ? ' — ' + escapeHtml(mnyReasonLabel(r.editReason)) : ''}.</div>` : ''}
-      <div class="mny-sub">Came in</div>
-      ${mnyBarHtml(inBar, { empty: 'Nothing came in' })}
-      ${outBar.segs.length ? `<div class="mny-sub">Went out</div>${mnyBarHtml(outBar, {})}` : ''}
-      ${r.debtBalanceAfter != null
-        ? `<div class="mny-row"><span>Still owing at the end of the week</span><b>${mnyMoney(r.debtBalanceAfter)}</b></div>` : ''}
-      ${r.xp ? `<div class="mny-note">+${r.xp} XP</div>` : ''}
-    </div>`;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1198,7 +1142,9 @@ function mnyHandleClick(ev) {
     return;
   }
   if (a === 'kid')     { mnySetKid(el.getAttribute('data-mny-kid')); return; }
-  if (a === 'story')   { mnyOpenStory(); return; }
+  // 📒 The passbook's two doors (decision 14).
+  if (a === 'sundays') { mnyOpenSundays(); return; }
+  if (a === 'bymonth') { mnyOpenByMonth(); return; }
   if (a === 'tab')     { mnyGoTab(el.getAttribute('data-mny-tab')); return; }
   if (a === 'tourkid') { mnyOpenTour('kid'); return; }
   if (a === 'backmoney')   { mnyOpenMyMoney(mnyViewKid()); return; }
@@ -1206,14 +1152,9 @@ function mnyHandleClick(ev) {
   if (a === 'backplanner') { goWeek(); return; }
   if (a === 'backtoday')   { goToday(); return; }
   if (a === 'tourpar') { mnyOpenTour('parent'); return; }
-  if (a === 'prices') {
-    // Money school's price list keeps its remembered toggle.
-    mnySetPricesOpen(!mnyPricesOpen());
-    mnyRenderSchool();
-    return;
-  }
   if (a === 'ask')     { mnyShowConcept(el.getAttribute('data-mny-concept')); return; }
-  if (a === 'concept') { mnySchoolConcept = el.getAttribute('data-mny-concept'); mnyRenderSchool(); return; }
+  // 💡 A Money school idea opens in the idea sheet (one explainer table, MNY_CONCEPTS).
+  if (a === 'idea')    { mnySchoolConcept = el.getAttribute('data-mny-concept'); mnyOpenInfoSheet('idea', { id: mnySchoolConcept }); return; }
   if (a === 'cal') {
     const month = mnyCalMonth || String(todayKey()).slice(0, 7);
     const [y, m] = month.split('-').map(Number);
@@ -1228,12 +1169,12 @@ function mnyHandleClick(ev) {
     mnyRenderMyMoney();
     return;
   }
-  if (a === 'storymode')  { mnyStoryMode = el.getAttribute('data-mny-mode'); mnyRenderStory(); return; }
-  if (a === 'storymonth') {
-    const [y, m] = String(mnyStoryMonth).split('-').map(Number);
+  if (a === 'sundaysmode')  { mnySundaysMode = el.getAttribute('data-mny-mode'); mnyRenderHistory(); return; }
+  if (a === 'sundaysmonth') {
+    const [y, m] = String(mnySundaysMonth).split('-').map(Number);
     const d = new Date(y, m - 1 + Number(el.getAttribute('data-mny-dir')), 1);
-    mnyStoryMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    mnyRenderStory();
+    mnySundaysMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    mnyRenderHistory();
     return;
   }
 }
@@ -1274,13 +1215,7 @@ function mnyShowConcept(id, opts) {
   el.innerHTML = `<div class="mny-concept mv2-idea" role="dialog" aria-modal="true" aria-label="${escapeAttr(c.icon + ' ' + c.title)}">
       ${tabs ? `<div class="mv2-idea-tabs">${tabs}</div>` : ''}
       <div class="mv2-idea-title">${escapeHtml(c.icon + ' ' + c.title)}</div>
-      <div class="mv2-idea-grid">
-        <b class="mv2-idea-what">What</b><span>${escapeHtml(c.what)}</span>
-        <b class="mv2-idea-why">Why</b><span>${escapeHtml(c.why)}</span>
-        <b class="mv2-idea-watch">Watch</b><span>${escapeHtml(c.risk)}</span>
-      </div>
-      ${c.cn ? `<div class="mv2-idea-cn" lang="zh">${escapeHtml(c.cn)}</div>` : ''}
-      ${c.open ? '' : `<div class="mv2-idea-lock">🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.</div>`}
+      ${mnyIdeaBody(c, kid)}
       <div class="mv2-idea-foot">
         <button type="button" class="mv2-btn" id="mnyConceptMore">📚 Take me to Money school</button>
         <button type="button" class="mv2-btn mv2-btn--go" id="mnyConceptClose">Got it</button>

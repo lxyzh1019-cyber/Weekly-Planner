@@ -97,7 +97,7 @@ function mnyAddRequest(kid, fields) {
       grp: Number(f.grp) || 0, ovr: Number(f.ovr) || 0,
       qualified: !!f.qualified, provincial: !!f.provincial,
     });
-    if (!r.sport && !r.name) { showToast('Which meet was it?'); return null; }
+    if (!r.sport && !r.name) { showToast('Which competition was it?'); return null; }
     /* One competition, one question (owner's review M8-4): a meet that
        already has a result waiting for Dad, or one he said yes to, cannot be
        told again — from the sheet, the other device or anywhere else. */
@@ -1003,11 +1003,23 @@ function rqGiftBody(kid, d) {
 }
 /* 💷 What things pay — today's prices, read-only (the list My money and
    Money school have always shown, `pmPriceCards`). */
-function rqPricesBody() {
+/* The list in groups behind tabs, so no group needs a scroll; it opens on
+   🏆 Competitions and 📦 Box fine, as the stage 8 drawing shows it. */
+const RQ_PRICE_TABS = [
+  { id: 'comp',  label: '🏆 Competitions & fines', groups: ['comp', 'fines'] },
+  { id: 'chores', label: '🧹 Chores', groups: ['chores'] },
+  { id: 'due',   label: '⏰ When due', groups: ['due'] },
+  { id: 'learn', label: '📘 Learning & streak', groups: ['learning', 'streak'] },
+  { id: 'xp',    label: '⭐ XP', groups: ['xp'] },
+];
+function rqPricesBody(d) {
   const r = mrRules();
-  const changed = JSON.stringify(r) !== JSON.stringify(mrRulesForWeek(mnyWeekKey()));
-  return `${changed ? `<p class="rq-lead">Something changed price this week. These are the new prices, from now on — what I already did this week still pays what it was worth then.</p>` : ''}
-    <div class="mny-prices rq-prices">${pmPriceCards(r, false)}</div>`;
+  const changed = JSON.stringify(r) !== JSON.stringify(mrRulesForWeek(mrMoneyWeekOf(todayKey())));   // the money week she is in
+  const tab = RQ_PRICE_TABS.find(t => t.id === (d && d.priceTab)) || RQ_PRICE_TABS[0];
+  return `<p class="rq-lead">One list, opened from My money and from Money school. Today's prices.</p>
+    ${changed ? `<p class="rq-lead">Something changed price this week. These are the new prices, from now on — what I already did this week still pays what it was worth then.</p>` : ''}
+    <div class="rq-opts rq-pricetabs">${RQ_PRICE_TABS.map(t => rqOpt(t.label, t.id === tab.id, 'rq-pricetab', ` data-mny-id="${t.id}"`)).join('')}</div>
+    <div class="mny-prices rq-prices">${pmPriceCards(r, tab.groups)}</div>`;
 }
 
 /* ⏳ What she asked, newest first, with its answer in her words. */
@@ -1077,7 +1089,7 @@ function rqRender() {
   else if (d.kind === 'club') body = rqClubBody(kid, d);
   else if (d.kind === 'gift') body = rqGiftBody(kid, d);
   else if (d.kind === 'dispute') body = rqDisputeBody(kid, d);
-  else if (d.kind === 'prices') body = rqPricesBody();
+  else if (d.kind === 'prices') body = rqPricesBody(d);
   else if (MNY_INFO_KINDS.indexOf(d.kind) >= 0) body = mnyInfoSheetBody(d);
   else body = rqListBody(kid);
   host.innerHTML = `<button type="button" class="rq-x" data-mny-action="rq-close" aria-label="Close">✕</button>${body}`;
@@ -1100,6 +1112,7 @@ function rqHandleAction(a, el) {
   if (!rqDraft) return;
   const d = rqDraft, kid = d.kid;
   if (a === 'rq-close') { rqClose(); return; }
+  if (a === 'rq-pricetab') { d.priceTab = el.getAttribute('data-mny-id'); rqRender(); return; }
   if (el.getAttribute('aria-disabled') === 'true') {
     const why = el.getAttribute('data-mny-why');
     if (why) showToast(why);

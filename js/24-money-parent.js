@@ -125,7 +125,7 @@ function mnySavePending() {
 /* One name per home, so the queue row, the card and any sheet say the same
    words about the same pot. */
 function mnyHomeLabel(home) {
-  return ({ cash: 'Cash', ready: 'Kept ready', locked: 'Locked away', invest: 'In companies' })[String(home)]
+  return ({ cash: 'Waiting for Sunday', ready: 'Savings', locked: 'Locked away', invest: 'Companies' })[String(home)]
     || String(home);
 }
 
@@ -551,7 +551,7 @@ function mnyAddMissedWeek(kid) {
    itself (mnyLateCompSync keeps the row in step), and its flat amount is the
    rule's. Hand-typed rows without `defaulted` keep the editor as they were. */
 function mnyDefaultedRowRefusal(row) {
-  return `That week was credited by ${row.defaultReason === 'grandma' ? 'the Grandfather rule' : 'the flat default'}, and the money is already in her wallet — it is not edited here. To correct a meet, change the meet itself.`;
+  return `That week was credited by ${row.defaultReason === 'grandma' ? 'the Grandfather rule' : 'the flat default'}, and the money is already in her wallet — it is not edited here. To correct a competition, change the competition itself.`;
 }
 function mnyEditLedger(kid, wk, field, delta) {
   ctEnsureShared();

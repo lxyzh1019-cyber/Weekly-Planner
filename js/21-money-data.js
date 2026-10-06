@@ -38,11 +38,11 @@
    and nothing made them agree, so a pot, its lesson and the ladder row could
    each have said something different about the same moment. */
 const MNY_STAGES = [
-  { id: 'start',  icon: '🎿', title: 'What I owe, and what I keep' },
+  { id: 'start',  icon: '🧱', title: 'My loan' },
   { id: 'ready',  icon: '🏦', title: 'Savings' },
-  { id: 'locked', icon: '🔒', title: 'Locking money away' },
-  { id: 'stock',  icon: '📈', title: 'Trying it with stocks' },
-  { id: 'mix',    icon: '🧩', title: 'Building my own mix' },
+  { id: 'locked', icon: '🔒', title: 'Locked away' },
+  { id: 'stock',  icon: '📈', title: 'Companies' },
+  { id: 'mix',    icon: '🎉', title: 'All paid off' },
 ];
 
 /* Where money can go on a Sunday. `stage` is the MNY_STAGES id that opens it.
@@ -55,7 +55,7 @@ const MNY_BUCKETS = [
   // into one afternoon.
   { key: 'spend', icon: '🛍️', label: 'Spend it',       stage: 'start', tint: 'var(--mny-pot-spend-tint)' },
   { key: 'ready', icon: '🏦', label: 'Savings',  stage: 'ready', tint: 'var(--mny-pot-ready-tint)' },
-  { key: 'gic',   icon: '🔒', label: 'Locked away · 4 weeks', stage: 'locked', tint: 'var(--mny-pot-gic-tint)' },
+  { key: 'gic',   icon: '🔒', label: 'Locked away', stage: 'locked', tint: 'var(--mny-pot-gic-tint)' },
   { key: 'stock', icon: '📈', label: 'Companies',  stage: 'stock', tint: 'var(--mny-pot-stock-tint)' },
 ];
 
@@ -121,7 +121,7 @@ const MNY_REFLECT = {
 
 /* What the parent should have in front of them before the meeting starts. */
 const MNY_CHECKS = [
-  { id: 'c1', label: 'Chores graded for all six days' },
+  { id: 'c1', label: 'Chores graded for every day' },   // + the money week's days, at render (mnyCheckLabel)
   { id: 'c2', label: 'Learning pages counted' },
   { id: 'c3', label: 'Routine days agreed (morning / afternoon / evening)' },
   { id: 'c4', label: 'Anything boxed this week talked about' },
@@ -162,11 +162,11 @@ const MNY_CONCEPTS = [
     why: 'I get to do what I love now, not years from now.',
     risk: 'It costs: interest every {every} Sundays, and the payment comes first every week, even a bad week. Each extra $1 counts as {bonus1}.',
     cn: '贷款：现在就能做想做的事，不用等；代价是利息，而且每周必须先还。' },
-  { id: 'cash', icon: '💵', title: 'Cash', stage: 'start',
-    what: 'Money you can use today, sitting in your wallet.',
-    why: 'It is ready the moment you need it.',
-    risk: 'It does not grow at all while it sits there.',
-    cn: '现金：马上能用，但放着不会长。' },
+  { id: 'waiting', icon: '📥', title: 'Waiting for Sunday', stage: 'start', isNew: true,
+    what: 'Money that came in since Sunday: a gift, cash from home, a lock that came back.',
+    why: 'Nothing gets decided in a hurry. On Sunday it joins my pile and I choose where every dollar goes.',
+    risk: 'It is not an account, and it does not grow while it waits.',
+    cn: '等星期天：这周进来的钱，星期天一起决定放哪儿；它不是账户，也不会长。' },
   { id: 'spend', icon: '👛', title: 'Spending', stage: 'start',
     what: 'Cash I take out to buy something I want this week.',
     why: 'Spending on things I love brings real happiness. That is what money is for.',
@@ -192,7 +192,7 @@ const MNY_CONCEPTS = [
     why: 'Money you leave alone quietly makes a bit more money.',
     risk: 'It is small. It will not make you rich on its own.',
     cn: '利息：钱放着不动，会慢慢多一点；但不多，靠它发不了财。' },
-  { id: 'gic', icon: '🔒', title: 'Locking money away for {lockWeeks} weeks', stage: 'locked',
+  { id: 'gic', icon: '🔒', title: 'Locked away for {lockWeeks} weeks', stage: 'locked',
     what: 'You promise not to touch it for {lockWeeks} weeks, and the bank pays you a bit more.',
     why: 'More than Savings, and the amount is promised.',
     risk: 'You really cannot touch it for {lockWeeks} weeks. Not even if you change your mind.',
@@ -200,7 +200,7 @@ const MNY_CONCEPTS = [
   { id: 'stock', icon: '📈', title: 'Owning a bit of a company', stage: 'stock',
     what: 'You buy a small piece of a real company.',
     why: 'If the company does well, your piece is worth more.',
-    risk: 'It can go down too. In 2023 one of these fell by a third in six months.',
+    risk: 'It can go down too. In 2023 one of these fell {stockDrop}% in three months.',
     cn: '买公司的一小块：会涨，也会跌。' },
   { id: 'mix', icon: '🧩', title: 'Not putting it all in one place', stage: 'mix',
     what: 'Splitting your money so it is not all doing the same job.',
@@ -210,7 +210,7 @@ const MNY_CONCEPTS = [
 ];
 function mnyConceptById(id) { return MNY_CONCEPTS.find(c => c.id === id) || null; }
 /* The `?` on any bucket, tile or row → the idea behind it. */
-const MNY_ASK = { loan: 'debt', ready: 'ready', gic: 'gic', stock: 'stock', cash: 'cash', extra: 'extra', save: 'save' };
+const MNY_ASK = { loan: 'debt', ready: 'ready', gic: 'gic', stock: 'stock', waiting: 'waiting', extra: 'extra', save: 'save' };
 
 /* ════════════════════════════════════════════════════════════════
    WHAT SHE OWNS
@@ -222,7 +222,7 @@ const MNY_ASK = { loan: 'debt', ready: 'ready', gic: 'gic', stock: 'stock', cash
    Cash stays in the wallet; everything else lives here.
    ════════════════════════════════════════════════════════════════ */
 const MNY_HOLDING_KINDS = [
-  { id: 'savings', icon: '🏦', label: 'Money kept ready' },
+  { id: 'savings', icon: '🏦', label: 'Savings' },
   { id: 'gic',     icon: '🔒', label: 'Locked away' },
   { id: 'stock',   icon: '📈', label: 'A bit of a company' },
 ];
@@ -1659,6 +1659,12 @@ function mnyIsOpen(kid, stageId) {
 }
 function mnyNeedLabel(stageId) { return 'Opens at ' + mnyStagePct(stageId) + '% paid off'; }
 
+/* How many weeks a lock lasts, from today's rules (`pots.lockWeeks`). The
+   ideas and the tour both read it. */
+function mnyLockWeeks(rules) {
+  const n = Number(mrRuleOr(rules || mrRules(), 'pots.lockWeeks'));
+  return isFinite(n) && n > 0 ? n : 4;
+}
 /* The rule words in a concept's text, read from today's rules. One owner: the
    card body and the Money school chips both read it. */
 function mnyConceptSwap(kid) {
@@ -1672,10 +1678,12 @@ function mnyConceptSwap(kid) {
     debt: naming,
     every: String(num('loan.interestEverySundays', 4)),
     bonus1: '$' + one.toFixed(2),
-    lockWeeks: String(num('pots.lockWeeks', 4)),
+    lockWeeks: String(mnyLockWeeks(r)),
     cap: (typeof sdCapWords === 'function') ? sdCapWords(num('spend.capPct', 20)) : num('spend.capPct', 20) + '%',
+    // The Companies chart's own fall (`mnyStockDrop`, js/23), so the idea and the chart cannot drift.
+    stockDrop: String((typeof mnyStockDrop === 'function') ? mnyStockDrop() : 21),
   };
-  return (s) => String(s || '').replace(/\{(debt|every|bonus1|lockWeeks|cap)\}/g, (m, k) => tokens[k]);
+  return (s) => String(s || '').replace(/\{(debt|every|bonus1|lockWeeks|cap|stockDrop)\}/g, (m, k) => tokens[k]);
 }
 /* The concept card, with the real debt named in it and every number a rule
    decides read from today's rules. */
@@ -1798,36 +1806,28 @@ function mnyGoTab(id) {
   mmGoStep(id === 'grow' ? 3 : 4);
 }
 
-/* The bar itself. `cur` is the tab that is showing, and it is not a link. */
-/* Which of the five pages this viewer should be offered.
+/* Which money pages this viewer is offered, as tabs in the money head.
 
-   A kid was being shown all five, numbered, each wearing a badge telling her
-   whose page it was — three of them labelled MEETING or PARENT, i.e. three
-   things she is being shown and told she may not use. That reads as a locked
-   door on her own money page. She gets the two that are hers; a grown-up and the
-   meeting still get the whole rail, because for them it IS the map.
-
-   Filtering only. Same components, same routes, same numbering source — the
-   meeting pages still explain themselves if she arrives from elsewhere. */
+   A kid gets her two (decision 14, 2026-10-06): 💰 My money and 🎓 Money
+   school — the meeting pages are not hers to open alone, and Money rules is a
+   grown-up page. A grown-up and the meeting still get the whole rail, with a
+   tag naming whose page each is, because for them it IS the map. */
 function mnyTabsFor() {
   const parentish = (typeof isParent === 'function' && isParent()) ||
                     (typeof mmIsOpen === 'function' && mmIsOpen());
   if (parentish) return MNY_TABS;
   return MNY_TABS.filter(t => t.who === 'kid' || t.who === 'optional');
 }
-function mnyTabBar(cur, opts) {
-  // `compact`: the one-row head (My money, §N) draws the names without numbers, as the mockup does.
-  const compact = !!(opts && opts.compact);
+/* The tabs inside the money head (`mnyPageHead` with `tabs`): icon and name,
+   no numbers — the numbered five-page bar is retired. `cur` is the tab that
+   is showing, and it is not a link. */
+function mnyTabBar(cur) {
   const tabs = mnyTabsFor();
-  // Numbering comes from the full table, so "1" and "5" mean the same thing to a
-  // kid and a parent looking at the same system.
-  const label = tabs.length === MNY_TABS.length ? 'The five money pages' : 'Your money pages';
-  return `<nav class="mny-tabs" aria-label="${escapeAttr(label)}">${tabs.map((t) => {
+  return `<nav class="mny-tabs" aria-label="Money pages">${tabs.map((t) => {
     const sel = t.id === cur;
-    const n = MNY_TABS.indexOf(t) + 1;
     return `<button type="button" class="mny-tab${sel ? ' on' : ''}"${sel ? ' aria-current="page"' : ''}
-        data-mny-action="tab" data-mny-tab="${t.id}"${compact ? ` aria-label="${escapeAttr(t.label)}"` : ''}>
-        <span>${compact ? `${t.icon}<span class="ph-word"> ${escapeHtml(t.label)}</span>` : `${n} ${t.icon} ${escapeHtml(t.label)}`}</span>
+        data-mny-action="tab" data-mny-tab="${t.id}" aria-label="${escapeAttr(t.label)}">
+        <span>${t.icon}<span class="ph-word"> ${escapeHtml(t.label)}</span></span>
         ${t.who === 'kid' || t.who === 'optional' ? '' : `<span class="mny-tab-tag">${escapeHtml(t.who)}</span>`}
       </button>`;
   }).join('')}</nav>`;
@@ -1843,14 +1843,16 @@ const MNY_TOURS = {
       body: 'Everything here is yours to look at any time, without asking. Nothing on this page can take money away from you — a number only changes on Sunday, with a parent sitting next to you, or when your parents say yes to something you asked.' },
     { icon: '☀️', title: 'How long until Sunday', where: 'Top card',
       body: 'Seven circles, one for each day. Each shows what your chores have earned so far, and the line under them says about how much that is. On Sunday you guess the total together.' },
-    { icon: '🏦', title: 'The three places your money sits', where: 'Everything I have',
-      body: 'Savings (your goal jars are inside it), money Locked away for 4 weeks, and money in Companies. Add them together and that is everything you have. Money that came in since Sunday shows as 📥 Waiting for Sunday until you choose where it goes. A place that is not open yet says when it opens. Tap any ? to find out what it is.' },
+    { icon: '🏦', title: 'The three places your money sits', where: '✅ What I own',
+      body: () => 'Savings (your goal jars are inside it), money Locked away for ' + mnyLockWeeks() + ' weeks, and money in Companies. Add them together and that is **what you own**. Money that came in since Sunday shows as 📥 Waiting for Sunday until you choose where it goes. A place that is not open yet says when it opens. Tap any ? to find out what it is.' },
     { icon: '🎯', title: 'What you are saving for', where: 'Goal jars',
       body: 'Each goal is its own jar. It shows how full it is, the day you want it by, and about how much a week that takes. ✏️ New goal asks your parents.' },
     { icon: '🧱', title: 'Your loan wall', where: 'Loan wall',
-      body: 'One hundred bricks. Each one you fill is a bit more paid back. The big numbers say how much is left and when it is paid off; 📋 My loans shows each one.' },
+      body: () => { const n = mnyDebts(mnyViewKid()).length;
+        return 'One hundred bricks. Each one you fill is a bit more paid back. The big numbers say how much is left and when it is paid off; **the loans door** ('
+          + n + ' loan' + (n === 1 ? '' : 's') + ' · Details ▸) shows each one.'; } },
     { icon: '📒', title: 'Your last four Sundays', where: 'Passbook',
-      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: to the wall, saved, or cash. Tap a Sunday for its numbers. 📖 opens your whole money story.' },
+      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: **to the wall, Savings or cash out**. 📖 opens your whole money story, Sunday by Sunday, and 📊 By month shows it month by month.' },
   ],
   parent: [
     { icon: '⚙️', title: 'The only page that changes a number', where: 'The whole screen',

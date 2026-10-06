@@ -11,42 +11,26 @@
      bank    → gone. What she owns is one record per holding now, edited by a
                parent with no market simulation behind it.
 
-   What is left is the price list itself, which is worth keeping in one place
-   because two surfaces render it — 💰 My money and 🎓 Money school — and
-   building it twice is how they would start to disagree.
+   What is left is the price list itself, kept in one place: the one sheet
+   "💷 What things pay ▸" opens, from 💰 My money's week sheet and from 🎓
+   Money school (js/45 `rqPricesBody`).
    ════════════════════════════════════════════════════════════════ */
-let pocketKid = 'jess';
-
-/* Kids look at their own money; a parent looks at whichever kid is selected. */
-function pocketViewKid() {
-  return isParent() ? (pocketKid === 'jenn' ? 'jenn' : 'jess') : activeProfile();
-}
-
-/* Kept as a redirect so older call sites and any saved deep link land
-   somewhere sensible instead of on a screen that no longer exists. */
-function openPocketMoney(kid, tab) {
-  ctPrepareRead();
-  if (isParent() && (kid === 'jenn' || kid === 'jess')) pocketKid = kid;
-  if (tab === 'setup' && isParent()) {
-    showScreen('parent');
-    if (typeof setParentTab === 'function') setParentTab('money');
-    return;
-  }
-  mnyOpenMyMoney(kid || pocketViewKid());
-}
-
 /* The price list, rendered straight from the rules so it is always the truth.
    Read-only: the parent edits prices on Money rules (js/24-money-parent.js),
    which has its own steppers. An `editable` mode that drew ✏️ buttons here was
    removed — nothing ever handled their clicks, and its only caller passed
    false. */
-function pmPriceCards(r) {
+/* `only` (optional): the groups to draw — 'chores', 'due', 'learning',
+   'streak', 'comp', 'fines', 'xp' — for the sheet's group tabs; all of them
+   when left out. */
+function pmPriceCards(r, only = null) {
   const row = (label, value) => `<div class="ct-item"><div class="ct-item-left"><span>${label}</span></div>
       <span class="ct-meta">${value}</span></div>`;
   const g = (r.chores && r.chores.grade) || {};
+  const want = id => !only || only.indexOf(id) >= 0;
   let html = '';
 
-  html += `<div class="chore-card"><h3>🧹 Household chores</h3>
+  if (want('chores')) html += `<div class="chore-card"><h3>🧹 Household chores</h3>
     <div class="ct-meta">${(r.chores || {}).freeChoresPerWeek} each week are free — every chore after that pays. The free ones are always your <b>lowest-paying</b> chores, so doing your best work first never costs you.</div>
     ${row('On time <b>and</b> to standard', '$' + Number(g[3] || 0).toFixed(2))}
     ${row('To standard, but late', '$' + Number(g[2] || 0).toFixed(2))}
@@ -57,7 +41,7 @@ function pmPriceCards(r) {
   </div>`;
 
   const pool = r.chorePool || [];
-  if (pool.length) {
+  if (pool.length && want('due')) {
     html += `<div class="chore-card"><h3>⏰ When each chore is due</h3>
       <div class="ct-meta">"On time" is different for every chore — check the chore, not the clock.</div>
       ${pool.map(c => row(escapeHtml(c.label), escapeHtml(c.deadline || '—'))).join('')}
@@ -65,7 +49,7 @@ function pmPriceCards(r) {
   }
 
   const li = (r.learning && r.learning.items) || [];
-  html += `<div class="chore-card"><h3>📘 Learning</h3>
+  if (want('learning')) html += `<div class="chore-card"><h3>📘 Learning</h3>
     ${li.map(it => row(
         escapeHtml(it.label) + ` <span class="ct-meta">(${it.perUnit} ${escapeHtml(it.unit)})</span>`,
         it.xpOnly ? 'XP only' : '$' + Number(it.amount || 0).toFixed(2))).join('')}
@@ -73,13 +57,13 @@ function pmPriceCards(r) {
   </div>`;
 
   const tiers = ((r.streak || {}).tiers) || [];
-  html += `<div class="chore-card"><h3>🔥 Routine streak</h3>
+  if (want('streak')) html += `<div class="chore-card"><h3>🔥 Routine streak</h3>
     ${tiers.map(t => row(t.days + ' days in a row', '+$' + Number(t.bonus || 0).toFixed(2))).join('')}
     <div class="ct-meta">${pmStreakNote(r.streak || {})}</div>
   </div>`;
 
   const cp = r.competition || {};
-  html += `<div class="chore-card"><h3>🏆 Competition days</h3>
+  if (want('comp')) html += `<div class="chore-card"><h3>🏆 Competitions</h3>
     ${row('Swim — per point', '$' + Number((cp.swim || {}).perPoint || 0).toFixed(2))}
     ${row('Qualify for Provincials', '+$' + Number((cp.swim || {}).qualifyBonus || 0).toFixed(2))}
     ${row('Provincials — per point', '$' + Number((cp.swim || {}).provincialPerPoint || 0).toFixed(2))}
@@ -91,15 +75,17 @@ function pmPriceCards(r) {
   </div>`;
 
   const fi = (r.fines && r.fines.items) || [];
-  html += `<div class="chore-card"><h3>📦 Sunday Box &amp; fines</h3>
-    <div class="ct-meta">${pmFinesNote(fi)}</div>
+  /* One short line, then the prices (the stage 8 drawing); what the rules
+     say about repeats is one short note under them. */
+  if (want('fines')) html += `<div class="chore-card"><h3>📦 Box fine</h3>
+    <div class="ct-meta">Leave something out and it's boxed until Sunday. <b>Box first, fine on repeat.</b></div>
     ${fi.map(f => row(escapeHtml(f.label), '−$' + Number(f.amount || 0).toFixed(2)
       + pmFineWhen(f, fi))).join('')}
-    <div class="ct-meta">A day never goes below $0. Fines can take what you earned that day — they can't put you in debt.</div>
+    <div class="ct-meta">${pmFinesNote(fi)} A day never goes below $0.</div>
   </div>`;
 
   const xp = (r.xp && r.xp.awards) || [];
-  html += `<div class="chore-card"><h3>⭐ XP</h3>
+  if (want('xp')) html += `<div class="chore-card"><h3>⭐ XP</h3>
     <div class="ct-meta">XP isn't money — it's the record of everything money doesn't capture. ${(r.xp || {}).perLevel} XP = one level.</div>
     ${xp.map(a => row(escapeHtml(a.label), a.xp + ' XP')).join('')}
   </div>`;
@@ -121,15 +107,13 @@ function pmCountWord(n) {
 }
 
 function pmFinesNote(items) {
-  const box = `Leave something out and it's boxed until Sunday — it comes back at the family meeting. <b>Box first, fine on repeat</b> — the second time that week, it's boxed <i>and</i> it costs.`;
   const talk = items.filter(f => Math.round(Number(f.freeRepeats) || 0) > 0);
-  if (!talk.length) return box;
+  if (!talk.length) return `The second time that week, it's boxed <i>and</i> it costs.`;
   const ns = [...new Set(talk.map(f => Math.round(Number(f.freeRepeats))))];
   const first = ns.length === 1
-    ? (ns[0] === 1 ? 'the first time in a week is' : `the first ${pmCountWord(ns[0])} times in a week are`)
-    : 'the first few times in a week are';
-  const rest = talk.length < items.length ? ' Anything that says <b>every time</b> costs from the first.' : '';
-  return `${box} Some of these start as a conversation: <b>${first}</b> a talk, not a fine, and each time after that costs what it says.${rest}`;
+    ? (ns[0] === 1 ? 'The first time in a week is' : `The first ${pmCountWord(ns[0])} times in a week are`)
+    : 'The first few times in a week are';
+  return `${first} a talk, not a fine.`;
 }
 
 /* The short "when" beside a fine, so the row and the sentence above it say the
