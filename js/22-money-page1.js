@@ -885,7 +885,7 @@ function mnyInfoSheetBody(d) {
     const rows = mnyGoalsNearestFirst(kid).map(g => {
       const saved = mnyGoalJarValue(kid, g);
       const line = mnyGoalLine(kid, g, saved);
-      return `<div class="mv2-li"><span>${escapeHtml((g.icon || '🎯') + ' ' + g.name)} <span class="mv2-note">${escapeHtml(line || '🎉 saved')}</span></span>
+      return `<div class="mv2-li mv2-li--pick"><span>${escapeHtml((g.icon || '🎯') + ' ' + g.name)} <span class="mv2-note">${escapeHtml(line || '🎉 saved')}</span></span>
           <b>${escapeHtml(mnyMoney(saved))} of ${escapeHtml(mnyMoney(g.target))}</b>
           <button type="button" class="mv2-btn${on && on.id === g.id ? ' on' : ''}" data-mny-action="goal-show" data-mny-goal="${escapeAttr(g.id)}">${on && on.id === g.id ? '✓ on my card' : 'Show on card'}</button></div>`;
     }).join('');

@@ -385,9 +385,9 @@ function sdGuessMain(c) {
     const on = d.guess === g;
     const mark = [hist.length && Math.round(lastWeek / 5) * 5 === g ? 'last week' : '',
                   hist.length && Math.round(avg / 5) * 5 === g ? 'my avg' : ''].filter(Boolean).join(' ');
-    return `<button type="button" class="sd-rung${on ? ' on' : ''}" data-mny-action="sd-guess" data-sd-v="${g}" aria-pressed="${on}">
+    return `<button type="button" class="sd-rung${on ? ' on' : ''}" data-mny-action="sd-guess" data-sd-v="${g}" aria-pressed="${on}" style="--f:${(0.2 + i * 0.08).toFixed(2)}">
         <span class="sd-rung-mark">${escapeHtml(mark)}</span><span class="sd-rung-pin">${on ? '▼' : ''}</span>
-        <span class="sd-rung-bar${i % 2 ? ' alt' : ''}" style="height:${(14 + i * 5.8).toFixed(1)}%"><b>$${g}</b></span></button>`;
+        <span class="sd-rung-bar${i % 2 ? ' alt' : ''}"><b>$${g}</b></span></button>`;
   }).join('');
   const hint = u.total
     ? [u.asks ? `parents: ${u.asks} to answer` : '', u.sessions ? `my club sessions: ${u.sessions} to tick` : '', u.rows ? 'a new row on my wall' : ''].filter(Boolean).join(' · ') + ' first →'
@@ -654,8 +654,14 @@ function sdLayPile() {
   }
   const must = box.querySelector('.sd-minline');
   if (must) {
-    must.style.bottom = Math.min(H - 2, Number(must.getAttribute('data-sd-v')) / 5 * rowH).toFixed(1) + 'px';
+    const mb = Math.min(H - 2, Number(must.getAttribute('data-sd-v')) / 5 * rowH);
+    must.style.bottom = mb.toFixed(1) + 'px';
     must.style.width = (W - AX + 6) + 'px';
+    /* The "loan first" words sit above the line; when the top row of coins
+       (the dashed taken-off ones) reaches past it, they sit above that row. */
+    const label = must.firstElementChild;
+    const topRow = coins.length ? Math.floor((coins.length - 1) / 5) * rowH + (rowH - D) / 2 + D : 0;
+    if (label) label.style.top = topRow > mb ? (-19 - Math.min(topRow - mb, Math.max(0, H - mb - 19))).toFixed(1) + 'px' : '';
   }
 }
 function sdPaydayMain(c) {

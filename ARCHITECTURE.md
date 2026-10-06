@@ -4338,6 +4338,18 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   numbers do not read beside a sheet.
 - **Held by** smoke `aSundayRowOpensItsSheet` and the unit case in
   `tests/sunday.test.js`.
+- **The money fit check (PR 5 part 2, build 2026-10-06e)** is smoke
+  `noLabelIsCutOnTheMoneyScreens`: every money screen and sheet, both looks,
+  390×844 and 1194×834, seeded twice — the usual names, then long names
+  ("Winter skating camp", "Championship entries", "Grandma Rosalind") and
+  4-digit amounts ($1,234.56 loan left, $1,050), read from `window.__fitLong`
+  by `mv2Seed`, `sdSeedWeek` and the Sunday rows. Three rules for every visible
+  text: **no clip** (its block is not narrower than it, "…" or not), **no
+  spill** (inside its nearest four-sided box, not on a border line around it,
+  not past the screen's side), **no overlap** (no two line boxes cross; 1px
+  allowed). A scroll container may scroll. A failure is fixed in the Stage 7
+  order: `--mny-fit`, bigger text where there is room, shorter words, a box
+  that grows — never a cut.
 
 ## Known trip hazards
 
