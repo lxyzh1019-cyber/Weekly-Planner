@@ -1527,7 +1527,7 @@ function mmRenderQuarterly() {
 function mmDoQuarterlyReview() {
   mrMarkQuarterReviewed();
   mmHide();
-  openPocketMoney(ctParentKid, 'setup');
+  mnyGoTab('rules');   // Grown-ups' money rules
 }
 function mmSkipQuarterlyReview() {
   mrMarkQuarterReviewed();

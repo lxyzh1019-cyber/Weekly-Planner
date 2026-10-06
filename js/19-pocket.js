@@ -11,30 +11,10 @@
      bank    → gone. What she owns is one record per holding now, edited by a
                parent with no market simulation behind it.
 
-   What is left is the price list itself, which is worth keeping in one place
-   because two surfaces render it — 💰 My money and 🎓 Money school — and
-   building it twice is how they would start to disagree.
+   What is left is the price list itself, kept in one place: the one sheet
+   "💷 What things pay ▸" opens, from 💰 My money's week sheet and from 🎓
+   Money school (js/45 `rqPricesBody`).
    ════════════════════════════════════════════════════════════════ */
-let pocketKid = 'jess';
-
-/* Kids look at their own money; a parent looks at whichever kid is selected. */
-function pocketViewKid() {
-  return isParent() ? (pocketKid === 'jenn' ? 'jenn' : 'jess') : activeProfile();
-}
-
-/* Kept as a redirect so older call sites and any saved deep link land
-   somewhere sensible instead of on a screen that no longer exists. */
-function openPocketMoney(kid, tab) {
-  ctPrepareRead();
-  if (isParent() && (kid === 'jenn' || kid === 'jess')) pocketKid = kid;
-  if (tab === 'setup' && isParent()) {
-    showScreen('parent');
-    if (typeof setParentTab === 'function') setParentTab('money');
-    return;
-  }
-  mnyOpenMyMoney(kid || pocketViewKid());
-}
-
 /* The price list, rendered straight from the rules so it is always the truth.
    Read-only: the parent edits prices on Money rules (js/24-money-parent.js),
    which has its own steppers. An `editable` mode that drew ✏️ buttons here was
@@ -79,7 +59,7 @@ function pmPriceCards(r) {
   </div>`;
 
   const cp = r.competition || {};
-  html += `<div class="chore-card"><h3>🏆 Competition days</h3>
+  html += `<div class="chore-card"><h3>🏆 Competitions</h3>
     ${row('Swim — per point', '$' + Number((cp.swim || {}).perPoint || 0).toFixed(2))}
     ${row('Qualify for Provincials', '+$' + Number((cp.swim || {}).qualifyBonus || 0).toFixed(2))}
     ${row('Provincials — per point', '$' + Number((cp.swim || {}).provincialPerPoint || 0).toFixed(2))}
@@ -91,7 +71,7 @@ function pmPriceCards(r) {
   </div>`;
 
   const fi = (r.fines && r.fines.items) || [];
-  html += `<div class="chore-card"><h3>📦 Sunday Box &amp; fines</h3>
+  html += `<div class="chore-card"><h3>📦 Box fine</h3>
     <div class="ct-meta">${pmFinesNote(fi)}</div>
     ${fi.map(f => row(escapeHtml(f.label), '−$' + Number(f.amount || 0).toFixed(2)
       + pmFineWhen(f, fi))).join('')}

@@ -130,18 +130,21 @@ function flMonthShort(m) {
 
 /* ── The sentence ──────────────────────────────────────────────────
    Said in words before anything is drawn, because a bar chart answers "how
-   much of each" and a child's first question is "what happened". */
+   much of each" and a child's first question is "what happened". In the four
+   groups My money and the passbook use — 💪 earned, 🎁 given, 🌱 made, ➖
+   taken off — then what went out and what was put away to grow. No balance:
+   what is waiting right now is My money's 📥 door, not this page's. */
 function flStory(flow, periodWords) {
-  const saved = money2(flow.savedTotal);
+  const src = k => money2(Math.max(0, Number((flow.sources || {})[k]) || 0));
+  const earned = money2(src('earned') + src('prize'));
+  const off = money2(Math.max(0, Number((flow.dests || {}).fine) || 0));
   const out = money2(flow.outTotal);
-  const bits = [];
-  bits.push(`${mnyMoney(flow.inTotal)} came in`);
-  if (out > 0) bits.push(`${mnyMoney(out)} went out`);
-  if (saved > 0) bits.push(`${mnyMoney(saved)} went somewhere to grow`);
-  /* "Left" is a BALANCE, not in-minus-out: she may have had money before the
-     span started. Saying it as a subtraction would be arithmetic a child could
-     check and find wrong. */
-  return `${escapeHtml(periodWords)}, ${bits.join(', ')}. You have ${mnyMoney(flow.inHand)} in cash right now.`;
+  const saved = money2(flow.savedTotal);
+  const groups = `💪 I earned ${mnyMoney(earned)}, 🎁 I was given ${mnyMoney(src('gift'))}, 🌱 my money made ${mnyMoney(src('interest'))} and ➖ ${mnyMoney(off)} was taken off.`;
+  const after = [];
+  if (out > 0) after.push(`${mnyMoney(out)} went out`);
+  if (saved > 0) after.push(`${mnyMoney(saved)} was put away to grow`);
+  return `${escapeHtml(periodWords)}: ${groups}${after.length ? ' ' + after.join(' and ') + '.' : ''}`;
 }
 
 /* ── A ribbon row ──────────────────────────────────────────────────
@@ -209,7 +212,10 @@ function flHistoryStrip(months, selected) {
     </div>`;
 }
 
-/* ── The screen ────────────────────────────────────────────────── */
+/* ── The page ─────────────────────────────────────────────────────
+   📊 By month — the passbook's second door (decision 14), drawn under My
+   money's head by `mnyRenderHistory` (js/22): the Flow on the left, every
+   month on the right. */
 function flRenderFlow(kid) {
   const months = flMonthsFor(kid);
   const selected = flCurrentMonth(months);
@@ -221,8 +227,9 @@ function flRenderFlow(kid) {
     : `In ${flMonthLabel(selected || todayKey().slice(0, 7))}`;
 
   const chips = FL_PERIODS.map(p =>
-    `<button type="button" class="fl-chip${flPeriod === p.id ? ' on' : ''}"
-       data-fl-action="period" data-fl-id="${p.id}">${escapeHtml(p.label)}</button>`).join('');
+    `<button type="button" class="mv2-btn${flPeriod === p.id ? ' on' : ''}"
+       data-fl-action="period" data-fl-id="${p.id}" aria-pressed="${flPeriod === p.id}">${escapeHtml(p.label)}</button>`).join('');
+  const head = `<div class="mv2-cardhead"><span class="mv2-title">📊 By month</span></div>`;
 
   const inRows = flSourceRows(flow);
   /* Every key `outTotal` counted is drawn: the four named ones first, then
@@ -238,17 +245,19 @@ function flRenderFlow(kid) {
      here" for both would send a parent looking for a bug in the second case. */
   if (!inRows && !outRows && !growRows) {
     const anyAtAll = (typeof evList === 'function') && evList(kid).length > 0;
-    return `<div class="mny-card">
-        <div class="mny-label">🌊 Where your money goes</div>
+    return `<div class="mv2-flow mv2-flow--empty"><div class="mv2-card mv2-flow-main">
+        ${head}
         <div class="fl-empty">${anyAtAll
           ? 'Nothing moved in this one. Try <b>All of it</b> to see the whole story.'
-          : 'Your money story starts the first time a week is settled or something is given to you. Nothing yet — that is just the beginning, not a problem.'}</div>
+          : 'My money story starts the first time a week is settled or something is given to me. Nothing yet: that is just the beginning, not a problem.'}</div>
         ${anyAtAll ? `<div class="fl-chiprow">${chips}</div>` : ''}
-      </div>`;
+      </div></div>`;
   }
 
-  return `<div class="mny-card">
-      <div class="mny-label">🌊 Where your money goes</div>
+  const strip = flHistoryStrip(months, selected);
+  return `<div class="mv2-flow${strip ? '' : ' mv2-flow--one'}">
+    <div class="mv2-card mv2-flow-main">
+      ${head}
       <div class="fl-chiprow">${chips}</div>
       <p class="fl-story">${flStory(flow, periodWords)}</p>
 
@@ -264,16 +273,14 @@ function flRenderFlow(kid) {
 
       <div class="fl-group">
         <div class="fl-cap">🌱 Put away to grow <b>${mnyMoney(flow.savedTotal)}</b></div>
-        ${growRows || '<div class="fl-empty">Nothing was put away — it is all still cash.</div>'}
+        ${growRows || '<div class="fl-empty">Nothing was put away to grow.</div>'}
       </div>
-
-      ${flow.inHand > 0 ? `<div class="fl-left">
-        <span>📥 Waiting for Sunday, right now</span><b>${mnyMoney(flow.inHand)}</b>
-      </div>` : ''}
-      <div class="fl-note">This last number is not what came in take away what went out —
-      you had money before this ${flPeriod === 'all' ? 'story' : 'month'} started, and that counts too.</div>
     </div>
-    ${flHistoryStrip(months, selected)}`;
+    ${strip ? `<div class="mv2-card mv2-flow-months">
+      <div class="mv2-cardhead"><span class="mv2-title">📅 Every month</span></div>
+      ${strip}
+    </div>` : ''}
+  </div>`;
 }
 
 /* ── Events ────────────────────────────────────────────────────────
@@ -284,13 +291,13 @@ function flHandleClick(e) {
   const el = e.target.closest('[data-fl-action]');
   if (!el) return;
   const a = el.getAttribute('data-fl-action');
-  if (a === 'period') { flPeriod = el.getAttribute('data-fl-id'); mnyRenderStory(); return; }
+  if (a === 'period') { flPeriod = el.getAttribute('data-fl-id'); mnyRenderHistory(); return; }
   if (a === 'month') {
     /* Tapping a column always means "show me this month", so it selects the
        period as well. Selecting a month and leaving the screen on "all of it"
        would be a control that appears to do nothing. */
     flMonth = el.getAttribute('data-fl-month');
     flPeriod = 'month';
-    mnyRenderStory();
+    mnyRenderHistory();
   }
 }

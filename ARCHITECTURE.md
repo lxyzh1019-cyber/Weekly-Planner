@@ -4279,6 +4279,28 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
   counts one build per render.
 
+### Money fit and logic, PR 4 part B — the old money pages read the new rules (build 2026-10-06b)
+
+- **Two tabs, two doors (decision 14).** A kid's money head has two tabs, 💰 My
+  money and 🎓 Money school (`mnyTabBar`, icons and names, no numbers; a
+  grown-up still gets the whole tagged rail from `mnyTabsFor`). The money story
+  page and its head button are gone. 📒 My passbook has two doors, each a full
+  page under My money's head (`mnyMoneyHead`, ◀ back to My money) on
+  `#screen-moneystory`: the 📖 icon (`sundays`) opens **📖 All my Sundays**
+  (`mnySundaysPage` — every settled Sunday from the frozen ledger row through
+  `sdHistGroups`, labelled with `mrMoneyWeekLabel`) and **📊 By month ▸**
+  (`bymonth`) opens the Flow (`flRenderFlow`, js/42). `mnyRenderHistory` draws
+  whichever is open. No bottom bar on any money page (`TD_NAV_SCREENS`).
+- **One explainer table.** An idea's words live only in `MNY_CONCEPTS` (js/21).
+  The idea sheet (`mnyOpenInfoSheet('idea', {id})`, kind in `MNY_INFO_KINDS`),
+  Money school's 💡 rows, the '?' card (`mnyShowConcept`) and 📥 Waiting for
+  Sunday's sheet all read it; `mnyIdeaBody` is the one body. Rule numbers in an
+  idea are `mnyConceptSwap` tokens — `{lockWeeks}` (`mnyLockWeeks`) and
+  `{stockDrop}` (`mnyStockDrop`, the Companies chart's own fall).
+- **The old pages wear the new look.** Money school (`.mv2-school`) and the
+  two passbook pages (`.mv2-hist`, `.mv2-flow`) are `.mv2-card`s inside the
+  `money-tokens` markers, the Flow's `.fl-*` rules included.
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

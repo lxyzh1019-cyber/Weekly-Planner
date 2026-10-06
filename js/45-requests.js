@@ -97,7 +97,7 @@ function mnyAddRequest(kid, fields) {
       grp: Number(f.grp) || 0, ovr: Number(f.ovr) || 0,
       qualified: !!f.qualified, provincial: !!f.provincial,
     });
-    if (!r.sport && !r.name) { showToast('Which meet was it?'); return null; }
+    if (!r.sport && !r.name) { showToast('Which competition was it?'); return null; }
     /* One competition, one question (owner's review M8-4): a meet that
        already has a result waiting for Dad, or one he said yes to, cannot be
        told again — from the sheet, the other device or anywhere else. */
@@ -1005,7 +1005,7 @@ function rqGiftBody(kid, d) {
    Money school have always shown, `pmPriceCards`). */
 function rqPricesBody() {
   const r = mrRules();
-  const changed = JSON.stringify(r) !== JSON.stringify(mrRulesForWeek(mnyWeekKey()));
+  const changed = JSON.stringify(r) !== JSON.stringify(mrRulesForWeek(mrMoneyWeekOf(todayKey())));   // the money week she is in
   return `${changed ? `<p class="rq-lead">Something changed price this week. These are the new prices, from now on — what I already did this week still pays what it was worth then.</p>` : ''}
     <div class="mny-prices rq-prices">${pmPriceCards(r, false)}</div>`;
 }

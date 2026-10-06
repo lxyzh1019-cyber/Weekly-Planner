@@ -77,13 +77,6 @@ function stockPrice(ticker, monthOverride) {
   const m = ((cfg.startMonth + simMonth) % 12 + 12) % 12;
   return STOCKS_2023[ticker].prices[m];
 }
-/* What she owns now lives in one record per holding (js/21-money-data.js), so
-   a parent can keep it truthful by hand instead of a simulation deciding for
-   them. These four keep their old names because half the app calls them. */
-function portfolioValue(kid) { return mnyInvestedTotal(kid); }
-function gicTotal(kid) { return mnyLockedTotal(kid); }
-function savingsTotal(kid) { return mnySavedTotal(kid); }
-function netWorth(kid) { return mnyEverything(kid); }
 
 /* ── Transactions (each guards against overdraw; returns true on success) ── */
 /* ── Shadow writes into the money stream ──

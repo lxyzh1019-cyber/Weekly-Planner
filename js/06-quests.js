@@ -179,39 +179,7 @@ function renderStickerCollection(kid) {
 /* showPocketMoney / togglePocketMoney / renderQuestMoneyStrip lived here. They
    rendered into #questMoneyWrap on the Quest Board, which is gone; Today's own
    money card (tdMoneyChart) is the kid-facing summary now, and 💰 My money is
-   still the page that owns the detail. buildHowIEarnCard, which this called,
-   is untouched — the money pages use it. */
-
-/* The Quest Board keeps a three-line answer to "how am I doing?" and hands the
-   rest to 💰 My money (js/22-money-page1.js). This used to be the whole money
-   card; a board about today's quests is the wrong place for a wallet, a debt
-   and a year's pacing, and duplicating them here meant two screens that could
-   disagree about the same dollar. */
-function mnyQuestSummary(kid, wk) {
-  const b = mrWeekBreakdown(wk, kid);
-  const owing = mnyTotalOwing(kid);
-  const pct = mnyPaidPct(kid);
-  return `<div class="mny-card">
-      <div class="mny-row"><span>Earned this week so far</span><b>${mnyMoney(b.net)}</b></div>
-      <div class="mny-row"><span>Everything I have</span><b>${mnyMoney(mnyEverything(kid))}</b></div>
-      ${owing > 0
-        ? `<div class="mny-row"><span>Still to pay off</span><b>${mnyMoney(owing)}</b></div>
-           <div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>`
-        : ''}
-      <button type="button" class="mny-btn wide primary" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 Open My money ›</button>
-    </div>`;
-}
-
-/* 3a — "How I earn": one kid-readable card that gathers every money rule and
-   the wallet in one place. Display-only — reads existing chore/money state.
-
-   Every week reads from the rules, so a price edited on the Pocket Money setup
-   tab shows up here immediately and this card can never go stale against it.
-   There used to be a second, legacy card for weeks before the model switch;
-   there is one model now, and `buildHowIEarnCardLegacy` went with it. */
-function buildHowIEarnCard(kid, wk) {
-  return mnyQuestSummary(kid, wk);
-}
+   still the page that owns the detail. */
 
 /* Week-topbar money button. Both roles land on 💰 My money — a parent looking
    at a kid's money should see exactly what the kid sees, and everything a

@@ -772,6 +772,7 @@ function ckRail(kid) {
       <div class="ck-rail-cap">Earned this week</div>
       <div class="ck-rail-total">${ckMoney(board.net)}</div>
       <div class="ck-sub">kept after fines · a day never goes below $0</div>
+      ${ctMoneyDoor(kid)}
     </div>
     <div class="ck-card">
       <div class="ck-rail-cap">${CT_DAYS[ctDay]} · ${ckMoney(bar.cap)} ceiling</div>

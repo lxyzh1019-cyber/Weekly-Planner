@@ -945,72 +945,14 @@ function ctRenderWeekMatrix(kid) {
 
 
 
+/* 💰 The Chores tab's money card is one door now (decision 9): what a week
+   paid and what she has are 💰 My money's to say. Drawn on every week — the
+   old board's grid here, the kid tab's rail under "Earned this week" (js/26). */
+function ctMoneyDoor(kid) {
+  return `<button type="button" class="mv2-door ct-money-door" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money <span class="mv2-chev" aria-hidden="true">▸</span></button>`;
+}
 function ctRenderMoneyCard(kid) {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
-  const money = ctWeekMoney(ctWeekKey, kid);
-  const snap = c.moneySnapshots[ctWeekKey];
-  const newModel = !ctWeekIsPreSystem(ctWeekKey, kid);
-  let body;
-  if (snap && snap[kid] != null) {
-    body = `<div class="ct-meta">Earned before the new money system.</div>`;
-  } else if (newModel) {
-    // Under the rulebook model the money comes from graded chores, learning,
-    // the streak and competitions — not from group payouts, and there is no
-    // weekly total cap.
-    const b = mrWeekBreakdown(ctWeekKey, kid);
-    const lines = [];
-    if (b.chorePaid) lines.push(`<div class="ct-meta">🧹 Household chores +$${b.chorePaid.toFixed(2)}</div>`);
-    if (b.learnPaid) lines.push(`<div class="ct-meta">📘 Learning +$${b.learnPaid.toFixed(2)}</div>`);
-    if (b.streak.bonus) lines.push(`<div class="ct-meta">🔥 Streak (${b.streak.days} days) +$${b.streak.bonus.toFixed(2)}</div>`);
-    if (b.compPaid) lines.push(`<div class="ct-meta">🏆 Competition +$${b.compPaid.toFixed(2)}</div>`);
-    if (b.fines.total) lines.push(`<div class="ct-meta">📦 Fines −$${b.fines.total.toFixed(2)}</div>`);
-    Object.keys(b.honesty.voidedChannels || {}).forEach(ch =>
-      lines.push(`<div class="ct-meta">⚖️ ${escapeHtml(ch)} voided this week — honesty</div>`));
-    if (b.chores.overflowChores) lines.push(`<div class="ct-meta">⭐ ${b.chores.overflowChores} chore${b.chores.overflowChores > 1 ? 's' : ''} past the daily max — earns XP</div>`);
-    if (!lines.length) lines.push(`<div class="ct-meta">Do a household chore to start earning.</div>`);
-    body = lines.join('');
-  } else {
-    const wk = c.groupPayoutsFired[ctWeekKey] || {};
-    const lines = [];
-    let uncapped = 0;
-    for (const gid of Object.keys(wk)) {
-      const e = wk[gid][kid];
-      if (!e) continue;
-      const g = ctGroupById(gid);
-      const gname = g ? `${g.icon || ''} ${g.name}`.trim() : 'Group';
-      if (e === true) {
-        const amt = g ? (Number(g.valueDollars) || 0) : 0; uncapped += amt;
-        lines.push(`<div class="ct-meta">✅ ${escapeHtml(gname)} +$${amt.toFixed(2)}</div>`);
-      } else {
-        const amt = Number(e.total) || 0; uncapped += amt;
-        const dayCount = e.days ? Object.keys(e.days).length : 0;
-        const suffix = dayCount ? ` ×${dayCount} day${dayCount > 1 ? 's' : ''}` : '';
-        lines.push(`<div class="ct-meta">✅ ${escapeHtml(gname)}${suffix} +$${amt.toFixed(2)}</div>`);
-      }
-    }
-    if (ctGetGoalBonus(ctWeekKey, kid)) { uncapped += 1; lines.push(`<div class="ct-meta">⭐ Weekly goal bonus +$1.00</div>`); }
-    if (!lines.length) lines.push(`<div class="ct-meta">Finish a chore group to earn pocket money.</div>`);
-    if (uncapped > CT_MONEY_CAP) lines.push(`<div class="ct-meta ct-cap-note">Capped at $${CT_MONEY_CAP} this week.</div>`);
-    body = lines.join('');
-  }
-  const nw = netWorth(kid);
-  const finalized = !!(c.finalizedWeeks && c.finalizedWeeks[ctWeekKey] && c.finalizedWeeks[ctWeekKey][kid] != null);
-  return `<div class="chore-card chore-card--full"><h3>💰 ${name}'s pocket money</h3>
-    <div class="ct-money-total">$${money.toFixed(2)}${newModel
-      ? ` <span class="ct-money-cap">this week</span>`
-      : ` <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span>`}</div>
-    <div class="ct-meta" style="font-style:italic">Chores are how you help the family 💛 — the pocket money is a bonus for practising with real money.</div>
-    <div class="ct-meta">${finalized ? '✅ Paid out at the family meeting' : 'Preliminary — confirmed at the weekly family meeting'}</div>
-    ${body}
-    <div class="ct-meta" style="margin-top:0.4rem">🏦 Net worth: <b>$${nw.toFixed(2)}</b></div>
-    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
-      ${isParent()
-        ? `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money</button>
-           <button type="button" class="pill-btn" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Family meeting</button>`
-        : `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money</button>`}
-    </div></div>`;
+  return `<div class="chore-card chore-card--full">${ctMoneyDoor(kid)}</div>`;
 }
 /* ── A week from before the chore pool, read-only (R5 §5 C2, row 15) ──
    renderChoreTab draws such a week with the old board: ctRenderWeekControls,

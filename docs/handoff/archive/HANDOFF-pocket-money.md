@@ -1,3 +1,5 @@
+Archived 2026-10-06 — pre-redesign planning note; the Sunday v15 handoff and BUILD-SPEC replaced it.
+
 # Handoff — Weekly-Planner pocket money
 
 Written 2026-09-22 from a cloud session on branch `claude/inspiring-gauss-232zww`.

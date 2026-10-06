@@ -77,7 +77,7 @@ const EV_MARKER_KINDS = ['settle', 'reviewed', 'note'];
    is the app's. Icons match the ones already on the money pages so a ribbon and
    a card are recognisably the same thing. */
 const EV_SOURCE_LABELS = {
-  earned:   { icon: '🧹', label: 'Jobs and routines' },
+  earned:   { icon: '🏠', label: 'Home' },
   prize:    { icon: '🏆', label: 'Competitions' },
   gift:     { icon: '🎁', label: 'Gifts' },
   borrowed: { icon: '🎿', label: 'Borrowed' },

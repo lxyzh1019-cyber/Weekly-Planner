@@ -1,9 +1,9 @@
 // Weekly-Planner — 🎓 Money school: the ideas behind every number.
 // Classic script, global scope — declarations only (see MODULARIZATION_PLAN.md).
 /* ════════════════════════════════════════════════════════════════
-   PAGE 5 · MONEY SCHOOL
+   🎓 MONEY SCHOOL — the second of her two money tabs (decision 14)
 
-   The other four pages tell her what happened. This one tells her why any of
+   💰 My money tells her what happened. This one tells her why any of
    it works that way. It is the only money page with no numbers of her own on
    it, and the only one she never has to open.
 
@@ -68,19 +68,23 @@ function mnyRenderSchool() {
 
   if (!mnyConceptById(mnySchoolConcept)) mnySchoolConcept = 'debt';
 
+  /* The same head as My money (decision 14): ◀, the title, the two tabs,
+     ? and the date; no bottom bar. Three columns of `.mv2` cards on the
+     iPad, filling the screen; one column on the phone. */
   wrap.innerHTML =
-      `${mnyPageHead('🎓 Money school', 'Why any of it works this way', [], { back: 'backschool' })}
-       ${mnyTabBar('school')}
-       <div class="mny-cols school">
-         <div class="mny-col">${mnyLadderCard(kid, pct, idx)}</div>
-         <div class="mny-col">${mnyConceptPanel(kid)}</div>
-         <div class="mny-col">${mnyWorkListsCard()}${mnyBuysCard()}</div>
+      `${mnyPageHead('🎓 Money school', '', [
+          { action: 'tourkid', icon: '?', word: 'How this page works' },
+        ], { kidSwitch: true, tabs: 'school', date: true, back: 'backschool', big: true })}
+       <div class="mv2-school">
+         <div class="mv2-col">${mnyLadderCard(kid, pct, idx)}</div>
+         <div class="mv2-col">${mnyIdeasCard(kid)}</div>
+         <div class="mv2-col">${mnyStockChart()}${mnyWorkListsCard()}${mnyBuysCard()}</div>
        </div>`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
 
-/* The ladder. Where she is, what is next, and what it takes — stated as the
-   real number, because "60%" with no dollars behind it is not a goal. */
+/* 🔓 What opens when. Where she is, what is next, and what it takes — stated
+   as the real number, because "60%" with no dollars behind it is not a goal. */
 function mnyLadderCard(kid, pct, idx) {
   const owed = mnyTotalOwing(kid);
   const principal = mnyTotalPrincipal(kid);
@@ -90,73 +94,59 @@ function mnyLadderCard(kid, pct, idx) {
 
   const rows = MNY_STAGES.map((s, i) => {
     const open = i <= idx;
-    return `<div class="mny-row${i === idx ? ' total' : ''}${open ? '' : ' dim'}">
+    return `<div class="mv2-li mv2-ladder-row${i === idx ? ' here' : ''}${open ? '' : ' dim'}">
         <span>${s.icon} ${escapeHtml(s.title)}</span>
         <b>${i === idx ? 'you are here' : (open ? 'open' : '🔒 ' + mnyStagePct(s.id) + '%')}</b>
       </div>`;
   }).join('');
 
-  return `<div class="mny-card">
-      <div class="mny-label">This opens up as your loan comes down</div>
-      <div class="mny-total">${pct}%</div>
-      <div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>
-      <div class="mny-goal-row">${owed > 0
-        ? `${mnyMoney(owed)} still to go`
+  return `<div class="mv2-card mv2-ladder">
+      <div class="mv2-cardhead"><span class="mv2-title">🔓 What opens when</span><b class="mv2-ladder-pct">${pct}%</b></div>
+      <span class="mv2-bar mv2-ladder-bar"><i style="width:${pct}%"></i></span>
+      <div class="mv2-line mv2-ladder-goal">${owed > 0
+        ? `${mnyMoney(owed)} still to go on my loan`
         /* No loan is not a loan paid off. `mnyPaidPct` reads 100 for a child
            who owes nothing, which opens every pot — but "paid off" would be
            celebrating something that never happened. */
         : (principal > 0 ? `All paid off. Everything is open.` : `Nothing to pay back, so everything is open.`)}</div>
-      <div class="mny-rows">${rows}</div>
+      <div class="mv2-rows">${rows}</div>
       ${next && toNext > 0
-        ? `<div class="mny-note">Pay off <b>${mnyMoney(toNext)}</b> more and <b>${escapeHtml(next.icon + ' ' + next.title)}</b> opens.</div>`
+        ? `<div class="mv2-line mv2-teal">Pay off <b>${mnyMoney(toNext)}</b> more and <b>${escapeHtml(next.icon + ' ' + next.title)}</b> opens.</div>`
         : ''}
     </div>`;
 }
 
-/* The chips, and whichever idea is picked. */
-function mnyConceptPanel(kid) {
-  /* A locked chip is still tappable. Disabling it would leave a kid pressing a
-     dead button with no idea why; tapping it says what opens it, which is the
-     only useful thing a locked lesson has to offer. */
+/* 💡 The ideas: one door row each, in the order they open. A door opens the
+   idea in the same sheet My money's doors use (`mnyOpenInfoSheet('idea')`,
+   reading MNY_CONCEPTS — the one statement of each idea). A locked idea is
+   still a door: its sheet says what opens it, which is the only useful thing
+   a locked lesson has to offer. */
+function mnyIdeasCard(kid) {
   const swap = mnyConceptSwap(kid);
-  const chips = MNY_CONCEPTS.map(c => {
+  const rows = MNY_CONCEPTS.map(c => {
     const open = mnyIsOpen(kid, c.stage);
-    return `<button type="button" class="mny-chip ${mnySchoolConcept === c.id ? 'on' : ''}${open ? '' : ' locked'}"
-      data-mny-action="concept" data-mny-concept="${c.id}">
-      ${c.icon} ${escapeHtml(swap(c.title))}${open ? '' : ' 🔒'}</button>`;
+    return `<button type="button" class="mv2-li mv2-idea-row${open ? '' : ' dim'}" data-mny-action="idea" data-mny-concept="${escapeAttr(c.id)}">
+        <span>${c.icon} ${escapeHtml(swap(c.title))}</span>
+        <b>${open ? '' : '🔒 '}<span class="mv2-chev" aria-hidden="true">▸</span></b>
+      </button>`;
   }).join('');
-
-  const c = mnyConceptCard(mnySchoolConcept, kid);
-  const toGo = money2(Math.max(0, (mnyStagePct(c.stage) / 100) * mnyTotalPrincipal(kid) - mnyTotalPaid(kid)));
-  const body = c.open
-    ? `<div class="mny-sub">What it is</div><p>${escapeHtml(c.what)}</p>
-       <div class="mny-sub">${escapeHtml(c.whyLabel)}</div><p>${escapeHtml(c.why)}</p>
-       <div class="mny-sub">${escapeHtml(c.riskLabel)}</div><p>${escapeHtml(c.risk)}</p>`
-    : `<p>🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.</p>
-       ${toGo > 0 ? `<p>Pay off <b>${mnyMoney(toGo)}</b> more and this one opens.</p>` : ''}
-       <p>It is not a secret — it is just easier to understand once you have money that could go either way.</p>`;
-
-  return `<div class="mny-card">
-      <div class="mny-label">The ideas</div>
-      <div class="mny-chiprow">${chips}</div>
-    </div>
-    <div class="mny-card">
-      <div class="mny-week-head"><span class="mny-label">${escapeHtml(c.icon + ' ' + c.title)}</span></div>
-      <div class="mny-concept-body">${body}</div>
-    </div>
-    ${mnySchoolConcept === 'stock' ? mnyStockChart() : ''}`;
+  return `<div class="mv2-card mv2-ideas">
+      <div class="mv2-cardhead"><span class="mv2-title">💡 The ideas</span></div>
+      <div class="mv2-line">Tap one to read what it is, why it helps and what to watch.</div>
+      <div class="mv2-rows">${rows}</div>
+    </div>`;
 }
 
-/* What money actually buys. The list exists so a number can be weighed against
+/* 🛒 What money buys. The list exists so a number can be weighed against
    something real — "$40" is a word, "a pizza night" is a quantity. */
 function mnyBuysCard() {
   const items = mnyBuysItems();
   if (!items.length) return '';
-  return `<div class="mny-card">
-      <div class="mny-label">🛒 What money buys</div>
-      <div class="mny-rows">${items.map(i =>
-        `<div class="mny-row"><span>${escapeHtml(i.label)}</span><b>${mnyMoney(i.amount)}</b></div>`).join('')}</div>
-      <div class="mny-note">Real prices, from things we actually buy. It is how you tell whether something is worth saving for.</div>
+  return `<div class="mv2-card mv2-buys">
+      <div class="mv2-cardhead"><span class="mv2-title">🛒 What money buys</span></div>
+      <div class="mv2-rows">${items.map(i =>
+        `<div class="mv2-li"><span>${escapeHtml(i.label)}</span><b>${mnyMoney(i.amount)}</b></div>`).join('')}</div>
+      <div class="mv2-note">Real prices, from things we actually buy. It is how you tell whether something is worth saving for.</div>
     </div>`;
 }
 
@@ -165,9 +155,8 @@ function mnyBuysCard() {
 
    "Just part of being here" is a lesson and stays as one. Its one line a rule
    decides — how many household chores a week are free — is written from the
-   live rules. What PAYS is the live price list itself, in the same closed-by-
-   default card and the same remembered toggle My money uses: the literal list
-   that stood here still said homework paid after it stopped paying. */
+   live rules. What PAYS is the live price list itself, behind the door
+   "💷 What things pay ▸" — the same sheet My money's week sheet opens. */
 function mnyWorkListsCard() {
   const free = Math.max(0, Math.round(Number((mrRules().chores || {}).freeChoresPerWeek) || 0));
   const words = ['', 'first', 'first two', 'first three', 'first four', 'first five', 'first six', 'first seven'];
@@ -175,10 +164,10 @@ function mnyWorkListsCard() {
     ? `The ${words[free] || 'first ' + free} household chore${free === 1 ? '' : 's'} each week`
     : '';
   const lines = MNY_UNPAID.concat(freeLine ? [freeLine] : []);
-  return `<div class="mny-card">
-      <div class="mny-label">Just part of being here</div>
-      <div class="mny-rows">${lines.map(t => `<div class="mny-row"><span>${escapeHtml(t)}</span></div>`).join('')}</div>
-      <div class="mny-note">Nobody gets paid for these. They are what living in a family looks like.</div>
-    </div>
-    ${mnyPricesCard(mnyWeekKey())}`;
+  return `<div class="mv2-card mv2-unpaid">
+      <div class="mv2-cardhead"><span class="mv2-title">🏡 Just part of being here</span></div>
+      <div class="mv2-rows">${lines.map(t => `<div class="mv2-li"><span>${escapeHtml(t)}</span></div>`).join('')}</div>
+      <div class="mv2-note">Nobody gets paid for these. They are what living in a family looks like.</div>
+      ${mnyDoor('prices-sheet', '💷 What things pay')}
+    </div>`;
 }
