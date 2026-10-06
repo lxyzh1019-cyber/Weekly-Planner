@@ -4232,6 +4232,46 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   ribbon colours (`FL_COLOURS`, js/42) read the v15 meaning tokens that My money
   uses (`--mny-v15-bar/gold/saved/wall/cash/made`).
 
+### Money fit and logic, PR 3 — the money sections' sizes are tokens (build 2026-10-05f)
+
+- **The markers.** In `css/app.css`, `/* money-tokens:start … */` (just before
+  the "SUNDAY v15 — GROWN-UPS AND HER REQUEST SHEETS" banner) and
+  `/* money-tokens:end */` (the last line) bound the money sections: Grown-ups,
+  the request sheets, My money v2, Sunday and the `.pn-` "Waiting for you"
+  rules. New money rules go inside them. The old `.mny-` section joins in PR 4.
+- **Inside the markers a size is a token.** Corners: `--radius-md` 14px
+  (cards), `--radius-btn` 11px (buttons, inputs), `--radius-bar` 6px (bars),
+  `--radius-xs` 4px (tiny pills), `--radius-full` (chips and round things).
+  Border widths: `--bw-hair` 1px, `--bw-info` 1.5px, `--bw-chip` 2px,
+  `--bw-card` / `--bw-btn` 2.5px, `--bw-rule` 3px. These live in the top `:root`
+  beside the radius scale: both looks draw the same boxes. Shadows:
+  `--mny-shadow-card` (3px 3px 0) and `--mny-shadow-btn` (2px 2px 0) in the money
+  `:root`; the colour inside is `--mny-v15-shadow`, set per look. **Never point a
+  money shadow at the app's navy `--shadow-sm/md`** — a shared token with a
+  per-look meaning is the R11 4A hazard. Selected fills `--sel-tab`/`--sel-tab-ink`
+  (Grown-ups tabs) and `--sel-opt`/`--sel-opt-ink` (teal options); the main
+  button `--btn-main`/`--btn-main-ink` and its resting state
+  `--btn-off`/`--btn-off-ink` (`.gu-save`, `.rq-send`, `.sd-go`, `.sd-sign.ready`).
+- **What holds it.** `tests/check-look-tokens.js` rule 5 (the plan's "rule 6"):
+  between the markers every `border-radius`, `box-shadow`, `border`,
+  `border-width` and `border-<side>(-width)` value carries its size only as
+  `var(--…)` (a bare `0`, `none`, `transparent`, `currentColor` pass); an inset
+  or comma-list shadow passes only by a named `SIZE_EXEMPT` entry (the coin face
+  and the `sdGlow` keyframes today); a missing marker or a stale entry fails.
+- **The words check.** `tests/check-money-words.js` (in `npm run check`) scans
+  string and template text in `js/*.js` and visible text in `index.html` for
+  the retired money words — dad, meet(s), prizes, stocks, locking money,
+  everything I have, in cash / cash right now — and a `{word}` placeholder no
+  code filled (`mnyConceptSwap`'s own source and the words it fills inside
+  `MNY_CONCEPTS` pass). Identifiers, comments, hyphenated classes and actions,
+  and lowercase quoted keys (`kind: 'meet'`) never match. Allowances are named
+  (`ALLOW`, `EXEMPT` with the PR that fixes the hit); a stale one fails.
+- **⚙️ Rules builds its groups once per render.** `guRender('rules')` calls
+  `guRuleSections()` once and hands the result to `guRuleIndex(secs)` and
+  `guRulesMain(secs)`; each still builds its own when called alone
+  (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
+  counts one build per render.
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

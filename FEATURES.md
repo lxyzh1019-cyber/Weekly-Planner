@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v30 — 2026-10-05, v29 + Money fit and logic — PR 2: "Competitions" in place of "meet" on the money screens, no parent named on the price card, the lock-weeks chip reads the rule, Grown-ups figures in the look's font, Story colours match My money, a week settled without a sign says so (build 2026-10-05e); before that v28 + Money fit and logic — PR 1: one pile figure, From my bank adds up, the money week named Sun–Sat, a too-big commitment needs a parent's tick, the down payment leaves the 🛟 $10, a 20-Sunday run per girl (build 2026-10-05d) (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v31 — 2026-10-05, v30 + Money fit and logic — PR 3: the money sections' corners, border widths and shadows read shared size tokens between two marker comments (a check fails a typed size there), a words check fails retired money words and a raw {placeholder} on screen, ⚙️ Rules builds its groups once per render (build 2026-10-05f); before that v29 + Money fit and logic — PR 2: "Competitions" in place of "meet" on the money screens, no parent named on the price card, the lock-weeks chip reads the rule, Grown-ups figures in the look's font, Story colours match My money, a week settled without a sign says so (build 2026-10-05e); before that v28 + Money fit and logic — PR 1: one pile figure, From my bank adds up, the money week named Sun–Sat, a too-big commitment needs a parent's tick, the down payment leaves the 🛟 $10, a 20-Sunday run per girl (build 2026-10-05d) (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -559,6 +559,21 @@ No screen reads these yet; Stages 2–4 build Grown-ups, My money v2 and the Sun
 | Grown-ups figures, Story colours | kept, changed | body font in Pop; v15 tokens |
 | Signed step for a week settled without a sign | kept, changed | title and line say so instead of "Signed." |
 | `--mny-flow-*` tokens | kept | seven now unread; PR 4 retires them |
+| — | missing: none | |
+
+### Money fit and logic — PR 3: shared values and checks (manifested 2026-10-05, plan "Money fit and logic", build 2026-10-05f)
+- 📏 **Money sizes are tokens.** Between `/* money-tokens:start */` and `/* money-tokens:end */` in css/app.css (Grown-ups, request sheets, My money v2, Sunday, the `.pn-` "Waiting for you" rules) every corner, border width and shadow reads a token: `--radius-md` 14 / `--radius-btn` 11 / `--radius-bar` 6 / `--radius-xs` 4 / `--radius-full`; `--bw-hair` 1 / `--bw-info` 1.5 / `--bw-chip` 2 / `--bw-card` and `--bw-btn` 2.5 / `--bw-rule` 3; `--mny-shadow-card` 3×3 and `--mny-shadow-btn` 2×2 in `--mny-v15-shadow` (per look). Selected fills `--sel-tab(-ink)`, `--sel-opt(-ink)`; main button `--btn-main(-ink)`, `--btn-off(-ink)`.
+- 🔍 **What changed on screen** (nearest token; both looks alike): corners 9/10/12 → 11px, 7/8 → 6px, 2/3/5 → 4px (two 10px-tall bars 5 → 6, same look), 13/16/18 → 14px (the four sheets, `.mv2-idea`, `.sd-newrow`, `.sd-job/.sd-cat/.sd-col/.sd-box--off`); shadows 4×5 → 3×3 (`.sd-job`, `.sd-cat`, `.sd-col`, `.sd-newrow`), 2×3 → 2×2 (`.rq-send`), 1.5×1.5 → 2×2 (`.sd-cell-look`); borders 1.3 → 1.5px (loan wall bricks), 3.5 → 3px (Signed stamp); `.sd-go.off` text `--mny-v15-sub` → `--btn-off-ink` (= `--mny-v15-muted`, a shade darker in Pop only).
+- 🧪 **Checks.** tests/check-look-tokens.js rule 5 (typed size between the markers, missing marker, stale `SIZE_EXEMPT`); new tests/check-money-words.js in `npm run check` (dad, meet(s), prizes, stocks, locking money, everything I have, in cash / cash right now, raw `{word}`; named ALLOW and EXEMPT, stale fails; 8 known hits left for PR 4, two of them newly found: the defaulted-row refusal's "meet" and the competition request's "Which meet was it?" toast). ⚙️ Rules: `guRender('rules')` builds `guRuleSections()` once for the index and the main column; `theGrandfatherRuleReadsAsItselfEverywhere` counts 1.
+
+| Feature | v30 → v31 | Note |
+|---|---|---|
+| Money screens' layout, colours, fonts, words | kept | sizes moved to tokens; changes listed above, no fit or words changed |
+| Corners, shadows, border widths in the money sections | kept, changed | nearest token (list above) |
+| Selected tab and option fills, main button and its resting state | kept | same colours through tokens; `.sd-go.off` text one shade darker in Pop |
+| ⚙️ Rules tab: index, groups, search, open-group from Setup | kept | groups built once per render; `guRuleOpenGroup` unchanged |
+| Look-token check rules 1–4 | kept | rule 5 added |
+| Money size rule, money words check, Rules build counter | added | listed above |
 | — | missing: none | |
 
 ## Regression table format (paste at the end of every edit)
