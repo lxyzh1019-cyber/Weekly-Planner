@@ -1035,5 +1035,44 @@ function fill(w, k) {
   }
 }
 
+/* ── 📒 One Sunday's sheet reads its frozen row (decision 16, Money fit and logic PR 5) ──
+   `sdSundayRecord` is the one reader the Sunday sheet draws: what came in in
+   the four groups (the same as All my Sundays), what was taken off (fines and
+   cash drawn early), where it went, the loan left after, and whether it was
+   settled without a sign. */
+{
+  const bad = [];
+  const signed = {
+    weekKey: '2026-09-28', chores: 14, learning: 2, streak: 3, sessionsPaid: 6, competition: 5, net: 30, fines: 1,
+    groups: { earned: 30, given: 10, made: 0.42, bank: 4, takenOff: 3 }, advance: 2,
+    loan: { paid: 12, must: 12 }, extra: 3, ready: 10, goal: 4, gic: 0, stock: 2, cashOut: 5, spend: 7,
+    debtBalanceAfter: 640.5, sunday: { signed: { ok: 1 } },
+  };
+  try {
+  const frozen = Object.freeze(Object.assign({}, signed, { groups: Object.freeze(Object.assign({}, signed.groups)), loan: Object.freeze(Object.assign({}, signed.loan)) }));
+  const a = s.sdSundayRecord(frozen);
+  const ci = a.cameIn;
+  if (ci.earned !== 30 || ci.home !== 19 || ci.club !== 6 || ci.comp !== 5) bad.push('came in 💪 ' + JSON.stringify(ci));
+  if (ci.given !== 10 || ci.made !== 0.42 || ci.bank !== 4) bad.push('came in 🎁 🌱 📥 ' + JSON.stringify(ci));
+  if (a.takenOff.total !== 3 || a.takenOff.fines !== 1 || a.takenOff.advance !== 2) bad.push('taken off ' + JSON.stringify(a.takenOff));
+  const went = a.went.map(x => x.k + ':' + x.v).join(' ');
+  if (went !== 'wall:15 saved:10 goal:4 stock:2 cash:5') bad.push('went ' + went);
+  if (a.loanLeftAfter !== 640.5) bad.push('loan left after ' + a.loanLeftAfter);
+  if (a.noSign) bad.push('a signed Sunday reads as settled without a sign');
+  if (a.total !== s.sdHistGroups({ row: signed }).total || a.total !== 41) bad.push('total ' + a.total + ", not All my Sundays' 41");
+  // A Grandfather-rule week: no groups, no sign, no loan figure kept.
+  const d = s.sdSundayRecord({ weekKey: '2026-09-21', defaulted: true, defaultReason: 'grandma', net: 20, outside: 0, fines: 0,
+    loan: { paid: 8 }, ready: 0, spend: 12 });
+  if (!d.noSign) bad.push('a defaulted Sunday does not read as settled without a sign');
+  if (d.cameIn.earned !== 20 || d.cameIn.home !== null || d.cameIn.bank !== 0) bad.push('defaulted came in ' + JSON.stringify(d.cameIn));
+  if (d.loanLeftAfter !== null) bad.push('defaulted loan left after ' + d.loanLeftAfter);
+  const dw = d.went.map(x => x.k + ':' + x.v).join(' ');
+  if (dw !== 'wall:8 saved:0 goal:0 cash:12') bad.push('defaulted went ' + dw);
+  if (!s.sdSundayRecord({ handEntered: true, sunday: { signed: {} } }).noSign) bad.push('a hand-entered Sunday reads as signed');
+  } catch (e) { bad.push('threw: ' + e.message); }
+  check('PR 5: sdSundayRecord reads one frozen Sunday — four came-in groups, taken off, where it went, loan left after, settled without a sign',
+    typeof s.sdSundayRecord !== 'function' ? 'sdSundayRecord is not exported' : (bad.length ? bad : true));
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach(f => console.log('  - ' + f)); process.exit(1); }

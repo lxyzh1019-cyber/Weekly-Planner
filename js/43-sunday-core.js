@@ -917,6 +917,40 @@ function sdHistGroups(r) {
            off: -off, total: sdR2(earned + given + (bank || 0) - off) };
 }
 
+/* 📒 One settled Sunday, read whole from its frozen ledger row (decision 16:
+   a tap on any Sunday row opens that Sunday's sheet). What came in is
+   `sdHistGroups` — the same four groups as All my Sundays — and the rest is
+   what the row kept: ➖ fines and ⏪ cash drawn early, 🧱 where it went, the
+   loan left after (`debtBalanceAfter`, null when the row never kept it), and
+   whether it was settled without a sign (a defaulted or hand-entered week, or
+   one with no Sunday sign on record). Pure: the sheet only draws it. */
+function sdSundayRecord(row) {
+  const r = row || {};
+  const n = v => sdR2(Number(v) || 0);
+  const g = sdHistGroups({ row: r, earned: n(r.net), given: n(r.deposits != null ? r.deposits : r.outside) });
+  const off = sdR2(-g.off);
+  const advance = Math.max(0, n(r.advance));
+  const fines = r.groups ? Math.max(0, sdR2(off - advance)) : Math.max(0, n(r.fines));
+  const L = r.loan || {};
+  const went = [
+    ['wall', '🧱 To my loan wall', sdR2(n(L.paid) + n(r.extra != null ? r.extra : r.debtExtra)), true],
+    ['saved', '🏦 Savings', n(r.ready), true],
+    ['goal', '🎯 Goal jars', n(r.goal), true],
+    ['gic', '🔒 Locked away', n(r.gic), false],
+    ['stock', '📈 Companies', n(r.stock), false],
+    ['cash', '💵 Cash out', n(r.cashOut != null ? r.cashOut : r.spend), true],
+  ].filter(x => x[3] || x[2] > 0).map(([k, label, v]) => ({ k, label, v }));
+  return {
+    weekKey: r.weekKey || null,
+    cameIn: { earned: g.earned, home: g.home, club: g.club, comp: g.comp, given: g.given, made: g.made || 0, bank: g.bank || 0 },
+    takenOff: { total: off, fines, advance },
+    went,
+    loanLeftAfter: r.debtBalanceAfter != null && isFinite(Number(r.debtBalanceAfter)) ? n(r.debtBalanceAfter) : null,
+    noSign: !!(r.defaulted || r.handEntered || !(r.sunday && r.sunday.signed)),
+    total: g.total,
+  };
+}
+
 /* "Loan per month" changed: each open row's monthly scaled toward `now`,
    the rounding residual on the last row, so the rows add up to `now` to the
    cent (Plan "Money fit and logic" L3). */
@@ -972,7 +1006,7 @@ if (typeof module !== 'undefined' && module.exports) {
     sdImpactWeek, sdImpactWeekly, sdImpact, sdWithAgreed, sdAgreeInto, sdSavingLine,
     sdOweOwnForecast, sdOweOwnSeries, sdThinLabels, SD_CHART_LABELS,
     sdSegHitsBox, sdGapLabelSpot, SD_REQUEST_TAGS, sdRequestTag, sdOff$, sdFineFloorNote,
-    sdLoanPlan, sdOweAfterPlan, sdHistGroups, sdRescaleMonthly, SD_COMMIT_MIN_STEADY, SD_COMMIT_MAX_SHARE,
+    sdLoanPlan, sdOweAfterPlan, sdHistGroups, sdSundayRecord, sdRescaleMonthly, SD_COMMIT_MIN_STEADY, SD_COMMIT_MAX_SHARE,
     sdCommitPlan,
   };
 }

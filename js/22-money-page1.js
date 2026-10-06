@@ -403,7 +403,7 @@ function mnyLoanWallCard(kid) {
     </button>`).join('');
   const n = f.rows.length, rest = Math.max(0, open.length - top.length);
   return `<div class="mv2-card mv2-wall">
-      <div class="mv2-cardhead"><span class="mv2-title">🧱 My loan wall</span><b class="mv2-left">${escapeHtml(mnyMoney(f.left))} left</b></div>
+      <div class="mv2-cardhead"><span class="mv2-title">🧱 My loan wall</span><b class="mv2-left mny-total mny-total--owe">${escapeHtml(mnyMoney(f.left))} left</b></div>
       <div class="mv2-bricks" role="img" aria-label="${escapeAttr(Math.round(pct) + '% of the loan paid back')}">${bricks}</div>
       <div class="mv2-sum">
         <div class="mv2-sumrow"><span>✅ paid <b>${escapeHtml(mnyMoney(f.paid))}</b> · ${Math.round(pct)}%</span><span>📅 <b>${escapeHtml(mnyMoney(f.weekly))}</b> a week</span></div>
@@ -453,7 +453,7 @@ function mnyTileHint(kid, t, jarTotal) {
 function mnyOwnCard(kid) {
   const p = mnyEverythingParts(kid);
   return `<div class="mv2-card mv2-have">
-      <div class="mv2-cardhead"><span class="mv2-title">✅ What I own</span><b class="mv2-total">${escapeHtml(mnyMoney(p.own))}${p.jarTotal > 0 ? ' with 🎯' : ''}</b></div>
+      <div class="mv2-cardhead"><span class="mv2-title">✅ What I own</span><b class="mv2-total mny-total mny-total--own">${escapeHtml(mnyMoney(p.own))}${p.jarTotal > 0 ? ' with 🎯' : ''}</b></div>
       ${p.tiles.map(t => `<div class="mv2-acct${t.open ? '' : ' shut'}" data-mny-tile="${t.k}">
           <span class="mv2-acct-name">${t.icon} ${escapeHtml(t.label)}</span><b class="mv2-tile-val">${escapeHtml(mnyMoney(t.value))}</b>
           <span class="mv2-acct-hint">${escapeHtml(t.hint)}</span>
@@ -605,12 +605,12 @@ function mnyPassbookCard(kid) {
     const tot = parts.reduce((a, x) => a + Math.max(0, x[1]), 0);
     return tot > 0 ? parts.filter(x => x[1] > 0).map(([cls, v]) => `<i class="${cls}" style="width:${(v / tot * 100).toFixed(1)}%"></i>`).join('') : '';
   };
-  const rows = p.last4.map((r, i) => `<div class="mv2-bookrow${i === 0 ? ' latest' : ''}" data-mny-week="${escapeAttr(r.weekKey)}">
+  const rows = p.last4.map((r, i) => `<button type="button" class="mv2-bookrow mv2-sunday-door${i === 0 ? ' latest' : ''}" data-mny-week="${escapeAttr(r.weekKey)}" ${mnySundayDoorAttrs(r.weekKey)}>
       <span class="mv2-bookdate">${escapeHtml(mnyDayMonth(r.sunday))}</span>
       <b class="mv2-bookin">${escapeHtml(mnyBook$(r.inAmt))}</b><span class="mv2-bookv">${escapeHtml(mnyBook$(r.wall))}</span><span class="mv2-bookv">${escapeHtml(mnyBook$(r.saved))}</span><span class="mv2-bookv">${escapeHtml(mnyBook$(r.cash))}</span>
       ${r.split ? `<span class="mv2-bookbar mv2-bookbar--in">${bar([['mv2-sw--earned', r.earned], ['mv2-sw--given', r.given], ['mv2-sw--made', r.made]])}</span>` : '<span></span>'}
       <span class="mv2-bookbar mv2-bookbar--out">${bar([['mv2-sw--wall', r.wall], ['mv2-sw--saved', r.saved], ['mv2-sw--cash', r.cash]])}</span>
-    </div>`).join('');
+    </button>`).join('');
   const t = p.total, n = p.last4.length;
   const pf = (i, v) => sdPercentLabel(p.shares[i], v);
   const note = `These ${n} Sunday${n === 1 ? '' : 's'}: I earned ${mnyBook$(t.inAmt)}, about ${mnyMoney(t.inAmt / n)} a week.${p.placed > 0 ? ` ${pf(0, t.wall)} to the wall · ${pf(1, t.saved)} saved · ${pf(2, t.cash)} cash.` : ''}`;
@@ -796,7 +796,7 @@ function mnyStickersCard(kid) {
    (`mnyIdeaBody`), and 📥 Waiting for Sunday's sheet says what that money is
    in the 'waiting' idea's own words.
    ════════════════════════════════════════════════════════════════ */
-const MNY_INFO_KINDS = ['week', 'loan', 'loans', 'waiting', 'goals', 'month', 'idea'];
+const MNY_INFO_KINDS = ['week', 'loan', 'loans', 'waiting', 'goals', 'month', 'idea', 'sunday'];
 function mnyOpenInfoSheet(kind, opts) {
   mnyOpenRequestSheet(kind, Object.assign({ kid: mnyViewKid() }, opts || {}));
 }
@@ -809,6 +809,7 @@ function mnyInfoSheetTitle(d) {
     const c = mnyConceptCard(d.id, d.kid);
     return c ? `${c.icon} ${c.title}` : '💡 An idea';
   }
+  if (d.kind === 'sunday') return d.id ? `📒 Sunday ${mnyDayMonth(sdSundayOf(d.id))} · Week of ${mrMoneyWeekLabel(d.id, d.kid)}` : '📒 A Sunday';
   return { week: '📊 This week so far', loans: '🧱 All my loans · side by side', waiting: '📥 Waiting for Sunday',
            goals: '🎯 My goals · pick one for the card', month: '🗓️ My month' }[d.kind] || '';
 }
@@ -895,15 +896,50 @@ function mnyInfoSheetBody(d) {
       + `<button type="button" class="mv2-btn" data-mny-action="goal-new">＋ New goal</button>`;
   }
   if (d.kind === 'month') return mnyCalendarBody(kid);
+  if (d.kind === 'sunday') return mnySundayBody(kid, d.id);
   return '';
+}
+
+/* 📒 One settled Sunday's sheet (decision 16): a tap on any passbook row or
+   All my Sundays row opens it. It draws `sdSundayRecord` (js/43), the one
+   reader of a frozen row — 💰 what came in in the four groups, ➖ what was
+   taken off (each fine with what the daily floor did to it, cash drawn
+   early), 🧱 where it went, the loan left after, and the note for a week
+   settled without a sign. Parents' full record stays `guWeekRecord` (js/46). */
+function mnySundayDoorAttrs(wk) {
+  return `data-mny-action="sunday-sheet" data-mny-id="${escapeAttr(wk)}" aria-label="${escapeAttr('Sunday ' + mnyDayMonth(sdSundayOf(wk)))}"`;
+}
+function mnySundayBody(kid, wk) {
+  const row = mnyLedgerRows(kid).find(r => r.weekKey === wk);
+  if (!row) return `<div class="mv2-line">That Sunday is not on record.</div>`;
+  const rec = sdSundayRecord(row), c = rec.cameIn, t = rec.takenOff;
+  const li = (l, v, cls) => `<div class="mv2-li${cls ? ' ' + cls : ''}"><span>${l}</span><b>${escapeHtml(v)}</b></div>`;
+  const head = (txt) => `<div class="mv2-title mv2-title--sm">${escapeHtml(txt)}</div>`;
+  const fineRows = mnyFineRows(kid, wk, true);
+  return `<div class="mv2-sunday-sheet">` + head('💰 Came in')
+    + li('💪 Money I earned', mnyMoney(c.earned), 'g')
+    + (c.home != null ? li('&nbsp;&nbsp;🏠 Home · chores and routine', mnyMoney(c.home)) + li('&nbsp;&nbsp;⛸️ Club job', mnyMoney(c.club)) + li('&nbsp;&nbsp;🏆 Competitions', mnyMoney(c.comp)) : '')
+    + li('🎁 Money I was given', mnyMoney(c.given), 'g')
+    + li('🌱 Money my money made', mnyMoney(c.made), 'g')
+    + li('📥 From my bank', mnyMoney(c.bank), 'g')
+    + head('➖ Taken off')
+    + li('➖ Taken off', sdOff$(t.total, mnyMoney), 'g')
+    + (fineRows || (t.fines > 0 ? li('&nbsp;&nbsp;📦 Fines', sdOff$(t.fines, mnyMoney)) : ''))
+    + (t.advance > 0 ? li('&nbsp;&nbsp;⏪ Drawn early', sdOff$(t.advance, mnyMoney)) : '')
+    + head('🧱 Where it went')
+    + rec.went.map(x => li(escapeHtml(x.label), mnyMoney(x.v))).join('')
+    + (rec.loanLeftAfter != null ? li('🧱 Loan left after', mnyMoney(rec.loanLeftAfter), 'g mv2-sunday-left') : '')
+    + (rec.noSign ? `<div class="mv2-line mv2-sunday-nosign">✍️ Settled without a sign — a parent entered this week, or the Grandfather rule paid it.</div>` : '')
+    + `</div>`;
 }
 
 /* 📦 Her fines this money week, one row each under ➖ Taken off, each with
    "This fine is wrong" (owner, 2026-10-05). The amount is what that fine
    costs in the week this sheet totals (`mrFinesWeek`), shown negative; a free one
    (logged, nothing taken off) says "free". A fine she already asked about
-   shows where the question stands instead of the button. */
-function mnyFineRows(kid, weekKey) {
+   shows where the question stands instead of the button. A settled Sunday's
+   sheet lists them read-only (`readOnly`). */
+function mnyFineRows(kid, weekKey, readOnly) {
   const keys = mrMoneyDayKeys(weekKey, kid);
   const fines = mrFines(kid).filter(f => f && keys.indexOf(f.dayKey) >= 0);
   const charged = (mrFinesWeek(weekKey, kid, null) || {}).chargeable || {};   // the same week as the ➖ total above
@@ -911,7 +947,7 @@ function mnyFineRows(kid, weekKey) {
     const cost = money2(charged[f.id] || 0);
     const floor = cost > 0 ? mnyFineFloorNote(kid, f, weekKey) : '';
     const q = mnyFineDispute(kid, f.id);
-    const right = q ? `<span class="mv2-finestate${q.open ? ' wait' : ''}">${escapeHtml(rqStatusText(q))}</span>`
+    const right = readOnly ? '' : q ? `<span class="mv2-finestate${q.open ? ' wait' : ''}">${escapeHtml(rqStatusText(q))}</span>`
       : `<button type="button" class="mv2-finebtn" data-mny-action="fine-dispute" data-mny-id="${escapeAttr(f.id)}">📦 This fine is wrong</button>`;
     return `<div class="mv2-li mv2-fine"><span>&nbsp;&nbsp;📦 ${escapeHtml(guFineLabel(f.itemId))} <span class="mv2-note">${escapeHtml(mnyDayName(f.dayKey))}</span></span>
         <b class="${cost > 0 ? 'mv2-late' : ''}">${escapeHtml(cost > 0 ? sdOff$(cost, mnyMoney) : 'free')}${floor ? `<span class="mv2-floor"> · ${escapeHtml(floor)}</span>` : ''}</b>${right}</div>`;
@@ -1021,13 +1057,13 @@ function mnySundaysPage(kid) {
     const note = r.defaulted
       ? (r.defaultReason === 'grandma' ? '👴 Grandfather rule: every week got the same amount.' : '🕰️ Nobody sat down for this week, so it got a flat amount.')
       : (r.weeksLate ? `🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after it finished.` : '');
-    return `<div class="mv2-hist-row" data-mny-week="${escapeAttr(r.weekKey)}">
+    return `<button type="button" class="mv2-hist-row mv2-sunday-door" data-mny-week="${escapeAttr(r.weekKey)}" ${mnySundayDoorAttrs(r.weekKey)}>
         <span class="mv2-hist-week">Week of ${escapeHtml(mrMoneyWeekLabel(r.weekKey, kid))}</span>
         <b class="mv2-hist-amt">${escapeHtml(mnyMoney(g.total))}</b>
         <span class="mv2-histbar" role="img" aria-label="${escapeAttr(words)}">${earnedSegs}${seg('mv2-sw--given', g.given, '🎁 given')}${seg('mv2-sw--made', g.made || 0, '🌱 made')}</span>
         <span class="mv2-hist-words"><span>${escapeHtml(earnedLine)}</span><span>${escapeHtml(restLine)}</span></span>
         ${note ? `<span class="mv2-note mv2-hist-note">${escapeHtml(note)}</span>` : ''}
-      </div>`;
+      </button>`;
   }).join('');
 
   /* The summary on top of the one card, as drawn: what came in across the
@@ -1120,6 +1156,8 @@ function mnyHandleClick(ev) {
   if (a === 'info-waiting') { mnyOpenInfoSheet('waiting'); return; }
   if (a === 'info-goals')   { mnyOpenInfoSheet('goals'); return; }
   if (a === 'info-month')   { mnyOpenInfoSheet('month'); return; }
+  // 📒 A Sunday row (passbook or All my Sundays) opens that Sunday's sheet (decision 16).
+  if (a === 'sunday-sheet') { mnyOpenInfoSheet('sunday', { id: el.getAttribute('data-mny-id') }); return; }
   // ⋯ "Show on card": which goal the card shows, on this device (Plan v17 §1).
   if (a === 'goal-show') {
     mnySetGoalCardId(mnyViewKid(), el.getAttribute('data-mny-goal'));

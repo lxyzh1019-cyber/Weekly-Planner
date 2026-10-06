@@ -7940,7 +7940,7 @@
   --mny-v15-sub: #6b5d4f;
   --mny-v15-muted: #5a4d41;
   --mny-v15-shadow: rgba(42, 35, 32, 0.15);
-  --mny-v15-scrim: rgba(42, 35, 32, 0.38);
+  --mny-v15-scrim: rgba(42, 35, 32, 0.62);   /* PR 5: dark enough that the page's numbers do not read beside a sheet */
 }
 :root[data-look="calm"] {
   --mny-v15-paper-fade: rgba(255, 255, 255, 0);
@@ -7952,7 +7952,7 @@
   --mny-v15-sub: var(--ink-light);
   --mny-v15-muted: var(--ink-light);
   --mny-v15-shadow: rgba(28, 34, 64, 0.15);
-  --mny-v15-scrim: rgba(28, 34, 64, 0.38);
+  --mny-v15-scrim: rgba(28, 34, 64, 0.62);
 }
 
 /* ── 👨‍👩‍👧 Grown-ups (js/46-grownups.js) ── */
@@ -7992,11 +7992,10 @@
 .gu-kidchip { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-bar); padding: 0 8px; }
 .gu-kidchip--jenn { background: var(--mny-v15-jenn); }
 .gu-kidchip--jess { background: var(--mny-v15-jess); }
-.gu-step, .gu-x {
+.gu-x {
   width: 44px; height: 44px; flex: none; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1));
+  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1));
 }
-.gu-x { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-num { min-width: 42px; text-align: center; font-family: var(--font-round); font-variant-numeric: var(--num-variant); }
 .gu-pair { display: flex; align-items: center; gap: 3px; }
 /* Was an ellipsis; a name on the money screens is never cut with "…" (owner's review, Plan v6 §M) — it wraps. */
@@ -8081,7 +8080,6 @@
 /* A day still to come (📦 Fines › Day, Plan v5 Deviation 23): dashed and not
    tappable; the ink stays full so the label still reads. */
 .gu-opt:disabled { border-style: dashed; cursor: not-allowed; }
-.gu-optval { display: inline-flex; align-items: center; justify-content: center; background: var(--mny-v15-amber); cursor: default; }
 .gu-afford { gap: 4px; padding: 10px 14px; }
 .gu-afford--ok { background: var(--mny-v15-green); }
 .gu-afford--warn { background: var(--mny-v15-warn); }
@@ -8309,7 +8307,6 @@ button.gu-loanrow {
 }
 .rq-opt.on { background: var(--sel-opt); color: var(--sel-opt-ink); }
 .rq-opt.off { border-style: dashed; opacity: 0.5; }
-.rq-val { display: inline-flex; align-items: center; justify-content: center; background: var(--mny-v15-amber); cursor: default; }
 .rq-race {
   display: grid; grid-template-columns: 30px minmax(0, 1fr) 124px auto 44px; gap: 8px; align-items: center;
   border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); background: var(--mny-v15-sky); padding: 6px 8px;
@@ -8549,7 +8546,7 @@ button.gu-loanrow {
 .mv2-acct.shut { border-style: dashed; background: transparent; color: var(--mny-v15-muted); }
 .mv2-acct.shut .mv2-acct-hint { color: var(--mny-v15-muted); }
 .mv2-acct-name { white-space: nowrap; }
-.mv2-tile-val { margin-left: auto; font-weight: 700; font-size: calc(1.125rem * var(--text-scale, 1)); white-space: nowrap; font-variant-numeric: var(--num-variant); }
+.mv2-tile-val { margin-left: auto; text-align: right; font-weight: 700; font-size: calc(1.125rem * var(--text-scale, 1)); white-space: nowrap; font-variant-numeric: var(--num-variant); }
 .mv2-acct-hint { width: 100%; font-size: calc(0.875rem * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); line-height: 1.25; }
 .mv2-waiting { display: flex; }
 
@@ -8605,6 +8602,16 @@ button.gu-loanrow {
 .mv2-bookrow.latest .mv2-bookdate { color: var(--mny-v15-red); }
 b.mv2-bookin { color: var(--mny-v15-teal-ink); white-space: nowrap; }
 .mv2-bookv { white-space: nowrap; font-weight: 700; }
+/* PR 5 (Stage C b): every money column right-aligned (BUILD-SPEC §0: Patrick Hand has no tabular figures). */
+.mv2-bookin, .mv2-bookv, .mv2-bookhead > span:not(:first-child) { text-align: right; }
+/* 📒 Each Sunday row is a door to that Sunday's sheet (decision 16): a
+   44px button that keeps the row's own look. */
+button.mv2-sunday-door {
+  width: 100%; min-height: 44px; margin: 0; color: inherit; background: transparent; font-family: inherit; font-weight: inherit;
+  line-height: inherit; cursor: pointer; border-left: 0; border-right: 0;
+}
+button.mv2-bookrow { border-top: 0; }
+button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 /* Rule C (Plan v18): fewer Sundays in the same 426px read larger. */
 .mv2-booktable--n1 .mv2-bookrow:not(.mv2-bookhead), .mv2-booktable--n2 .mv2-bookrow:not(.mv2-bookhead) { font-size: calc(1.1875rem * var(--text-scale, 1)); }
 .mv2-booktable--n3 .mv2-bookrow:not(.mv2-bookhead) { font-size: calc(1.0625rem * var(--text-scale, 1)); }
@@ -8831,6 +8838,7 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); white-space: nowrap; }
   --sd-jenn: #ffe9ef;
   --sd-jess: #e3f0fe;
   --sd-own: #2f7f62;
+  --sd-own-ink: #256a51;   /* PR 5: --sd-own as text — 5.8:1 on the sky What I own card, where #2f7f62 is 4.4:1 */
 }
 
 .sd { font-family: var(--font-body); color: var(--mny-v15-ink); font-size: calc(1rem * var(--text-scale, 1)); position: relative; }
@@ -8901,6 +8909,15 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); white-space: nowrap; }
 .sd-teal { color: var(--mny-v15-teal-ink); }
 .sd-green { color: var(--mny-v15-teal-ink); }
 .sd-violet { color: var(--sd-purple); }
+/* Money fit and logic PR 5 (Stage C a): an amount in a title row — My money's
+   loan wall and What I own, Payday's pile, I choose's What I owe / What I own —
+   is one family: the title font (Gochi in Pop, Baloo in Calm) coloured by what
+   it means: owe purple, own green, pile the money accent. Money in stays teal
+   (in = teal: the passbook's 💰 in column, Payday, the cash flow). */
+.mny-total { font-family: var(--font-head); font-weight: 400; white-space: nowrap; }
+.mny-total--owe { color: var(--sd-purple); }
+.mny-total--own { color: var(--sd-own-ink); }
+.mny-total--pile { color: var(--mny-v15-red); }
 /* Names on the money screens are never cut with "…" (owner's review). */
 .sd-nowrap { white-space: nowrap; }
 .sd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -8908,9 +8925,20 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); white-space: nowrap; }
 .sd-row .sd-go { margin-left: auto; }
 .sd-pill { font-weight: 700; font-size: calc(0.9375rem * var(--text-scale, 1)); border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-bar); padding: 0 7px; background: var(--mny-v15-paper); white-space: nowrap; }
 .sd-tag { font-style: normal; color: var(--mny-v15-teal-ink); }
-.sd-step {
-  width: 44px; height: 44px; flex: none; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0; cursor: pointer; box-shadow: var(--mny-shadow-btn);
+/* Money fit and logic PR 5 (Stage C c): ONE stepper look — Sunday's .sd-step,
+   Grown-ups' .gu-step and the − / + of the request sheets and Grown-ups' forms
+   (.mny-step, set by rqOpt / guOpt on a − or +): a 44px round button, ink
+   border and button shadow. The value between them is plain text
+   (.mny-stepval), never a button. */
+.sd-step, .gu-step, .rq-opt.mny-step, .gu-opt.mny-step, .rq-race .rq-opt.mny-step {
+  width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: none; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-full); padding: 0; cursor: pointer; box-shadow: var(--mny-shadow-btn);
   background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1.25rem * var(--text-scale, 1));
+}
+.gu-step, .gu-opt.mny-step { font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+.rq-opt.mny-step.off, .gu-opt.mny-step:disabled { border-style: dashed; }
+.mny-stepval {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 48px; padding: 0 4px;
+  font-weight: 700; font-variant-numeric: var(--num-variant); white-space: nowrap;
 }
 .sd-step--gold { background: var(--mny-v15-gold); }
 .sd-step--peach { background: var(--sd-fill-adv); }
@@ -9662,4 +9690,11 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); white-space: nowrap; }
 .ct-money-card { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; padding: 14px 16px 6px; }
 .ct-money-card .mv2-door { font-family: var(--font-head); font-size: calc(1.375rem * var(--text-scale, 1)); }
 .ct-money-sub { font-size: calc(0.9375rem * var(--text-scale, 1)); color: var(--mny-v15-muted); }
+/* Money fit and logic PR 5 (Stage C e): tap buttons inside the markers wear the
+   tap-button box — thick border and the button shadow (BUILD-SPEC §0, "Tap
+   buttons: thick border and shadow"). Information boxes, doors and list rows
+   (.gu-loanrow, .mv2-idea-row, .mv2-door, the Sunday rows) and the dashed
+   "add / not yet" buttons keep their thin edge or none. */
+.gu-tab, .gu-btn, .gu-save, .gu-yes, .gu-talk, .gu-no, .gu-undo, .gu-toggle, .gu-opt, .gu-x,
+.rq-meet, .rq-opt, .rq-notnow, .mv2-idea-tab, .sd-off { border-width: var(--bw-btn); box-shadow: var(--mny-shadow-btn); }
 /* money-tokens:end */

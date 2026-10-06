@@ -7307,7 +7307,9 @@ function findChromium() {
   /* ── THE FLOW SAYS WHERE IT WENT ──────────────────────────────────
      Stage 1 stored movements instead of balances FOR THIS SCREEN, and until
      now nothing read them: `evFlow`, `evMonths` and `evTypicalMonth` were
-     unit-tested and had no caller. A calculation with no reader is a
+     unit-tested and had no caller. (Money fit and logic PR 5 removed the
+     `evMonths` / `evTypicalMonth` wrappers; the pure `evMonthsOf` /
+     `evTypicalMonthOf` stay, unit-tested.) A calculation with no reader is a
      calculation nobody finds out is wrong.
 
      The owner's instruction is the thing to hold here: *I do not want the kids
@@ -23994,7 +23996,7 @@ function findChromium() {
         const jcard = [...wrap.querySelectorAll('.gu-tint--jess')][0];
         if (!jcard || !/1\. 🏊 Swim club fees/.test(jcard.textContent) || !/\$360\.00 of \$500\.00/.test(jcard.textContent)) bad.push('her wall card does not list the row with what is left: ' + (jcard && jcard.textContent));
         guPress('[data-mnyp-action="gucmkid"][data-mnyp-id="jess"]');
-        guPress('[data-mnyp-action="gucmshareset"][data-mnyp-id="50"]');
+        guCommit().share = 50;   // her share is the − 50% + stepper alone now (Money fit and logic PR 5)
         guPress('[data-mnyp-action="gucmweeksset"][data-mnyp-id="26"]');
         const input = wrap.querySelector('[data-mnyp-action="gucmwhat"]');
         input.value = 'Winter Invitational entry';
@@ -25471,7 +25473,7 @@ function findChromium() {
         Object.keys(L).forEach(wk => { if (L[wk]) delete L[wk][kid]; });   // no steady money on record
         const wrap = guOpen('commit');
         guPress('[data-mnyp-action="gucmkid"][data-mnyp-id="jess"]');
-        guPress('[data-mnyp-action="gucmshareset"][data-mnyp-id="50"]');
+        guCommit().share = 50;   // her share is the − 50% + stepper alone now (Money fit and logic PR 5)
         guPress('[data-mnyp-action="gucmweeksset"][data-mnyp-id="26"]');
         const input = wrap.querySelector('[data-mnyp-action="gucmwhat"]');
         input.value = 'Spring camp'; input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -25936,6 +25938,89 @@ function findChromium() {
       return bad.length ? bad : true;
     });
     await guTeardown();
+  }
+
+  /* ── 📒 A Sunday row opens its sheet (decision 16, Money fit and logic PR 5) ──
+     Before PR 5 the passbook rows and All my Sundays rows were plain rows: a
+     Sunday's own numbers (where each dollar went, what was taken off, the loan
+     left after) were nowhere a kid could open. Asserted, in both looks at 390
+     and 1194: every passbook row and every All my Sundays row is a 44px door
+     named "Sunday d Mon"; a tap opens one info sheet titled "📒 Sunday d Mon ·
+     Week of …" with the four came-in groups, ➖ Taken off, 🧱 Where it went and
+     the loan left after; a row with no sign says so; nothing in the sheet is
+     cut or spills; ✕ closes it; and the scrim behind is dark enough (≥ 0.6)
+     that the page's numbers do not read through. */
+  if (want('aSundayRowOpensItsSheet')) {
+    const out = [];
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      for (const w of [390, 1194]) {
+        await page.setViewportSize({ width: w, height: w === 390 ? 844 : 834 });
+        await page.waitForTimeout(100);
+        const r = await page.evaluate((tag) => {
+          const bad = [];
+          const kid = 'jenn';
+          const shown = el => !!el && el.getClientRects().length > 0;
+          try {
+            const seeded = mv2Seed(kid); if (seeded) bad.push(seeded);
+            profile = kid; mnySundaysMode = 'week'; mnySundaysMonth = null;
+            const newest = mnyLedgerRows(kid)[0];
+            state.shared.chore.moneyLedger[newest.weekKey][kid].debtBalanceAfter = 612.34;
+            const ov = document.getElementById('requestOverlay');
+            const opens = (row, where) => {
+              const wk = row.getAttribute('data-mny-id');
+              if (row.getAttribute('data-mny-action') !== 'sunday-sheet' || !wk) { bad.push(where + ' row is not a Sunday door'); return; }
+              const want = 'Sunday ' + mnyDayMonth(sdSundayOf(wk));
+              if (row.getAttribute('aria-label') !== want) bad.push(where + ' row is named "' + row.getAttribute('aria-label') + '", not "' + want + '"');
+              const b = row.getBoundingClientRect();
+              if (b.height < 44 - 0.5 || b.width < 44) bad.push(where + ' row is ' + Math.round(b.width) + '×' + Math.round(b.height) + ', under 44px');
+              row.click();
+              if (!ov.classList.contains('open')) { bad.push(where + ': the tap opened nothing'); return; }
+              const title = (document.getElementById('rqSheetTitle') || {}).textContent || '';
+              const wantTitle = '📒 ' + want + ' · Week of ' + mrMoneyWeekLabel(wk, kid);
+              if (title.trim() !== wantTitle) bad.push(where + ': the sheet is titled "' + title.trim() + '", not "' + wantTitle + '"');
+              const body = document.getElementById('requestBody');
+              const txt = body.textContent.replace(/\s+/g, ' ');
+              ['💰 Came in', '💪 Money I earned', '🎁 Money I was given', '🌱 Money my money made', '📥 From my bank', '➖ Taken off', '🧱 Where it went', '🧱 To my loan wall', '💵 Cash out']
+                .forEach(t => { if (txt.indexOf(t) < 0) bad.push(where + ': the sheet has no ' + t); });
+              if (wk === newest.weekKey && txt.indexOf('Loan left after' + ' ' + mnyMoney(612.34)) < 0 && txt.indexOf('Loan left after' + mnyMoney(612.34)) < 0) bad.push(where + ': no "Loan left after ' + mnyMoney(612.34) + '": ' + txt.slice(0, 200));
+              if (!/Settled without a sign/.test(txt)) bad.push(where + ': a seeded row with no sign does not say "Settled without a sign"');
+              const sheet = ov.querySelector('.sheet').getBoundingClientRect();
+              body.querySelectorAll('*').forEach(el => {
+                if (!shown(el) || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
+                const a = el.getBoundingClientRect();
+                if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== 'visible') bad.push(where + ': cut "' + el.textContent.trim().slice(0, 24) + '"');
+                if (a.right > sheet.right + 1 || a.left < sheet.left - 1) bad.push(where + ': "' + el.textContent.trim().slice(0, 24) + '" spills out of the sheet');
+              });
+              const alpha = Number((getComputedStyle(ov).backgroundColor.match(/rgba?\(([^)]+)\)/) || [])[1].split(',')[3] || 1);
+              if (!(alpha >= 0.6)) bad.push(where + ': the scrim behind the sheet is ' + alpha + ' — the page reads through it');
+              const x = body.querySelector('[data-mny-action="rq-close"]');
+              if (!x) bad.push(where + ': the sheet has no ✕');
+              else { x.click(); if (ov.classList.contains('open')) bad.push(where + ': ✕ did not close the sheet'); }
+            };
+            mnyOpenMyMoney(kid);
+            const book = [...document.querySelectorAll('#mnyPage1Wrap .mv2-book .mv2-bookrow:not(.mv2-bookhead):not(.mv2-booktotal)')];
+            if (book.length !== Math.min(4, mnyLedgerRows(kid).length)) bad.push('the passbook shows ' + book.length + ' Sunday rows');
+            if (document.querySelector('#mnyPage1Wrap .mv2-booktotal[data-mny-action]')) bad.push('the passbook total row is a door; it stays plain');
+            if (book[0]) opens(book[0], 'passbook');
+            mnyOpenSundays();
+            const hist = [...document.querySelectorAll('#mnyStoryWrap .mv2-hist-row')];
+            if (!hist.length) bad.push('All my Sundays shows no rows');
+            hist.forEach(h => { if (h.getAttribute('data-mny-action') !== 'sunday-sheet') bad.push('an All my Sundays row is not a door'); });
+            if (hist[1]) opens(hist[1], 'All my Sundays');
+            if (hist[0]) opens(hist[0], 'All my Sundays (newest)');
+          } catch (e) { bad.push('threw: ' + e.message); }
+          finally { if (typeof rqDraft !== 'undefined' && rqDraft) rqClose(); goToday(); }
+          return bad.map(b => '[' + tag + '] ' + b);
+        }, look + ' ' + w);
+        out.push(...r);
+      }
+    }
+    await clearLooks();
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await guTeardown();
+    checks.aSundayRowOpensItsSheet = out.length ? out : true;
   }
 
   /* The shares of what she placed add to exactly 100 (largest remainder), and

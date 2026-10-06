@@ -644,11 +644,14 @@ function rqClose() { rqDraft = null; closeSheet('requestOverlay'); }
 
 /* ── One option button: the prototype's opt(label, on, pick, disabled). A
    disabled option is still pressable and says why (data-mny-why), because a
-   greyed control with no reason is one a child works around. */
+   greyed control with no reason is one a child works around. A − or + is a
+   stepper button (`.mny-step`, one look with the Sunday and Grown-ups
+   steppers, Money fit and logic PR 5). */
 function rqOpt(label, on, action, attrs, why) {
-  return `<button type="button" class="rq-opt${on ? ' on' : ''}${why ? ' off' : ''}" data-mny-action="${action}"${attrs || ''}${why ? ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"` : ''}>${escapeHtml(label)}</button>`;
+  return `<button type="button" class="rq-opt${label === '−' || label === '+' ? ' mny-step' : ''}${on ? ' on' : ''}${why ? ' off' : ''}" data-mny-action="${action}"${attrs || ''}${why ? ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"` : ''}>${escapeHtml(label)}</button>`;
 }
-function rqVal(label) { return `<span class="rq-opt rq-val">${escapeHtml(label)}</span>`; }
+// The value between a stepper's − and +: plain text, not a button (PR 5).
+function rqVal(label) { return `<span class="mny-stepval">${escapeHtml(label)}</span>`; }
 function rqRow(q, optsHtml) {
   return `<div class="rq-row"><div class="rq-q">${escapeHtml(q)}</div><div class="rq-opts">${optsHtml}</div></div>`;
 }
@@ -788,7 +791,7 @@ function rqResultBody(kid, d) {
         <select class="rq-select" data-mny-action="rq-ev" data-mny-i="${i}" aria-label="Race ${i + 1}">${RQ_SWIM_EVENTS.map(e =>
           `<option value="${escapeAttr(e)}"${e === r.ev ? ' selected' : ''}>${escapeHtml(e)}</option>`).join('')}</select>
         <input class="rq-input rq-time" type="text" value="${escapeAttr(r.time || '')}" placeholder="time 0:41.2" data-mny-action="rq-time" data-mny-i="${i}" aria-label="Race ${i + 1} time">
-        <span class="rq-step">${rqOpt('−', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="-1" aria-label="Fewer points"`)}<b class="rq-num">${Number(r.pts) || 0} pts</b>${rqOpt('+', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="1" aria-label="More points"`)}</span>
+        <span class="rq-step">${rqOpt('−', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="-1" aria-label="Fewer points"`)}<b class="rq-num mny-stepval">${Number(r.pts) || 0} pts</b>${rqOpt('+', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="1" aria-label="More points"`)}</span>
         ${rqOpt('✕', false, 'rq-racedel', ` data-mny-i="${i}" aria-label="Take this race off"`, races.length > 1 ? '' : 'One race stays — change it instead.')}
       </div>`).join('')}
       ${races.length < 4 ? `<button type="button" class="rq-custom" data-mny-action="rq-raceadd">➕ Add a race (${4 - races.length} left)</button>` : ''}

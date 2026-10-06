@@ -1852,7 +1852,7 @@ const MNY_TOURS = {
         return 'One hundred bricks. Each one you fill is a bit more paid back. The big numbers say how much is left and when it is paid off; **the loans door** ('
           + n + ' loan' + (n === 1 ? '' : 's') + ' · Details ▸) shows each one.'; } },
     { icon: '📒', title: 'Your last four Sundays', where: 'Passbook',
-      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: **to the wall, Savings or cash out**. 📖 opens your whole money story, Sunday by Sunday, and 📊 By month shows it month by month.' },
+      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: **to the wall, Savings or cash out**. 📖 opens your whole money story, Sunday by Sunday, and 📊 By month shows it month by month. Tap a Sunday for its numbers.' },
   ],
   parent: [
     { icon: '⚙️', title: 'The only page that changes a number', where: 'The whole screen',
