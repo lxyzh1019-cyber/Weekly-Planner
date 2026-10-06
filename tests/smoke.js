@@ -21719,6 +21719,16 @@ function findChromium() {
       said.forEach(([where, t]) => { if (/Grandma rule|👵/.test(t)) bad.push(where + ' still says "Grandma rule"'); });
       mnyParentSection = 'rules'; mnyRenderRulesTab();
       if (!/👴 Grandfather rule/.test(document.getElementById('mnyRulesWrap').textContent)) bad.push('⚙️ Rules has no 👴 Grandfather rule card');
+      // Money fit and logic PR 3 (B5): one ⚙️ Rules render builds its groups
+      // (guRuleSections — every rule card, the log, the one-time settings) once,
+      // and hands them to the index and the main column.
+      {
+        const real = guRuleSections;
+        let builds = 0;
+        guRuleSections = function () { builds++; return real.apply(this, arguments); };
+        try { mnyRenderRulesTab(); } finally { guRuleSections = real; }
+        if (builds !== 1) bad.push(`⚙️ Rules built its groups ${builds} times in one render (want 1)`);
+      }
       if (!/Grandfather rule/.test(mnyDefaultedRowRefusal({ defaultReason: 'grandma' }))) bad.push('the refusal does not name the Grandfather rule');
       profile = 'jenn'; mnyOpenStory();
       const story = document.getElementById('mnyStoryWrap').textContent;

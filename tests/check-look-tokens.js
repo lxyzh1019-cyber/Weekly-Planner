@@ -7,7 +7,7 @@
 // look when the family switches to the other — nobody sees it until a child does. So a
 // typed colour or font anywhere outside the shared value set fails the build.
 //
-// Four rules:
+// Five rules:
 //
 // 1. css/app.css. Comments are stripped first. Outside a TOKEN BLOCK no
 //    declaration may carry a colour literal — hex, rgb()/rgba(), hsl()/hsla(),
@@ -66,6 +66,21 @@
 //    (L12), so its own sizes stay as typed and carry `/* look: <reason> */` on
 //    the same line — in css/app.css too, where that mark is read for this rule
 //    only. In js/html, (b) and EXEMPT work as in rule 2.
+//
+// 5. Money sizes (Money fit and logic PR 3; the plan called it "rule 6" — there
+//    is no other rule 5). css/app.css between the marker comments
+//    `/* money-tokens:start … */` and `/* money-tokens:end */`: every
+//    `border-radius` (and its corner longhands), `box-shadow`, `border`,
+//    `border-width` and `border-top/right/bottom/left(-width)` value carries its
+//    size only as `var(--…)` tokens — `var(--bw-card) solid var(--x)` passes,
+//    `2.5px solid var(--x)` fails, and so does a size in a var() fallback or a
+//    calc(). A bare `0`, `none`, `transparent`, `currentColor` and `inherit`
+//    pass. An `inset …` shadow and a comma list (the glow animations) pass only
+//    by a named SIZE_EXEMPT entry {selector, prop, why}, keyed by the rule's
+//    full selector path (an at-rule prelude, then the selector); a stale entry
+//    fails. Token blocks' own --custom-properties are where the sizes live and
+//    are not checked. Both markers must be there exactly once, start first —
+//    a missing marker fails, so the rule cannot switch itself off.
 //
 // What it knowingly does NOT catch:
 //   - Named colours in js/ and index.html (`color:white` in a template string).
@@ -128,6 +143,21 @@ const JS_FONT_SIZE = /font-size\s*:\s*([^;"'`\n]*)/gi;
 const JS_FONT_SIZE_DOM = /fontSize\s*(?:=(?!=)|:)\s*([^;\n]*)/g;
 const ABS_SIZE_DOM = /(?:[\d}]|['"`])\s*(?:px|rem|pt|pc|cm|mm)\b/i;
 
+/* Rule 5: money-span size values that cannot be one token each, BY NAME.
+   `selector` is the full selector path (at-rule preludes and the selector,
+   joined by a space, whitespace collapsed). A stale entry fails. */
+const SIZE_EXEMPT = [
+  { selector: '.sd-coin i', prop: 'box-shadow',
+    why: 'the coin face: an inset shine ring plus its drop shadow, drawn as one coin, not a card or button shadow' },
+  { selector: '@keyframes sdGlow 0%, 100%', prop: 'box-shadow',
+    why: 'the bonus glow animation (sdGlow): three stacked glows that pulse, not a resting size' },
+  { selector: '@keyframes sdGlow 50%', prop: 'box-shadow',
+    why: 'the bonus glow animation (sdGlow) at its peak' },
+];
+const SIZE_PROP = /^(?:border(?:-(?:top|right|bottom|left))?(?:-width)?|border-radius|border-(?:top|bottom)-(?:left|right)-radius|box-shadow)$/;
+const MONEY_START = /\/\*\s*money-tokens:start\b/g;
+const MONEY_END = /\/\*\s*money-tokens:end\b/g;
+
 const problems = [];
 const lineOf = (src, offset) => { let n = 1; for (let i = 0; i < offset; i++) if (src.charCodeAt(i) === 10) n++; return n; };
 const blank = (s) => s.replace(/[^\n]/g, ' ');
@@ -157,6 +187,27 @@ for (const m of cssSrc.matchAll(/\/\*([\s\S]*?)\*\//g)) {
   const line = lineOf(cssSrc, m.index);
   if (readMark(CSS_FILE, line, m[1])) cssMarks.add(line);
 }
+// Rule 5: the money span, read from the source before comments are blanked.
+const startMarks = [...cssSrc.matchAll(MONEY_START)].map(m => m.index);
+const endMarks = [...cssSrc.matchAll(MONEY_END)].map(m => m.index);
+let moneySpan = null;
+if (startMarks.length !== 1 || endMarks.length !== 1 || endMarks[0] < startMarks[0]) {
+  problems.push({ where: CSS_FILE, rule: 'money markers',
+    detail: `found ${startMarks.length} money-tokens:start and ${endMarks.length} money-tokens:end marker(s)${startMarks.length === 1 && endMarks.length === 1 ? ', end before start' : ''}`,
+    fix: 'keep exactly one /* money-tokens:start … */ before the money sections and one /* money-tokens:end */ after them' });
+} else moneySpan = { start: startMarks[0], end: endMarks[0] };
+const sizeExemptHits = new Map(SIZE_EXEMPT.map(x => [x, 0]));
+let moneySizeDecls = 0;
+// A size typed in the value: what is left after the var(--…) tokens and bare 0s
+// still has a digit, or the value is an inset / comma list (exempt by name only).
+function moneySizeProblem(value) {
+  let v = value.replace(/!important/i, '');
+  let prev;
+  do { prev = v; v = v.replace(/var\(--[\w-]+\)/g, ' '); } while (v !== prev);
+  if (/\binset\b/i.test(v) || v.includes(',')) return 'an inset or comma-list value';
+  v = v.replace(/(^|[\s(])0(?=$|[\s)])/g, '$1');
+  return /\d/.test(v) ? 'a typed size' : '';
+}
 let unscaledKept = 0;
 // Strip comments, keeping every newline so offsets map to lines.
 const css = cssSrc.replace(/\/\*[\s\S]*?\*\//g, blank);
@@ -185,6 +236,16 @@ let cssDecls = 0, tokenBlocks = 0;
     if (inToken && prop.startsWith('--')) return;              // the shared value set itself
     const where = `${CSS_FILE}:${lineOf(css, at)}`;
     const ctx = `${selector.replace(/\s+/g, ' ').slice(0, 60)} { ${prop}: ${value.replace(/\s+/g, ' ').slice(0, 70)} }`;
+    // Rule 5: inside the money markers a size is a token.
+    if (moneySpan && at > moneySpan.start && at < moneySpan.end && SIZE_PROP.test(prop)) {
+      moneySizeDecls++;
+      const fullSel = stack.join(' ').replace(/\s+/g, ' ');
+      const ex = SIZE_EXEMPT.find(x => x.selector === fullSel && x.prop === prop);
+      const bad = moneySizeProblem(value);
+      if (ex) sizeExemptHits.set(ex, sizeExemptHits.get(ex) + 1);
+      else if (bad) problems.push({ where, rule: 'money size', detail: `${bad} in ${ctx}`,
+        fix: 'write the size as a token: var(--radius-md|btn|bar|xs|full), var(--bw-hair|info|chip|card|btn|rule), var(--mny-shadow-card|btn); an inset or glow goes in SIZE_EXEMPT by name' });
+    }
     for (const lit of literalsInCssValue(value)) {
       problems.push({ where, rule: 'css colour', detail: `${lit} in ${ctx}`,
         fix: inToken ? 'only --custom-properties may hold a value in a token block; read it with var(--…)'
@@ -380,6 +441,11 @@ for (const name of fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith(
   scanLines(HTML_FILE, src.split('\n'), text.split('\n'), marks, new Set());
 }
 
+for (const [x, hits] of sizeExemptHits) {
+  if (!hits) problems.push({ where: `tests/check-look-tokens.js SIZE_EXEMPT`, rule: 'stale exemption',
+    detail: `"${x.selector}" { ${x.prop} } is no longer inside the money markers`,
+    fix: 'delete the entry from SIZE_EXEMPT — an exemption that outlives its reason is a hole' });
+}
 for (const [x, hits] of exemptHits) {
   if (!hits) problems.push({ where: `tests/check-look-tokens.js EXEMPT`, rule: 'stale exemption',
     detail: `${x.file} "${x.match}" no longer matches a line with a colour or font literal`,
@@ -406,7 +472,8 @@ if (!problems.length) {
   console.log(`OK  ${cssDecls} css declarations checked, colours and fonts only in ${tokenBlocks} token block(s); `
     + `${scannedFiles} js/html file(s) clean — ${allowedLiterals} literal(s) kept by ${marksUsed} look: mark(s) `
     + `(${tablesCovered} table(s)) and ${EXEMPT.length} exemption(s); every absolute font size multiplies --text-scale `
-    + `(${unscaledKept} print-only size(s) kept by look: marks); ${looksNote}`);
+    + `(${unscaledKept} print-only size(s) kept by look: marks); ${looksNote}; `
+    + `${moneySizeDecls} money size value(s) between the markers are tokens (${SIZE_EXEMPT.length} named exemption(s))`);
   process.exit(0);
 }
 console.error(`FAIL  ${problems.length} typed colour/font/size problem(s):\n`);

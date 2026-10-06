@@ -230,7 +230,9 @@ function guRender(tab) {
   }[tab] || [guCommitMain, guCommitSide];
   if (tab === 'weeks') return `${guTabBar()}<div class="gu-weeks2">${guWeeksMain()}</div>`;
   if (tab === 'rules') {
-    return `${guTabBar()}<div class="gu-grid gu-grid--rules"><nav class="gu-ruleindex" aria-label="Rule groups">${guRuleIndex()}</nav><div class="gu-main">${parts[0]()}</div><div class="gu-side">${parts[1]()}</div><div class="gu-savestrip">${guSaveStrip()}</div></div>`;
+    // Built once per render and handed to both columns (Money fit and logic PR 3, B5).
+    const secs = guRuleSections();
+    return `${guTabBar()}<div class="gu-grid gu-grid--rules"><nav class="gu-ruleindex" aria-label="Rule groups">${guRuleIndex(secs)}</nav><div class="gu-main">${guRulesMain(secs)}</div><div class="gu-side">${parts[1]()}</div><div class="gu-savestrip">${guSaveStrip()}</div></div>`;
   }
   return `${guTabBar()}<div class="gu-grid gu-grid--${tab}"><div class="gu-main">${parts[0]()}</div><div class="gu-side">${parts[1]()}</div></div>`;
 }
@@ -982,8 +984,7 @@ function guRuleOpenGroup(kind) {
   const i = guRuleSections().findIndex(s => s.kind === kind);
   if (i >= 0) { guRuleSec = i; guRuleSearch = ''; }
 }
-function guRuleIndex() {
-  const secs = guRuleSections();
+function guRuleIndex(secs = guRuleSections()) {
   const cur = Math.max(0, Math.min(secs.length - 1, guRuleSec));
   return `<label class="gu-q gu-search-label" for="guRuleSearch">🔎 Find a price or rule</label>
     <input class="gu-input" id="guRuleSearch" type="search" value="${escapeAttr(guRuleSearch)}" placeholder="Find a price or rule…" data-mnyp-action="gurulesearch" autocomplete="off">
@@ -1001,9 +1002,8 @@ function guRuleRowHtml(r, saved, R) {
       <span class="gu-rulevalbox"><b class="gu-ruleval${ch ? ' changed' : ''}">${escapeHtml(guFmt(r.unit, now))}</b>${ch ? `<span class="gu-was">was ${escapeHtml(guFmt(r.unit, was))}</span>` : ''}</span>
       <button type="button" class="gu-step" data-mnyp-action="gurule" data-mnyp-d="${r.step}"${attrs} aria-label="More">+</button></span></div>`;
 }
-function guRulesMain() {
+function guRulesMain(secs = guRuleSections()) {
   const saved = guSavedRules(), R = guPendingRules();
-  const secs = guRuleSections();
   const cur = Math.max(0, Math.min(secs.length - 1, guRuleSec));
   const body = secs.map((s, i) => {
     const head = `<div class="gu-cardtitle">${escapeHtml(s.title)}</div>`;
