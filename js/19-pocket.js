@@ -87,7 +87,7 @@ function pmPriceCards(r) {
     ${row('Skating placement — group / overall (1st)', '$' + Number((((cp.skate||{}).placement||{}).group||{})[1] || 0).toFixed(2) + ' each')}
     ${row('Skating star level — Silver / Gold per item', '$' + Number((cp.dance || {}).silverPerItem || 0).toFixed(2) + ' / $' + Number((cp.dance || {}).goldPerItem || 0).toFixed(2))}
     ${row('Skating star level — all Gold', '+$' + Number((cp.dance || {}).allGoldBonus || 0).toFixed(2) + ' (test max $' + Number((cp.dance || {}).testCap || 0).toFixed(0) + ')')}
-    <div class="ct-meta">Both skating placements stack. <b>No cap on points.</b> The official results sheet decides — not Mom, not Dad, not you.</div>
+    <div class="ct-meta">Both skating placements stack. <b>No cap on points.</b> The official results sheet decides — not your parents, not you.</div>
   </div>`;
 
   const fi = (r.fines && r.fines.items) || [];

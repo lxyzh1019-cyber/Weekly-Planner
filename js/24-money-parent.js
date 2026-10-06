@@ -289,7 +289,7 @@ async function mnyRunDefaultSweep() {
     `Credit ${mnyMoney(plan.total)} under the Grandfather rule?\n\n`
     + ['jenn', 'jess'].map(k => `${mnyKidName(k)}: ${mnyMoney(plan.perKid[k])}`).join(' · ')
     + `\n\n${mnyMoney(plan.amount)} per child for each week with no family meeting, ${span}`
-    + (comps > 0 ? `, and ${mnyMoney(comps)} of meets already on file in those weeks on top.` : '.')
+    + (comps > 0 ? `, and ${mnyMoney(comps)} of competitions already on file in those weeks on top.` : '.')
     + (sk ? `\n\n${sk} week${sk === 1 ? '' : 's'} had a family meeting and ${sk === 1 ? 'is' : 'are'} left alone.` : '')
     + `\n\nThe last ${MNY_CATCHUP_REACH} weeks are left to the catch-up list.`,
     { okLabel: 'Credit it', cancelLabel: 'Not now' });
@@ -379,12 +379,12 @@ async function mnyRunPayMeets() {
   const plans = mnyUnpaidMeetsPlan();
   const total = money2(plans.reduce((n, p) => n + p.total, 0));
   const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
-  if (!weeks) { showToast('Every meet is paid ✅'); return; }
+  if (!weeks) { showToast('Every competition is paid ✅'); return; }
   const lines = plans.filter(p => p.weeks.length).map(p =>
     `${mnyKidName(p.kid)}: ${mnyMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
   const ok = await showConfirm(
-    `Pay ${mnyMoney(total)} for meets ${weeks} settled week${weeks === 1 ? ' never' : 's never'} paid?\n\n` +
-    `${lines.join('\n')}\n\nEach week is brought up to what its meets are worth, and nothing is ever taken back.`,
+    `Pay ${mnyMoney(total)} for competitions ${weeks} settled week${weeks === 1 ? ' never' : 's never'} paid?\n\n` +
+    `${lines.join('\n')}\n\nEach week is brought up to what its competitions are worth, and nothing is ever taken back.`,
     { okLabel: 'Pay it', cancelLabel: 'Not now' });
   if (!ok) return;
   const res = mnyPayUnpaidMeets();

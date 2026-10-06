@@ -539,7 +539,7 @@ function sdTiles(c) {
     { id: 'club', group: 'earned', name: '⛸️ Club job', every: true, amount: money2(b.sessionsPaid),
       note: `${ses} session${ses === 1 ? '' : 's'} × ${sdD(sdRule(c.rules, 'sessions.perSession'))}`, coin: 'earned', badge: 'WOW' },
     { id: 'comp', group: 'earned', name: '🏆 Competitions', amount: c.f.compIn,
-      note: (b.comp.entries || []).map(e => (e.name || mnySportLabel(e.sport)) + place(e)).join(' · ') || (c.f.lateIn ? 'a meet from a settled week' : 'none this week'), coin: 'earned', badge: 'BRAVO!' },
+      note: (b.comp.entries || []).map(e => (e.name || mnySportLabel(e.sport)) + place(e)).join(' · ') || (c.f.lateIn ? 'a competition from a settled week' : 'none this week'), coin: 'earned', badge: 'BRAVO!' },
     { id: 'gifts', group: 'given', name: '🎁 Gifts', amount: c.f.giftsIn,
       note: c.f.deps.filter(x => !sdIsHomeCash(x)).map(x => `${x.giver || x.from} ${sdD(x.amount)}`).filter(Boolean).join(' · ') || 'only after a parent says yes', coin: 'given', badge: 'THANKS!' },
     { id: 'made', group: 'made', name: '🌱 My pots earned', amount: money2(Math.max(0, passive)), noCoins: true,
@@ -1043,8 +1043,8 @@ function sdOpenVerdict(c, key) {
 function sdSignedMain(c) {
   const d = c.d, s = d.signed;
   if (!s || !s.signed) {
-    return `<div class="sd-title">✍️ Signed.</div>
-      <div class="sd-line">${escapeHtml(c.name)}'s money for this week has moved. The passbook on My money has the week.</div>`;
+    return `<div class="sd-title">✍️ Settled without a sign</div>
+      <div class="sd-line">A parent entered this week, or the Grandfather rule paid it. The passbook on My money has it.</div>`;
   }
   const sg = s.signed, w = Object.assign({}, s.w, { alloc: {} }), r = c.rules;
   const res = { signed: sg, after: Object.assign({ pots: s.after.pots, left: s.after.left, loan: s.after.loan }, s.after) };
@@ -1305,8 +1305,8 @@ function sdNewRowCard(c) {
   const meets = c.f.hist.map(h => h.comp).filter(v => v > 0);
   const meetAvg = meets.length ? money2(meets.reduce((a, v) => a + v, 0) / meets.length) : 0;
   const payback = isSur ? '' : `<div class="sd-newrow-payback">${escapeHtml(meetAvg > 0
-    ? `💡 Does it earn back? My meets pay me about ${sdM(meetAvg)} each. This row is paid back by about ${Math.ceil(money2(row.principal) / meetAvg)} meets.`
-    : '💡 Does it earn back? No meet has paid me in my last Sundays yet, so my steady money pays it back.')}</div>`;
+    ? `💡 Does it earn back? My competitions pay me about ${sdM(meetAvg)} each. This row is paid back by about ${Math.ceil(money2(row.principal) / meetAvg)} competitions.`
+    : '💡 Does it earn back? No competition has paid me in my last Sundays yet, so my steady money pays it back.')}</div>`;
   // How could I get back under half? — the prototype's three ideas.
   const rate = sdRule(c.rules, 'sessions.perSession');
   const choresAvg = c.f.hist.length ? c.f.hist.reduce((a, h) => a + money2((h.row || {}).chores), 0) / c.f.hist.length : 0;

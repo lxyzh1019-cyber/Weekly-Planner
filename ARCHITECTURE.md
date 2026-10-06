@@ -4227,6 +4227,10 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   up to its total. I choose's "what I owe → after" is `sdOweAfterPlan` — the
   sign's own loan arithmetic (`sdLoanPlan`, which `sdSign` now calls).
   `sdRescaleLoanRows` puts the rounding cent on the last row (`sdRescaleMonthly`).
+- **Grown-ups figures read the body font in Pop** (`.gu, #grownupsOverlay` join the
+  `--font-round: var(--font-body)` rule beside `.mv2` and `.sd`), and the Story's
+  ribbon colours (`FL_COLOURS`, js/42) read the v15 meaning tokens that My money
+  uses (`--mny-v15-bar/gold/saved/wall/cash/made`).
 
 ## Known trip hazards
 

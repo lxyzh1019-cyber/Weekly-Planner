@@ -53,7 +53,7 @@
 
 const RC_KINDS = [
   { id: 'chore', icon: '🧹', label: 'A chore graded',   kid: false },
-  { id: 'meet',  icon: '🏆', label: 'A meet result',    kid: false },
+  { id: 'meet',  icon: '🏆', label: 'A competition result',    kid: false },
   { id: 'gift',  icon: '🎁', label: 'Money she was given', kid: true },
   { id: 'fine',  icon: '📦', label: 'Something owed',   kid: false },
   { id: 'move',  icon: '🔀', label: 'Move money',       kid: true },
@@ -287,7 +287,7 @@ function rcMeetForm() {
   }
   const linked = rcDraft.id
     ? `<p class="rc-note">Moving the date moves the 🏆 block on the calendar with it —
-       a meet left behind on the old day is a second meet nobody held.</p>`
+       a competition left behind on the old day is a second competition nobody held.</p>`
     : `<p class="rc-note">Recording this puts a 🏆 block on that day if there is not one
        already: 8am to 3pm, with travel and warm-up around it.</p>`;
   return `${rcField('What was it called', 'name', rcDraft.name, 'text', ' placeholder="Winter Invitational"')}

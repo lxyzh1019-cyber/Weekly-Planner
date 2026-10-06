@@ -8532,7 +8532,7 @@ button.gu-loanrow {
    every figure is Patrick Hand like the words around it, and Calm keeps its
    own Lexend (the Calm look's rule). Money columns are right-aligned —
    Patrick Hand has no equal-width digits. */
-.mv2, .sd, .mm-head--two, #requestOverlay, #sundayOverlay, .mny-head--big { --font-round: var(--font-body); }
+.mv2, .sd, .mm-head--two, #requestOverlay, #sundayOverlay, .mny-head--big, .gu, #grownupsOverlay { --font-round: var(--font-body); }
 .mv2 {
   display: grid; grid-template-columns: minmax(0, 1fr) 352px; gap: 14px; align-items: stretch;
   font-family: var(--font-body); color: var(--mny-v15-ink); font-size: calc(1rem * var(--text-scale, 1));

@@ -1659,11 +1659,9 @@ function mnyIsOpen(kid, stageId) {
 }
 function mnyNeedLabel(stageId) { return 'Opens at ' + mnyStagePct(stageId) + '% paid off'; }
 
-/* The concept card, with the real debt named in it and every number a rule
-   decides read from today's rules. */
-function mnyConceptCard(id, kid) {
-  const c = mnyConceptById(id);
-  if (!c) return null;
+/* The rule words in a concept's text, read from today's rules. One owner: the
+   card body and the Money school chips both read it. */
+function mnyConceptSwap(kid) {
   const names = mnyDebts(kid).map(d => d.name);
   const naming = names.length ? names.join(' and ') : 'my loan';
   const r = mrRules();
@@ -1677,7 +1675,14 @@ function mnyConceptCard(id, kid) {
     lockWeeks: String(num('pots.lockWeeks', 4)),
     cap: (typeof sdCapWords === 'function') ? sdCapWords(num('spend.capPct', 20)) : num('spend.capPct', 20) + '%',
   };
-  const swap = (s) => String(s || '').replace(/\{(debt|every|bonus1|lockWeeks|cap)\}/g, (m, k) => tokens[k]);
+  return (s) => String(s || '').replace(/\{(debt|every|bonus1|lockWeeks|cap)\}/g, (m, k) => tokens[k]);
+}
+/* The concept card, with the real debt named in it and every number a rule
+   decides read from today's rules. */
+function mnyConceptCard(id, kid) {
+  const c = mnyConceptById(id);
+  if (!c) return null;
+  const swap = mnyConceptSwap(kid);
   return {
     id: c.id, icon: c.icon, title: swap(c.title), stage: c.stage,
     open: mnyIsOpen(kid, c.stage),

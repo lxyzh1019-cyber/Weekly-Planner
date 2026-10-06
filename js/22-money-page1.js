@@ -723,7 +723,7 @@ function mnyCalendarBody(kid) {
       <div class="mv2-dow">${['M','T','W','T','F','S','S'].map(x => `<span>${x}</span>`).join('')}</div>
       <div class="mv2-calgrid">${cells}</div>
       <div class="mv2-row2"><span>This month's results</span><b>${escapeHtml(mnyMoney(total))}</b></div>
-      <div class="mv2-line">Tap a day: a result, a meet still to come, or "add a competition?". We never talk about money before or during a competition. That is a promise, not a rule.</div>
+      <div class="mv2-line">Tap a day: a result, a competition still to come, or "add a competition?". We never talk about money before or during a competition. That is a promise, not a rule.</div>
     </div>`;
 }
 /* A tapped calendar day (Deviation 39). One question per kind of day:
