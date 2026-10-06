@@ -82,6 +82,12 @@ function mnyTourGo(d) {
   mnyTourStep = next;
   mnyDrawTour();
 }
+/* A tour page's words, escaped, with **bold** where the stage 8 drawing
+   bolds them ("what you own", "the loans door"). Escaped first, so only the
+   two asterisks become markup. */
+function mnyTourWords(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
 function mnyDrawTour() {
   const steps = MNY_TOURS[mnyTourWho] || [];
   const s = steps[mnyTourStep];
@@ -105,7 +111,7 @@ function mnyDrawTour() {
   el.innerHTML = `<div class="mny-tour" role="dialog" aria-modal="true" aria-label="${escapeAttr(s.title)}">
       <div class="mny-tour-where">${escapeHtml(s.where)}</div>
       <div class="mny-tour-title">${escapeHtml(s.icon + ' ' + s.title)}</div>
-      <p>${escapeHtml(typeof s.body === 'function' ? s.body() : s.body)}</p>
+      <p>${mnyTourWords(typeof s.body === 'function' ? s.body() : s.body)}</p>
       <div class="mny-tour-foot">
         <button type="button" class="mny-btn" data-tour="-1">${mnyTourStep ? '◀ Back' : 'Close'}</button>
         <div class="mny-dots">${steps.map((_, i) =>
@@ -942,8 +948,8 @@ function mnyIdeaBody(c, kid) {
      📖 All my Sundays — every settled Sunday, newest first, read from the
         FROZEN ledger row through `sdHistGroups` (js/43, the same reader as
         the meeting's "My last 4 Sundays"), so a Sunday reads what it paid then.
-     📊 By month — the Flow (js/42-flow.js), which reads the stream and so
-        sees a gift on a Tuesday the ledger never holds.
+     📊 By month — the Flow (js/42-flow.js), the same frozen rows added up
+        by the month their Sunday falls in (build 2026-10-06c).
    ════════════════════════════════════════════════════════════════ */
 function mnyOpenSundays() { mnyHistPage = 'sundays'; showScreen('moneystory'); mnyRenderHistory(); }
 function mnyOpenByMonth() { mnyHistPage = 'month'; showScreen('moneystory'); mnyRenderHistory(); }
@@ -979,14 +985,16 @@ function mnySundaysPage(kid) {
         <div class="mv2-line">Every Sunday I sign gets written here: what came in, what was taken off, and where it went. Nothing signed yet.</div>
       </div></div>`;
   }
-  const months = Array.from(new Set(all.map(r => r.weekKey.slice(0, 7)))).sort().reverse();
+  /* A Sunday's month is the month of its Sunday (`flSundayMonth`, js/42) —
+     the same month 📊 By month puts it in. */
+  const months = Array.from(new Set(all.map(r => flSundayMonth(r.weekKey)))).sort().reverse();
   if (!mnySundaysMonth || months.indexOf(mnySundaysMonth) < 0) mnySundaysMonth = months[0];
   const rows = (mnySundaysMode === 'month')
-    ? all.filter(r => r.weekKey.slice(0, 7) === mnySundaysMonth)
+    ? all.filter(r => flSundayMonth(r.weekKey) === mnySundaysMonth)
     : all.slice(0, 12);
   const groups = rows.map(r => ({ r, g: mnySundayGroups(r) }));
 
-  const modeBtns = [['week', 'By week'], ['month', 'By month']].map(([id, label]) =>
+  const modeBtns = [['week', 'By Sunday'], ['month', 'By month']].map(([id, label]) =>
     `<button type="button" class="mv2-btn${mnySundaysMode === id ? ' on' : ''}" data-mny-action="sundaysmode" data-mny-mode="${id}" aria-pressed="${mnySundaysMode === id}">${label}</button>`).join('');
   const monthNav = (mnySundaysMode === 'month')
     ? `<div class="mv2-hist-nav">
@@ -1003,9 +1011,13 @@ function mnySundaysPage(kid) {
     const earnedSegs = g.home != null
       ? seg('mv2-sw--earned', g.home, '🏠 Home') + seg('mv2-sw--earned', g.club, '⛸️ Club job') + seg('mv2-sw--earned', g.comp, '🏆 Competitions')
       : seg('mv2-sw--earned', g.earned, '💪 Money I earned');
-    // The four groups on every Sunday, ➖ included when nothing was taken off.
-    const words = [`💪 ${mnyMoney(g.earned)}`, `🎁 ${mnyMoney(g.given)}`, `🌱 ${mnyMoney(g.made || 0)}`,
+    /* The four groups on every Sunday, ➖ included when nothing was taken
+       off; 💪 with its 🏠 / ⛸️ / 🏆 split where the row kept it (as drawn). */
+    const earnedLine = `💪 ${mnyMoney(g.earned)}` + (g.home != null
+      ? ` (🏠 ${mnyMoney(g.home)} · ⛸️ ${mnyMoney(g.club)} · 🏆 ${mnyMoney(g.comp)})` : '');
+    const restLine = [`🎁 ${mnyMoney(g.given)}`, `🌱 ${mnyMoney(g.made || 0)}`,
       `➖ ${g.off < 0 ? sdOff$(-g.off, mnyMoney) : mnyMoney(0)}`].join(' · ');
+    const words = earnedLine + ' · ' + restLine;
     const note = r.defaulted
       ? (r.defaultReason === 'grandma' ? '👴 Grandfather rule: every week got the same amount.' : '🕰️ Nobody sat down for this week, so it got a flat amount.')
       : (r.weeksLate ? `🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after it finished.` : '');
@@ -1013,35 +1025,29 @@ function mnySundaysPage(kid) {
         <span class="mv2-hist-week">Week of ${escapeHtml(mrMoneyWeekLabel(r.weekKey, kid))}</span>
         <b class="mv2-hist-amt">${escapeHtml(mnyMoney(g.total))}</b>
         <span class="mv2-histbar" role="img" aria-label="${escapeAttr(words)}">${earnedSegs}${seg('mv2-sw--given', g.given, '🎁 given')}${seg('mv2-sw--made', g.made || 0, '🌱 made')}</span>
-        <span class="mv2-hist-words">${escapeHtml(words)}</span>
+        <span class="mv2-hist-words"><span>${escapeHtml(earnedLine)}</span><span>${escapeHtml(restLine)}</span></span>
         ${note ? `<span class="mv2-note mv2-hist-note">${escapeHtml(note)}</span>` : ''}
       </div>`;
   }).join('');
 
+  /* The summary on top of the one card, as drawn: what came in across the
+     Sundays shown, then what was taken off. Came in + 📥 from my bank −
+     taken off is the Sundays' own totals added. */
   const sum = k => money2(groups.reduce((a, x) => a + (Number(x.g[k]) || 0), 0));
-  const t = { earned: sum('earned'), home: sum('home'), club: sum('club'), comp: sum('comp'), given: sum('given'), made: sum('made'),
-              bank: sum('bank'), off: sum('off'), total: sum('total') };
-  const split = groups.some(x => x.g.home != null);
-  const li = (l, v, cls) => `<div class="mv2-li${cls ? ' ' + cls : ''}"><span>${escapeHtml(l)}</span><b>${escapeHtml(v)}</b></div>`;
+  const came = money2(sum('earned') + sum('given')), bank = sum('bank'), off = sum('off');
   const period = mnySundaysMode === 'month' ? mnySundaysMonthLabel(mnySundaysMonth)
-    : `My last ${groups.length} Sunday${groups.length === 1 ? '' : 's'}`;
-  const sw = cls => `<i class="mv2-sw ${cls}"></i>`;
+    : `${groups.length} Sunday${groups.length === 1 ? '' : 's'}`;
+  const li = (l, v, cls) => `<div class="mv2-li ${cls}"><span>${escapeHtml(l)}</span><b>${escapeHtml(v)}</b></div>`;
   return `<div class="mv2-hist">
       <div class="mv2-card mv2-hist-list">
         <div class="mv2-cardhead"><span class="mv2-title">📖 All my Sundays</span><span class="mv2-hist-modes">${modeBtns}</span></div>
         ${monthNav}
-        <div class="mv2-bookkey"><span>${sw('mv2-sw--earned')}💪 earned ${sw('mv2-sw--given')}🎁 given ${sw('mv2-sw--made')}🌱 made</span><span>➖ taken off</span></div>
+        <div class="mv2-hist-sums">
+          ${li('Came in, ' + period, mnyMoney(came), 'mv2-hist-came')}
+          ${bank > 0 ? li('📥 From my bank', mnyMoney(bank), 'mv2-hist-bank') : ''}
+          ${li('➖ Taken off', off < 0 ? sdOff$(-off, mnyMoney) : mnyMoney(0), 'mv2-hist-off')}
+        </div>
         <div class="mv2-hist-rows">${list}</div>
-      </div>
-      <div class="mv2-card mv2-hist-totals">
-        <div class="mv2-cardhead"><span class="mv2-title">${escapeHtml(period)}</span></div>
-        ${li('💪 Money I earned', mnyMoney(t.earned), 'g')}
-        ${split ? li('🏠 Home', mnyMoney(t.home), 'mv2-hist-sub') + li('⛸️ Club job', mnyMoney(t.club), 'mv2-hist-sub') + li('🏆 Competitions', mnyMoney(t.comp), 'mv2-hist-sub') : ''}
-        ${li('🎁 Money I was given', mnyMoney(t.given), 'g')}
-        ${li('🌱 Money my money made', mnyMoney(t.made), 'g')}
-        ${t.bank > 0 ? li('📥 From my bank', mnyMoney(t.bank), 'g') : ''}
-        ${li('➖ Taken off', t.off < 0 ? sdOff$(-t.off, mnyMoney) : '$0.00', 'g')}
-        ${li('= Into my pile', mnyMoney(t.total), 'g mv2-hist-sum')}
         <div class="mv2-note">Each Sunday as it was signed: what it paid then, not what today's prices would pay.</div>
       </div>
     </div>`;

@@ -948,11 +948,15 @@ function ctRenderWeekMatrix(kid) {
 /* 💰 The Chores tab's money card is one door now (decision 9): what a week
    paid and what she has are 💰 My money's to say. Drawn on every week — the
    old board's grid here, the kid tab's rail under "Earned this week" (js/26). */
+/* 💰 The chore tab's one door to My money (decision 9), under the board on
+   every week, where the pocket-money card stood — the stage 8 drawing: the
+   door and the line saying what is behind it. */
 function ctMoneyDoor(kid) {
-  return `<button type="button" class="mv2-door ct-money-door" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money <span class="mv2-chev" aria-hidden="true">▸</span></button>`;
+  return `<div class="ct-money-card"><button type="button" class="mv2-door ct-money-door" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money <span class="mv2-chev" aria-hidden="true">▸</span></button>
+    <span class="ct-money-sub">what I earned, my loan wall, what I own</span></div>`;
 }
 function ctRenderMoneyCard(kid) {
-  return `<div class="chore-card chore-card--full">${ctMoneyDoor(kid)}</div>`;
+  return `<div class="chore-card--full">${ctMoneyDoor(kid)}</div>`;
 }
 /* ── A week from before the chore pool, read-only (R5 §5 C2, row 15) ──
    renderChoreTab draws such a week with the old board: ctRenderWeekControls,

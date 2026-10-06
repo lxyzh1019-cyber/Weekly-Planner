@@ -70,15 +70,17 @@ function mnyRenderSchool() {
 
   /* The same head as My money (decision 14): ◀, the title, the two tabs,
      ? and the date; no bottom bar. Three columns of `.mv2` cards on the
-     iPad, filling the screen; one column on the phone. */
+     iPad, filling the screen, as the stage 8 drawing places them: the ladder
+     over the Companies chart, the ideas, then "Just part of being here" over
+     what money buys. One column on the phone. */
   wrap.innerHTML =
       `${mnyPageHead('🎓 Money school', '', [
           { action: 'tourkid', icon: '?', word: 'How this page works' },
         ], { kidSwitch: true, tabs: 'school', date: true, back: 'backschool', big: true })}
        <div class="mv2-school">
-         <div class="mv2-col">${mnyLadderCard(kid, pct, idx)}</div>
+         <div class="mv2-col">${mnyLadderCard(kid, pct, idx)}${mnyStockChart()}</div>
          <div class="mv2-col">${mnyIdeasCard(kid)}</div>
-         <div class="mv2-col">${mnyStockChart()}${mnyWorkListsCard()}${mnyBuysCard()}</div>
+         <div class="mv2-col">${mnyWorkListsCard()}${mnyBuysCard()}</div>
        </div>`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
@@ -92,26 +94,31 @@ function mnyLadderCard(kid, pct, idx) {
   const toNext = next && principal > 0
     ? money2(Math.max(0, (mnyStagePct(next.id) / 100) * principal - mnyTotalPaid(kid))) : 0;
 
+  /* Each step says where it opens, as drawn: "open · 20%", "I am here ·
+     30%", "🔒 at 40%" (the first step opens at 0%, so it says only "open"). */
   const rows = MNY_STAGES.map((s, i) => {
     const open = i <= idx;
+    const at = mnyStagePct(s.id);
+    const verdict = i === idx ? 'I am here' + (at > 0 ? ' · ' + at + '%' : '')
+      : open ? 'open' + (at > 0 ? ' · ' + at + '%' : '') : '🔒 at ' + at + '%';
     return `<div class="mv2-li mv2-ladder-row${i === idx ? ' here' : ''}${open ? '' : ' dim'}">
         <span>${s.icon} ${escapeHtml(s.title)}</span>
-        <b>${i === idx ? 'you are here' : (open ? 'open' : '🔒 ' + mnyStagePct(s.id) + '%')}</b>
+        <b>${verdict}</b>
       </div>`;
   }).join('');
 
   return `<div class="mv2-card mv2-ladder">
-      <div class="mv2-cardhead"><span class="mv2-title">🔓 What opens when</span><b class="mv2-ladder-pct">${pct}%</b></div>
-      <span class="mv2-bar mv2-ladder-bar"><i style="width:${pct}%"></i></span>
-      <div class="mv2-line mv2-ladder-goal">${owed > 0
-        ? `${mnyMoney(owed)} still to go on my loan`
+      <div class="mv2-cardhead"><span class="mv2-title">🔓 What opens when</span></div>
+      <div class="mv2-ladder-goal">${owed > 0
+        ? `<b class="mv2-ladder-pct">${pct}%</b><span>of my loans paid</span><b class="mv2-ladder-left">${mnyMoney(owed)} to go</b>`
         /* No loan is not a loan paid off. `mnyPaidPct` reads 100 for a child
            who owes nothing, which opens every pot — but "paid off" would be
            celebrating something that never happened. */
-        : (principal > 0 ? `All paid off. Everything is open.` : `Nothing to pay back, so everything is open.`)}</div>
+        : `<span>${principal > 0 ? 'All paid off. Everything is open.' : 'Nothing to pay back, so everything is open.'}</span>`}</div>
+      <span class="mv2-bar mv2-ladder-bar"><i style="width:${pct}%"></i></span>
       <div class="mv2-rows">${rows}</div>
       ${next && toNext > 0
-        ? `<div class="mv2-line mv2-teal">Pay off <b>${mnyMoney(toNext)}</b> more and <b>${escapeHtml(next.icon + ' ' + next.title)}</b> opens.</div>`
+        ? `<div class="mv2-sum mv2-ladder-next">Pay off <b>${mnyMoney(toNext)}</b> more and <b>${escapeHtml(next.icon + ' ' + next.title)}</b> opens.</div>`
         : ''}
     </div>`;
 }
@@ -123,17 +130,20 @@ function mnyLadderCard(kid, pct, idx) {
    a locked lesson has to offer. */
 function mnyIdeasCard(kid) {
   const swap = mnyConceptSwap(kid);
+  let locked = false;
   const rows = MNY_CONCEPTS.map(c => {
     const open = mnyIsOpen(kid, c.stage);
+    if (!open) locked = true;
     return `<button type="button" class="mv2-li mv2-idea-row${open ? '' : ' dim'}" data-mny-action="idea" data-mny-concept="${escapeAttr(c.id)}">
-        <span>${c.icon} ${escapeHtml(swap(c.title))}</span>
-        <b>${open ? '' : '🔒 '}<span class="mv2-chev" aria-hidden="true">▸</span></b>
+        <span>${c.icon} <span class="mv2-idea-name">${escapeHtml(swap(c.title))}</span>${c.isNew ? ' <i class="mv2-newtag">new</i>' : ''}</span>
+        <b>${open ? '' : '🔒 at ' + mnyStagePct(c.stage) + '% '}<span class="mv2-chev" aria-hidden="true">▸</span></b>
       </button>`;
   }).join('');
   return `<div class="mv2-card mv2-ideas">
       <div class="mv2-cardhead"><span class="mv2-title">💡 The ideas</span></div>
-      <div class="mv2-line">Tap one to read what it is, why it helps and what to watch.</div>
+      <div class="mv2-line">Each one opens the same page as the ? on My money.</div>
       <div class="mv2-rows">${rows}</div>
+      ${locked ? '<div class="mv2-idea-locknote">A locked idea still opens: it says what opens it and how much is left to pay.</div>' : ''}
     </div>`;
 }
 
@@ -146,7 +156,7 @@ function mnyBuysCard() {
       <div class="mv2-cardhead"><span class="mv2-title">🛒 What money buys</span></div>
       <div class="mv2-rows">${items.map(i =>
         `<div class="mv2-li"><span>${escapeHtml(i.label)}</span><b>${mnyMoney(i.amount)}</b></div>`).join('')}</div>
-      <div class="mv2-note">Real prices, from things we actually buy. It is how you tell whether something is worth saving for.</div>
+      <div class="mv2-note">Real prices, from things we actually buy.</div>
     </div>`;
 }
 

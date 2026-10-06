@@ -162,7 +162,7 @@ const MNY_CONCEPTS = [
     why: 'I get to do what I love now, not years from now.',
     risk: 'It costs: interest every {every} Sundays, and the payment comes first every week, even a bad week. Each extra $1 counts as {bonus1}.',
     cn: '贷款：现在就能做想做的事，不用等；代价是利息，而且每周必须先还。' },
-  { id: 'waiting', icon: '📥', title: 'Waiting for Sunday', stage: 'start',
+  { id: 'waiting', icon: '📥', title: 'Waiting for Sunday', stage: 'start', isNew: true,
     what: 'Money that came in since Sunday: a gift, cash from home, a lock that came back.',
     why: 'Nothing gets decided in a hurry. On Sunday it joins my pile and I choose where every dollar goes.',
     risk: 'It is not an account, and it does not grow while it waits.',
@@ -1844,13 +1844,15 @@ const MNY_TOURS = {
     { icon: '☀️', title: 'How long until Sunday', where: 'Top card',
       body: 'Seven circles, one for each day. Each shows what your chores have earned so far, and the line under them says about how much that is. On Sunday you guess the total together.' },
     { icon: '🏦', title: 'The three places your money sits', where: '✅ What I own',
-      body: () => 'Savings (your goal jars are inside it), money Locked away for ' + mnyLockWeeks() + ' weeks, and money in Companies. Add them together and that is everything you have. Money that came in since Sunday shows as 📥 Waiting for Sunday until you choose where it goes. A place that is not open yet says when it opens. Tap any ? to find out what it is.' },
+      body: () => 'Savings (your goal jars are inside it), money Locked away for ' + mnyLockWeeks() + ' weeks, and money in Companies. Add them together and that is **what you own**. Money that came in since Sunday shows as 📥 Waiting for Sunday until you choose where it goes. A place that is not open yet says when it opens. Tap any ? to find out what it is.' },
     { icon: '🎯', title: 'What you are saving for', where: 'Goal jars',
       body: 'Each goal is its own jar. It shows how full it is, the day you want it by, and about how much a week that takes. ✏️ New goal asks your parents.' },
     { icon: '🧱', title: 'Your loan wall', where: 'Loan wall',
-      body: 'One hundred bricks. Each one you fill is a bit more paid back. The big numbers say how much is left and when it is paid off; the loans door shows each one.' },
+      body: () => { const n = mnyDebts(mnyViewKid()).length;
+        return 'One hundred bricks. Each one you fill is a bit more paid back. The big numbers say how much is left and when it is paid off; **the loans door** ('
+          + n + ' loan' + (n === 1 ? '' : 's') + ' · Details ▸) shows each one.'; } },
     { icon: '📒', title: 'Your last four Sundays', where: 'Passbook',
-      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: to the wall, Savings or cash out. 📖 opens all my Sundays, and 📊 By month shows where it came from and went, month by month.' },
+      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: **to the wall, Savings or cash out**. 📖 opens your whole money story, Sunday by Sunday, and 📊 By month shows it month by month.' },
   ],
   parent: [
     { icon: '⚙️', title: 'The only page that changes a number', where: 'The whole screen',

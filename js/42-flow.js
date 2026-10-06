@@ -23,14 +23,17 @@
    before deciding something. This is the page where she finds out how it got
    there. Two questions, two screens.
 
-   ── It owns no arithmetic ──
+   ── Where its numbers come from (build 2026-10-06c) ──
 
-   Every number comes from `evFlow` / `evMonths` / `evTypicalMonth`
-   (js/40-stream.js), which are pure, unit-tested in `tests/stream.test.js`,
-   and were written in Stage 1 with exactly this screen in mind. A second place
-   that decides what "came in" means is a second place that can disagree with
-   the first — the defect this repo keeps recording. This file arranges and
-   labels; it never sums a movement itself.
+   The FROZEN ledger: every settled Sunday, read through `sdHistGroups`
+   (js/43, the reader 📖 All my Sundays and the meeting's "My last 4 Sundays"
+   use), and put in the month its Sunday falls in — so the 4 Oct Sunday is
+   October's, and a month here is exactly the Sundays All my Sundays lists
+   for it. It read the event stream until 2026-10-06c; the stream books a
+   settled week on its Monday and has nothing for a week written straight
+   into the ledger, so October showed "I earned $0.00" beside a Sunday that
+   paid $30.00. One reader of a Sunday, one month for it. This file groups and
+   adds those readings; it decides nothing about what a Sunday paid.
 
    ── Three periods, one question ──
 
@@ -38,8 +41,8 @@
    | All of it  | the whole history, since the family began |
    | A typical month | every ribbon divided by the months that PASSED |
 
-   The third is the one that answers "am I doing all right", and `evTypicalMonth`
-   divides by elapsed months rather than months holding events — deliberately,
+   The third is the one that answers "am I doing all right", and it divides
+   by elapsed months rather than months holding Sundays — deliberately,
    because dividing by months with data turns a quiet summer into a good one.
 
    ── The history strip ──
@@ -62,59 +65,85 @@ const FL_PERIODS = [
   { id: 'typical', label: 'A typical month' },
 ];
 
-/* Where money went, as TWO groups, each under a caption that is the sum of
-   its own bars. There was one — "➡️ Where it went $outTotal" — above bars
-   drawn from every destination, and `outTotal` deliberately leaves out money
-   moved between her own pots: observed live as "$0.00" above a $30.00 bar.
-
-   Out: what left for good — spent, a fine, a loan paid back, a gift given
-   back (`returned` was counted in the total and never drawn). `loan` sits
-   after the other two because paying a debt down reads oddly beside either.
-   Grow: what she put away, in the order she is taught the pots. */
-const FL_OUT_DESTS = ['spent', 'fine', 'loan', 'returned'];
-const FL_SAVED_DESTS = ['ready', 'locked', 'invest'];
-
 /* One hue per ribbon, matched to the pots they name on 💰 My money so the two
    screens cannot be telling a child about different things. */
 const FL_COLOURS = {
-  earned: 'var(--mny-v15-bar)', prize: 'var(--mny-flow-prize)',
-  gift: 'var(--mny-v15-gold)', borrowed: 'var(--mny-v15-wall)',
-  interest: 'var(--mny-flow-interest)', typed: 'var(--mny-flow-typed)',
-  opening: 'var(--mny-flow-opening)',
-  ready: 'var(--mny-v15-saved)', locked: 'var(--mny-flow-locked)',
-  invest: 'var(--mny-v15-made)',
-  spent: 'var(--mny-v15-cash)', fine: 'var(--mny-flow-fine)',
-  loan: 'var(--mny-v15-wall)',
+  earned: 'var(--mny-v15-bar)', gift: 'var(--mny-v15-gold)', made: 'var(--mny-flow-interest)',
+  off: 'var(--mny-flow-fine)',
+  loan: 'var(--mny-v15-wall)', spent: 'var(--mny-v15-cash)',
+  ready: 'var(--mny-v15-saved)', locked: 'var(--mny-flow-locked)', invest: 'var(--mny-v15-made)',
 };
 
-function flColour(key) { return FL_COLOURS[String(key)] || 'var(--mny-flow-other)'; }
-function flSourceLabel(key) { return EV_SOURCE_LABELS[key] || { icon: '💰', label: String(key) }; }
-function flDestLabel(key) { return EV_DEST_LABELS[key] || { icon: '💰', label: String(key) }; }
+/* ── The months, from the frozen ledger ─────────────────────────── */
 
-/* ── What period is on screen ──────────────────────────────────── */
+/* The month a settled week belongs to: the month of its Sunday (the money
+   week runs Monday–Sunday and is paid that Sunday — decision 15). */
+function flSundayMonth(weekKey) { return sdSundayOf(weekKey).slice(0, 7); }
 
-/* Every month the family has any money in, oldest first. Read once per render
-   and handed to both the strip and the picker, because calling `evMonths`
-   twice is a second answer waiting to happen. */
-function flMonthsFor(kid) {
-  return (typeof evMonths === 'function') ? evMonths(kid) : [];
+/* What a set of settled Sundays add up to, in the page's groups. Came in:
+   💪 earned (🏠 / ⛸️ / 🏆 where the row kept the split), 🎁 given, 🌱 made,
+   ➖ taken off — so "came in" is what the Sundays added. Went out: 🧱 to
+   the loan wall, 🛍️ spent. Put away to grow: 🏦 Savings (goal jars inside
+   it), 🔒 Locked away, 📈 Companies. `div` makes a typical month: each
+   figure divided first, so every caption is still the sum of its rows. */
+function flSum(rows, div) {
+  const n = v => money2(Number(v) || 0);
+  const d = Math.max(1, Number(div) || 1);
+  const t = { earned: 0, home: 0, club: 0, comp: 0, split: false, given: 0, made: 0, off: 0,
+              loan: 0, spent: 0, ready: 0, locked: 0, invest: 0 };
+  rows.forEach(r => {
+    const g = mnySundayGroups(r);
+    t.earned += n(g.earned); t.given += n(g.given); t.made += n(g.made); t.off += Math.max(0, -n(g.off));
+    if (g.home != null) { t.split = true; t.home += n(g.home); t.club += n(g.club); t.comp += n(g.comp); }
+    t.loan += n((r.loan || {}).paid) + n(r.extra != null ? r.extra : r.debtExtra);
+    t.spent += n(r.spend);
+    t.ready += n(r.ready) + n(r.goal); t.locked += n(r.gic); t.invest += n(r.stock);
+  });
+  Object.keys(t).forEach(k => { if (typeof t[k] === 'number') t[k] = money2(t[k] / d); });
+  t.inTotal = money2(t.earned + t.given + t.made - t.off);
+  t.outTotal = money2(t.loan + t.spent);
+  t.savedTotal = money2(t.ready + t.locked + t.invest);
+  t.count = rows.length;
+  return t;
 }
 
+/* Every month from her first settled Sunday to this month, oldest first. A
+   month with no Sunday is still there, marked `empty`: a gap is a fact, and
+   a month silently missing from a chart reads as a month that did not happen. */
+function flMonthsFor(kid) {
+  const rows = mnyLedgerRows(kid);
+  if (!rows.length) return [];
+  const keys = rows.map(r => flSundayMonth(r.weekKey)).sort();
+  const now = todayKey().slice(0, 7);
+  const last = keys[keys.length - 1] > now ? keys[keys.length - 1] : now;
+  const out = [];
+  let [y, m] = keys[0].split('-').map(Number);
+  for (let guard = 0; guard < 600; guard++) {
+    const key = y + '-' + String(m).padStart(2, '0');
+    const these = rows.filter(r => flSundayMonth(r.weekKey) === key);
+    out.push(Object.assign({ month: key, empty: !these.length }, flSum(these)));
+    if (key >= last) break;
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+
+/* The month on screen: the one she picked, else the newest with a Sunday. */
 function flCurrentMonth(months) {
   if (!months.length) return null;
-  const keys = months.map(m => m.month);
-  if (flMonth && keys.indexOf(flMonth) >= 0) return flMonth;
-  return keys[keys.length - 1];
+  if (flMonth && months.some(m => m.month === flMonth)) return flMonth;
+  const full = months.filter(m => !m.empty);
+  return (full.length ? full[full.length - 1] : months[months.length - 1]).month;
 }
 
-/* The flow being drawn. One function, so the sentence, the two bars and the
-   footnote can never describe different spans. */
+/* The flow being drawn. One function, so the sentence, the bars and the
+   strip can never describe different spans. */
 function flFlowFor(kid, months) {
-  if (flPeriod === 'typical') return evTypicalMonth(kid);
-  if (flPeriod === 'all') return evFlow(kid);
+  const rows = mnyLedgerRows(kid);
+  if (flPeriod === 'typical') return Object.assign(flSum(rows, months.length), { months: months.length });
+  if (flPeriod === 'all') return flSum(rows);
   const key = flCurrentMonth(months);
-  if (!key) return evFlow(kid);
-  return months.find(m => m.month === key) || evFlow(kid);
+  return months.find(m => m.month === key) || flSum([]);
 }
 
 function flMonthLabel(m) {
@@ -135,15 +164,10 @@ function flMonthShort(m) {
    taken off — then what went out and what was put away to grow. No balance:
    what is waiting right now is My money's 📥 door, not this page's. */
 function flStory(flow, periodWords) {
-  const src = k => money2(Math.max(0, Number((flow.sources || {})[k]) || 0));
-  const earned = money2(src('earned') + src('prize'));
-  const off = money2(Math.max(0, Number((flow.dests || {}).fine) || 0));
-  const out = money2(flow.outTotal);
-  const saved = money2(flow.savedTotal);
-  const groups = `💪 I earned ${mnyMoney(earned)}, 🎁 I was given ${mnyMoney(src('gift'))}, 🌱 my money made ${mnyMoney(src('interest'))} and ➖ ${mnyMoney(off)} was taken off.`;
+  const groups = `💪 I earned ${mnyMoney(flow.earned)}, 🎁 I was given ${mnyMoney(flow.given)}, 🌱 my money made ${mnyMoney(flow.made)} and ➖ ${mnyMoney(flow.off)} was taken off.`;
   const after = [];
-  if (out > 0) after.push(`${mnyMoney(out)} went out`);
-  if (saved > 0) after.push(`${mnyMoney(saved)} was put away to grow`);
+  if (flow.outTotal > 0) after.push(`${mnyMoney(flow.outTotal)} went out`);
+  if (flow.savedTotal > 0) after.push(`${mnyMoney(flow.savedTotal)} was put away to grow`);
   return `${escapeHtml(periodWords)}: ${groups}${after.length ? ' ' + after.join(' and ') + '.' : ''}`;
 }
 
@@ -152,110 +176,108 @@ function flStory(flow, periodWords) {
    the biggest ribbon in ITS OWN group, not to the grand total: an "in" group
    and an "out" group with one scale between them would draw a $2 fine as an
    invisible sliver next to $40 of jobs, which is the one row a child most
-   needs to see. The totals under each group are what compare the two. */
+   needs to see. The totals under each group are what compare the two.
+   `always` rows show at $0 too (the four came-in groups, as drawn); a `sub`
+   row is a part of the row above it — no bar, and not added again. */
 function flRibbonRows(entries) {
-  const rows = entries.filter(e => money2(e.value) > 0);
-  if (!rows.length) return '';
-  const max = rows.reduce((m, e) => Math.max(m, money2(e.value)), 0);
+  const rows = entries.filter(e => e.always || e.sub || money2(e.value) > 0);
+  const max = rows.filter(e => !e.sub).reduce((m, e) => Math.max(m, money2(e.value)), 0);
   return rows.map(e => {
-    const pct = Math.max(4, Math.round((money2(e.value) / max) * 100));
+    if (e.sub) {
+      return `<div class="fl-row fl-subrow"><span class="fl-row-name">${e.icon} ${escapeHtml(e.label)}</span>
+          <span class="fl-sub-amt">${mnyMoney(e.value)}</span></div>`;
+    }
+    const v = money2(e.value);
+    const pct = v > 0 && max > 0 ? Math.max(4, Math.round((v / max) * 100)) : 0;
     return `<div class="fl-row">
         <span class="fl-row-name">${e.icon} ${escapeHtml(e.label)}</span>
         <span class="fl-track"><span class="fl-bar" style="width:${pct}%;background:${escapeAttr(e.colour)}"></span></span>
-        <b class="fl-row-amt">${mnyMoney(e.value)}</b>
+        <b class="fl-row-amt">${e.minus && v > 0 ? '−' : ''}${mnyMoney(v)}</b>
       </div>`;
   }).join('');
 }
 
-function flSourceRows(flow) {
-  return flRibbonRows(EV_SOURCES.map(k => {
-    const l = flSourceLabel(k);
-    return { icon: l.icon, label: l.label, value: flow.sources[k] || 0, colour: flColour(k) };
-  }));
+function flInRows(f) {
+  const sub = (icon, label, value) => ({ icon, label, value, sub: true });
+  return flRibbonRows([
+    { icon: '💪', label: 'Money I earned', value: f.earned, colour: FL_COLOURS.earned, always: true },
+    ...(f.split ? [sub('🏠', 'Home · chores and routine', f.home), sub('⛸️', 'Club job', f.club), sub('🏆', 'Competitions', f.comp)] : []),
+    { icon: '🎁', label: 'Money I was given', value: f.given, colour: FL_COLOURS.gift, always: true },
+    { icon: '🌱', label: 'Money my money made', value: f.made, colour: FL_COLOURS.made, always: true },
+    { icon: '➖', label: 'Taken off', value: f.off, colour: FL_COLOURS.off, always: true, minus: true },
+  ]);
 }
-function flDestRows(flow, keys) {
-  return flRibbonRows(keys.map(k => {
-    const l = flDestLabel(k);
-    return { icon: l.icon, label: l.label, value: flow.dests[k] || 0, colour: flColour(k) };
-  }));
+function flOutRows(f) {
+  return flRibbonRows([
+    { icon: '🧱', label: 'To my loan wall', value: f.loan, colour: FL_COLOURS.loan },
+    { icon: '🛍️', label: 'Spent', value: f.spent, colour: FL_COLOURS.spent },
+  ]);
+}
+function flGrowRows(f) {
+  return flRibbonRows([
+    { icon: '🏦', label: 'Savings', value: f.ready, colour: FL_COLOURS.ready },
+    { icon: '🔒', label: 'Locked away', value: f.locked, colour: FL_COLOURS.locked },
+    { icon: '📈', label: 'Companies', value: f.invest, colour: FL_COLOURS.invest },
+  ]);
 }
 
 /* ── The history strip ─────────────────────────────────────────────
-   Every month since the family began, oldest first, each column stacked by
+   Every month since her first Sunday, oldest first, each column stacked by
    where that month's money came from and scaled against the busiest month. An
    EMPTY month keeps its column: a summer with no jobs is something to see, and
-   a month silently dropped reads as a month that did not happen.
+   a month silently dropped reads as a month that did not happen. The columns
+   share the card's width and take the height left under the groups, so the
+   strip fills the card (BUILD-SPEC §0: no empty band).
 
-   One tappable control per month, 44px wide, which is also what makes the
-   strip a picker rather than a picture. */
+   One tappable control per month, 44px or more each way, which is also what
+   makes the strip a picker rather than a picture. */
 function flHistoryStrip(months, selected) {
   if (months.length < 2) return '';
-  const max = months.reduce((m, mo) => Math.max(m, money2(mo.inTotal)), 0);
+  const came = mo => money2(mo.earned + mo.given + mo.made);
+  const max = months.reduce((m, mo) => Math.max(m, came(mo)), 0);
   const cols = months.map(mo => {
     const on = mo.month === selected && flPeriod === 'month';
-    const stack = max > 0 ? EV_SOURCES.map(k => {
-      const v = money2(mo.sources[k] || 0);
-      if (!(v > 0)) return '';
-      return `<span class="fl-seg" style="height:${(v / max) * 100}%;background:${escapeAttr(flColour(k))}"></span>`;
-    }).join('') : '';
+    const stack = max > 0 ? [['earned', mo.earned], ['gift', mo.given], ['made', mo.made]].map(([k, v]) =>
+      v > 0 ? `<span class="fl-seg" style="height:${(v / max) * 100}%;background:${escapeAttr(FL_COLOURS[k])}"></span>` : '').join('') : '';
     return `<button type="button" class="fl-col${on ? ' on' : ''}${mo.empty ? ' empty' : ''}"
         data-fl-action="month" data-fl-month="${escapeAttr(mo.month)}"
-        aria-label="${escapeAttr(flMonthLabel(mo.month) + ' — ' + mnyMoney(mo.inTotal) + ' came in')}">
+        aria-label="${escapeAttr(flMonthLabel(mo.month) + ' — ' + mnyMoney(came(mo)) + ' came in')}">
         <span class="fl-stack">${stack}</span>
         <span class="fl-col-name">${flMonthShort(mo.month)}</span>
       </button>`;
   }).join('');
   return `<div class="fl-strip-wrap">
       <div class="fl-strip">${cols}</div>
-      <div class="fl-note">Every month since you started. Taller means more came in that month —
-      an empty one is a month where nothing did, which is worth seeing too.</div>
+      <div class="fl-note">Every month since my first Sunday. Taller means more came in that month; tap one to see it.</div>
     </div>`;
 }
 
 /* ── The page ─────────────────────────────────────────────────────
    📊 By month — the passbook's second door (decision 14), drawn under My
-   money's head by `mnyRenderHistory` (js/22): the Flow on the left, every
-   month on the right. */
+   money's head by `mnyRenderHistory` (js/22): one card, the groups on top
+   and every month along the bottom, filling the screen. */
 function flRenderFlow(kid) {
   const months = flMonthsFor(kid);
+  const head = `<div class="mv2-cardhead"><span class="mv2-title">📊 By month</span></div>`;
+  if (!months.length) {
+    return `<div class="mv2-flow mv2-flow--empty"><div class="mv2-card mv2-flow-main">
+        ${head}
+        <div class="fl-empty">My money story starts the first time a Sunday is signed. Nothing yet: that is just the beginning, not a problem.</div>
+      </div></div>`;
+  }
   const selected = flCurrentMonth(months);
   const flow = flFlowFor(kid, months);
 
   const periodWords = flPeriod === 'typical'
     ? `In a typical month, across the ${flow.months} ${flow.months === 1 ? 'month' : 'months'} you have been going`
     : flPeriod === 'all' ? 'Since the very beginning'
-    : `In ${flMonthLabel(selected || todayKey().slice(0, 7))}`;
+    : `In ${flMonthLabel(selected)}`;
 
   const chips = FL_PERIODS.map(p =>
     `<button type="button" class="mv2-btn${flPeriod === p.id ? ' on' : ''}"
        data-fl-action="period" data-fl-id="${p.id}" aria-pressed="${flPeriod === p.id}">${escapeHtml(p.label)}</button>`).join('');
-  const head = `<div class="mv2-cardhead"><span class="mv2-title">📊 By month</span></div>`;
-
-  const inRows = flSourceRows(flow);
-  /* Every key `outTotal` counted is drawn: the four named ones first, then
-     anything else that left — a company losing value, the migration's
-     negative opening. Undrawn, those made the caption bigger than its bars. */
-  const outRows = flDestRows(flow, FL_OUT_DESTS.concat(Object.keys(flow.dests)
-    .filter(k => !evIsHome(k) && FL_OUT_DESTS.indexOf(k) < 0)));
-  const growRows = flDestRows(flow, FL_SAVED_DESTS);
-
-  /* Nothing recorded is a real state and it has TWO causes that need different
-     answers: a family that has not run the set-up yet, and a child who simply
-     has not earned anything in the month she is looking at. Saying "nothing
-     here" for both would send a parent looking for a bug in the second case. */
-  if (!inRows && !outRows && !growRows) {
-    const anyAtAll = (typeof evList === 'function') && evList(kid).length > 0;
-    return `<div class="mv2-flow mv2-flow--empty"><div class="mv2-card mv2-flow-main">
-        ${head}
-        <div class="fl-empty">${anyAtAll
-          ? 'Nothing moved in this one. Try <b>All of it</b> to see the whole story.'
-          : 'My money story starts the first time a week is settled or something is given to me. Nothing yet: that is just the beginning, not a problem.'}</div>
-        ${anyAtAll ? `<div class="fl-chiprow">${chips}</div>` : ''}
-      </div></div>`;
-  }
-
-  const strip = flHistoryStrip(months, selected);
-  return `<div class="mv2-flow${strip ? '' : ' mv2-flow--one'}">
+  const outRows = flOutRows(flow), growRows = flGrowRows(flow);
+  return `<div class="mv2-flow">
     <div class="mv2-card mv2-flow-main">
       ${head}
       <div class="fl-chiprow">${chips}</div>
@@ -263,7 +285,7 @@ function flRenderFlow(kid) {
 
       <div class="fl-group">
         <div class="fl-cap">⬇️ What came in <b>${mnyMoney(flow.inTotal)}</b></div>
-        ${inRows || '<div class="fl-empty">Nothing came in.</div>'}
+        ${flInRows(flow)}
       </div>
 
       <div class="fl-group">
@@ -275,11 +297,8 @@ function flRenderFlow(kid) {
         <div class="fl-cap">🌱 Put away to grow <b>${mnyMoney(flow.savedTotal)}</b></div>
         ${growRows || '<div class="fl-empty">Nothing was put away to grow.</div>'}
       </div>
+      ${flHistoryStrip(months, selected)}
     </div>
-    ${strip ? `<div class="mv2-card mv2-flow-months">
-      <div class="mv2-cardhead"><span class="mv2-title">📅 Every month</span></div>
-      ${strip}
-    </div>` : ''}
   </div>`;
 }
 
