@@ -26215,6 +26215,35 @@ function findChromium() {
             hist.forEach(h => { if (h.getAttribute('data-mny-action') !== 'sunday-sheet') bad.push('an All my Sundays row is not a door'); });
             if (hist[1]) opens(hist[1], 'All my Sundays');
             if (hist[0]) opens(hist[0], 'All my Sundays (newest)');
+            // A fine added to a settled week's day after its Sunday must not draw a charged row under the frozen ➖ total.
+            const wasP = profile; profile = 'parent';
+            let late = null; const lateAll = [];
+            for (const dk of mrMoneyDayKeys(newest.weekKey, kid)) {   // the first day where a slip really costs something (the first ones are free repeats)
+              const add = [];
+              for (let n = 0; n < 4 && !late; n++) {
+                const f = mrAddFine(kid, 'tone', dk); if (!f) break;
+                add.push(f);
+                if ((((mrFinesWeek(newest.weekKey, kid, null) || {}).chargeable || {})[f.id] || 0) > 0) late = f;
+              }
+              if (late) { lateAll.push(...add); break; }
+              add.forEach(f => mrRemoveFine(kid, f.id));
+            }
+            profile = wasP;
+            if (!late) bad.push('could not add a late fine to the newest settled week');
+            else {
+              mnyOpenSundays();
+              const nh = document.querySelector('#mnyStoryWrap .mv2-hist-row[data-mny-id="' + newest.weekKey + '"]') || document.querySelector('#mnyStoryWrap .mv2-hist-row');
+              nh.click();
+              const lbody = document.getElementById('requestBody');
+              const lrows = [...lbody.querySelectorAll('.mv2-fine')];
+              const frozenLine = [...lbody.querySelectorAll('.mv2-li')].some(l => /📦 Fines/.test(l.textContent) && !l.classList.contains('mv2-fine'));
+              const rec = sdSundayRecord(mnyLedgerRows(kid).find(r => r.weekKey === newest.weekKey));
+              const shownSum = lrows.reduce((n, l) => { const m = (l.querySelector('b') || {}).textContent.match(/−\$?([\d.,]+)/); return n + (m ? Number(m[1].replace(/,/g, '')) : 0); }, 0);
+              if (lrows.length && Math.round(shownSum * 100) !== Math.round(rec.takenOff.fines * 100)) bad.push('late fine: the sheet lists ' + lrows.length + ' fine row(s) charging ' + shownSum.toFixed(2) + ' under a frozen ➖ fines total of ' + rec.takenOff.fines.toFixed(2) + ': ' + lbody.textContent.replace(/\s+/g, ' ').slice(0, 160));
+              if (!lrows.length && rec.takenOff.fines > 0 && !frozenLine) bad.push('late fine: neither the fine rows nor the frozen 📦 Fines line show');
+              const lx = lbody.querySelector('[data-mny-action="rq-close"]'); if (lx) lx.click();
+              lateAll.forEach(f => mrRemoveFine(kid, f.id));
+            }
           } catch (e) { bad.push('threw: ' + e.message); }
           finally { if (typeof rqDraft !== 'undefined' && rqDraft) rqClose(); goToday(); }
           return bad.map(b => '[' + tag + '] ' + b);

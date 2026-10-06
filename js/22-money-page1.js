@@ -915,7 +915,10 @@ function mnySundayBody(kid, wk) {
   const rec = sdSundayRecord(row), c = rec.cameIn, t = rec.takenOff;
   const li = (l, v, cls) => `<div class="mv2-li${cls ? ' ' + cls : ''}"><span>${l}</span><b>${escapeHtml(v)}</b></div>`;
   const head = (txt) => `<div class="mv2-title mv2-title--sm">${escapeHtml(txt)}</div>`;
-  const fineRows = mnyFineRows(kid, wk, true);
+  /* One frozen row: the live fine rows draw only while what they charge still adds up, to the cent,
+     to the row's frozen fines; a fine added or removed after that Sunday falls back to one frozen line. */
+  const liveCharge = mnyFineRowsCharge(kid, wk);
+  const fineRows = money2(liveCharge) === money2(t.fines) ? mnyFineRows(kid, wk, true) : '';
   return `<div class="mv2-sunday-sheet">` + head('💰 Came in')
     + li('💪 Money I earned', mnyMoney(c.earned), 'g')
     + (c.home != null ? li('&nbsp;&nbsp;🏠 Home · chores and routine', mnyMoney(c.home)) + li('&nbsp;&nbsp;⛸️ Club job', mnyMoney(c.club)) + li('&nbsp;&nbsp;🏆 Competitions', mnyMoney(c.comp)) : '')
@@ -939,6 +942,11 @@ function mnySundayBody(kid, wk) {
    (logged, nothing taken off) says "free". A fine she already asked about
    shows where the question stands instead of the button. A settled Sunday's
    sheet lists them read-only (`readOnly`). */
+function mnyFineRowsCharge(kid, weekKey) {
+  const keys = mrMoneyDayKeys(weekKey, kid);
+  const charged = (mrFinesWeek(weekKey, kid, null) || {}).chargeable || {};
+  return mrFines(kid).filter(f => f && keys.indexOf(f.dayKey) >= 0).reduce((n, f) => n + money2(charged[f.id] || 0), 0);
+}
 function mnyFineRows(kid, weekKey, readOnly) {
   const keys = mrMoneyDayKeys(weekKey, kid);
   const fines = mrFines(kid).filter(f => f && keys.indexOf(f.dayKey) >= 0);
