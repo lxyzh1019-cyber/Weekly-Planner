@@ -16343,6 +16343,7 @@ function findChromium() {
       for (const [w, h] of [[390, 844], [1194, 834]]) {
         await page.setViewportSize({ width: w, height: h });
         const names = new Set();
+        let clashNotes = 0;
         for (const [id, nav, label] of KID_SCREENS) {
           const seeded = await ev(label || id, `(${nav.toString()})()`);
           if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
@@ -16353,11 +16354,14 @@ function findChromium() {
             return darkContrastFindings(scr, lab, '.print-sheet');
           }, [id, `${label || id}@${w}`]);
           if (found) bad.push(...found);
+          if (id === 'screen-today') clashNotes += await ev('clash notes', () => document.querySelectorAll('#screen-today .quest-conflict-note').length) || 0;
           let name = (label || id).replace(/^screen-/, '').replace(/[^a-z0-9]+/gi, '-');
           while (names.has(name)) name += '-2';
           names.add(name);
           await snap(name, w);
         }
+        // The seeded Today always carries an overlap; a run that measured no clash note measured nothing of it.
+        if (clashNotes < 1) bad.push(`screen-today@${w}: no .quest-conflict-note was on show, so its ink was not measured`);
         /* R12 (2026-09-27): Today with a missed day this week — 🕓 Catch up open
            under ✏️ Modify my plan, "＋ Add to an earlier day" after it. Measured
            for contrast, 44px controls, 13px words, no sideways scroll and its
