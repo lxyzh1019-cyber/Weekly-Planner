@@ -393,41 +393,26 @@ function sdCheckInOut(sg) {
   return { in: inn, out, ok, why: ok ? null : `In ${sdMoney(inn)} ≠ Out ${sdMoney(out)} — nothing was signed.` };
 }
 
-/* ── Step 4 · Sign ─────────────────────────────────────────────────
-   The prototype's sign(): the signed record, the passbook row, the stickers,
-   the milestone crossed, and the state after. Refused while money is unplaced
-   ("place $X first") or if In ≠ Out. The loan takes interest first, then the
-   must-pay, then extra at 1 + bonus; extra beyond what clears the loan spills
-   to Savings (🎉). The goal jar never passes its goal; the rest goes to
-   Savings. Below the 🏦 Savings gate (judged on the loan before this
-   Sunday), the leftover cents and the jar's overflow go on the loan as extra
-   instead, counted at 1 + bonus like any extra (`overToLoan`). */
-function sdSign(w, rules) {
+/* The loan and the goal jar under her plan as it stands — the one answer
+   both the sign and I choose's "what I owe → after" read (Plan "Money fit and
+   logic", PR 1). The goal jar first: what it cannot take is overflow; with
+   Savings shut, the cents and the overflow go on the wall as extra. Then the
+   loan: interest first, then principal; extra only up to what clears it, each
+   extra dollar on principal counting 1 + the bonus. */
+function sdLoanPlan(w, P, rules) {
   const x = w || {};
-  const P = sdPile(x, rules);
-  if (P.pile > 0) return { ok: false, why: `place $${P.pile} first` };
   const a = sdAlloc(x.alloc);
-  // A placement is dollars put somewhere; a negative one is not a plan.
-  if (SD_ALLOC_KEYS.some(k => !(Number(a[k]) >= 0))) return { ok: false, why: 'Every box needs $0 or more — nothing was signed.' };
-  if (P.pile < 0) return { ok: false, why: `That is $${-P.pile} more than my pile — nothing was signed.` };
   const pots = Object.assign({ ready: 0, goal: 0, gic: 0, stock: 0 }, x.pots || {});
-  const pull = Object.assign({ ready: 0, stock: 0, cash: 0 }, x.pull || {});
   const loan = Object.assign({ principal: 0, paid: 0, interest: 0, arrears: 0, weekly: 0 }, x.loan || {});
   const b = sdBonusRate(rules);
-  const week = Number(x.week) || 0;
   const left0 = sdLeft(loan);
-
-  // The goal jar first: what it cannot take is overflow.
   const target = x.goal ? Number(x.goal.target) || 0 : 0;
   const goalRoom = target > 0 ? Math.max(0, sdR2(target - pots.goal)) : a.goal;
   const toGoal = sdR2(Math.min(a.goal, goalRoom));
   const goalOver = sdR2(a.goal - toGoal);
-  // Savings shut: the cents and the overflow go on the wall as extra.
   const readyOpen = sdIsOpen('ready', x, rules);
   const overToLoan = readyOpen ? 0 : sdR2(P.cents + goalOver);
   const extraIn = sdR2(a.extra + overToLoan);
-
-  // The loan: interest first, then principal; extra only up to what clears it.
   let interest = sdR2(loan.interest);
   const mustToInt = sdR2(Math.min(interest, P.minNow));
   interest = sdR2(interest - mustToInt);
@@ -445,7 +430,34 @@ function sdSign(w, rules) {
     arrears: P.shortfall,                 // carried, with no interest on it
   });
   const nl = sdLeft(loanAfter);
-  const pay = sdR2(left0 - nl);             // what came off the wall
+  return { pots, loan, left0, toGoal, goalOver, readyOpen, overToLoan, extraUsed, spill, loanAfter, nl,
+           pay: sdR2(left0 - nl) };          // pay: what came off the wall
+}
+/* 🧱 "What I owe → after my plan" on I choose: what the sign would leave. */
+function sdOweAfterPlan(w, rules) {
+  return sdLoanPlan(w, sdPile(w, rules), rules).nl;
+}
+
+/* ── Step 4 · Sign ─────────────────────────────────────────────────
+   The prototype's sign(): the signed record, the passbook row, the stickers,
+   the milestone crossed, and the state after. Refused while money is unplaced
+   ("place $X first") or if In ≠ Out. The loan takes interest first, then the
+   must-pay, then extra at 1 + bonus; extra beyond what clears the loan spills
+   to Savings (🎉). The goal jar never passes its goal; the rest goes to
+   Savings. Below the 🏦 Savings gate (judged on the loan before this
+   Sunday), the leftover cents and the jar's overflow go on the loan as extra
+   instead, counted at 1 + bonus like any extra (`overToLoan`). */
+function sdSign(w, rules) {
+  const x = w || {};
+  const P = sdPile(x, rules);
+  if (P.pile > 0) return { ok: false, why: `place $${P.pile} first` };
+  const a = sdAlloc(x.alloc);
+  // A placement is dollars put somewhere; a negative one is not a plan.
+  if (SD_ALLOC_KEYS.some(k => !(Number(a[k]) >= 0))) return { ok: false, why: 'Every box needs $0 or more — nothing was signed.' };
+  if (P.pile < 0) return { ok: false, why: `That is $${-P.pile} more than my pile — nothing was signed.` };
+  const pull = Object.assign({ ready: 0, stock: 0, cash: 0 }, x.pull || {});
+  const week = Number(x.week) || 0;
+  const { pots, loan, left0, toGoal, goalOver, readyOpen, overToLoan, extraUsed, spill, loanAfter, nl, pay } = sdLoanPlan(x, P, rules);
 
   // The milestone: a gate crossed by THIS payment (🏦 Savings at 20% too).
   const pctBefore = sdPaidPct(loan), pctAfter = sdPaidPct(loanAfter);
@@ -884,6 +896,70 @@ function sdFineFloorNote(raw, applied, fmt) {
   return a <= 0.004 ? 'nothing taken — the day was $0' : `only ${f(a)} taken — the day earned ${f(a)}`;
 }
 
+/* 📊 One frozen ledger row in Payday's groups (My last 4 Sundays, Plan v17
+   §2). A row from before a group was kept shows what it has (null where it
+   kept nothing). Total = earned + given + bank − taken off, the pile's own
+   sum (`sdPile().tp`); 🌱 made stays in her pots, so it is shown but not
+   added. Pure, so the 20-Sunday run can hold it to the pile. */
+function sdHistGroups(r) {
+  const row = r.row || {};
+  const n = v => sdR2(Number(v) || 0);
+  const G = row.groups || null;
+  const home = sdR2(n(row.chores) + n(row.learning) + n(row.streak));
+  const club = n(row.sessionsPaid), comp = n(row.competition);
+  const split = (home + club + comp) > 0;
+  const earned = split ? sdR2(home + club + comp) : n(r.earned);
+  const given = G ? n(G.given) : n(r.given);
+  const bank = G ? n(G.bank) : null;
+  const off = G ? n(G.takenOff) : n(row.fines);
+  const made = G ? n(G.made) : (row.passive != null ? Math.max(0, n(row.passive)) : null);
+  return { earned, home: split ? home : null, club: split ? club : null, comp: split ? comp : null, given, made, bank,
+           off: -off, total: sdR2(earned + given + (bank || 0) - off) };
+}
+
+/* "Loan per month" changed: each open row's monthly scaled toward `now`,
+   the rounding residual on the last row, so the rows add up to `now` to the
+   cent (Plan "Money fit and logic" L3). */
+function sdRescaleMonthly(monthlies, now) {
+  const list = (monthlies || []).map(v => sdR2(v));
+  const sum = sdR2(list.reduce((a, v) => a + v, 0));
+  if (!(sum > 0) || !list.length) return list;
+  const out = list.map(v => sdR2(v * now / sum));
+  const rest = sdR2(sdR2(now) - out.slice(0, -1).reduce((a, v) => sdR2(a + v), 0));
+  out[out.length - 1] = Math.max(0, rest);
+  return out;
+}
+
+/* 🆕 A commitment's numbers, before anything is written — the one answer
+   Grown-ups' "Can she afford it?" card and `mnyAddCommitment` both read
+   (Plan "Money fit and logic" L5 / L6). Her share; 10 % of it down, out of
+   🏦 Savings only ABOVE the 🛟 safety line (the 🛟 still pays a surprise
+   cost — `mnyAddSurprise`); what Savings cannot cover stays on the new row,
+   which is paid over `weeks` Sundays as its own monthly figure, so the weekly
+   must-pay is the loan's own rule (monthly × 12 ÷ 52, `mnyWeeklyDue`).
+   Steady money under $5 a week shows no share, and a share over 50 % of it
+   is allowed — both only with a parent's ✓ (`needsTick`). */
+const SD_COMMIT_MIN_STEADY = 5;     // below $5 a week of steady money, no share is shown
+const SD_COMMIT_MAX_SHARE = 50;     // over 50 % of steady money needs a parent's ✓
+function sdCommitPlan(o) {
+  const x = o || {};
+  const her = sdR2((Number(x.cost) || 0) * (Number(x.sharePct) || 0) / 100);
+  const weeks = Math.max(1, Math.round(Number(x.weeks) || 1));
+  const down = Math.round(her * 10) / 100;
+  const fromSavings = sdR2(Math.min(down, Math.max(0, (Number(x.saved) || 0) - (Number(x.safety) || 0))));
+  const toWall = sdR2(down - fromSavings);
+  const added = sdR2(her - fromSavings);
+  const monthly = sdR2(added / weeks * 52 / 12);
+  const weekly = sdR2(monthly * 12 / 52);
+  const p0 = sdR2(x.weeklyNow), p1 = sdR2(p0 + weekly);
+  const steady = sdR2(x.steady);
+  const lowSteady = !(steady >= SD_COMMIT_MIN_STEADY);
+  const r0 = lowSteady ? null : p0 / steady * 100, r1 = lowSteady ? null : p1 / steady * 100;
+  const over = !lowSteady && r1 > SD_COMMIT_MAX_SHARE;
+  return { her, weeks, down, fromSavings, toWall, added, monthly, weekly, p0, p1, steady, r0, r1,
+           lowSteady, over, needsTick: lowSteady || over };
+}
+
 // Inert in the browser; lets tests/sunday.test.js hold the pure core in Node.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -896,5 +972,7 @@ if (typeof module !== 'undefined' && module.exports) {
     sdImpactWeek, sdImpactWeekly, sdImpact, sdWithAgreed, sdAgreeInto, sdSavingLine,
     sdOweOwnForecast, sdOweOwnSeries, sdThinLabels, SD_CHART_LABELS,
     sdSegHitsBox, sdGapLabelSpot, SD_REQUEST_TAGS, sdRequestTag, sdOff$, sdFineFloorNote,
+    sdLoanPlan, sdOweAfterPlan, sdHistGroups, sdRescaleMonthly, SD_COMMIT_MIN_STEADY, SD_COMMIT_MAX_SHARE,
+    sdCommitPlan,
   };
 }

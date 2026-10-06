@@ -752,5 +752,240 @@ function fill(w, k) {
   check("taken off: the screen's own format", O(3, v => '$' + v) === '−$3');
 }
 
+/* ── Money fit and logic, PR 1 (2026-10-05) ───────────────────────── */
+{
+  const r18 = require(path.join(__dirname, '..', 'js', '18-rules.js'));
+
+  /* L3 · "loan per month" changed: the rows' monthly figures add up to the new
+     figure exactly (the rounding residual sits on the last row), and the
+     weekly must-pay (monthly × 12 ÷ 52 per row) is within a cent per row. */
+  {
+    const bad = [];
+    const cases = [[[70, 25, 33.33], 120], [[10, 10, 10], 50], [[56], 61], [[33.33, 33.33, 33.34], 100.01],
+      [[12.5, 7.25, 40, 3.1], 77.77], [[1, 2, 3, 4, 5, 6, 7], 29.99]];
+    const rand = rng(20261005);
+    for (let i = 0; i < 200; i++) {
+      const n = between(rand, 1, 5);
+      cases.push([Array.from({ length: n }, () => r2(between(rand, 100, 9000) / 100)), r2(between(rand, 500, 20000) / 100)]);
+    }
+    cases.forEach(([rows, now]) => {
+      const next = s.sdRescaleMonthly(rows, now);
+      const sum = r2(next.reduce((a, v) => a + v, 0));
+      if (sum !== r2(now)) bad.push(`${JSON.stringify(rows)} → ${now}: rows sum to ${sum}`);
+      const wk = r2(next.reduce((a, v) => a + r2(v * 12 / 52), 0));
+      if (Math.abs(wk - r2(now * 12 / 52)) > 0.01 * next.length + 1e-9) bad.push(`${JSON.stringify(rows)} → ${now}: weekly ${wk} vs ${r2(now * 12 / 52)}`);
+      if (next.some(v => v < 0)) bad.push(`${JSON.stringify(rows)} → ${now}: a negative row ${JSON.stringify(next)}`);
+    });
+    check('L3 rescale: the rows\' monthly figures sum to the new "loan per month" exactly', bad.length ? bad.slice(0, 6) : true);
+  }
+
+  /* L5 / L6 · a commitment, before anything is written. */
+  {
+    const P = o => s.sdCommitPlan(Object.assign({ cost: 60, sharePct: 50, weeks: 26, saved: 20, safety: 10, weeklyNow: 16.15, steady: 40 }, o));
+    const a = P({});
+    check('new weekly payment after a commitment: $16.15 → $17.19 for $27 over 26 weeks',
+      a.her === 30 && a.down === 3 && a.added === 27 && a.weekly === 1.04 && a.p0 === 16.15 && a.p1 === 17.19
+        ? true : JSON.stringify(a));
+    const b = P({ saved: 11 }), c = P({ saved: 5 });
+    check('L6 down payment: Savings pays only above the 🛟 $10, the rest joins the wall',
+      b.fromSavings === 1 && b.toWall === 2 && b.added === 29 && c.fromSavings === 0 && c.toWall === 3 && c.added === 30
+      && a.fromSavings === 3 && a.toWall === 0 ? true : JSON.stringify([a, b, c].map(x => [x.fromSavings, x.toWall, x.added])));
+    check('L6 the new row\'s weekly figure is the wall part over its weeks (monthly × 12 ÷ 52)',
+      b.monthly === r2(29 / 26 * 52 / 12) && b.weekly === r2(b.monthly * 12 / 52) && b.p1 === r2(16.15 + b.weekly)
+        ? true : JSON.stringify(b));
+    const low = P({ steady: 4.99 }), zero = P({ steady: 0 });
+    check('L5 steady under $5: no share is shown and a parent\'s ✓ is needed',
+      low.lowSteady === true && low.r0 === null && low.r1 === null && low.needsTick === true && zero.needsTick === true
+        ? true : JSON.stringify([low, zero].map(x => [x.lowSteady, x.r1, x.needsTick])));
+    const over = P({ weeklyNow: 19.5 }), under = P({ weeklyNow: 10 });
+    check('L5 over 50 % of steady money needs a parent\'s ✓; under it does not',
+      over.over === true && over.needsTick === true && under.over === false && under.needsTick === false && Math.round(under.r1) === 28
+        ? true : JSON.stringify([over, under].map(x => [x.r1, x.over, x.needsTick])));
+  }
+
+  /* L4 · the money week's name: its first and last day. */
+  {
+    const rule = wk => r18.mrDayKeyAdd(wk, 6) >= '2026-10-11';
+    const none = () => null;
+    const L = r18.mrMoneyWeekLabelPure;
+    const got = [L('2026-10-12', rule, none), L('2026-10-05', rule, none), L('2026-09-28', rule, none),
+      L('2026-09-28', () => true, none), L('2026-11-02', rule, none)];
+    const want = ['Sun 11 – Sat 17 Oct', 'Mon 5 – Sat 10 Oct', 'Mon 28 Sep – Sun 4 Oct', 'Sun 27 Sep – Sat 3 Oct', 'Sun 1 – Sat 7 Nov'];
+    check('L4 money week label: Sun–Sat, the switch week Mon 5 – Sat 10, Mon–Sun before the rule',
+      got.join('|') === want.join('|') ? true : got);
+    const newFirst = wk => wk === '2026-10-05' ? ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'] : null;
+    const oldFirst = wk => wk === '2026-09-28' ? true : null;
+    check('L4 the switch Sunday is named by the week that paid it',
+      L('2026-10-05', rule, newFirst) === 'Sun 4 – Sat 10 Oct' && L('2026-10-05', rule, oldFirst) === 'Mon 5 – Sat 10 Oct'
+        ? true : [L('2026-10-05', rule, newFirst), L('2026-10-05', rule, oldFirst)]);
+  }
+
+  /* 🧱 owe after my plan (I choose): exactly what the sign leaves, interest
+     owed and the 10 % bonus included. */
+  {
+    const w = { weekKey: '2026-10-12', week: 3, lines: [{ key: 'jobs', amount: 21 }, { key: 'streak', amount: 2 }],
+      loan: { principal: 1000, paid: 300, interest: 2.5, arrears: 0, weekly: 16.15 }, pots: { ready: 12, goal: 8, gic: 0, stock: 0 },
+      locks: [], goal: { name: 'Guards', target: 35 }, pull: {}, adv: { owed: 0, manual: 0 }, alloc: { extra: 6 }, hist: [] };
+    const res = s.sdSign(w, R);
+    // Below the 🏦 Savings gate the jar's overflow goes on the wall too (the old
+    // chooser figure, left − (must-pay + extra × 1.1), said $521.67 here).
+    const lo = { weekKey: '2026-10-12', week: 3, lines: [{ key: 'jobs', amount: 21 }, { key: 'streak', amount: 2 }, { key: 'pa', amount: 6.5 }],
+      loan: { principal: 600, paid: 60, interest: 0, arrears: 0, weekly: 9.23 }, pots: { ready: 0, goal: 4, gic: 0, stock: 0 },
+      locks: [], goal: { name: 'Goggles', target: 12 }, pull: {}, adv: { owed: 0, manual: 0 }, alloc: { goal: 12 }, hist: [] };
+    lo.alloc.extra = s.sdPile(lo, R).hers - 12;
+    const resLo = s.sdSign(lo, R);
+    check('owe after plan: I choose shows what the sign leaves (interest owed; the jar overflowing below the Savings gate)',
+      res.ok && resLo.ok && s.sdOweAfterPlan(w, R) === res.after.left && s.sdOweAfterPlan(lo, R) === resLo.after.left && resLo.after.left === 517.27
+        ? true : JSON.stringify([res.after && res.after.left, s.sdOweAfterPlan(w, R), resLo.after && resLo.after.left, s.sdOweAfterPlan(lo, R)]));
+  }
+
+  /* M7 · 20 Sundays per girl with real-shaped numbers, through the pure core
+     (an `sdBuildInput`-shaped week → `sdSign`). Approvals are modelled the way
+     the app stamps them: a ⏪ Draw early feeds `adv.owed` until its
+     `appliedAmount` reaches its amount and the sign stamps `appliedWeek`
+     (js/23-money-meeting.js); a gift feeds 🎁 until stamped at the sign
+     (js/23); a 🧱 wall move is paid once at Sunday open from Savings, as extra
+     at 1 + bonus, and stamped (js/40-stream.js `mnyApplyApprovedWallMoves`); a
+     🎯 goal switch is applied once at Sunday open and stamped
+     (js/45-requests.js `mnyApplyApprovedGoals`). The stamps are this model's;
+     the smoke suite drives the app's own. */
+  ['jenn', 'jess'].forEach(kid => {
+    const bad = [];
+    const J = kid === 'jenn';
+    let st = startOf(kid);
+    const reqs = [
+      ...[2, 9, 15].map(i => ({ id: 'adv' + i, kind: 'adv', amount: J ? 3 : 2, approvedFor: i, appliedAmount: 0, appliedWeek: null })),
+      ...[3, 11].map(i => ({ id: 'dep' + i, kind: 'dep', amount: J ? 10 : 15, approvedFor: i, appliedWeek: null })),
+      ...[6, 14].map(i => ({ id: 'wall' + i, kind: 'wall', amount: 4, approvedFor: i, appliedWeek: null })),
+      { id: 'goal10', kind: 'goal', approvedFor: 10, name: J ? 'Skate bag' : 'Art set', target: J ? 60 : 45, appliedWeek: null },
+    ];
+    const stampsSeen = {};
+    const stamp = (r, wk) => { if (r.appliedWeek) bad.push(`${r.id} stamped twice`); r.appliedWeek = wk; stampsSeen[r.id] = (stampsSeen[r.id] || 0) + 1; };
+    const lockBack = st.locks.map(l => [l.back, l.amount]);   // [Sunday it comes back, amount]
+    const rows = [];
+    let advTakenSum = 0, giftsSum = 0, wallPaid = 0, interestSundays = [];
+    for (let i = 1; i <= 20; i++) {
+      const tag = `${kid} Sunday ${i}`;
+      const weekKey = s.sdDayKeyAdd('2026-09-28', 7 * (i - 1));
+      const live = reqs.filter(r => r.approvedFor <= i && !r.appliedWeek);
+      // Sunday opens: the goal switch and the wall moves, each once.
+      live.filter(r => r.kind === 'goal').forEach(r => {
+        st.pots = s.sdNewGoal(st.pots, { name: r.name, target: r.target }, 'goal');
+        st.goal = { name: r.name, target: r.target }; stamp(r, weekKey);
+      });
+      live.filter(r => r.kind === 'wall').forEach(r => {
+        const amt = r2(Math.min(r.amount, st.pots.ready));
+        st.pots = Object.assign({}, st.pots, { ready: r2(st.pots.ready - amt) });
+        const b = R.loan.extraBonusPct / 100;
+        const credit = r2(Math.min(r2(st.loan.principal - st.loan.paid), amt * (1 + b)));
+        st.loan = Object.assign({}, st.loan, { paid: r2(st.loan.paid + credit) });
+        r.appliedAmount = amt; wallPaid = r2(wallPaid + amt); stamp(r, weekKey);
+      });
+      const gifts = r2(live.filter(r => r.kind === 'dep').reduce((a, r) => a + r.amount, 0));
+      const advOwed = r2(live.filter(r => r.kind === 'adv').reduce((a, r) => a + r.amount - r.appliedAmount, 0));
+      const lines = [
+        { key: 'jobs', label: '🧹 Chores', amount: (J ? [5, 6, 4, 7][i % 4] : [4, 5, 6, 3][i % 4]) * R.chores.dailyCap },
+        { key: 'streak', label: '🔥 Routine streak', amount: [0, 1, 2, 3][i % 4] },
+        { key: 'pa', label: '⛸️ Club job', amount: (J ? 2 : 1) * R.sessions.perSession },
+        { key: 'comp', label: '🏆 Competitions', amount: (i === 5 || i === 13) ? (J ? 15 : 12) : 0 },
+        { key: 'gifts', label: '🎁 Gifts', amount: gifts },
+        { key: 'ret', label: '🌱 My pots earned', amount: 0 },
+        { key: 'fine', label: '📦 Fines', amount: (i === 7 || i === 12) ? -1 : 0 },
+      ];
+      const w = { weekKey, week: st.week, lines, loan: st.loan, pots: st.pots, locks: st.locks, goal: st.goal,
+        pull: {}, adv: { owed: advOwed, manual: 0 }, alloc: {}, hist: [], histCat: st.histCat, stickers: st.stickers, guess: 30 };
+      if (i === 8) { const pr = s.sdSetPull(w, 'ready', 1, R); if (pr.ok) w.pull = pr.pull; }
+      // Her plan: Savings and the jar a little, a lock every other week, a treat, the rest on the wall.
+      let cur = Object.assign({}, w, { alloc: {} });
+      const tap = (k, n) => { const r = s.sdPlace(cur, k, 1, n, R); if (r.ok) cur = Object.assign({}, cur, { alloc: r.alloc }); };
+      tap('ready', 2); tap('goal', J ? 3 : 4); if (i % 2) tap('gic', 1); tap('spend', 1);
+      tap('extra', 999);
+      w.alloc = cur.alloc;
+      const P = s.sdPile(w, R);
+      if (P.pile !== 0) bad.push(`${tag}: $${P.pile} left unplaced`);
+      const oweAfter = s.sdOweAfterPlan(w, R);
+      const snap = JSON.stringify(w);
+      const res = s.sdSign(w, R);
+      if (!res.ok) { bad.push(`${tag}: refused — ${res.why}`); break; }
+      const sg = res.signed;
+      if (!res.check.ok) bad.push(`${tag}: In ${res.check.in} ≠ Out ${res.check.out}`);
+      if (oweAfter !== res.after.left) bad.push(`${tag}: I choose says owe ${oweAfter}, the sign leaves ${res.after.left}`);
+      // L1: one pile figure — Payday's pile and I choose's chip (P.tp), Signed's
+      // money in less what was taken off, and My last 4 Sundays' total.
+      const takenOff = r2(-sg.outFine + sg.adv);
+      const row = { row: { chores: lines[0].amount, streak: lines[1].amount, sessionsPaid: lines[2].amount, competition: lines[3].amount,
+        groups: { earned: r2(sg.inSteady + lines[3].amount), given: gifts, made: 0, bank: sg.inBank, takenOff } } };
+      const hg = s.sdHistGroups(row);
+      if (P.tp !== hg.total || r2(res.check.in - takenOff) !== P.tp) bad.push(`${tag}: pile ${P.tp}, last-4 total ${hg.total}, Signed in − taken off ${r2(res.check.in - takenOff)}`);
+      // The cents rule: Savings when open, else on the loan with the jar's overflow.
+      if (s.sdIsOpen('ready', w, R)) {
+        if (sg.overToLoan !== 0 || r2(sg.ready - (w.alloc.ready || 0) - sg.spill) < r2(P.cents) - 0.001) bad.push(`${tag}: the cents did not reach Savings`);
+      } else if (sg.overToLoan < sg.cents) bad.push(`${tag}: cents ${sg.cents} not on the loan (${sg.overToLoan})`);
+      if (res.after.pots.goal > st.goal.target + 0.001) bad.push(`${tag}: goal jar ${res.after.pots.goal} of ${st.goal.target}`);
+      // A lock comes back after exactly 4 Sundays.
+      const matured = s.sdMatured(w);
+      const due = r2(lockBack.filter(([back]) => back === i).reduce((a, [, v]) => a + v, 0));
+      if (matured !== due) bad.push(`${tag}: ${matured} came back, ${due} was due`);
+      if (w.alloc.gic) lockBack.push([i + R.pots.lockWeeks, w.alloc.gic]);
+      // Redo, then sign again: the same ledger.
+      const again = s.sdSign(JSON.parse(snap), R);
+      if (JSON.stringify(again) !== JSON.stringify(res)) bad.push(`${tag}: a re-sign after Redo differs`);
+      // The sign stamps what it used.
+      let advLeft = sg.adv;
+      live.filter(r => r.kind === 'adv').forEach(r => {
+        const pay = r2(Math.min(r2(r.amount - r.appliedAmount), advLeft));
+        r.appliedAmount = r2(r.appliedAmount + pay); advLeft = r2(advLeft - pay);
+        if (r.appliedAmount >= r.amount) stamp(r, weekKey);
+      });
+      live.filter(r => r.kind === 'dep').forEach(r => stamp(r, weekKey));
+      advTakenSum = r2(advTakenSum + sg.adv); giftsSum = r2(giftsSum + gifts);
+      rows.push(res.bookRow);
+      const li = s.sdLoanInterest(res.after.loan, st.sinceInterest, R);
+      if (li.interest > 0) interestSundays.push(i);
+      st = { weekKey, week: res.after.week, loan: li.loan, pots: res.after.pots, locks: res.after.locks, goal: st.goal,
+             histCat: res.after.histCat, stickers: res.after.stickers, sinceInterest: li.sundaysSince, advOwed: res.after.advOwed };
+    }
+    if (interestSundays.join(',') !== '4,8,12,16,20') bad.push('interest on Sundays ' + interestSundays.join(','));
+    if (!lockBack.some(([back]) => back > 1 && back <= 20)) bad.push('no lock placed in the run came back');
+    reqs.forEach(r => { if (stampsSeen[r.id] !== 1) bad.push(`${r.id} applied ${stampsSeen[r.id] || 0} times`); });
+    const advAsked = r2(reqs.filter(r => r.kind === 'adv').reduce((a, r) => a + r.amount, 0));
+    const depAsked = r2(reqs.filter(r => r.kind === 'dep').reduce((a, r) => a + r.amount, 0));
+    if (advTakenSum !== advAsked) bad.push(`drawn early ${advTakenSum} taken off, ${advAsked} asked`);
+    if (giftsSum !== depAsked) bad.push(`gifts ${giftsSum} paid in, ${depAsked} given`);
+    if (!(wallPaid > 0)) bad.push('no wall move was paid');
+    // The passbook's total row is the sum of its rows, and every row placed what came in.
+    const T = ['earned', 'wall', 'saved', 'cash'].map(k => r2(rows.reduce((a, x) => a + x[k], 0)));
+    const byRow = rows.reduce((a, x) => [r2(a[0] + x.earned), r2(a[1] + x.wall), r2(a[2] + x.saved), r2(a[3] + x.cash)], [0, 0, 0, 0]);
+    if (T.join() !== byRow.join() || rows.length !== 20) bad.push(`passbook total ${T} vs rows ${byRow} over ${rows.length} rows`);
+    check(`M7 20 Sundays for ${kid}: In = Out, one pile figure, cents, interest on 4/8/12/16/20, locks back after 4, goal capped, each approval once, Redo re-sign identical, passbook total`,
+      bad.length ? bad.slice(0, 8) : true);
+  });
+
+  /* Optional: SUNDAY_REPLAY=<path to a Parent › App export> replays her signed
+     Sundays through the same In = Out and pile checks. Skipped when unset. */
+  if (process.env.SUNDAY_REPLAY) {
+    const fs = require('fs');
+    const bad = [];
+    let n = 0;
+    try {
+      const data = JSON.parse(fs.readFileSync(process.env.SUNDAY_REPLAY, 'utf8'));
+      const shared = data.shared || (data.state && data.state.shared) || {};
+      const led = (shared.chore || {}).moneyLedger || {};
+      Object.keys(led).sort().forEach(wk => Object.keys(led[wk] || {}).forEach(kid => {
+        const r = led[wk][kid];
+        const sg = r && r.sunday && r.sunday.signed;
+        if (!sg) return;
+        n++;
+        const io = s.sdCheckInOut(sg);
+        if (!io.ok) bad.push(`${kid} ${wk}: ${io.why}`);
+        const tp = r2(io.in - (-sg.outFine + sg.adv));
+        const hg = s.sdHistGroups({ row: r });
+        if (r.groups && hg.total !== tp) bad.push(`${kid} ${wk}: last-4 total ${hg.total}, pile ${tp}`);
+      }));
+    } catch (e) { bad.push('could not read ' + process.env.SUNDAY_REPLAY + ': ' + e.message); }
+    check(`replay of ${process.env.SUNDAY_REPLAY}: ${n} signed Sundays hold In = Out and one pile figure`, bad.length ? bad.slice(0, 8) : true);
+  }
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach(f => console.log('  - ' + f)); process.exit(1); }

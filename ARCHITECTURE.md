@@ -4202,6 +4202,32 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   stands `mrMoneyWeekRuleOn` down for the check): from the week of Sun 11 Oct
   2026 the current week is Sunday–Saturday and they failed by the date.
 
+### Money fit and logic, PR 1 — money rules (build 2026-10-05d)
+
+- **The money week has one name on the money surfaces:** `mrMoneyWeekLabel(wk, kid)`
+  (js/18, beside `mrMoneyDays`; pure twin `mrMoneyWeekLabelPure`, tested in
+  tests/sunday.test.js) names the first and last day the week pays — "Sun 11 –
+  Sat 17 Oct", the switch week "Mon 5 – Sat 10 Oct" (while it is open, the
+  switch Sunday belongs to the old week), "Mon 28 Sep – Sun 4 Oct" before the
+  dated rule. Used ONLY by the meeting's head while the money step is on
+  (`mmHead`), Signed's header, the story's week card and Grown-ups › 📒 Weeks
+  rows. `mmWeekLabel` and its planner callers stay Mon–Sun — do not swap them.
+- **A too-big commitment needs the parent's tick.** `sdCommitPlan` (js/43) is
+  the one answer for a commitment's numbers, read by the "Can she afford it?"
+  card and by `mnyAddCommitment`: steady money under $5 a week shows no share,
+  and that or a share over 50 % is saved only with "I checked this with her"
+  ticked (`guCommitDraft.tickFor`, form state tied to the figures — no stored
+  field, nothing in `state.shared`). The 10 % down comes out of Savings only
+  above the 🛟 safety line; the rest stays on the new row. A 🌧️ surprise cost is
+  unchanged: the 🛟 pays it first (decision 8).
+- **One pile figure.** Payday's 💰 My pile, I choose's chip ("$X left" beside
+  it), Signed's money in less taken off and My last 4 Sundays' total
+  (`sdHistGroups`, moved to js/43 so it is node-tested) are all `sdPile().tp`.
+  🏦 From my bank lists "📥 Waiting for Sunday" as its own line, so its lines add
+  up to its total. I choose's "what I owe → after" is `sdOweAfterPlan` — the
+  sign's own loan arithmetic (`sdLoanPlan`, which `sdSign` now calls).
+  `sdRescaleLoanRows` puts the rounding cent on the last row (`sdRescaleMonthly`).
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

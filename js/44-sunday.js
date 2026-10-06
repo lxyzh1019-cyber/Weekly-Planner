@@ -229,7 +229,8 @@ function sdRescaleLoanRows(kid, wk) {
   const open = mnyOpenDebtsOldestFirst(kid);
   const sum = money2(open.reduce((a, x) => a + money2(x.monthly), 0));
   if (!(sum > 0)) return 0;
-  open.forEach(x => { x.monthly = money2(money2(x.monthly) * ch.now / sum); x.monthlyRescaledFor = ch.key; markItemUpdated(x); });
+  const next = sdRescaleMonthly(open.map(x => x.monthly), ch.now);
+  open.forEach((x, i) => { x.monthly = next[i]; x.monthlyRescaledFor = ch.key; markItemUpdated(x); });
   saveAll();
   return open.length;
 }
@@ -672,8 +673,10 @@ function sdPaydayMain(c) {
   const pull = (k, name, sub) => `<div class="sd-pull"><div class="sd-pull-name"><span class="sd-nowrap">${escapeHtml(name)}</span><span class="sd-note">${escapeHtml(sub)}</span></div>
       <button type="button" class="sd-step" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="-1" aria-label="Less">−</button><b>$${Number(d.pull[k]) || 0}</b>
       <button type="button" class="sd-step sd-step--gold" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="1" aria-label="More">+</button></div>`;
+  // 📥 Money that came in since last Sunday joins the pile on its own
+  // (Deviation 37); it is one line of the box, so the box adds up to its total.
   const waiting = money2(f.carry + f.homeIn);
-  const bankNote = [waiting > 0 ? `📥 ${sdM(waiting)} waiting` : '', f.unlocked > 0 ? 'a lock came back' : ''].filter(Boolean).join(' · ') || 'only if I need it';
+  const bankNote = f.unlocked > 0 ? 'a lock came back' : 'only if I need it';
   const mustRows = isParent() ? `<button type="button" class="sd-step" data-mny-action="sd-must" data-sd-d="-1" aria-label="A parent: pay less this week">−</button><button type="button" class="sd-step" data-mny-action="sd-must" data-sd-d="1" aria-label="A parent: back toward the schedule">+</button>` : '';
   const reduced = f.due.filter(x => x.reduced);
   const impact = reduced.length ? ` A parent made it ${sdM(money2(reduced.reduce((a, x) => a + x.scheduled - x.amount, 0)))} less — still owed next Sunday, no interest.` : '';
@@ -710,6 +713,7 @@ function sdPaydayMain(c) {
             <div class="sd-pulls">
               ${pull('ready', '🏦 From Savings', `$${savingsFree} free`)}
               ${pull('cash', '🏠 From home', 'cash I bring in')}
+              ${waiting > 0 ? `<div class="sd-pull"><div class="sd-pull-name"><span class="sd-nowrap">📥 Waiting for Sunday</span><span class="sd-note">came in this week</span></div><b>${escapeHtml(sdM(waiting))}</b></div>` : ''}
             </div>
           </div>
         </div>
@@ -727,7 +731,7 @@ function sdPaydayMain(c) {
         </div>
       </div>
       <div class="sd-pile">
-        <div class="sd-pile-head"><span class="sd-box-title">💰 My pile</span><b class="sd-red">${escapeHtml(sdM(done ? P.tp : 0))}</b></div>
+        <div class="sd-pile-head"><span class="sd-box-title">💰 My pile</span><b class="sd-red">${escapeHtml(sdM(done || sdReducedMotion() ? P.tp : 0))}</b></div>
         <div class="sd-pilebox">
           <div class="sd-stack">${sdCoins(c)}</div>
           <div class="sd-ruler"></div>
@@ -752,26 +756,8 @@ function sdGuessResult(c) {
   return (Math.abs(d.guess - Pd) <= 5 ? `$${d.guess} — really close!` : d.guess > Pd ? `$${d.guess} — it's less.` : `$${d.guess} — it's more!`)
     + (cats.length ? ` · ${right} of ${cats.length} sources right` : '');
 }
-/* 📊 My last 4 Sundays, in exactly the left side's groups (Plan v17 §2).
-   Read from the frozen ledger rows (`sdLedgerHistory`); a row from before a
-   group was kept shows what it has ("—" where it kept nothing). Total =
-   earned + given + bank − taken off, the pile's own sum; 🌱 made stays in
-   her pots, so it is shown but not added. */
-function sdHistGroups(r) {
-  const row = r.row || {};
-  const n = v => money2(Number(v) || 0);
-  const G = row.groups || null;
-  const home = money2(n(row.chores) + n(row.learning) + n(row.streak));
-  const club = n(row.sessionsPaid), comp = n(row.competition);
-  const split = (home + club + comp) > 0;
-  const earned = split ? money2(home + club + comp) : n(r.earned);
-  const given = G ? n(G.given) : n(r.given);
-  const bank = G ? n(G.bank) : null;
-  const off = G ? n(G.takenOff) : n(row.fines);
-  const made = G ? n(G.made) : (row.passive != null ? Math.max(0, n(row.passive)) : null);
-  return { earned, home: split ? home : null, club: split ? club : null, comp: split ? comp : null, given, made, bank,
-           off: -off, total: money2(earned + given + (bank || 0) - off) };
-}
+/* 📊 My last 4 Sundays reads each frozen row through `sdHistGroups` (js/43,
+   the pure core, so tests/sunday.test.js holds its total to the pile). */
 function sdPaydaySide(c) {
   const b = c.f.b;
   // Her money week's own days (Deviation 34: Sun..Sat after the switch).
@@ -920,7 +906,7 @@ function sdChooseMain(c) {
   const sum = `🧱 ${sdM(gv[0])} + 👛 ${sdM(gv[1])} + 🌱 ${sdM(gv[2])} = ${sdM(money2(gv[0] + gv[1] + gv[2]))}${pile > 0 ? ` · $${pile} still in my pile` : ' ✓'}${centsTxt}`;
   const minusOk = d.pick && d.pick !== 'fixed' && (d.alloc[d.pick] || 0) > 0;
   return `<div class="sd-choosehead">
-      <button type="button" class="sd-pilechip" data-mny-action="sd-back" data-sd-to="1" aria-label="${escapeAttr('My pile ' + sdM(TP))}"><span class="sd-pilecoins" aria-hidden="true">💰</span><b>${escapeHtml(pile > 0 ? `$${pile} left` : sdM(TP))}</b></button>
+      <button type="button" class="sd-pilechip" data-mny-action="sd-back" data-sd-to="1" aria-label="${escapeAttr('My pile ' + sdM(TP) + (pile > 0 ? ` · $${pile} left` : ''))}"><span class="sd-pilecoins" aria-hidden="true">💰</span><b>${escapeHtml(sdM(TP))}</b>${pile > 0 ? `<span class="sd-note">$${pile} left</span>` : ''}</button>
       <span class="sd-title">🤝 What I do with it</span>
       <button type="button" class="sd-sign${pile > 0 ? '' : ' ready'}${nudge ? ' shake' : ''}" data-sd-sign="1" aria-label="${escapeAttr(pile > 0 ? `Place $${pile} first` : 'Hold to sign my plan')}">
         <span class="sd-sign-fill" style="width:${signing}%"></span>
@@ -954,7 +940,7 @@ function sdChooseSide(c) {
   const left = sdLeft(w.loan), PR = w.loan.principal || 0;
   const extra = sdVal(c, 'extra');
   const payNow = money2(P.minNow + extra * (1 + b));
-  const oweAfter = money2(Math.max(0, left - payNow));
+  const oweAfter = sdOweAfterPlan(w, r);
   const lk = d.last ? d.last.k : null;
   const hk = d.focus === 'all' ? 'all' : ({ fixed: 'loan', extra: 'loan', ready: 'ready', goal: 'goal', gic: 'gic', stock: 'stock' })[lk] || null;
   const hot = id => hk === 'all' || hk === id;
@@ -1109,9 +1095,8 @@ function sdSignedMain(c) {
   const at = Number(row.updatedAt || row.at) || 0;
   const when = at ? new Date(at) : null;
   const signedLine = `✓ signed ${mnyDayName(sdSundayOf(c.wk))}${when ? ' · ' + when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase() : ''}`;
-  const mdays = (c.f.b.chores.days || []).map(x => String(x.dayKey));
   const nSigned = mnyLedgerRows(c.kid).filter(x => x && x.sunday && String(x.weekKey) <= String(c.wk)).length;
-  const weekLine = mdays.length ? `money week ${mnyDayName(mdays[0])} – ${mnyDayName(mdays[mdays.length - 1])} · Week ${Math.max(1, nSigned)}` : '';
+  const weekLine = `money week ${mrMoneyWeekLabel(c.wk, c.kid)} · Week ${Math.max(1, nSigned)}`;
   return `<div class="sd-sighead">
       <div class="sd-sighead-text">
         <span class="sd-title">✍️ Signed. This is my plan.</span>
