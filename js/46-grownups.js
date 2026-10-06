@@ -240,9 +240,10 @@ function guHead(title, strap) {
   return `<div class="gu-head"><h2 class="gu-title">${escapeHtml(title)}</h2><span class="gu-strap">${escapeHtml(strap)}</span></div>`;
 }
 function guOpt(label, on, action, attrs, off) {
-  return `<button type="button" class="gu-opt${on ? ' on' : ''}" data-mnyp-action="${action}"${attrs || ''}${off ? ' disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
+  return `<button type="button" class="gu-opt${label === '−' || label === '+' ? ' mny-step' : ''}${on ? ' on' : ''}" data-mnyp-action="${action}"${attrs || ''}${off ? ' disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
 }
-function guVal(label) { return `<span class="gu-opt gu-optval">${escapeHtml(label)}</span>`; }
+// The value between a stepper's − and +: plain text, not a button (Money fit and logic PR 5).
+function guVal(label) { return `<span class="mny-stepval">${escapeHtml(label)}</span>`; }
 function guFormRow(q, opts) {
   return `<div class="gu-formrow"><span class="gu-q">${escapeHtml(q)}</span><div class="gu-opts">${opts}</div></div>`;
 }
@@ -563,8 +564,7 @@ function guCommitMain() {
   ];
   if (!sur) {
     rows.push(guFormRow('Her share', guOpt('−', false, 'gucmshare', ' data-mnyp-d="-5" aria-label="Less"') + guVal(c.share + '%')
-      + guOpt('+', false, 'gucmshare', ' data-mnyp-d="5" aria-label="More"')
-      + [25, 50, 75, 100].map(p => guOpt(p + '%', c.share === p, 'gucmshareset', ` data-mnyp-id="${p}"`)).join('')));
+      + guOpt('+', false, 'gucmshare', ' data-mnyp-d="5" aria-label="More"')));   // one 50 %: the stepper is the control (PR 5)
     rows.push(guFormRow('Pay it over', guOpt('−', false, 'gucmweeks', ' data-mnyp-d="-1" aria-label="A week less"')
       + guVal(c.weeks + (c.weeks === 1 ? ' week' : ' weeks'))
       + guOpt('+', false, 'gucmweeks', ' data-mnyp-d="1" aria-label="A week more"')
@@ -1534,7 +1534,6 @@ function guAction(a, el) {
   } else if (a === 'gucmkid') { guCommit().kid = id;
   } else if (a === 'gucmcost') { guCommit().cost = Math.max(5, guCommit().cost + d);
   } else if (a === 'gucmshare') { guCommit().share = Math.max(5, Math.min(100, guCommit().share + d));
-  } else if (a === 'gucmshareset') { guCommit().share = Number(id) || 50;
   } else if (a === 'gucmweeks') { guCommit().weeks = Math.max(1, Math.min(104, guCommit().weeks + d));
   } else if (a === 'gucmweeksset') { guCommit().weeks = Number(id) || 26;
   } else if (a === 'gucmtick') { const c = guCommit(), key = guCommitTickKey(c); c.tickFor = c.tickFor === key ? null : key;

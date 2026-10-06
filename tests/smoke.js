@@ -5201,11 +5201,14 @@ function findChromium() {
         profile = 'parent';
         const p = getProfData(kid);
         const wk = ctThisWeekKey(), days = mrWeekDayKeys(wk);
+        /* The fit check's second pass (window.__fitLong) seeds long names and
+           4-digit amounts: $1,234.56 loan left, a $1,050 cost. */
+        const L = !!window.__fitLong;
         delete p.debts;
         const d0 = mnyDebts(kid)[0];
-        Object.assign(d0, { name: 'Skates & boots', icon: '⛸️', principal: 600, paid: 220, monthly: 40, createdAt: 1,
+        Object.assign(d0, { name: L ? 'Winter skating camp' : 'Skates & boots', icon: '⛸️', principal: L ? 1454.56 : 600, paid: 220, monthly: 40, createdAt: 1,
           arrears: 0, arrearsInterest: 0, payments: [], bonusRate: 10, lastInterestAdded: 0, downPayment: 0, downPaid: 0 });
-        const d1 = mnyAddDebt(kid, { name: 'Fall season entries', icon: '🏆', principal: 400, monthly: 30 });
+        const d1 = mnyAddDebt(kid, { name: L ? 'Championship entries' : 'Fall season entries', icon: '🏆', principal: L ? 1050 : 400, monthly: 30 });
         if (d1) { d1.paid = 90; d1.createdAt = 2; d1.lastInterestAdded = 0.92; d1.arrearsInterest = 0.92; d1.bonusRate = 10; }
         ensureWallet(kid).cash = 0; p.holdings = []; p.events = [];
         moneyAddCash(kid, 40, { kind: 'gift', from: 'gift', note: 'seed' });
@@ -5214,8 +5217,8 @@ function findChromium() {
         p.savingGoals = [];
         /* Three weeks past this week's Sunday, never "today": on a Sunday the jar's
            date was today and read "the day has passed" (a date-pinned failure). */
-        const g1 = mnyAddGoal(kid, { name: 'New skate guards', icon: '🛼', target: 35, targetDate: sdDayKeyAdd(days[6], 21) });
-        mnyAddGoal(kid, { name: 'Book set', icon: '📚', target: 50 });
+        const g1 = mnyAddGoal(kid, { name: L ? 'Championship entries' : 'New skate guards', icon: '🛼', target: L ? 1050 : 35, targetDate: sdDayKeyAdd(days[6], 21) });
+        mnyAddGoal(kid, { name: L ? 'Winter skating camp' : 'Book set', icon: '📚', target: L ? 1050 : 50 });
         moneyDepositGoal(kid, 8, { goalId: g1.id });
         ctEnsureShared();
         const c = state.shared.chore; c.moneyLedger = c.moneyLedger || {};
@@ -5229,13 +5232,13 @@ function findChromium() {
         p.requests = []; p.moveRequests = [];
         p.deposits = (p.deposits || []).filter(x => !x.addedBy);
         profile = kid;
-        mnyAddRequest(kid, { kind: 'gift', amount: 20, from: 'Birthday money', giver: 'Uncle Mike' });
-        mnyAddRequest(kid, { kind: 'adv', amount: 2, why: 'school book fair' });
-        mnyAddRequest(kid, { kind: 'goal', name: 'Skate bag', icon: '🎒', target: 30 });
+        mnyAddRequest(kid, { kind: 'gift', amount: L ? 1050 : 20, from: 'Birthday money', giver: L ? 'Grandma Rosalind' : 'Uncle Mike' });
+        mnyAddRequest(kid, { kind: 'adv', amount: 2, why: L ? 'Championship entries' : 'school book fair' });
+        mnyAddRequest(kid, { kind: 'goal', name: L ? 'Winter skating camp' : 'Skate bag', icon: '🎒', target: L ? 1050 : 30 });
         profile = 'parent';
         p.expected = [];
         const nm = formatDayKey(String(todayKey()).slice(0, 8) + '01'); nm.setMonth(nm.getMonth() + 1);
-        mnyAddExpected(kid, { month: ctDateToKey(nm).slice(0, 7), label: '🎄 Christmas', amount: 20 });
+        mnyAddExpected(kid, { month: ctDateToKey(nm).slice(0, 7), label: L ? '🎄 Grandma Rosalind' : '🎄 Christmas', amount: L ? 1050 : 20 });
         const meetDay = String(todayKey());     // in this month, and its day has come
         setDayBlocks(meetDay, [...(getDayBlocks(meetDay, kid) || []).filter(b => b.id !== 'mv2-meet'),
           { id: 'mv2-meet', actId: 'competition', tag: 'skating', compName: 'Fall Classic', startMin: 8 * 60, durationMin: 240 }], kid);
@@ -5474,8 +5477,9 @@ function findChromium() {
       try {
         const wk = sdSeedWeek('jenn', { paid: 450 });
         moneyAddCash('jenn', 30, { kind: 'typed', from: 'typed', note: 'seed' }); moneyDeposit('jenn', 30, { note: 'seed' });
-        mnyAddGoal('jenn', { name: 'Skate guards', icon: '🛼', target: 35, targetDate: sdDayKeyAdd(wk, 40) });
-        profile = 'jenn'; mnyAddRequest('jenn', { kind: 'adv', amount: 2, why: 'Book fair' }); profile = 'parent';
+        const L = !!window.__fitLong;
+        mnyAddGoal('jenn', { name: L ? 'Winter skating camp' : 'Skate guards', icon: '🛼', target: L ? 1050 : 35, targetDate: sdDayKeyAdd(wk, 40) });
+        profile = 'jenn'; mnyAddRequest('jenn', { kind: 'adv', amount: 2, why: L ? 'Championship entries' : 'Book fair' }); profile = 'parent';
         renderMeetingMode();
         if (${step} >= 1) { mnyAnswerRequest('jenn', mnyEnsureRequests('jenn')[0].id, 'yes'); sdReveal('jenn'); }
         if (${step} >= 2) { sdClick('[data-mny-action="sd-tochoose"]'); sdClick('[data-sd-p="saving"]'); }
@@ -5629,14 +5633,15 @@ function findChromium() {
       pd.deposits = []; pd.competitions = []; pd.honesty = []; pd.requests = []; pd.moveRequests = [];
       pd.holdings = []; pd.savingGoals = []; pd.events = [];
       ensureWallet(kid).cash = 0;
-      sdOneLoan(kid, 1000, 70).paid = o.paid != null ? o.paid : 336;
+      // window.__fitLong: the fit check's long pass — $1,234.56 left after the paid part.
+      sdOneLoan(kid, window.__fitLong ? 1234.56 + (o.paid != null ? o.paid : 336) : 1000, 70).paid = o.paid != null ? o.paid : 336;
       const e = mrEnsureEarnings(kid, wk); e.overrides = {}; e.sessions = {}; e.paymentOverrides = {};
       ['dishes', 'mop', 'vacuum', 'bins'].forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
       const days = mrWeekDayKeys(wk);
       setDayBlocks(days[1], [...(getDayBlocks(days[1], kid) || []).filter(b => b.id !== 'sd-aj'),
         { id: 'sd-aj', actId: 'assistant_job', startMin: 17 * 60, durationMin: 90 }], kid);
       mrSetSessionAttendance(kid, wk, 'sd-aj', true);
-      mnyAddDeposit(kid, wk, { amount: 5, from: 'A gift', giver: 'Grandma', dayKey: days[0] });
+      mnyAddDeposit(kid, wk, { amount: 5, from: 'A gift', giver: window.__fitLong ? 'Grandma Rosalind' : 'Grandma', dayKey: days[0] });
       mmUndoKid = {}; mmUndoKidGone = {}; sdDrafts = {}; sdOpened = {};
       try { localStorage.removeItem(sdDraftKey(kid, wk)); } catch (err) {}
       openFamilyMeeting();
@@ -5662,16 +5667,6 @@ function findChromium() {
      handwriting at a smaller scale, so every width that fits in one has to be
      measured in the other; and at 1194×834, the iPad this app lives on. */
   const kidFindings = [];
-  /* ✂️ Owner's review (Plan v6 §M 5a): no label on the money screens is cut
-     with "…" at the iPad's 1194 — checked on the seeded rows of this same
-     sweep (My money, her sheets, the explainer, Sunday's four steps) and on
-     Grown-ups' six tabs below. An element is cut when its text-overflow is
-     ellipsis and its text is wider than its box. */
-  const cutFindings = [];
-  const cutLabels = (sel) => page.evaluate((q) => [...document.querySelectorAll(q)]
-    .filter(e => e.offsetParent && getComputedStyle(e).textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1)
-    .map(e => `.${String(e.className || e.tagName).split(/\s+/)[0]} "${e.textContent.trim().slice(0, 30)}"`), sel);
-  const CUT_MONEY_ROOTS = '.mv2 *, .sd *, .gu *, #requestOverlay.open *, #sundayOverlay.open *, #grownupsOverlay.open *, #mnyConceptCard *, #mnySchoolWrap *, #mnyStoryWrap *';
   for (const look of ['pop', 'calm']) {
     try { await setLook(look); } catch (e) { kidFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
     for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1194, 834], [1440, 900], [900, 1100]]) {
@@ -5721,10 +5716,6 @@ function findChromium() {
         if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
         if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
         if (problems.length) kidFindings.push(`[${look}] ${label || id}@${w}: ${problems.join(' | ')}`);
-        if (w === 1194 && /^(screen-mymoney\/seeded|screen-moneyschool\/seeded|screen-moneystory\/|sheet\/|sunday\/)/.test(String(label || ''))) {
-          const cut = await cutLabels(CUT_MONEY_ROOTS);
-          if (cut.length) cutFindings.push(`[${look}] ${label}@1194: ${cut.slice(0, 8).join(', ')}`);
-        }
       }
     }
   }
@@ -5833,10 +5824,6 @@ function findChromium() {
           }
           if (under.length) problems.push(`${under.length} text(s) under 13px: ${under.slice(0, 6).join(', ')}`);
           if (problems.length) parentFindings.push(`${where}: ${problems.join(' | ')}`);
-          if (w === 1194 && dest.indexOf('gu:') === 0) {
-            const cut = await cutLabels(CUT_MONEY_ROOTS);
-            if (cut.length) cutFindings.push(`${where}: ${cut.slice(0, 8).join(', ')}`);
-          }
         }
       }
     }
@@ -5854,7 +5841,225 @@ function findChromium() {
     if (parentSmallPrint.size) console.log(`Parent portal small print under 13px in both looks (predates the looks; listed, not failed): ${parentSmallPrint.size}\n  ${[...parentSmallPrint].slice(0, 40).join('\n  ')}`);
   }
   if (want('parentScreensMeetTheHouseRules')) checks.parentScreensMeetTheHouseRules = parentFindings.length === 0 || parentFindings;
-  if (want('noLabelIsCutOnTheMoneyScreens')) checks.noLabelIsCutOnTheMoneyScreens = cutFindings.length === 0 || cutFindings;
+  /* ✂️ The money fit check (Plan v6 §M 5a, grown by Money fit and logic PR 5).
+     Every money screen and sheet — My money, Money school, All my Sundays, By
+     month, her request and info sheets (the Sunday sheet among them), the '?'
+     card, Sunday's four steps and Grown-ups' six tabs — in both looks, at the
+     phone (390×844) and the iPad (1194×834), after the look's fonts load; then
+     again seeded with long names (12+ letters) and 4-digit amounts
+     (window.__fitLong). Three rules for every visible text:
+       clip    — its box is no narrower than its text (scrollWidth ≤ clientWidth+1,
+                 with or without "…");
+       spill   — it stays inside its nearest bordered box (1px allowed), and
+                 nothing runs past the screen's left or right edge;
+       overlap — no two texts sit on each other (1px allowed).
+     A scroll container (Calm's .mm-body, a sheet) may scroll: text scrolled
+     out of its view is not measured, and its own overflow is not a clip. */
+  if (want('noLabelIsCutOnTheMoneyScreens')) {
+    const fitFindings = [];
+    const fitMeasure = (rootId) => {
+      const root = document.getElementById(rootId);
+      if (!root) return ['no element #' + rootId];
+      const vw = document.documentElement.clientWidth;
+      const out = new Set();
+      const css = new Map();
+      const cs = (el) => { let c = css.get(el); if (!c) { c = getComputedStyle(el); css.set(el, c); } return c; };
+      const name = (el) => el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map(c => '.' + c).join('');
+      const scrolls = (el) => /auto|scroll/.test(cs(el).overflowX + ' ' + cs(el).overflowY);
+      const borders = (c) => ['Top', 'Right', 'Bottom', 'Left'].map(s => (c['border' + s + 'Style'] === 'none' ? 0 : parseFloat(c['border' + s + 'Width']) || 0));
+      // A box has a border on all four sides; a single rule (a dashed line, a head's underline) is not one.
+      const boxed = (c) => borders(c).every(v => v > 0);
+      const shown = (el) => {
+        for (let e = el; e; e = e.parentElement) {
+          const c = cs(e);
+          if (c.display === 'none' || c.visibility === 'hidden' || c.opacity === '0') return false;
+          if (e === root) break;
+        }
+        return true;
+      };
+      const lines = [];
+      const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (let n; (n = tw.nextNode());) {
+        const text = n.textContent.replace(/\s+/g, ' ').trim();
+        if (!text) continue;
+        const el = n.parentElement;
+        if (!el || el.closest('svg, script, style, noscript, template') || !shown(el)) continue;
+        if (cs(el).position === 'absolute' && el.getBoundingClientRect().width <= 1) continue;   // screen-reader only
+        const range = document.createRange(); range.selectNodeContents(n);
+        /* A text's box is its line, not the font's whole ascent and descent:
+           Pop's handwriting fonts reach well past a tight line-height, which
+           draws nothing over the line above. */
+        const ec = cs(el), lh = parseFloat(ec.lineHeight) || parseFloat(ec.fontSize) * 1.2;
+        let rects = [...range.getClientRects()].filter(r => r.width > 0.5 && r.height > 0.5).map(r => {
+          const trim = Math.max(0, (r.height - lh) / 2);
+          return { left: r.left, right: r.right, top: r.top + trim, bottom: r.bottom - trim };
+        });
+        if (!rects.length) continue;
+        let block = null, bordered = null, scroller = null;
+        const ruled = [];
+        for (let e = el; e; e = e.parentElement) {
+          const c = cs(e);
+          if (!bordered && !scroller && borders(c).some(v => v > 0)) ruled.push(e);
+          if (!block && c.display !== 'inline' && c.display !== 'contents') block = e;
+          if (!bordered && !scroller && boxed(c)) bordered = e;
+          if (!scroller && scrolls(e) && e !== document.documentElement && e !== document.body) scroller = e;
+          if (e === root || (bordered && scroller)) break;
+        }
+        /* Text a scroll container has scrolled out of view is still measured
+           against its own boxes; it is only not compared with text outside
+           that container, which it passes under as it scrolls. */
+        const view = scroller && scroller.getBoundingClientRect();
+        const inView = (r) => !view || (r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom);
+        const tag = `${name(el)} "${text.slice(0, 32)}"`;
+        // Cut: the box is narrower than its text, and it is this text that runs past it.
+        const bx = block && block.getBoundingClientRect();
+        if (block && !scrolls(block) && block.clientWidth > 0 && block.scrollWidth > block.clientWidth + 1
+            && rects.some(r => r.right > bx.left + block.clientLeft + block.clientWidth + 1 || r.left < bx.left + block.clientLeft - 1)) {
+          out.add(`clip · ${block === el ? tag : name(block) + ' › ' + tag} (${block.scrollWidth} > ${block.clientWidth})`);
+        }
+        if (bordered) {
+          const b = bordered.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(bordered));
+          const inner = { left: b.left + bl, right: b.right - br, top: b.top + bt, bottom: b.bottom - bb };
+          if (rects.some(r => r.left < inner.left - 1 || r.right > inner.right + 1 || r.top < inner.top - 1 || r.bottom > inner.bottom + 1)) {
+            out.add(`spill · ${tag} out of ${name(bordered)}`);
+          }
+        }
+        // Nor may it sit on a line drawn by a box or rule around it.
+        ruled.forEach(e => {
+          const b = e.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(e));
+          const strips = [bt && { left: b.left, right: b.right, top: b.top, bottom: b.top + bt }, br && { left: b.right - br, right: b.right, top: b.top, bottom: b.bottom },
+            bb && { left: b.left, right: b.right, top: b.bottom - bb, bottom: b.bottom }, bl && { left: b.left, right: b.left + bl, top: b.top, bottom: b.bottom }].filter(Boolean);
+          if (rects.some(r => strips.some(t => Math.min(r.right, t.right) - Math.max(r.left, t.left) > 1 && Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top) > 1))) {
+            out.add(`spill · ${tag} on the border of ${name(e)}`);
+          }
+        });
+        // Past the screen's side: only the part a scroll container shows counts.
+        const shownPart = (r) => (view ? { left: Math.max(r.left, view.left), right: Math.min(r.right, view.right) } : r);
+        if (rects.some(r => inView(r) && (shownPart(r).right > vw + 1 || shownPart(r).left < -1))) out.add(`spill · ${tag} past the screen edge`);
+        rects.forEach(r => lines.push({ r, tag, n, scroller, seen: inView(r) }));
+      }
+      for (let i = 0; i < lines.length; i++) {
+        for (let j = i + 1; j < lines.length; j++) {
+          const a = lines[i], b = lines[j];
+          if (a.n === b.n || (a.scroller !== b.scroller && !(a.seen && b.seen))) continue;
+          const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+          const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+          if (ix > 1 && iy > 1) out.add(`overlap · ${a.tag} × ${b.tag}`);
+        }
+      }
+      // A bordered box past the screen's side (a card edge peeking in or out).
+      root.querySelectorAll('*').forEach(el => {
+        if (!shown(el) || !boxed(cs(el))) return;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        for (let e = el.parentElement; e && e !== root; e = e.parentElement) if (/auto|scroll|hidden|clip/.test(cs(e).overflowX)) return;
+        if (r.right > vw + 1 || r.left < -1) out.add(`spill · ${name(el)} box past the screen edge (${Math.round(r.left)} to ${Math.round(r.right)})`);
+        /* A box laid out in the flow stays inside the box around it (a sticker
+           placed on purpose is position:absolute and is not held to this). */
+        if (/absolute|fixed/.test(cs(el).position)) return;
+        for (let e = el.parentElement; e && root.contains(e); e = e.parentElement) {
+          if (boxed(cs(e))) {
+            const p = e.getBoundingClientRect(), [pt, pr, pb, pl] = borders(cs(e));
+            if (r.left < p.left + pl - 1 || r.right > p.right - pr + 1) out.add(`spill · ${name(el)} box in ${name(el.parentElement)} "${el.textContent.trim().slice(0, 20)}" out of ${name(e)} (${Math.round(r.left)} to ${Math.round(r.right)} past ${Math.round(p.right - pr)})`);
+            break;
+          }
+          if (scrolls(e)) break;
+        }
+      });
+      return [...out];
+    };
+    const fitReset = () => page.evaluate(() => {
+      const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
+      const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
+      if (window.__mv2Snap) { const sn = JSON.parse(window.__mv2Snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); window.__mv2Snap = null; saveLocal(); }
+      if (window.__sdSweepSnap) { sdRestore(window.__sdSweepSnap); window.__sdSweepSnap = null; if (mmIsOpen()) mmHide(); profile = window.__sdSweepProfile; window.__sdSweepProfile = null; }
+      const sdo = document.getElementById('sundayOverlay'); if (sdo && sdo.classList.contains('open')) closeSheet('sundayOverlay');
+      profile = 'jenn';   // her screens, as she sees them (Grown-ups' rows leave the parent signed in)
+    });
+    const MV2_HOLD = `${MV2_SEED_SRC}
+      window.__mv2Snap = window.__mv2Snap || JSON.stringify(state);
+      const said = window.mv2Seed('jenn');`;
+    const FIT_KID_ROWS = [
+      ...KID_SCREENS.filter(r => /^screen-(mymoney\/seeded|moneyschool\/seeded|moneystory\/(sundays|bymonth))$/.test(String(r[2] || ''))),
+      ...KID_SHEETS,
+      // A grown-up's My money: the head carries the whole rail.
+      ['screen-mymoney', `() => { profile = 'parent'; parentUnlockedThisSession = true; mnyOpenMyMoney('jenn'); }`, 'screen-mymoney/parent'],
+      // Her info sheets over My money, the 📒 Sunday sheet among them.
+      ...['week', 'loans', 'waiting', 'goals', 'month', 'sunday'].map(kind => ['requestOverlay', `() => {
+        ${MV2_HOLD}
+        const row = mnyLedgerRows('jenn')[0];
+        mnyOpenInfoSheet('${kind}', '${kind}' === 'sunday' ? { id: row && row.weekKey } : {});
+        if (!document.getElementById('requestOverlay').classList.contains('open')) return 'the ${kind} info sheet did not open';
+        return said;
+      }`, 'info/' + kind]),
+    ];
+    const GU_TABS = ['approve', 'commit', 'fines', 'expect', 'rules', 'weeks'];
+    for (const long of [false, true]) {
+      await page.evaluate((l) => { window.__fitLong = l; }, long);
+      const pass = long ? 'long' : 'short';
+      for (const look of ['pop', 'calm']) {
+        try { await setLook(look); } catch (e) { fitFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
+        for (const [w, h] of [[390, 844], [1194, 834]]) {
+          await page.setViewportSize({ width: w, height: h });
+          for (const [id, nav, label] of FIT_KID_ROWS) {
+            await fitReset();
+            // Her request sheets over a My money with long names in the long pass.
+            if (long && /^sheet\//.test(String(label))) await page.evaluate(`(() => { ${MV2_HOLD} return said; })()`);
+            const said = await page.evaluate(`(${nav.toString()})()`);
+            await page.waitForTimeout(200);
+            const where = `${label || id} · ${look} · ${w} · ${pass}`;
+            if (typeof said === 'string') { fitFindings.push(`${where} · ${said}`); continue; }
+            const on = await page.evaluate((sid) => { const el = document.getElementById(sid);
+              return !!el && (el.classList.contains('active') || el.classList.contains('open') || el.classList.contains('mny-concept-scrim')); }, id);
+            if (!on) { fitFindings.push(`${where} · the screen was not on show`); continue; }
+            (await page.evaluate(fitMeasure, id)).forEach(f => fitFindings.push(`${where} · ${f}`));
+          }
+          await fitReset();
+          // Grown-ups' six tabs over a seeded week: questions, fines, a loan, money expected.
+          await page.evaluate((L) => {
+            window.__fitGuSnap = JSON.stringify(state);
+            const was = profile, wasToast = window.showToast; window.showToast = () => {};
+            try {
+              const wk = ctThisWeekKey(), days = mrWeekDayKeys(wk);
+              profile = 'parent';
+              if (L) Object.assign(mnyEnsureDebts('jenn')[0], { name: 'Winter skating camp', principal: 1454.56, paid: 220 });
+              mrAddFine('jess', 'tone', days[1], { who: 'Mom' });
+              mrAddFine('jess', 'box_repeat', days[2], { who: 'Dad' });
+              const fine = mrFines('jess')[mrFines('jess').length - 1];
+              mnyAddExpected('jenn', { month: String(todayKey()).slice(0, 7), label: L ? '🎄 Grandma Rosalind' : '🎄 Christmas', amount: L ? 1050 : 20 });
+              profile = 'jess';
+              mnyAddRequest('jess', { kind: 'comp', sport: 'swim', name: L ? 'Championship entries' : 'Swim time trial', custom: true, dayKey: days[2],
+                races: [{ ev: '50 Free', time: '0:41.8', pts: 6 }] });
+              mnyAddRequest('jess', { kind: 'dispute', fineId: fine.id, why: 'the bag was not mine' });
+              profile = 'jenn';
+              mnyAddRequest('jenn', { kind: 'gift', amount: L ? 1050 : 20, giver: L ? 'Grandma Rosalind' : 'Uncle Mike' });
+              mnyAddRequest('jenn', { kind: 'goal', name: L ? 'Winter skating camp' : 'New skate guards', icon: '🛼', target: L ? 1050 : 35 });
+            } finally { profile = was; window.showToast = wasToast; }
+          }, long);
+          for (const tab of GU_TABS) {
+            await page.evaluate((t) => {
+              profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+              showScreen('parent'); renderParentHome(); setParentTab('money'); mnyParentSection = t; mnyRenderRulesTab();
+            }, tab);
+            await page.waitForTimeout(200);
+            const where = `Grown-ups › ${tab} · ${look} · ${w} · ${pass}`;
+            (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`${where} · ${f}`));
+          }
+          await page.evaluate(() => {
+            const s = JSON.parse(window.__fitGuSnap); window.__fitGuSnap = null;
+            Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s);
+            mnyParentSection = 'approve'; saveLocal();
+          });
+        }
+      }
+    }
+    await page.evaluate(() => { window.__fitLong = false; });
+    await clearLooks();
+    await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+    await page.setViewportSize({ width: 900, height: 1100 });
+    if (fitFindings.length) console.log(`Money fit findings (${fitFindings.length}):\n  ${fitFindings.join('\n  ')}`);
+    checks.noLabelIsCutOnTheMoneyScreens = fitFindings.length === 0 || fitFindings;
+  }
 
   // Artifacts at the sizes this app is actually used at — phone, iPad both ways,
   // laptop. The assertions above are the gate; these are for a human deciding
@@ -7307,7 +7512,9 @@ function findChromium() {
   /* ── THE FLOW SAYS WHERE IT WENT ──────────────────────────────────
      Stage 1 stored movements instead of balances FOR THIS SCREEN, and until
      now nothing read them: `evFlow`, `evMonths` and `evTypicalMonth` were
-     unit-tested and had no caller. A calculation with no reader is a
+     unit-tested and had no caller. (Money fit and logic PR 5 removed the
+     `evMonths` / `evTypicalMonth` wrappers; the pure `evMonthsOf` /
+     `evTypicalMonthOf` stay, unit-tested.) A calculation with no reader is a
      calculation nobody finds out is wrong.
 
      The owner's instruction is the thing to hold here: *I do not want the kids
@@ -16136,6 +16343,7 @@ function findChromium() {
       for (const [w, h] of [[390, 844], [1194, 834]]) {
         await page.setViewportSize({ width: w, height: h });
         const names = new Set();
+        let clashNotes = 0;
         for (const [id, nav, label] of KID_SCREENS) {
           const seeded = await ev(label || id, `(${nav.toString()})()`);
           if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
@@ -16146,11 +16354,14 @@ function findChromium() {
             return darkContrastFindings(scr, lab, '.print-sheet');
           }, [id, `${label || id}@${w}`]);
           if (found) bad.push(...found);
+          if (id === 'screen-today') clashNotes += await ev('clash notes', () => document.querySelectorAll('#screen-today .quest-conflict-note').length) || 0;
           let name = (label || id).replace(/^screen-/, '').replace(/[^a-z0-9]+/gi, '-');
           while (names.has(name)) name += '-2';
           names.add(name);
           await snap(name, w);
         }
+        // The seeded Today always carries an overlap; a run that measured no clash note measured nothing of it.
+        if (clashNotes < 1) bad.push(`screen-today@${w}: no .quest-conflict-note was on show, so its ink was not measured`);
         /* R12 (2026-09-27): Today with a missed day this week — 🕓 Catch up open
            under ✏️ Modify my plan, "＋ Add to an earlier day" after it. Measured
            for contrast, 44px controls, 13px words, no sideways scroll and its
@@ -23994,7 +24205,7 @@ function findChromium() {
         const jcard = [...wrap.querySelectorAll('.gu-tint--jess')][0];
         if (!jcard || !/1\. 🏊 Swim club fees/.test(jcard.textContent) || !/\$360\.00 of \$500\.00/.test(jcard.textContent)) bad.push('her wall card does not list the row with what is left: ' + (jcard && jcard.textContent));
         guPress('[data-mnyp-action="gucmkid"][data-mnyp-id="jess"]');
-        guPress('[data-mnyp-action="gucmshareset"][data-mnyp-id="50"]');
+        guCommit().share = 50;   // her share is the − 50% + stepper alone now (Money fit and logic PR 5)
         guPress('[data-mnyp-action="gucmweeksset"][data-mnyp-id="26"]');
         const input = wrap.querySelector('[data-mnyp-action="gucmwhat"]');
         input.value = 'Winter Invitational entry';
@@ -25471,7 +25682,7 @@ function findChromium() {
         Object.keys(L).forEach(wk => { if (L[wk]) delete L[wk][kid]; });   // no steady money on record
         const wrap = guOpen('commit');
         guPress('[data-mnyp-action="gucmkid"][data-mnyp-id="jess"]');
-        guPress('[data-mnyp-action="gucmshareset"][data-mnyp-id="50"]');
+        guCommit().share = 50;   // her share is the − 50% + stepper alone now (Money fit and logic PR 5)
         guPress('[data-mnyp-action="gucmweeksset"][data-mnyp-id="26"]');
         const input = wrap.querySelector('[data-mnyp-action="gucmwhat"]');
         input.value = 'Spring camp'; input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -25936,6 +26147,118 @@ function findChromium() {
       return bad.length ? bad : true;
     });
     await guTeardown();
+  }
+
+  /* ── 📒 A Sunday row opens its sheet (decision 16, Money fit and logic PR 5) ──
+     Before PR 5 the passbook rows and All my Sundays rows were plain rows: a
+     Sunday's own numbers (where each dollar went, what was taken off, the loan
+     left after) were nowhere a kid could open. Asserted, in both looks at 390
+     and 1194: every passbook row and every All my Sundays row is a 44px door
+     named "Sunday d Mon"; a tap opens one info sheet titled "📒 Sunday d Mon ·
+     Week of …" with the four came-in groups, ➖ Taken off, 🧱 Where it went and
+     the loan left after; a row with no sign says so; nothing in the sheet is
+     cut or spills; ✕ closes it; and the scrim behind is dark enough (≥ 0.6)
+     that the page's numbers do not read through. */
+  if (want('aSundayRowOpensItsSheet')) {
+    const out = [];
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      for (const w of [390, 1194]) {
+        await page.setViewportSize({ width: w, height: w === 390 ? 844 : 834 });
+        await page.waitForTimeout(100);
+        const r = await page.evaluate((tag) => {
+          const bad = [];
+          const kid = 'jenn';
+          const shown = el => !!el && el.getClientRects().length > 0;
+          try {
+            const seeded = mv2Seed(kid); if (seeded) bad.push(seeded);
+            profile = kid; mnySundaysMode = 'week'; mnySundaysMonth = null;
+            const newest = mnyLedgerRows(kid)[0];
+            state.shared.chore.moneyLedger[newest.weekKey][kid].debtBalanceAfter = 612.34;
+            const ov = document.getElementById('requestOverlay');
+            const opens = (row, where) => {
+              const wk = row.getAttribute('data-mny-id');
+              if (row.getAttribute('data-mny-action') !== 'sunday-sheet' || !wk) { bad.push(where + ' row is not a Sunday door'); return; }
+              const want = 'Sunday ' + mnyDayMonth(sdSundayOf(wk));
+              if (row.getAttribute('aria-label') !== want) bad.push(where + ' row is named "' + row.getAttribute('aria-label') + '", not "' + want + '"');
+              const b = row.getBoundingClientRect();
+              if (b.height < 44 - 0.5 || b.width < 44) bad.push(where + ' row is ' + Math.round(b.width) + '×' + Math.round(b.height) + ', under 44px');
+              row.click();
+              if (!ov.classList.contains('open')) { bad.push(where + ': the tap opened nothing'); return; }
+              const title = (document.getElementById('rqSheetTitle') || {}).textContent || '';
+              const wantTitle = '📒 ' + want + ' · Week of ' + mrMoneyWeekLabel(wk, kid);
+              if (title.trim() !== wantTitle) bad.push(where + ': the sheet is titled "' + title.trim() + '", not "' + wantTitle + '"');
+              const body = document.getElementById('requestBody');
+              const txt = body.textContent.replace(/\s+/g, ' ');
+              ['💰 Came in', '💪 Money I earned', '🎁 Money I was given', '🌱 Money my money made', '📥 From my bank', '➖ Taken off', '🧱 Where it went', '🧱 To my loan wall', '💵 Cash out']
+                .forEach(t => { if (txt.indexOf(t) < 0) bad.push(where + ': the sheet has no ' + t); });
+              if (wk === newest.weekKey && txt.indexOf('Loan left after' + ' ' + mnyMoney(612.34)) < 0 && txt.indexOf('Loan left after' + mnyMoney(612.34)) < 0) bad.push(where + ': no "Loan left after ' + mnyMoney(612.34) + '": ' + txt.slice(0, 200));
+              if (!/Settled without a sign/.test(txt)) bad.push(where + ': a seeded row with no sign does not say "Settled without a sign"');
+              const sheet = ov.querySelector('.sheet').getBoundingClientRect();
+              body.querySelectorAll('*').forEach(el => {
+                if (!shown(el) || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
+                const a = el.getBoundingClientRect();
+                if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== 'visible') bad.push(where + ': cut "' + el.textContent.trim().slice(0, 24) + '"');
+                if (a.right > sheet.right + 1 || a.left < sheet.left - 1) bad.push(where + ': "' + el.textContent.trim().slice(0, 24) + '" spills out of the sheet');
+              });
+              const alpha = Number((getComputedStyle(ov).backgroundColor.match(/rgba?\(([^)]+)\)/) || [])[1].split(',')[3] || 1);
+              if (!(alpha >= 0.6)) bad.push(where + ': the scrim behind the sheet is ' + alpha + ' — the page reads through it');
+              const x = body.querySelector('[data-mny-action="rq-close"]');
+              if (!x) bad.push(where + ': the sheet has no ✕');
+              else { x.click(); if (ov.classList.contains('open')) bad.push(where + ': ✕ did not close the sheet'); }
+            };
+            mnyOpenMyMoney(kid);
+            const book = [...document.querySelectorAll('#mnyPage1Wrap .mv2-book .mv2-bookrow:not(.mv2-bookhead):not(.mv2-booktotal)')];
+            if (book.length !== Math.min(4, mnyLedgerRows(kid).length)) bad.push('the passbook shows ' + book.length + ' Sunday rows');
+            if (document.querySelector('#mnyPage1Wrap .mv2-booktotal[data-mny-action]')) bad.push('the passbook total row is a door; it stays plain');
+            if (book[0]) opens(book[0], 'passbook');
+            mnyOpenSundays();
+            const hist = [...document.querySelectorAll('#mnyStoryWrap .mv2-hist-row')];
+            if (!hist.length) bad.push('All my Sundays shows no rows');
+            hist.forEach(h => { if (h.getAttribute('data-mny-action') !== 'sunday-sheet') bad.push('an All my Sundays row is not a door'); });
+            if (hist[1]) opens(hist[1], 'All my Sundays');
+            if (hist[0]) opens(hist[0], 'All my Sundays (newest)');
+            // A fine added to a settled week's day after its Sunday must not draw a charged row under the frozen ➖ total.
+            const wasP = profile; profile = 'parent';
+            let late = null; const lateAll = [];
+            for (const dk of mrMoneyDayKeys(newest.weekKey, kid)) {   // the first day where a slip really costs something (the first ones are free repeats)
+              const add = [];
+              for (let n = 0; n < 4 && !late; n++) {
+                const f = mrAddFine(kid, 'tone', dk); if (!f) break;
+                add.push(f);
+                if ((((mrFinesWeek(newest.weekKey, kid, null) || {}).chargeable || {})[f.id] || 0) > 0) late = f;
+              }
+              if (late) { lateAll.push(...add); break; }
+              add.forEach(f => mrRemoveFine(kid, f.id));
+            }
+            profile = wasP;
+            if (!late) bad.push('could not add a late fine to the newest settled week');
+            else {
+              mnyOpenSundays();
+              const nh = document.querySelector('#mnyStoryWrap .mv2-hist-row[data-mny-id="' + newest.weekKey + '"]') || document.querySelector('#mnyStoryWrap .mv2-hist-row');
+              nh.click();
+              const lbody = document.getElementById('requestBody');
+              const lrows = [...lbody.querySelectorAll('.mv2-fine')];
+              const frozenLine = [...lbody.querySelectorAll('.mv2-li')].some(l => /📦 Fines/.test(l.textContent) && !l.classList.contains('mv2-fine'));
+              const rec = sdSundayRecord(mnyLedgerRows(kid).find(r => r.weekKey === newest.weekKey));
+              const shownSum = lrows.reduce((n, l) => { const m = (l.querySelector('b') || {}).textContent.match(/−\$?([\d.,]+)/); return n + (m ? Number(m[1].replace(/,/g, '')) : 0); }, 0);
+              if (lrows.length && Math.round(shownSum * 100) !== Math.round(rec.takenOff.fines * 100)) bad.push('late fine: the sheet lists ' + lrows.length + ' fine row(s) charging ' + shownSum.toFixed(2) + ' under a frozen ➖ fines total of ' + rec.takenOff.fines.toFixed(2) + ': ' + lbody.textContent.replace(/\s+/g, ' ').slice(0, 160));
+              if (!lrows.length && rec.takenOff.fines > 0 && !frozenLine) bad.push('late fine: neither the fine rows nor the frozen 📦 Fines line show');
+              const lx = lbody.querySelector('[data-mny-action="rq-close"]'); if (lx) lx.click();
+              lateAll.forEach(f => mrRemoveFine(kid, f.id));
+            }
+          } catch (e) { bad.push('threw: ' + e.message); }
+          finally { if (typeof rqDraft !== 'undefined' && rqDraft) rqClose(); goToday(); }
+          return bad.map(b => '[' + tag + '] ' + b);
+        }, look + ' ' + w);
+        out.push(...r);
+      }
+    }
+    await clearLooks();
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await guTeardown();
+    checks.aSundayRowOpensItsSheet = out.length ? out : true;
   }
 
   /* The shares of what she placed add to exactly 100 (largest remainder), and

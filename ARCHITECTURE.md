@@ -3393,7 +3393,9 @@ Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
 
 `js/42-flow.js`, at the head of `screen-moneystory`. Stage 1 stored movements
 instead of balances **for this screen**, and until Stage 4 nothing read them:
-`evFlow`, `evMonths` and `evTypicalMonth` were unit-tested and had no caller.
+`evFlow`, `evMonths` and `evTypicalMonth` were unit-tested and had no caller
+(the `evMonths` / `evTypicalMonth` wrappers are gone since Money fit and logic
+PR 5; the pure `evMonthsOf` / `evTypicalMonthOf` stay, unit-tested).
 A calculation with no reader is a calculation nobody finds out is wrong.
 
 **It does not lead with a total, and that is the whole design.** The owner's
@@ -3439,7 +3441,7 @@ live as $0.00 above a $30.00 bar — and `returned` was counted and never drawn.
 period.
 
 **Three periods, and the third is the honest one.** *This month* · *All of it* ·
-*A typical month*, which `evTypicalMonth` divides by the months that have
+*A typical month*, which `evTypicalMonthOf` divides by the months that have
 **elapsed**, empty ones included. Dividing by months holding events turns a
 quiet summer into a good one — the same mistake `mrYearToDate` makes with
 settled weeks, deliberately not repeated.
@@ -4278,6 +4280,13 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   `guRulesMain(secs)`; each still builds its own when called alone
   (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
   counts one build per render.
+- **Two selected fills, two meanings (PR 5, decision 5 kept both).** Teal
+  `--sel-opt` marks **a picked option** (`.sd-btn.on`, `.sd-chip.on`,
+  `.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
+  `.fl-col.on`); red `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
+  `.mm-step-cur`, `.sd-rung.on`, `.pn-segbtn.on`, `.gu-toggle.on`); ink
+  `--sel-tab` is a Grown-ups tab. A new selected state picks the one that
+  says what it means; it never invents a third.
 
 ### Money fit and logic, PR 4 part B — the old money pages read the new rules (build 2026-10-06b)
 
@@ -4300,6 +4309,47 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
 - **The old pages wear the new look.** Money school (`.mv2-school`) and the
   two passbook pages (`.mv2-hist`, `.mv2-flow`) are `.mv2-card`s inside the
   `money-tokens` markers, the Flow's `.fl-*` rules included.
+
+### Money fit and logic, PR 5 — the Sunday sheet, same thing same look (build 2026-10-06d)
+
+- **One Sunday, one reader (decision 16).** `sdSundayRecord(row)` (js/43, pure,
+  exported, unit-tested) reads one frozen ledger row: what came in through
+  `sdHistGroups` (the same four groups as All my Sundays), what was taken off
+  (fines and ⏪ drawn early), where it went, `debtBalanceAfter` as the loan left
+  after, and `noSign` (defaulted, hand-entered, or no Sunday sign). The info
+  sheet kind `sunday` (`MNY_INFO_KINDS`; `mnyOpenInfoSheet('sunday', {id: weekKey})`,
+  body `mnySundayBody`) draws it, opened by action `sunday-sheet` on every
+  passbook row and All my Sundays row (`mnySundayDoorAttrs`). A screen that
+  shows one settled Sunday to a kid reads this reader; `guWeekRecord` stays
+  the parents' fuller record.
+- **A total in a title row** wears `.mny-total` plus `--owe` (`--sd-purple`),
+  `--own` (`--sd-own-ink`, the spec green darkened to read at 4.5:1 on the sky
+  card) or `--pile` (`--mny-v15-red`) — one family for My money and the Sunday
+  screens. Money in is teal wherever it shows.
+- **One stepper.** `.sd-step`, `.gu-step` and `.mny-step` (`rqOpt` / `guOpt`
+  add it to a − or +) share one rule: a 44px round button, ink border, button
+  shadow. The value between them is `.mny-stepval`, plain text, never a
+  button.
+- **Tap buttons vs information boxes.** Inside the money markers a tap button
+  has `--bw-btn` and `--mny-shadow-btn`; an information box, a door or a list
+  row keeps a thin edge or none (BUILD-SPEC §0). The two selected meanings are
+  under PR 3 above.
+- **The sheet scrim** `--mny-v15-scrim` is 0.62 in both looks, so the page's
+  numbers do not read beside a sheet.
+- **Held by** smoke `aSundayRowOpensItsSheet` and the unit case in
+  `tests/sunday.test.js`.
+- **The money fit check (PR 5 part 2, build 2026-10-06e)** is smoke
+  `noLabelIsCutOnTheMoneyScreens`: every money screen and sheet, both looks,
+  390×844 and 1194×834, seeded twice — the usual names, then long names
+  ("Winter skating camp", "Championship entries", "Grandma Rosalind") and
+  4-digit amounts ($1,234.56 loan left, $1,050), read from `window.__fitLong`
+  by `mv2Seed`, `sdSeedWeek` and the Sunday rows. Three rules for every visible
+  text: **no clip** (its block is not narrower than it, "…" or not), **no
+  spill** (inside its nearest four-sided box, not on a border line around it,
+  not past the screen's side), **no overlap** (no two line boxes cross; 1px
+  allowed). A scroll container may scroll. A failure is fixed in the Stage 7
+  order: `--mny-fit`, bigger text where there is room, shorter words, a box
+  that grows — never a cut.
 
 ## Known trip hazards
 

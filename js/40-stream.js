@@ -393,10 +393,6 @@ function evReverse(kid, eventId, note) {
 function evBalance(kid, home, asOf) { return evBalanceOf(evList(kid), home, asOf); }
 function evWorth(kid, asOf) { return evWorthOf(evList(kid), asOf); }
 function evFlow(kid, from, to) { return evFlowOf(evList(kid), from, to); }
-function evMonths(kid, firstMonth, lastMonth) { return evMonthsOf(evList(kid), firstMonth, lastMonth); }
-function evTypicalMonth(kid, firstMonth, lastMonth) {
-  return evTypicalMonthOf(evList(kid), firstMonth, lastMonth);
-}
 function evSettledWeeks(kid) { return evSettledWeeksOf(evList(kid)); }
 function evWeekIsSettled(kid, weekKey) { return !!evSettledWeeks(kid)[weekKey]; }
 

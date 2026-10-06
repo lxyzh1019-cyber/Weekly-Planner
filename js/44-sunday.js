@@ -385,9 +385,9 @@ function sdGuessMain(c) {
     const on = d.guess === g;
     const mark = [hist.length && Math.round(lastWeek / 5) * 5 === g ? 'last week' : '',
                   hist.length && Math.round(avg / 5) * 5 === g ? 'my avg' : ''].filter(Boolean).join(' ');
-    return `<button type="button" class="sd-rung${on ? ' on' : ''}" data-mny-action="sd-guess" data-sd-v="${g}" aria-pressed="${on}">
+    return `<button type="button" class="sd-rung${on ? ' on' : ''}" data-mny-action="sd-guess" data-sd-v="${g}" aria-pressed="${on}" style="--f:${(0.2 + i * 0.08).toFixed(2)}">
         <span class="sd-rung-mark">${escapeHtml(mark)}</span><span class="sd-rung-pin">${on ? '▼' : ''}</span>
-        <span class="sd-rung-bar${i % 2 ? ' alt' : ''}" style="height:${(14 + i * 5.8).toFixed(1)}%"><b>$${g}</b></span></button>`;
+        <span class="sd-rung-bar${i % 2 ? ' alt' : ''}"><b>$${g}</b></span></button>`;
   }).join('');
   const hint = u.total
     ? [u.asks ? `parents: ${u.asks} to answer` : '', u.sessions ? `my club sessions: ${u.sessions} to tick` : '', u.rows ? 'a new row on my wall' : ''].filter(Boolean).join(' · ') + ' first →'
@@ -654,8 +654,14 @@ function sdLayPile() {
   }
   const must = box.querySelector('.sd-minline');
   if (must) {
-    must.style.bottom = Math.min(H - 2, Number(must.getAttribute('data-sd-v')) / 5 * rowH).toFixed(1) + 'px';
+    const mb = Math.min(H - 2, Number(must.getAttribute('data-sd-v')) / 5 * rowH);
+    must.style.bottom = mb.toFixed(1) + 'px';
     must.style.width = (W - AX + 6) + 'px';
+    /* The "loan first" words sit above the line; when the top row of coins
+       (the dashed taken-off ones) reaches past it, they sit above that row. */
+    const label = must.firstElementChild;
+    const topRow = coins.length ? Math.floor((coins.length - 1) / 5) * rowH + (rowH - D) / 2 + D : 0;
+    if (label) label.style.top = topRow > mb ? (-19 - Math.min(topRow - mb, Math.max(0, H - mb - 19))).toFixed(1) + 'px' : '';
   }
 }
 function sdPaydayMain(c) {
@@ -734,7 +740,7 @@ function sdPaydayMain(c) {
         </div>
       </div>
       <div class="sd-pile">
-        <div class="sd-pile-head"><span class="sd-box-title">💰 My pile</span><b class="sd-red">${escapeHtml(sdM(done || sdReducedMotion() ? P.tp : 0))}</b></div>
+        <div class="sd-pile-head"><span class="sd-box-title">💰 My pile</span><b class="mny-total mny-total--pile">${escapeHtml(sdM(done || sdReducedMotion() ? P.tp : 0))}</b></div>
         <div class="sd-pilebox">
           <div class="sd-stack">${sdCoins(c)}</div>
           <div class="sd-ruler"></div>
@@ -991,14 +997,14 @@ function sdChooseSide(c) {
   const loanPicked = d.pick === 'extra' || d.pick === 'fixed';
   return `<div class="sd-sidehead">${escapeHtml(words >= 3 ? '💼 Assets & debt' : '💼 What I have & owe')}</div>
     <div class="sd-panel sd-wall${hot('loan') ? ' hot' : ''}${loanPicked ? ' picked' : ''}">${burst('loan')}
-      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '🧱 Debt' : '🧱 What I owe')}</span><b class="sd-violet">${escapeHtml(payNow ? `${sdM(left)} → ${sdM(oweAfter)}` : sdM(left))}</b></div>
+      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '🧱 Debt' : '🧱 What I owe')}</span><b class="mny-total mny-total--owe">${escapeHtml(payNow ? `${sdM(left)} → ${sdM(oweAfter)}` : sdM(left))}</b></div>
       ${PR > 0 ? `<div class="sd-bricks" role="img" aria-label="${escapeAttr(Math.round(sdPaidPct(w.loan)) + '% of the loan paid')}">${bricks}</div>` : '<div class="sd-note">Nothing to pay back.</div>'}
       <span class="sd-line sd-teal">${escapeHtml(`🟩 paid · 🟨 this plan · free by ${free}${nLoans ? ` · ${nLoans} loan${nLoans === 1 ? '' : 's'}` : ''}`)}</span>
       <span class="sd-line">📌 <b>${escapeHtml(sdM(P.minNow))}</b> must pay${extra ? ` + 🧱 <b>${escapeHtml(sdM(extra))}</b> extra (counts <b>${escapeHtml(sdM(extra * (1 + b)))}</b>)` : ''}</span>
       <span class="sd-line sd-red">${escapeHtml(facts.lastInterest > 0 ? `🟥 +${sdM(facts.lastInterest)} interest added (${rate}% a year, every ${every} Sundays)` : `🟥 ${rate}% a year interest, added every ${every} Sundays`)}</span>
     </div>
     <div class="sd-panel sd-ownbox${['ready', 'gic', 'stock', 'goal'].some(hot) && hk ? ' hot' : ''}">${burst('ready') || burst('gic') || burst('stock')}
-      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '✅ Assets' : '✅ What I own')}</span><b class="sd-teal">${escapeHtml(ownNow === ownAfter ? sdM(ownNow) : `${sdM(ownNow)} → ${sdM(ownAfter)}`)}</b></div>
+      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '✅ Assets' : '✅ What I own')}</span><b class="mny-total mny-total--own">${escapeHtml(ownNow === ownAfter ? sdM(ownNow) : `${sdM(ownNow)} → ${sdM(ownAfter)}`)}</b></div>
       <div class="sd-key"><span><i class="sd-sw now"></i>now</span><span><i class="sd-sw plan"></i>this plan</span><span><i class="sd-sw out"></i>taken out</span><span><i class="sd-sw safe"></i>$${safety} safety</span></div>
       ${arow('ready', '🏦 Savings', money2(w.pots.ready + goalNow), money2(aR + goalTo))}
       ${arow('gic', '🔒 Locked away', w.pots.gic, aG)}
