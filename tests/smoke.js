@@ -6388,7 +6388,7 @@ function findChromium() {
           const card = sdBody().querySelector('.sd-newrow');
           if (!card) bad.push('the new-row card did not show');
           else {
-            if (!/💡 Does it earn back\? My meets pay me about \$12\.00 each\. This row is paid back by about 3 meets\./.test(card.textContent)) bad.push('no "Does it earn back?" line: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 200));
+            if (!/💡 Does it earn back\? My competitions pay me about \$12\.00 each\. This row is paid back by about 3 competitions./.test(card.textContent)) bad.push('no "Does it earn back?" line: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 200));
             if (!/How could I get back under half\?/.test(card.textContent) || card.querySelectorAll('[data-mny-action="sd-newidea"]').length !== 3) bad.push('over half, the card does not ask how to get back under half with three ideas');
             sdClick('[data-mny-action="sd-newok"]');
           }
@@ -22177,7 +22177,8 @@ function findChromium() {
       pnTidyOpen = true; showScreen('parent'); setParentTab('now');
       let wrap = document.getElementById('pnWrap');
       let txt = wrap.textContent.replace(/\s+/g, ' ');
-      if (txt.indexOf('Meets never paid') < 0) bad.push('Now › 🔧 Tidy-up has no "Meets never paid" card: ' + txt.slice(0, 300));
+      if (/\bmeets?\b/i.test(txt.replace(/Swim meet/gi, ''))) bad.push('the Approve repair card says "meet": ' + txt.slice(0, 300));
+      if (txt.indexOf('Competitions never paid') < 0) bad.push('Now › 🔧 Tidy-up has no "Competitions never paid" card: ' + txt.slice(0, 300));
       if (txt.indexOf('Winter Invitational') < 0 || txt.indexOf(mnyShortDate(W)) < 0 || txt.indexOf('$21.00') < 0) bad.push('the list does not show the week, the meet and $21');
       if (txt.indexOf('Autumn Cup') >= 0) bad.push('a week whose row already says more than its meets is listed');
       if (money2(mnyCash('jenn') - cash0) !== 0) bad.push('showing the list moved money');
@@ -22249,8 +22250,8 @@ function findChromium() {
       showScreen('parent'); setParentTab('money'); mnyParentSection = 'weeks'; guWeeksKid = 'jenn'; guWeekOpen = T; mnyRenderRulesTab();
       const wrap = document.getElementById('mnyRulesWrap');
       const txt = wrap.textContent.replace(/\s+/g, ' ');
-      if (!/👴 Grandfather rule \$3\.00 \+ meets \$21\.00/.test(txt)) bad.push('the Grandfather week does not read "👴 Grandfather rule $3 + meets $21": ' + txt.slice(0, 400));
-      if (!/No meeting — default \$3\.00 \+ meets \$0\.00/.test(txt)) bad.push('the older default week does not read "No meeting — default $3 + meets $0"');
+      if (!/👴 Grandfather rule \$3\.00 \+ competitions \$21\.00/.test(txt)) bad.push('the Grandfather week does not read "👴 Grandfather rule $3 + competitions $21": ' + txt.slice(0, 400));
+      if (!/No meeting — default \$3\.00 \+ competitions \$0\.00/.test(txt)) bad.push('the older default week does not read "No meeting — default $3 + competitions $0"');
       [G, D].forEach(wk => {
         if (wrap.querySelector(`[data-mnyp-action="guled"][data-mnyp-id="${wk}"]`)) bad.push('week ' + wk + ' still has steppers');
         if (wrap.querySelector(`[data-mnyp-action="guleddel"][data-mnyp-id="${wk}"]`)) bad.push('week ' + wk + ' can still be removed');
@@ -25605,6 +25606,74 @@ function findChromium() {
         if (JSON.stringify(state.shared).indexOf('checkedWithHer') >= 0) bad.push('the ✓ reached state.shared');
         if (evShadowDrift(kid).length) bad.push('drift after the commitment: ' + evShadowDrift(kid).join(', '));
       } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* Money fit and logic, PR 2 — words and small fixes. */
+  // "Competitions" wherever it is read; "Swim meet" stays. Sunday's Guess clue,
+  // Grown-ups' Expected tab and the Approve repair card (the repair check below
+  // scans the card) never say "meet" on their own.
+  if (want('noMeetsOnTheMoneyScreens')) {
+    await guSetup();
+    checks.noMeetsOnTheMoneyScreens = await page.evaluate(() => {
+      const snap = sdSnap(), unpin = sdPin(6);
+      const bad = [];
+      const meetWord = (t) => /\bmeets?\b/i.test(String(t).replace(/Swim meet/gi, ''));
+      try {
+        const kid = 'jenn';
+        sdSeedWeek(kid);
+        if (sdCur().step !== 0) bad.push('precondition: the Sunday did not open on Guess, step ' + sdCur().step);
+        const guess = sdBody().textContent.replace(/\s+/g, ' ');
+        if (meetWord(guess)) bad.push('Sunday Guess says "meet": ' + guess.slice(0, 200));
+        if (!/🏆 Competitions/.test(guess)) bad.push('the Guess clue does not read "🏆 Competitions": ' + guess.slice(0, 200));
+        mmHide();
+        const wrap = guOpen('expect');
+        const exp = wrap.textContent.replace(/\s+/g, ' ');
+        if (meetWord(exp)) bad.push('Grown-ups › Expected says "meet": ' + exp.slice(0, 300));
+        if (!/🏆 Competition/.test(exp)) bad.push('the Expected add chip does not read "🏆 Competition"');
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      finally { unpin(); sdRestore(snap); mmHide(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  // The price card names no parent; a Money school chip never shows a raw {token};
+  // a committed week with no sign says so; a Grown-ups figure is drawn in the look's body font (Patrick Hand in Pop).
+  if (want('moneyWordsAndSmallFixes')) {
+    await guSetup();
+    checks.moneyWordsAndSmallFixes = await page.evaluate(() => {
+      const snap = sdSnap(), unpin = sdPin(6);
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        // the price card (js/19) names no parent
+        const card = pmPriceCards(mrRules()).replace(/<[^>]*>/g, ' ');
+        if (/Mom|Dad/.test(card)) bad.push('the price card names a parent: ' + card.replace(/\s+/g, ' ').match(/.{30}(Mom|Dad).{20}/));
+        if (!/not your parents, not you/.test(card)) bad.push('the price card does not say "not your parents, not you"');
+        // Money school chips
+        const holder = document.createElement('div');
+        holder.innerHTML = mnyConceptPanel(kid);
+        const chips = [...holder.querySelectorAll('.mny-chip')].map(e => e.textContent.trim());
+        if (!chips.length) bad.push('no Money school chips');
+        chips.forEach(t => { if (/[{}]/.test(t)) bad.push('a Money school chip shows a raw token: ' + t); });
+        // a committed week with no Sunday record says it was settled without a sign
+        const wk = sdSeedWeek(kid), pl = state.shared.chore.weekPlans;
+        pl[wk] = pl[wk] || {}; pl[wk][kid] = Object.assign(pl[wk][kid] || {}, { committedAt: 1 });
+        const settled = sdRenderMoneyStep(wk).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+        if (!/Settled without a sign/.test(settled) || !/A parent entered this week, or the Grandfather rule paid it/.test(settled)) bad.push('a committed week with no sign does not say so: ' + settled.slice(0, 200));
+        if (/has moved/.test(settled)) bad.push('the Signed step still says the money "has moved"');
+        mmHide();
+        // Grown-ups figures in the look's font
+        applyLook('pop');
+        const wrap = guOpen('rules');
+        const fig = wrap.querySelector('.gu-fig, .gu-kv b, .gu-amt b');
+        if (!fig) bad.push('no Grown-ups figure found');
+        else if (!/Patrick Hand/.test(getComputedStyle(fig).fontFamily)) bad.push('a Grown-ups figure in Pop is drawn in ' + getComputedStyle(fig).fontFamily);
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      finally { unpin(); sdRestore(snap); mmHide(); }
       return bad.length ? bad : true;
     });
     await guTeardown();

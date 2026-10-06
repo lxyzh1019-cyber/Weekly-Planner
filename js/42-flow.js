@@ -77,14 +77,14 @@ const FL_SAVED_DESTS = ['ready', 'locked', 'invest'];
 /* One hue per ribbon, matched to the pots they name on 💰 My money so the two
    screens cannot be telling a child about different things. */
 const FL_COLOURS = {
-  earned: 'var(--mny-flow-earned)', prize: 'var(--mny-flow-prize)',
-  gift: 'var(--mny-flow-gift)', borrowed: 'var(--mny-flow-borrowed)',
+  earned: 'var(--mny-v15-bar)', prize: 'var(--mny-flow-prize)',
+  gift: 'var(--mny-v15-gold)', borrowed: 'var(--mny-v15-wall)',
   interest: 'var(--mny-flow-interest)', typed: 'var(--mny-flow-typed)',
   opening: 'var(--mny-flow-opening)',
-  ready: 'var(--mny-flow-ready)', locked: 'var(--mny-flow-locked)',
-  invest: 'var(--mny-flow-invest)',
-  spent: 'var(--mny-flow-spent)', fine: 'var(--mny-flow-fine)',
-  loan: 'var(--mny-flow-loan)',
+  ready: 'var(--mny-v15-saved)', locked: 'var(--mny-flow-locked)',
+  invest: 'var(--mny-v15-made)',
+  spent: 'var(--mny-v15-cash)', fine: 'var(--mny-flow-fine)',
+  loan: 'var(--mny-v15-wall)',
 };
 
 function flColour(key) { return FL_COLOURS[String(key)] || 'var(--mny-flow-other)'; }

@@ -118,11 +118,12 @@ function mnyConceptPanel(kid) {
   /* A locked chip is still tappable. Disabling it would leave a kid pressing a
      dead button with no idea why; tapping it says what opens it, which is the
      only useful thing a locked lesson has to offer. */
+  const swap = mnyConceptSwap(kid);
   const chips = MNY_CONCEPTS.map(c => {
     const open = mnyIsOpen(kid, c.stage);
     return `<button type="button" class="mny-chip ${mnySchoolConcept === c.id ? 'on' : ''}${open ? '' : ' locked'}"
       data-mny-action="concept" data-mny-concept="${c.id}">
-      ${c.icon} ${escapeHtml(c.title)}${open ? '' : ' 🔒'}</button>`;
+      ${c.icon} ${escapeHtml(swap(c.title))}${open ? '' : ' 🔒'}</button>`;
   }).join('');
 
   const c = mnyConceptCard(mnySchoolConcept, kid);

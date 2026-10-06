@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v29 — 2026-10-05, v28 + Money fit and logic — PR 1: one pile figure, From my bank adds up, the money week named Sun–Sat, a too-big commitment needs a parent's tick, the down payment leaves the 🛟 $10, a 20-Sunday run per girl (build 2026-10-05d) (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v30 — 2026-10-05, v29 + Money fit and logic — PR 2: "Competitions" in place of "meet" on the money screens, no parent named on the price card, the lock-weeks chip reads the rule, Grown-ups figures in the look's font, Story colours match My money, a week settled without a sign says so (build 2026-10-05e); before that v28 + Money fit and logic — PR 1: one pile figure, From my bank adds up, the money week named Sun–Sat, a too-big commitment needs a parent's tick, the down payment leaves the 🛟 $10, a 20-Sunday run per girl (build 2026-10-05d) (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -542,6 +542,23 @@ No screen reads these yet; Stages 2–4 build Grown-ups, My money v2 and the Sun
 | "Loan per month" rescale | kept, changed | residual cent on the last row |
 | One pile figure, bank lines, money week label, commitment tick, 20-Sunday run | added | tests and smoke listed above |
 | "📥 $X waiting" in the From my bank note | intentionally removed | shown once, as its own line (plan L2) |
+| — | missing: none | |
+
+### Money fit and logic — PR 2: words and small fixes (manifested 2026-10-05, plan "Money fit and logic", build 2026-10-05e)
+- 🏆 **"Competitions", not "meet"** wherever it is read on the money screens: Sunday's Guess clue and Bonus line, "Does it earn back?", Grown-ups' Expected add chip, "🏆 Competitions never paid" and its other sentences, Weeks' "+ competitions", the pay-them confirm and toast, the Record sheet's "A competition result", the passbook's day line. "Swim meet" (`mnySportLabel`, the swim request) and "up to 4 at one meet" stay; identifiers, classes and data keys are unchanged.
+- 💬 The price card says "not your parents, not you". 📚 Money school's chips read the same rule words as the card body (`mnyConceptSwap`, js/21, one owner for `mnyConceptCard` and the chips): no raw "{lockWeeks}".
+- 🔤 Grown-ups figures read the body font in Pop (`.gu, #grownupsOverlay` in the `--font-round: var(--font-body)` rule). 🎨 The Story's ribbons use My money's v15 meaning tokens (earned bar, gift gold, ready saved, loan and borrowed wall, spent cash, invest made); prize, interest, typed, opening, locked and fine keep their `--mny-flow-*`. The `--mny-flow-earned/gift/borrowed/ready/invest/spent/loan` tokens are now unread; they stay until PR 4 retires them.
+- ✍️ A week that is committed but has no Sunday record (a parent entered it, or the Grandfather rule paid it) reads "✍️ Settled without a sign" on the Signed step, with one line saying so; the side stays empty. (An uncommitted week never reaches Signed; it is sent back to I choose.)
+- Smoke — new: `noMeetsOnTheMoneyScreens`, `moneyWordsAndSmallFixes` (also the Signed wording); the repair-card check also scans for "meet"; older checks' expected text moved to "competitions".
+
+| Feature | v29 → v30 | Note |
+|---|---|---|
+| Sunday Guess clue, Bonus line, earn-back line, Expected, repair card, Record sheet | kept, changed | "meet" → "competition" in the words only |
+| "Swim meet", swim form "up to 4 at one meet", all identifiers | kept | deliberately unchanged |
+| Price card, Money school chips | kept, changed | no parent named; chips read the rule |
+| Grown-ups figures, Story colours | kept, changed | body font in Pop; v15 tokens |
+| Signed step for a week settled without a sign | kept, changed | title and line say so instead of "Signed." |
+| `--mny-flow-*` tokens | kept | seven now unread; PR 4 retires them |
 | — | missing: none | |
 
 ## Regression table format (paste at the end of every edit)

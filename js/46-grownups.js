@@ -56,7 +56,7 @@ const GU_TABS = [
 const GU_KIDS = ['jenn', 'jess'];
 const GU_DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 // The prototype's 🎁 add chips: [label, a guess in dollars].
-const GU_EXPECT_ADDS = [['🎂 Birthday', 20], ['🎄 Christmas', 20], ['🧧 New Year', 50], ['🏆 Meet', 12]];
+const GU_EXPECT_ADDS = [['🎂 Birthday', 20], ['🎄 Christmas', 20], ['🧧 New Year', 50], ['🏆 Competition', 12]];
 const GU_KIND_LABEL = { goal: 'wants a new goal', comp: 'says a result', gift: 'gift came in', move: 'asks to move',
                         dispute: 'disputes a fine', adv: 'wants to draw early', deposit: 'puts cash in',
                         skip: 'can’t make a session', cash: 'asks to cash out' };
@@ -401,7 +401,7 @@ function guGrandfatherCreditCard() {
   if (!n) return '';
   const perKid = GU_KIDS.map(k => {
     const weeks = plan.weeks.filter(w => w.kids.indexOf(k) >= 0).length;
-    return `<div class="gu-kv"><span>${escapeHtml(mnyKidName(k))} · ${weeks} week${weeks === 1 ? '' : 's'}${plan.comp[k] > 0 ? ` · ${escapeHtml(mnyMoney(plan.comp[k]))} of meets on top` : ''}</span><b>${escapeHtml(mnyMoney(plan.perKid[k]))}</b></div>`;
+    return `<div class="gu-kv"><span>${escapeHtml(mnyKidName(k))} · ${weeks} week${weeks === 1 ? '' : 's'}${plan.comp[k] > 0 ? ` · ${escapeHtml(mnyMoney(plan.comp[k]))} of competitions on top` : ''}</span><b>${escapeHtml(mnyMoney(plan.perKid[k]))}</b></div>`;
   }).join('');
   return `<div class="gu-card gu-plain">
       <div class="gu-cardhead"><span class="gu-cardtitle">👴 Grandfather rule</span><b class="gu-fig">${escapeHtml(mnyMoney(plan.total))}</b></div>
@@ -451,11 +451,11 @@ function guMeetsCard() {
   if (!weeks) return '';
   const total = money2(plans.reduce((n, p) => n + p.total, 0));
   return `<div class="gu-card gu-plain">
-      <div class="gu-cardhead"><span class="gu-cardtitle">🏆 Meets never paid</span><b class="gu-fig">${escapeHtml(mnyMoney(total))}</b></div>
-      <div class="gu-line">These weeks are settled and their meets are on file, but what the meets are worth was never paid. Nothing is taken back.</div>
+      <div class="gu-cardhead"><span class="gu-cardtitle">🏆 Competitions never paid</span><b class="gu-fig">${escapeHtml(mnyMoney(total))}</b></div>
+      <div class="gu-line">These weeks are settled and their competitions are on file, but what the competitions are worth was never paid. Nothing is taken back.</div>
       ${plans.filter(p => p.weeks.length).map(p => p.weeks.slice(0, 10).map(w =>
         `<div class="gu-kv"><span>${escapeHtml(mnyKidName(p.kid))} · week of ${escapeHtml(mnyShortDate(w.wk))} <span class="gu-line">${escapeHtml(w.names.join(', '))}</span></span><b>${escapeHtml(mnyMoney(w.gap))}</b></div>`).join('')).join('')}
-      <button type="button" class="gu-btn" data-mnyp-action="paymeets">Pay the ${escapeHtml(mnyMoney(total))} these meets never got, across ${weeks} week${weeks === 1 ? '' : 's'}</button>
+      <button type="button" class="gu-btn" data-mnyp-action="paymeets">Pay the ${escapeHtml(mnyMoney(total))} these competitions never got, across ${weeks} week${weeks === 1 ? '' : 's'}</button>
     </div>`;
 }
 function guWobblePct() { return Number(mrRuleOr(mrRules(), 'market.wobblePct')) || 0; }
@@ -818,7 +818,7 @@ function guExpectSide() {
     <div class="gu-card gu-plain gu-stack">
       <span>📅 Her timeline on Signed: the 🎲 bonus part of each future month.</span>
       <span>🏠 My money · Coming up: gifts and holidays.</span>
-      <span class="gu-line">Meets use her average per meet from the last 4. Change it here if a season is different.</span>
+      <span class="gu-line">Competitions use her average per competition from the last 4. Change it here if a season is different.</span>
     </div>`;
 }
 
@@ -888,7 +888,7 @@ function guGrandfatherCard() {
   const derived = !state.shared.chore.programStartDate;
   return `<div class="gu-card gu-rulesec gu-tint--lav">
       <div class="gu-cardtitle">👴 Grandfather rule</div>
-      <div class="gu-line">Every week from the start week that is outside the review window and had no family meeting gets the same flat amount for each girl. A meet on file is paid on top. The last ${MNY_CATCHUP_REACH} weeks are left to the catch-up list.</div>
+      <div class="gu-line">Every week from the start week that is outside the review window and had no family meeting gets the same flat amount for each girl. A competition on file is paid on top. The last ${MNY_CATCHUP_REACH} weeks are left to the catch-up list.</div>
       <label class="gu-rule"><span class="gu-rule-words"><span>Starts the week of</span></span>
         <input class="gu-input gu-date" type="date" value="${escapeAttr(f.from)}" data-mnyp-action="gmfrom"></label>
       <div class="gu-rule"><div class="gu-rule-words"><span>Each girl, each week</span></div>
@@ -1266,7 +1266,7 @@ function guWeekCell(kid, r) {
         <span class="gu-weektagchip">${escapeHtml(tag)}</span>
         ${fixable ? `<button type="button" class="gu-btn" aria-expanded="${open}" data-mnyp-action="guweekopen" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(r.weekKey)}">${open ? 'Done' : '✏️ Fix'}</button>` : ''}</div>
       <div class="gu-line">${escapeHtml(parts)}</div>
-      ${r.defaulted ? `<div class="gu-line">${escapeHtml(r.defaultReason === 'grandma' ? '👴 Grandfather rule' : 'No meeting — default')} ${escapeHtml(mnyMoney(money2(money2(r.gross) - money2(r.competition))))} + meets ${escapeHtml(mnyMoney(r.competition))} · already in her wallet, so it is not edited here; a meet is corrected through the meet.</div>` : ''}
+      ${r.defaulted ? `<div class="gu-line">${escapeHtml(r.defaultReason === 'grandma' ? '👴 Grandfather rule' : 'No meeting — default')} ${escapeHtml(mnyMoney(money2(money2(r.gross) - money2(r.competition))))} + competitions ${escapeHtml(mnyMoney(r.competition))} · already in her wallet, so it is not edited here; a competition is corrected through the competition.</div>` : ''}
       ${open ? guTypedWeekFields(kid, r) : ''}
     </div>`;
 }

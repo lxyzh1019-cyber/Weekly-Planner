@@ -553,7 +553,7 @@ function sdVerdicts(res, w, rules) {
   const incomeLines = [
     '📅 Steady ' + m(sg.inSteady) + ' (' + sP + '%): the money I earn every week from chores, routine and club sessions.',
     '🧱 My loan needs ' + m(minW) + ' first, every week. Steady covers it ' + cover.toFixed(1) + '×' + (cover < 1 ? ', not enough on its own.' : cover < 1.5 ? ', with little to spare.' : '.'),
-    ...(bP > 0 ? ['🎲 Bonus ' + m(sg.inBonus) + ' (' + bP + '%) came from ' + bonusNames + '. ' + (nextEv ? 'Next chance: ' + nextEv[0] + ', ' + nextEv[1] + '.' : 'No meet planned yet.')] : []),
+    ...(bP > 0 ? ['🎲 Bonus ' + m(sg.inBonus) + ' (' + bP + '%) came from ' + bonusNames + '. ' + (nextEv ? 'Next chance: ' + nextEv[0] + ', ' + nextEv[1] + '.' : 'No competition planned yet.')] : []),
     ...(avg4 ? ['📊 My 4-week average is ' + m(avg4) + '. This week is ' + (dAvg >= 0 ? m(dAvg) + ' more.' : m(-dAvg) + ' less.')] : []),
     ...(kP >= 10 ? ['🏦 ' + kP + '% came from my bank. That is my own money moving, not earning.'] : []),
     gap < 1 ? '👍 All from steady work. I can do this every week.' : '💪 To earn ' + m(earnedW) + ' with no bonus: ' + (parts.join(' + ') || 'keep every session') + (room < day ? '. Chores are already at the top.' : '.')];
@@ -683,7 +683,7 @@ function sdClues(rules) {
   return [
     ['🧹 Chores · ⛸️ job', `${sdWhole$(sdRule(rules, 'chores.dailyCap'))} a day · ${sdWhole$(sdRule(rules, 'sessions.perSession'))} a session`],
     ['🔥 Routine', sdStreakClue(rules)],
-    ['🏆 Meets', 'points + placing'],
+    ['🏆 Competitions', 'points + placing'],
     ['🎁 Gifts', 'only after a parent says yes'],
   ].map(([k, v]) => ({ k, v }));
 }
