@@ -5564,22 +5564,6 @@ function findChromium() {
       d.alloc = sdAlloc(alloc || { extra: c.P.hers });
       return mnyDoCommit(kid, wk);
     };
-    /* Plan v18 (Stage 7): the checks written for the Monday–Sunday money week
-       (owner decision #93, the house rules' streak, the fines Day row) pin that
-       rule, the way the date checks pin the clock: from Sun 11 Oct 2026 the
-       current week is Sunday–Saturday (Deviation 34), which has its own checks
-       (theMoneyWeekRunsSundayToSaturday, aDayIsNeverPaidTwiceAcrossTheSwitch).
-       Without the pin these four passed or failed by the calendar date.
-       It also stands down the neighbours' frozen days (mrMoneySettledDays):
-       a later Sun–Sat week settled by an earlier check covers this week's
-       Sunday, which then reads "taken" — a switch-week case these checks are
-       not about (aDayIsNeverPaidTwiceAcrossTheSwitch is). */
-    window.pinMonSunMoneyWeek = () => {
-      const real = window.mrMoneyWeekRuleOn, realSettled = window.mrMoneySettledDays;
-      window.mrMoneyWeekRuleOn = () => false;
-      window.mrMoneySettledDays = () => null;
-      return () => { window.mrMoneyWeekRuleOn = real; window.mrMoneySettledDays = realSettled; };
-    };
     window.sdSnap = () => JSON.stringify(state);
     window.sdRestore = (snap) => {
       const s = JSON.parse(snap);
@@ -6851,33 +6835,48 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  // Owner decision #93: "Did you do your Sunday routine?" — a tick counts the
-  // day; Mon–Sat kept and Sunday not ticked still pays the full tier.
+  // Decision 15 (2026-10-06, replaces owner decision #93 "Sunday counts if
+  // ticked by then"): at the meeting the Sunday routine is pre-marked — counted
+  // as kept without the tick. She still does it that evening; a later untick
+  // changes no money (the meeting froze the week).
   if (want('sundaySundayRoutineCounts')) checks.sundaySundayRoutineCounts = await page.evaluate(() => {
-    const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
-    try { return (() => {
     const snap = sdSnap(), unpin = sdPin(6);           // this week's Sunday, payday
     const bad = [];
     try {
       const kid = 'jenn', wk = sdSeedWeek(kid);
-      for (let dd = 0; dd < 6; dd++) routineSessionsForDay(kid, wk, dd).forEach(s => ctSetMandatory(wk, dd, s, kid, true));
-      routineSessionsForDay(kid, wk, 6).forEach(s => ctSetMandatory(wk, 6, s, kid, false));
+      const sunday = kept => routineSessionsForDay(kid, wk, 6).forEach(s => ctSetMandatory(wk, 6, s, kid, kept));
+      // Mon–Sat with one miss (Wednesday), Sunday not ticked: the pre-marked
+      // Sunday and the forgiving day make 7 — under #93 this paid $2.
+      for (let dd = 0; dd < 6; dd++) routineSessionsForDay(kid, wk, dd).forEach(s => ctSetMandatory(wk, dd, s, kid, dd !== 2));
+      sunday(false);
       const before = mrStreakWeek(wk, kid);
-      if (before.bonus !== 3) bad.push(`Mon–Sat kept, Sunday not ticked pays ${before.bonus} (${before.days} days), not the full $3`);
+      if (before.days !== 7 || before.bonus !== 3) bad.push(`one miss Mon–Sat, Sunday not ticked: ${before.days} days, $${before.bonus} — the meeting Sunday is not pre-marked`);
+      const sun = sdSundayRoutine({ kid, wk });
+      if (!sun.asked || sun.done !== true || sun.premarked !== true) bad.push('sdSundayRoutine does not pre-mark the meeting Sunday: ' + JSON.stringify(sun));
       renderMeetingMode();
       const btn = sdBody().querySelector('[data-mny-action="sd-sunroutine"]');
-      if (!btn) bad.push('step 1 does not ask about the Sunday routine');
-      else btn.click();
-      if (!routineSessionsForDay(kid, wk, 6).every(s => ctGetMandatory(wk, 6, s, kid))) bad.push('the tick did not mark Sunday’s routine');
-      const after = mrStreakWeek(wk, kid);
-      if (after.days !== 7 || after.bonus !== 3) bad.push(`ticked: ${after.days} days, $${after.bonus}`);
+      if (!btn) bad.push('step 1 lost the Sunday routine tile');
+      else if (!btn.classList.contains('on') || !/marked for you/.test(btn.textContent)) bad.push('the Sunday routine tile does not read as marked: ' + btn.textContent);
       sdOpenDad();
-      if (!/Sunday routine/.test(document.getElementById('sundayBody').textContent)) bad.push('Dad’s card does not ask about the Sunday routine');
+      const dad = document.getElementById('sundayBody').textContent;
+      if (dad.indexOf('Tonight’s routine still counts — it is marked for you.') < 0 && dad.indexOf("Tonight's routine still counts — it is marked for you.") < 0) bad.push('Dad’s card does not say the Sunday routine is marked');
+      if (/Did you do your Sunday routine/.test(dad)) bad.push('Dad’s card still asks her to tick the Sunday routine');
       closeSheet('sundayOverlay');
+      // Settled at the meeting with Sunday unticked: the frozen row pays the
+      // 7-day tier, and a later tick and untick change nothing.
+      sdSignHer(kid, wk);
+      const row = ((state.shared.chore.moneyLedger || {})[wk] || {})[kid];
+      if (!row) bad.push('precondition: the week did not settle');
+      else {
+        if (row.streak !== 3 || row.streakDays !== 7) bad.push(`settled with Sunday unticked: ${row.streakDays} days, $${row.streak}, not 7 days, $3`);
+        const was = JSON.stringify(row), cash = ensureWallet(kid).cash;
+        sunday(true); sunday(false);
+        const now = ((state.shared.chore.moneyLedger || {})[wk] || {})[kid];
+        if (JSON.stringify(now) !== was || ensureWallet(kid).cash !== cash) bad.push('a later tick/untick changed the settled week');
+      }
     } catch (e) { bad.push('threw: ' + e.message); }
     finally { unpin(); sdRestore(snap); mmHide(); }
     return bad.length ? bad : true;
-    })(); } finally { unpinRule(); }
   });
 
   /* ── THE MONEY STREAM AGREES WITH THE WALLET ──────────────────────
@@ -6977,8 +6976,6 @@ function findChromium() {
      deducting, a streak that gets easier, a denominator that changes. The
      calibration tools hold the money; this holds the behaviour. */
   if (want('theFourHouseRulesHold')) checks.theFourHouseRulesHold = await page.evaluate(() => {
-    const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
-    try { return (() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -7158,7 +7155,6 @@ function findChromium() {
       getProfData(kid).chore.mandatoryByWeek[wk] = savedMand;
     }
     return problems.length ? problems : true;
-    })(); } finally { unpinRule(); }
   });
 
   /* ── THE HOUSE RULES REACH A STORED RULEBOOK ──────────────────────
@@ -24052,8 +24048,6 @@ function findChromium() {
   if (want('grownupsFinesLogEvenWhenFree')) {
     await guSetup();
     checks.grownupsFinesLogEvenWhenFree = await page.evaluate(() => {
-      const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
-      try { return (() => {
       const bad = [];
       // Thursday of this week: Mon–Thu can be chosen, Fri–Sun have not happened.
       const unpin = c1.pin(3);
@@ -24096,7 +24090,6 @@ function findChromium() {
         if (mrFines(kid).some(f => f.id === id) || !state.shared.tombstones['fine:' + id]) bad.push('✕ did not remove the fine for good');
       } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); } finally { unpin(); }
       return bad.length ? bad : true;
-      })(); } finally { unpinRule(); }
     });
     await guTeardown();
   }
@@ -24594,8 +24587,6 @@ function findChromium() {
   if (want('anUnfinishedDayIsNeverForgiven')) {
     await guSetup();
     checks.anUnfinishedDayIsNeverForgiven = await page.evaluate(() => {
-      const unpinRule = pinMonSunMoneyWeek();   // Plan v18: the Mon–Sun money week this check is about
-      try { return (() => {
       const bad = [];
       const kid = 'jenn', wk = getDayKeys(0)[0];
       const setWeek = (week, pattern) => {
@@ -24626,146 +24617,13 @@ function findChromium() {
       } catch (e) { bad.push('threw: ' + e.message); }
       finally { unpin(); }
       return bad.length ? bad : true;
-      })(); } finally { unpinRule(); }
     });
     await guTeardown();
   }
 
 
 
-  /* 📅 Plan v6 Deviation 34: from the meeting of Sun 11 Oct the money week
-     is Sunday to Saturday. The meeting on a Sunday pays the seven finished
-     days before it — chores, routine streak, fines and club sessions — read
-     at their planner days (the Sunday at the previous planner week's day 6);
-     the planner week and every stored weekKey stay Monday–Sunday. */
-  if (want('theMoneyWeekRunsSundayToSaturday')) {
-    await guSetup();
-    checks.theMoneyWeekRunsSundayToSaturday = await page.evaluate(() => {
-      const bad = [];
-      const RealDate = Date;
-      const when = new RealDate(RealDate.UTC(2026, 9, 19, 19, 0, 0));   // Mon 19 Oct, midday in Edmonton
-      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
-      Date.prototype = RealDate.prototype; Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
-      try {
-        const kid = 'jenn', W = '2026-10-12', P = '2026-10-05';
-        const p = getProfData(kid);
-        p.fines = mrFines(kid).filter(f => String(f.dayKey) < '2026-10-04' || String(f.dayKey) > '2026-10-25');
-        if (!mrMoneyWeekIsSunday(W) || mrMoneyWeekIsSunday('2026-09-28')) bad.push('the rule: week of 12 Oct should be Sun–Sat and week of 28 Sep Mon–Sun');
-        const keys = mrMoneyDayKeys(W, kid).join(',');
-        if (keys !== '2026-10-11,2026-10-12,2026-10-13,2026-10-14,2026-10-15,2026-10-16,2026-10-17') bad.push('the meeting of 18 Oct does not pay Sun 11 – Sat 17: ' + keys);
-        if (mrMoneyDayKeys('2026-09-21', kid).join(',') !== mrWeekDayKeys('2026-09-21').join(',')) bad.push('a week before the switch is not Mon–Sun any more');
-        if (mrMoneyWeekOf('2026-10-11', kid) !== W || mrMoneyWeekOf('2026-10-17', kid) !== W || mrMoneyWeekOf('2026-10-18', kid) !== '2026-10-19') bad.push('a day is filed to the wrong money week: ' + [mrMoneyWeekOf('2026-10-11', kid), mrMoneyWeekOf('2026-10-17', kid), mrMoneyWeekOf('2026-10-18', kid)].join(','));
-        // Chores: Sun 11 (stored at P, day 6), Sat 17 (W, day 5) and Sun 18 (W, day 6).
-        ['dishes', 'mop', 'vacuum'].forEach(ch => mrSetChoreGrade(kid, P, 6, ch, 3));
-        ['dishes', 'mop'].forEach(ch => mrSetChoreGrade(kid, W, 5, ch, 3));
-        mrSetChoreGrade(kid, W, 6, 'bins', 3);
-        const cw = mrChoreWeek(W, kid);
-        const dayOf = k => cw.days.find(d => d.dayKey === k);
-        if (!dayOf('2026-10-11') || dayOf('2026-10-11').wk !== P || dayOf('2026-10-11').d !== 6) bad.push('Sun 11 is not read at the planner week before, day 6');
-        if (dayOf('2026-10-18')) bad.push('Sun 18 — the meeting day — is in the week it is the meeting of');
-        const graded = cw.days.filter(d => d.raw > 0).map(d => d.dayKey).concat(cw.freeUsed.map(f => f.dayKey));
-        if (graded.indexOf('2026-10-11') < 0 || graded.indexOf('2026-10-17') < 0) bad.push('chores: Sun 11 and Sat 17 should both count: ' + JSON.stringify(cw.days.map(d => [d.dayKey, d.raw])));
-        if (mrChoreDay(kid, '2026-10-18').wk !== '2026-10-19') bad.push('Sun 18\'s chores are not paid by the next money week');
-        // Routine streak: Sun 11 – Sat 17 kept is a 7-day run; Sun 18 belongs to the next week.
-        mrMoneyDays(W, kid).forEach(r => mrRoutineSessionsFor(r.wk, kid, r.d).forEach(s => ctSetMandatory(r.wk, r.d, s, kid, true)));
-        mrRoutineSessionsFor(W, kid, 6).forEach(s => ctSetMandatory(W, 6, s, kid, false));
-        const st = mrStreakWeek(W, kid);
-        if (st.days !== 7 || st.tier !== 7) bad.push('Sun 11 – Sat 17 kept should be a 7-day run: ' + JSON.stringify(st));
-        // Fines: one on Sun 11 counts for W, one on Sun 18 does not.
-        const f1 = mrAddFine(kid, 'box_repeat', '2026-10-11'), f2 = mrAddFine(kid, 'box_repeat', '2026-10-18');
-        const ch = mrFinesWeek(W, kid, null).chargeable;
-        if (!(f1.id in ch) || (f2.id in ch)) bad.push('fines: Sun 11 should count and Sun 18 should not: ' + JSON.stringify(Object.keys(ch)));
-        if (!(f2.id in mrFinesWeek('2026-10-19', kid, null).chargeable)) bad.push('the Sun 18 fine is not in the next money week');
-        // Club sessions: one on Sun 11 is the week's; one on Sun 18 is not.
-        setDayBlocks('2026-10-11', [...(getDayBlocks('2026-10-11', kid) || []), { id: 'mw-aj1', actId: 'assistant_job', startMin: 600, durationMin: 60 }], kid);
-        setDayBlocks('2026-10-18', [...(getDayBlocks('2026-10-18', kid) || []), { id: 'mw-aj2', actId: 'assistant_job', startMin: 600, durationMin: 60 }], kid);
-        const ses = mrSessionsWeek(W, kid).sessions.map(x => x.blockId);
-        if (ses.indexOf('mw-aj1') < 0 || ses.indexOf('mw-aj2') >= 0) bad.push('sessions: Sun 11 should be in and Sun 18 out: ' + ses.join(','));
-        // An answer given against the week it was planned in still counts.
-        mrSetSessionAttendance(kid, P, 'mw-aj1', true);
-        if (!(mrSessionsWeek(W, kid).sessions.find(x => x.blockId === 'mw-aj1') || {}).attended) bad.push('an attendance answer kept at the planner week is lost');
-        // The frozen ledger records the days it covered.
-        const row = mrFreezeWeekLedger(W, kid);
-        if ((row.days || []).join(',') !== keys) bad.push('the frozen row does not record its days: ' + JSON.stringify(row.days));
-        // Sunday's step 1 no longer asks about the meeting Sunday in a Sun–Sat week.
-        if (sdSundayRoutine({ kid, wk: W }).asked) bad.push('Sunday step 1 still asks for the Sunday routine in a Sun–Sat week');
-      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
-      finally { Date = RealDate; }
-      return bad.length ? bad : true;
-    });
-    await guTeardown();
-  }
-
-  /* 📅 The switch Sunday (Sun 4 Oct 2026) is day 6 of the last Mon–Sun week
-     and day 0 of the first Sun–Sat week. Whichever week settles first pays
-     it, and the other never does — read from the frozen row's `days`. */
-  if (want('aDayIsNeverPaidTwiceAcrossTheSwitch')) {
-    await guSetup();
-    checks.aDayIsNeverPaidTwiceAcrossTheSwitch = await page.evaluate(() => {
-      const bad = [];
-      const RealDate = Date;
-      const when = new RealDate(RealDate.UTC(2026, 9, 12, 19, 0, 0));   // Mon 12 Oct
-      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
-      Date.prototype = RealDate.prototype; Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
-      const snap = JSON.stringify(state);
-      try {
-        const kid = 'jess', OLD = '2026-09-28', NEW = '2026-10-05', SUN = '2026-10-04';
-        const reset = () => {
-          state = JSON.parse(snap);
-          const cc = state.shared.chore;
-          [OLD, NEW].forEach(wk => {
-            if (cc.finalizedWeeks && cc.finalizedWeeks[wk]) delete cc.finalizedWeeks[wk][kid];
-            if (cc.moneyLedger && cc.moneyLedger[wk]) delete cc.moneyLedger[wk][kid];
-            if (cc.meetingsMet) delete cc.meetingsMet[wk];
-          });
-          getProfData(kid).fines = [];
-          // Sun 4: three chores graded (stored at OLD, day 6) and a fine that costs.
-          ['dishes', 'mop', 'vacuum'].forEach(ch => mrSetChoreGrade(kid, OLD, 6, ch, 3));
-          ['dishes', 'mop', 'vacuum'].forEach(ch => mrSetChoreGrade(kid, NEW, 1, ch, 3));
-          return mrAddFine(kid, 'box_repeat', SUN);
-        };
-        const settle = (wk) => {
-          const row = mrFreezeWeekLedger(wk, kid);
-          const cc = state.shared.chore;
-          cc.moneyLedger = cc.moneyLedger || {}; (cc.moneyLedger[wk] = cc.moneyLedger[wk] || {})[kid] = row;
-          cc.finalizedWeeks = cc.finalizedWeeks || {}; (cc.finalizedWeeks[wk] = cc.finalizedWeeks[wk] || {})[kid] = row.net;
-          return row;
-        };
-        const paysSun = (wk) => mrMoneyDayKeys(wk, kid).indexOf(SUN) >= 0;
-        const sunPaidIn = (wk) => !!mrChoreWeek(wk, kid).days.find(d => d.dayKey === SUN && !d.taken && d.paid > 0);
-        // Open, both weeks name it.
-        let fine = reset();
-        if (!paysSun(OLD) || !paysSun(NEW)) bad.push('open: both weeks should name the switch Sunday');
-        // The old week settles first (the meeting of Sun 4 Oct): it keeps Sun 4.
-        const oldRow = settle(OLD);
-        if ((oldRow.days || []).indexOf(SUN) < 0) bad.push('the old week settled first did not freeze Sun 4');
-        if (paysSun(NEW)) bad.push('the first Sun–Sat week still pays Sun 4 after the old week paid it');
-        if (sunPaidIn(NEW)) bad.push('Sun 4\'s chores are paid again in the new week');
-        if (fine.id in mrFinesWeek(NEW, kid, null).chargeable) bad.push('Sun 4\'s fine is charged again in the new week');
-        if (mrMoneyWeekOf(SUN, kid) !== OLD) bad.push('Sun 4 is not filed to the week that paid it');
-        const newRow = settle(NEW);
-        if ((newRow.days || []).indexOf(SUN) >= 0) bad.push('the new week froze Sun 4 as well');
-        // The other order: the new week settles first and keeps it.
-        fine = reset();
-        if (!sunPaidIn(NEW)) bad.push('open: the new week does not show Sun 4\'s chores');
-        const newFirst = settle(NEW);
-        if ((newFirst.days || []).indexOf(SUN) < 0) bad.push('the new week settled first did not freeze Sun 4');
-        if (mrMoneyWeekOf(SUN, kid) !== NEW) bad.push('Sun 4 is not filed to the new week that paid it');
-        if (paysSun(OLD)) bad.push('the old week still pays Sun 4 after the new week paid it');
-        if (sunPaidIn(OLD)) bad.push('Sun 4\'s chores are paid again in the old week');
-        if (fine.id in mrFinesWeek(OLD, kid, null).chargeable) bad.push('Sun 4\'s fine is charged again in the old week');
-        const oldSecond = settle(OLD);
-        if ((oldSecond.days || []).indexOf(SUN) >= 0) bad.push('the old week froze Sun 4 as well');
-        // A row frozen before `days` existed covers its own Mon–Sun.
-        reset();
-        delete settle(OLD).days;
-        if (paysSun(NEW)) bad.push('a legacy old row (no days) does not keep Sun 4 out of the new week');
-      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
-      finally { Date = RealDate; state = JSON.parse(snap); }
-      return bad.length ? bad : true;
-    });
-    await guTeardown();
-  }
+  // Decision 15 (2026-10-06): the money week is Monday–Sunday everywhere; the Sun–Sat checks theMoneyWeekRunsSundayToSaturday and aDayIsNeverPaidTwiceAcrossTheSwitch are retired (the mapping is node-tested with explicit rules).
 
   /* 📒 The passbook: the last four Sundays from the frozen ledger, newest
      first, a = Total row that adds them, "showing the latest 4" when there
@@ -25531,9 +25389,10 @@ function findChromium() {
 
   /* L4: the money week has one name on the money surfaces — the meeting's
      head while the money step is on, the passbook's week card and Grown-ups ›
-     📒 Weeks — its first and last day. With the clock at Sun 11 Oct 2026 the
-     head reads "Mon 5 – Sat 10 Oct" (the switch week); at Sun 18 Oct, "Sun 11
-     – Sat 17 Oct". The planner's steps keep the Mon–Sun week. */
+     📒 Weeks — its first and last day. Decision 15 (2026-10-06): the money
+     week is Monday–Sunday, so with the clock at Sun 11 Oct 2026 the head and
+     the story card read "Mon 5 – Sun 11 Oct"; at Sun 18 Oct, "Mon 12 – Sun 18
+     Oct". The planner's steps keep the Mon–Sun week. */
   if (want('theMoneyHeadNamesTheMoneyWeek')) {
     await guSetup();
     checks.theMoneyHeadNamesTheMoneyWeek = await page.evaluate(() => {
@@ -25544,28 +25403,30 @@ function findChromium() {
         Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
         Date.prototype = RealDate.prototype; Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
       };
-      const snap = sdSnap();
+      const snap = sdSnap(), offset = weekOffset;
       try {
-        [[11, 'Mon 5 – Sat 10 Oct'], [18, 'Sun 11 – Sat 17 Oct']].forEach(([day, want]) => {
+        [[18, 'Mon 12 – Sun 18 Oct'], [11, 'Mon 5 – Sun 11 Oct']].forEach(([day, want]) => {
           pinAt(2026, 9, day);
           const wk = ctThisWeekKey();
           const money = mmHead(wk, '', 'money'), other = mmHead(wk, '', 'reflect');
           if (money.indexOf(want) < 0) bad.push(`Sun ${day} Oct: the money head does not read "${want}": ${(money.match(/mm-head-wk[^<]*<span[^>]*>[^<]*<\/span>([^<]*)/) || [])[1]}`);
           if (other.indexOf(mmWeekLabel(wk)) < 0) bad.push(`Sun ${day} Oct: a planner step lost its Mon–Sun week`);
-          Date = RealDate;
         });
-        // The meeting's own head, drawn, on the money step.
+        // The clock stays at Sun 11 Oct (the last pin) and the planner on its
+        // own week: the meeting's own head, drawn, on the money step.
+        weekOffset = 0;
         const kid = 'jenn', wk = sdSeedWeek(kid);
+        if (wk !== '2026-10-05') bad.push('precondition: the seeded week is ' + wk + ', not the week of Mon 5 Oct');
         const shown = (document.querySelector('.mm-head-wk') || {}).textContent || '';
-        if (shown.indexOf(mrMoneyWeekLabel(mmWeekKey())) < 0) bad.push('the drawn money head does not name the money week: ' + shown);
+        if (shown.indexOf(mrMoneyWeekLabel(mmWeekKey())) < 0 || shown.indexOf('Mon 5 – Sun 11 Oct') < 0) bad.push('the drawn money head does not read "Mon 5 – Sun 11 Oct": ' + shown);
         // The passbook's week card and Grown-ups › 📒 Weeks name it the same way.
         sdSignHer(kid, wk);
         const row = mnyLedgerRows(kid).find(r => r.weekKey === wk);
         if (!row) bad.push('precondition: no signed row');
-        else if (mnyStoryWeek(kid, row).indexOf('Week of ' + escapeHtml(mrMoneyWeekLabel(wk, kid))) < 0) bad.push('the passbook week card does not name the money week');
+        else if (mnyStoryWeek(kid, row).indexOf('Week of ' + escapeHtml('Mon 5 – Sun 11 Oct')) < 0) bad.push('the story week card does not read "Mon 5 – Sun 11 Oct": ' + mrMoneyWeekLabel(wk, kid));
         if (guWeeksMain().indexOf('>' + escapeHtml(mrMoneyWeekLabel(wk)) + '</button>') < 0) bad.push('Grown-ups › Weeks does not name the money week');
       } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
-      finally { Date = RealDate; sdRestore(snap); mmHide(); }
+      finally { Date = RealDate; weekOffset = offset; sdRestore(snap); mmHide(); }
       return bad.length ? bad : true;
     });
     await guTeardown();

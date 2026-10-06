@@ -585,15 +585,31 @@ function fill(w, k) {
     && row('Typical week').changed && row('Most to spend').changed ? true : JSON.stringify(moved[0].rows));
 }
 
-/* ── 📅 The money week runs Sunday to Saturday (Plan v6 Deviation 34) ──
-   js/18-rules.js's `mrMoneyDaysPure`, every fact handed in: which days a
-   meeting pays, before and after the switch, and that no day is ever paid by
-   two settled weeks whatever order the weeks are settled in. */
+/* ── 📅 The money week runs Monday to Sunday (decision 15, 2026-10-06) ──
+   Plan v6 Deviation 34 (Sunday to Saturday from 11 Oct 2026) was withdrawn
+   before it started. The shipped rulebook is Monday–Sunday and only a STORED
+   `week.startsOn: 'sunday'` with a `week.from` could turn the mapping on.
+   The mapping code stays for the record: js/18-rules.js's `mrMoneyDaysPure`,
+   every fact handed in, is tested below with explicit Sun–Sat rules — which
+   days a meeting pays, before and after a switch, and that no day is ever paid
+   by two settled weeks whatever order the weeks are settled in. */
 {
   const r18 = require(path.join(__dirname, '..', 'js', '18-rules.js'));
-  check('the money week rule is in the shipped rulebook: Sunday–Saturday from the meeting of 11 Oct 2026',
-    R.week && R.week.startsOn === 'sunday' && R.week.from === '2026-10-11' ? true : JSON.stringify(R.week));
-  const isSun = wk => r18.mrMoneyWeekRuleOn(R, wk);
+  check('decision 15: the shipped rulebook runs the money week Monday–Sunday, with no switch date',
+    R.week && R.week.startsOn === 'monday' && !('from' in R.week) ? true : JSON.stringify(R.week));
+  check('decision 15: the default rules never turn the Sun–Sat mapping on',
+    ['2026-09-28', '2026-10-05', '2026-10-12', '2027-03-01'].every(wk => !r18.mrMoneyWeekRuleOn(R, wk))
+      && !r18.mrMoneyWeekRuleOn({}, '2026-10-12') && !r18.mrMoneyWeekRuleOn({ week: { startsOn: 'sunday' } }, '2026-10-12')
+      ? true : 'a week reads Sun–Sat under the shipped or a partial rulebook');
+  // The withdrawn shipped pair, copied into a stored rulebook, never turns it on.
+  const copied = { week: { startsOn: 'sunday', from: '2026-10-11' } };
+  check('decision 15: a stored rulebook holding the withdrawn pair (sunday, 2026-10-11) reads every week Mon–Sun',
+    ['2026-09-28', '2026-10-05', '2026-10-12', '2027-03-01'].every(wk => !r18.mrMoneyWeekRuleOn(copied, wk)) ? true : 'a week reads Sun–Sat');
+  const chosen = { week: { startsOn: 'sunday', from: '2026-11-08' } };
+  check('a stored sunday rule with another date still turns the mapping on from that date',
+    !r18.mrMoneyWeekRuleOn(chosen, '2026-10-26') && r18.mrMoneyWeekRuleOn(chosen, '2026-11-02') && r18.mrMoneyWeekRuleOn(chosen, '2026-11-09') ? true : 'wrong');
+  // The mapping's own tests: a Sun–Sat rule from the meeting of 11 Oct, handed in as a function.
+  const isSun = wk => r18.mrDayKeyAdd(wk, 6) >= '2026-10-11';
   check('weeks whose meeting is before 11 Oct keep Mon–Sun; the week of 5 Oct is the first Sun–Sat',
     !isSun('2026-09-21') && !isSun('2026-09-28') && isSun('2026-10-05') && isSun('2026-11-02') ? true
       : [isSun('2026-09-28'), isSun('2026-10-05')].join(','));
@@ -818,6 +834,38 @@ function fill(w, k) {
     check('L4 the switch Sunday is named by the week that paid it',
       L('2026-10-05', rule, newFirst) === 'Sun 4 – Sat 10 Oct' && L('2026-10-05', rule, oldFirst) === 'Mon 5 – Sat 10 Oct'
         ? true : [L('2026-10-05', rule, newFirst), L('2026-10-05', rule, oldFirst)]);
+    // Decision 15: with the shipped rules every week is Mon–Sun.
+    const shipped = wk => r18.mrMoneyWeekRuleOn(R, wk);
+    const gotD = [L('2026-10-05', shipped, none), L('2026-10-12', shipped, none), L('2026-09-28', shipped, none)];
+    check('decision 15: with the default rules the week of 5 Oct reads "Mon 5 – Sun 11 Oct"',
+      gotD.join('|') === 'Mon 5 – Sun 11 Oct|Mon 12 – Sun 18 Oct|Mon 28 Sep – Sun 4 Oct' ? true : gotD);
+  }
+
+  /* 🔥 Decision 15: the meeting's own Sunday is pre-marked. In a week not
+     yet settled, its Sunday counts as kept once it has come — she still does
+     the routine that evening, and a later untick changes nothing (the meeting
+     freezes the week). `mrStreakRunPure` is the one rule mrStreakWeek reads. */
+  {
+    const run = r18.mrStreakRunPure;
+    const st = R.streak;
+    // Mon..Sat as given, then the meeting Sunday (today) not ticked.
+    const week = (monSat, live = true) => monSat.map(kept => ({ kept, today: false, meetingSunday: false }))
+      .concat([{ kept: false, today: live, meetingSunday: true }]);
+    const six = run(week([true, true, true, true, true, true]), st, true);
+    check('pre-mark: 6 kept days + the meeting Sunday (not ticked) = the 7-day tier, $3',
+      six.days === 7 && six.tier === 7 && six.bonus === 3 ? true : JSON.stringify(six));
+    const oneMiss = run(week([true, true, false, true, true, true]), st, true);
+    check('pre-mark: one miss Mon–Sat + the meeting Sunday = 7 days with the forgiving day, $3',
+      oneMiss.days === 7 && oneMiss.bonus === 3 ? true : JSON.stringify(oneMiss));
+    const twoMiss = run(week([true, false, true, false, true, true]), st, true);
+    check('pre-mark: two misses Mon–Sat still fail the 7-day tier',
+      twoMiss.tier < 7 && twoMiss.bonus < 3 ? true : JSON.stringify(twoMiss));
+    const settled = run(week([true, true, false, true, true, true], false), st, false);
+    check('pre-mark: a settled week is read whole — an unticked Sunday there is a miss, as before',
+      settled.days === 6 && settled.bonus === 2 ? true : JSON.stringify(settled));
+    const midWeek = run([{ kept: true }, { kept: true }, { kept: false, today: true, meetingSunday: false }], st, true);
+    check('pre-mark: only the meeting Sunday — a weekday not done yet still stops the live run',
+      midWeek.days === 2 ? true : JSON.stringify(midWeek));
   }
 
   /* 🧱 owe after my plan (I choose): exactly what the sign leaves, interest
