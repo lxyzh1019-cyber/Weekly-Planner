@@ -74,9 +74,17 @@ jobs:
   # suite. Runs on pull requests too: it is the only check that would catch a
   # broken screen, and it costs ~2 minutes.
   smoke:
-    name: Headless smoke test
+    name: Headless smoke test (${{ matrix.date }})
     runs-on: ubuntu-latest
     needs: checks
+    # The suite runs on a fixed date (SMOKE_DATE, noon Edmonton; tests/smoke.js)
+    # so its result cannot change with the calendar. Four dates, one job each:
+    # a regular weekday, a Sunday, the first of a month, and 2026-10-07, the
+    # Wednesday that first showed the Chores money door's tap-size failure.
+    strategy:
+      fail-fast: false
+      matrix:
+        date: ['2026-10-15', '2026-10-11', '2026-10-01', '2026-10-07']
     # A GitHub job with no timeout runs for SIX HOURS before the platform kills
     # it. Neither job had one, so the only way to stop a stuck run was for a
     # human to notice and cancel it by hand — which is exactly what happened on
@@ -139,6 +147,8 @@ jobs:
 
       - name: Smoke test
         run: npm run test:smoke
+        env:
+          SMOKE_DATE: ${{ matrix.date }}
 
       # Screenshots make a layout regression visible in the run itself rather
       # than only as a failed assertion.
@@ -146,7 +156,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-screenshots
+          name: smoke-screenshots-${{ matrix.date }}
           path: tests/out/
           if-no-files-found: warn
           retention-days: 14

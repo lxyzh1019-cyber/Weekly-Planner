@@ -83,6 +83,12 @@ pass of the suite`, exits 1 on a name that matches no check, and refuses to run
 under CI. The full suite gates every push. Give a new check the same
 `if (want('name'))` prefix as its neighbours.
 
+The suite runs on a fixed date, never the real calendar: `SMOKE_DATE=YYYY-MM-DD`
+(default `2026-10-07`) starts every page at noon Edmonton on that day and the
+clock runs on from there. CI runs the smoke job once per date in a matrix --
+`2026-10-15` (a weekday), `2026-10-11` (a Sunday), `2026-10-01` (the first of a
+month) and `2026-10-07` -- so a check that only passes on some days fails there.
+
 ## CI
 
 `.github/workflows/ci.yml` runs all three on every pull request and on pushes to
