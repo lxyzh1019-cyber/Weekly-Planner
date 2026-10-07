@@ -6823,7 +6823,9 @@ function findChromium() {
       for (let i = 0; i < 40; i++) sdPlaceIn(sdContext(kid, wk), 'spend', 1, 1);
       if (sdCur().alloc.spend !== cap) bad.push(`cash out reached ${sdCur().alloc.spend}, the cap is ${cap}`);
     } catch (e) { bad.push('threw: ' + e.message); }
-    finally { unpin(); sdRestore(snap); mmHide(); }
+    // The shake it set is timed on the pinned clock, so after unpin() it could
+    // still be running a day later; it is device-local, so sdRestore leaves it.
+    finally { unpin(); sdNudgeUntil = 0; sdRestore(snap); mmHide(); }
     return bad.length ? bad : true;
   });
 
@@ -27196,7 +27198,10 @@ function findChromium() {
       // third time per click and put this sweep past its budget.
       mnyMeetKid = 'jenn'; mnyExpandRow = null;
       // The Sunday ritual's drafts and timers (js/44), device-local.
-      clearInterval(sdCountTimer); sdDrafts = {}; sdOpened = {}; sdPress = null; sdSignHold = null;
+      // sdNudgeUntil too: the "place $X first" shake runs 1.4 s of real time, so a
+      // press of the sign on one drawing still showed on the next surface's first
+      // drawing on a fast runner and was gone by its second (CI, 2026-10-01 and -07).
+      clearInterval(sdCountTimer); sdDrafts = {}; sdOpened = {}; sdPress = null; sdSignHold = null; sdNudgeUntil = 0;
     };
     const as = (who) => {
       profile = who; parentViewing = 'jenn'; ctParentKid = 'jenn'; mnyKid = 'jenn';
