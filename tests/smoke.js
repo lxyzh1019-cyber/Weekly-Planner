@@ -121,6 +121,61 @@ function findChromium() {
   const shot = (name) => path.join(outDir, name + '.png');
 
   const browser = await chromium.launch({ executablePath: findChromium() });
+
+  /* One fixed date for the whole run — SMOKE_DATE=YYYY-MM-DD, noon in Edmonton.
+
+     The app reads "today" from the clock everywhere (the week shown, the day
+     selected, what counts as past), so a suite run on the real clock is a
+     different test each day: on Wed 2026-10-07 the house-rules check failed on
+     a clean main that had passed the day before. Every page this suite opens
+     starts at noon Edmonton on SMOKE_DATE and the clock then runs on in real
+     time, so timers, double-tap guards and the sync clock behave as on a device.
+     Default 2026-10-07 so a run with no variable is reproducible too; CI runs
+     the four dates in .github/workflows/ci.yml.
+
+     An init-script Date shim rather than page.clock: setFixedTime stops
+     Date.now (the double-tap guard and the sync-clock check measure intervals),
+     and clock.install fakes every timer, rAF and performance.now as well. The
+     shim shifts only bare `new Date()` and `Date.now()`, the same shape the
+     per-check pins (pinClockToWeekday, sdPin, c1.pin) already use and stack on.
+     Node-side wall time (the money sweep's ms) stays real. */
+  const SMOKE_DATE = process.env.SMOKE_DATE || '2026-10-07';
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(SMOKE_DATE);
+  if (!dateParts) { console.error(`SMOKE_DATE must be YYYY-MM-DD, got "${SMOKE_DATE}"`); process.exit(1); }
+  const smokeBaseMs = (() => {
+    const [y, m, d] = dateParts.slice(1).map(Number);
+    const wanted = Date.UTC(y, m - 1, d, 12, 0, 0);   // noon, read as if Edmonton were UTC
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const asEdmonton = (ms) => { const p = Object.fromEntries(fmt.formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+      return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second); };
+    let t = wanted;
+    for (let i = 0; i < 2; i++) t += wanted - asEdmonton(t);   // twice settles a DST edge
+    return t;
+  })();
+  const smokeClockOffset = smokeBaseMs - Date.now();
+  const smokeClock = (offset) => {
+    // Once per document: browser.newPage goes through newContext, so both hooks can fire.
+    if (window.__smokeClockOn) return;
+    window.__smokeClockOn = true;
+    const RealDate = Date;
+    function SmokeDate(...a) {
+      if (!new.target) return new RealDate(RealDate.now() + offset).toString();
+      return a.length ? new RealDate(...a) : new RealDate(RealDate.now() + offset);
+    }
+    SmokeDate.prototype = RealDate.prototype;
+    SmokeDate.now = () => RealDate.now() + offset;
+    SmokeDate.parse = RealDate.parse; SmokeDate.UTC = RealDate.UTC;
+    window.Date = SmokeDate;
+  };
+  // Every page and context the suite opens gets the clock before any app script.
+  {
+    const newPage = browser.newPage.bind(browser), newContext = browser.newContext.bind(browser);
+    browser.newPage = async (...a) => { const p = await newPage(...a); await p.addInitScript(smokeClock, smokeClockOffset); return p; };
+    browser.newContext = async (...a) => { const c = await newContext(...a); await c.addInitScript(smokeClock, smokeClockOffset); return c; };
+  }
+  console.log(`smoke clock: ${SMOKE_DATE} 12:00 America/Edmonton (${new Date(smokeBaseMs).toISOString()})`);
+
   /* Run the browser in the family's timezone, not the runner's.
 
      The app is inconsistent about zones, and only this pin hides it: todayKey()
@@ -11067,7 +11122,12 @@ function findChromium() {
     const bad = [];
     try {
       const kid = 'jess', wk = sdSeedWeek(kid, { paid: 0 });
+      /* Her own share to cap. The seed's week ($17 against a $16.15 payment)
+         leaves her $0, so the check only passed when an earlier check's
+         routine ticks had added a streak bonus — never when run alone. */
+      mnyAddDeposit(kid, wk, { amount: 40, from: 'A gift', giver: 'Grandma', dayKey: mrWeekDayKeys(wk)[0] });
       const c = sdContext(kid, wk);
+      if (!(c.P.hers > 0)) bad.push('fixture: her share is ' + c.P.hers + ', nothing to cap');
       if (!sdCanPlace('spend', c.w, c.rules).ok) bad.push('cash out is not open on her first Sunday');
       if (MNY_BUCKETS.find(b => b.key === 'spend').stage !== 'start') bad.push('the spend bucket is gated');
       const cap = Math.floor(c.P.hers * sdRule(c.rules, 'spend.capPct') / 100);
@@ -26446,10 +26506,15 @@ function findChromium() {
         mnyCalMonth = null;
         profile = 'parent';
         const today = String(todayKey());
+        /* The seeded meet is the only planned meet today: the calendar's day opens
+           the day's first planned meet, and earlier checks pinned to this week's
+           Thursday leave theirs behind, so on a Thursday the tap opened one of those. */
+        setDayBlocks(today, (getDayBlocks(today, kid) || []).filter(b => b.actId !== 'competition' || b.id === 'mv2-meet'), kid);
         const next = formatDayKey(today); next.setDate(next.getDate() + 7);
         const nextKey = ctDateToKey(next);
         setDayBlocks(nextKey, [...(getDayBlocks(nextKey, kid) || []), { id: 'mv2-soon', actId: 'competition', tag: 'swimming', compName: 'Winter Splash', startMin: 9 * 60, durationMin: 180 }], kid);
-        const recDay = today.slice(0, 8) + '01';
+        // This month's result on another day than the meet's (today): a recorded day shows the result, not the meet.
+        const recDay = today.slice(0, 8) + (today.slice(8) === '01' ? '02' : '01');
         mrAddCompetition(kid, { dayKey: recDay, sport: 'skate', name: 'Club trials', points: 6 });
         profile = kid;
         mnyOpenMyMoney(kid);
