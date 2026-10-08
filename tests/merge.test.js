@@ -501,7 +501,7 @@ check('ages are per profile',
    Everything above this line calls one merge function with two hand-built
    objects. That is a real test of that function and no test at all of the
    thing that actually goes wrong: two devices, each holding a whole document,
-   editing while offline, reconnecting in some order. AUDIT-PRODUCT.md asked
+   editing while offline, reconnecting in some order. docs/archive/AUDIT-PRODUCT.md asked
    for this matrix; it was never built, and every defect this release fixes
    lived in the gap.
 
