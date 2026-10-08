@@ -276,7 +276,7 @@ does *not* have included. An **unstamped** week keeps the grow-only union
 exactly as before, so no stale device can un-record a meeting that predates the
 mechanism. Same idiom as `goalsByWeek` and `mergeEarnings`: the unstamped case
 keeps the union. The guard checks this too; mark a genuine exception
-`// safe-delete: <why>`. (checked by tests/merge.test.js)
+`// safe-delete: <why>`. (checked by tests/check-shared-merge.js)
 
 ## A conflict is a parent's to decide, not the clock's
 
@@ -3989,7 +3989,7 @@ card (a day open) since Plan v7, which found nothing to fix there. (checked by s
 
 ## The money week runs Sunday to Saturday — Plan v6 Deviation 34 (2026-10-04)
 
-**Withdrawn 2026-10-06 by decision 15 (Money fit and logic, Plan v2):** the money week is Monday–Sunday everywhere; the Sunday routine is counted as kept at the meeting; the Sun–Sat mapping code stays for the record and is tested with explicit rules only. `MR_DEFAULT_RULES.week` is `{ startsOn: 'monday' }` (no `from`); `mrMoneyWeekRuleOn` reads the STORED rules only (no default fallback), so only a stored `week.startsOn: 'sunday'` with a stored `week.from` could turn the mapping on. The pending-rule card (`mrMoneyWeekRulePending` / `mrApplyMoneyWeekRule`, `MR_MONEY_WEEK_NOTE`, Grown-ups `guMoneyWeekCard`) is removed, and so are the smoke checks `theMoneyWeekRunsSundayToSaturday` and `aDayIsNeverPaidTwiceAcrossTheSwitch`. The pre-mark (replacing owner decision #93) is one pure rule, `mrStreakRunPure` (js/18, read by `mrStreakWeek`): in a week not yet settled, its meeting Sunday (day 6) counts as kept once it has come; a settled week is read whole as before. The text below is the record of the withdrawn rule. (checked by tests/sunday.test.js)
+**Withdrawn 2026-10-06 by decision 15 (Money fit and logic, Plan v2):** the money week is Monday–Sunday everywhere; the Sunday routine is counted as kept at the meeting; the Sun–Sat mapping code stays for the record and is tested with explicit rules only. `MR_DEFAULT_RULES.week` is `{ startsOn: 'monday' }` (no `from`); `mrMoneyWeekRuleOn` reads the STORED rules only (no default fallback), so only a stored `week.startsOn: 'sunday'` with a stored `week.from` could turn the mapping on. The pending-rule card (`mrMoneyWeekRulePending` / `mrApplyMoneyWeekRule`, `MR_MONEY_WEEK_NOTE`, Grown-ups `guMoneyWeekCard`) is removed, and so are the smoke checks `theMoneyWeekRunsSundayToSaturday` and `aDayIsNeverPaidTwiceAcrossTheSwitch`. The pre-mark (replacing owner decision #93) is one pure rule, `mrStreakRunPure` (js/18, read by `mrStreakWeek`): in a week not yet settled, its meeting Sunday (day 6) counts as kept once it has come; a settled week is read whole as before. The record of the withdrawn rule is in `docs/archive/architecture-history.md`. (checked by tests/sunday.test.js)
 
 The exact withdrawn pair (`startsOn: 'sunday'`, `from: '2026-10-11'`), copied into rulebooks seeded on builds 2026-10-04a–05f, is ignored by `mrMoneyWeekRuleOn`; any other stored sunday + `from` pair still counts.
 

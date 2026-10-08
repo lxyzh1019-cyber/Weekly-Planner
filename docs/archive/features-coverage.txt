@@ -4,29 +4,29 @@
 7 | (history only: scope note, superseded by this list) | removed — owner OK needed
 8 | (history only: scope note, superseded by this list) | removed — owner OK needed
 9 | (history only: scope note, superseded by this list) | removed — owner OK needed
-12 | Setup and working rules | Setup and working rules
-13 | Setup and working rules | Setup and working rules
-14 | Setup and working rules | Setup and working rules
-15 | Setup and working rules | Setup and working rules
-16 | Setup and working rules | Setup and working rules
-17 | Setup and working rules | Setup and working rules
-20 | Setup and working rules | Setup and working rules
-21 | Setup and working rules | Setup and working rules
-22 | Setup and working rules | Setup and working rules
-23 | Setup and working rules | Setup and working rules
-24 | Setup and working rules | Setup and working rules
-25 | Setup and working rules | Setup and working rules
-28 | Setup and working rules | Setup and working rules
-29 | Setup and working rules | Setup and working rules
-30 | Setup and working rules | Setup and working rules
-31 | Setup and working rules | Setup and working rules
-32 | Setup and working rules | Setup and working rules
-33 | Setup and working rules | Setup and working rules
-34 | Setup and working rules | Setup and working rules
-35 | Setup and working rules | Setup and working rules
-38 | Setup and working rules | Setup and working rules
-41 | Setup and working rules | Setup and working rules
-42 | Setup and working rules | Setup and working rules
+12 | CLAUDE.md is a pointer | Setup and working rules
+13 | ARCHITECTURE.md holds this repository's own operating rules | Setup and working rules
+14 | Every see CLAUDE.md comment | Setup and working rules
+15 | WORKING_RECORD.md is the request and deliverable ledger | Setup and working rules
+16 | FEATURES.md is the list every regression table is checked against | Setup and working rules
+17 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+20 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+21 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+22 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+23 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+24 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+25 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+28 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+29 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+30 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+31 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+32 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+33 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+34 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+35 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+38 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+41 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+42 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
 43 | Smoke subset | Data and rules
 44 | Short loop | Data and rules
 45 | Dead-action guard | Data and rules
@@ -43,11 +43,11 @@
 59 | Three escaping helpers | Data and rules
 60 | Verification before a push | Data and rules
 61 | SW_VERSION must be bumped | Data and rules
-64 | Build number is on the page | Shell and build number
+64 | APP_BUILD equals SW_VERSION | Shell and build number
 65 | Build under the tiles | Shell and build number
-66 | Build number is on the page | Shell and build number
-67 | Build number is on the page | Shell and build number
-68 | Build number is on the page | Shell and build number
+66 | The build number shown is what that device loaded | Shell and build number
+67 | (history only: test list) | removed — owner OK needed
+68 | (history only: consolidation note) | removed — owner OK needed
 71 | Kid nav has five places | Profile and navigation
 72 | Sister Sync is a tab | Profile and navigation
 73 | never for a parent | Profile and navigation
@@ -57,96 +57,96 @@
 79 | School-day offer | Week
 80 | School-day offer | Week
 81 | The offer sits above the week | Week
-82 | The offer sits above the week | Week
-83 | The offer sits above the week | Week
+82 | the old below-grid host is gone from the markup | Week
+83 | hidden in the preview view | Week
 84 | Add all N | Week
 85 | Add all N | Week
 86 | blank week offers | Week
 87 | blank week offers | Week
 90 | Every profile badge | Profile and navigation
-91 | Every profile badge | Profile and navigation
-92 | Every profile badge | Profile and navigation
-93 | Every profile badge | Profile and navigation
+91 | opens the one profile switcher | Profile and navigation
+92 | reads who is on screen | Profile and navigation
+93 | One writer makes every badge's text | Profile and navigation
 94 | parent's Day badge | Day
 95 | Nothing is announced as a control | Profile and navigation
-96 | Nothing is announced as a control | Profile and navigation
-97 | Nothing is announced as a control | Profile and navigation
-98 | Every profile badge | Profile and navigation
+96 | the meeting lock hides only the two badges | Profile and navigation
+97 | (history only: test list) | removed — owner OK needed
+98 | (history only: test list) | removed — owner OK needed
 99 | parent's Day badge | Day
 102 | A sister can be invited to | Day
-103 | A sister can be invited to | Day
-104 | A sister can be invited to | Day
-105 | A sister can be invited to | Day
-106 | A sister can be invited to | Day
-107 | A sister can be invited to | Day
-108 | A sister can be invited to | Day
-109 | A sister can be invited to | Day
-110 | A sister can be invited to | Day
-111 | A sister can be invited to | Day
-114 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-115 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-116 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-117 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-118 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-119 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
+103 | a watch block earns nothing | Day
+104 | A watch block reads 👀 Watching | Day
+105 | A watch block gives no training checks | Day
+106 | keeps the meet's own travel | Day
+107 | An invite sent from the parent portal is recorded as the child's | Sister Sync (the sisters' timeline)
+108 | Accepting a watch invite writes the watch block | Sister Sync (the sisters' timeline)
+109 | 👀 Invite my sister to watch shows for a kid and a parent | Day
+110 | A watch block still counts as planned time | Day
+111 | (history only: test list) | removed — owner OK needed
+114 | An invite has one writer | Sister Sync (the sisters' timeline)
+115 | its day comes from the screen it was sent from | Sister Sync (the sisters' timeline)
+116 | An invite sent from the parent portal is recorded as the child's | Sister Sync (the sisters' timeline)
+117 | A live invite of the same kind is refused | Sister Sync (the sisters' timeline)
+118 | A live invite of the same kind is refused | Sister Sync (the sisters' timeline)
+119 | A share of an activity the sister does not have is refused | Sister Sync (the sisters' timeline)
 120 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-121 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-122 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-123 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-124 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
-125 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
+121 | Each edit-sheet invite button reads its own kind | Day
+122 | The 💌 badge shows only on blocks really shared | Sister Sync (the sisters' timeline)
+123 | 💌 Invite <sister> on the edit sheet shows for a kid and a parent | Day
+124 | The public toggle on the edit sheet is parent-only | Day
+125 | (history only: test list) | removed — owner OK needed
 128 | Today signposts a waiting invite | Today
-129 | Today signposts a waiting invite | Today
-130 | Today signposts a waiting invite | Today
-131 | Today signposts a waiting invite | Today
-132 | Today signposts a waiting invite | Today
-133 | Today signposts a waiting invite | Today
-134 | Today signposts a waiting invite | Today
-135 | Today signposts a waiting invite | Today
-138 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-139 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-140 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-141 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-142 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-143 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-144 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-145 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-146 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
-147 | invite carries the sender's travel | Sister Sync (the sisters' timeline)
+129 | never counts a missed invite | Today
+130 | Today's invite note is for a child only | Today
+131 | in one line (one share, one watch, or N invites) | Today
+132 | as a 44px row between the hero and Coming up | Today
+133 | taps through to the Sister Sync inbox | Today
+134 | gone on the next render once answered | Today
+135 | (history only: test list) | removed — owner OK needed
+138 | An invite carries the sender's travel | Sister Sync (the sisters' timeline)
+139 | The invite confirm says what she gets | Sister Sync (the sisters' timeline)
+140 | Accepting a watch invite writes the watch block | Sister Sync (the sisters' timeline)
+141 | An invite sent before invites carried travel is placed exactly as before | Sister Sync (the sisters' timeline)
+142 | a missed invite is not waiting | Sister Sync (the sisters' timeline)
+143 | The inbox lists missed invites under the waiting ones | Sister Sync (the sisters' timeline)
+144 | can be added anyway | Sister Sync (the sisters' timeline)
+145 | The Day view's invite ghost is a second accept door | Day
+146 | (history only: test list) | removed — owner OK needed
+147 | (history only: fixed known defect) | removed — owner OK needed
 150 | this day, or all | Sister Sync (the sisters' timeline)
-151 | this day, or all | Sister Sync (the sisters' timeline)
-152 | this day, or all | Sister Sync (the sisters' timeline)
-153 | this day, or all | Sister Sync (the sisters' timeline)
-154 | this day, or all | Sister Sync (the sisters' timeline)
-155 | this day, or all | Sister Sync (the sisters' timeline)
-156 | this day, or all | Sister Sync (the sisters' timeline)
+151 | as one series invite | Sister Sync (the sisters' timeline)
+152 | The duplicate guard covers a series | Sister Sync (the sisters' timeline)
+153 | gives her her own series | Sister Sync (the sisters' timeline)
+154 | Accepting a series with days gone asks | Sister Sync (the sisters' timeline)
+155 | A series invite shows its ghost on each covered day | Sister Sync (the sisters' timeline)
+156 | The 💌 badge shows only on blocks really shared | Sister Sync (the sisters' timeline)
 157 | Send again? | Sister Sync (the sisters' timeline)
-158 | this day, or all | Sister Sync (the sisters' timeline)
+158 | (history only: test list) | removed — owner OK needed
 161 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-162 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-163 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-164 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-165 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-166 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-167 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-168 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-169 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-170 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
-171 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
+162 | On the timeline your own blocks are at least 44px tall | Sister Sync (the sisters' timeline)
+163 | no white text on a pastel | Looks
+164 | (history only: DOM contract, kept in ARCHITECTURE.md) | removed — owner OK needed
+165 | with a private block as a grey Busy shape | Sister Sync (the sisters' timeline)
+166 | Both free counts each block with its travel | Sister Sync (the sisters' timeline)
+167 | a both-free stripe | Sister Sync (the sisters' timeline)
+168 | Tapping your own block on the timeline invites your sister | Sister Sync (the sisters' timeline)
+169 | Sister Sync is in the kid house-rules sweep | Sister Sync (the sisters' timeline)
+170 | (history only: test list) | removed — owner OK needed
+171 | (history only: known-defect note) | removed — owner OK needed
 174 | Copy a day | Day
-175 | Copy a day | Day
-176 | Copy a day | Day
-177 | Copy a day | Day
-178 | Copy a day | Day
-179 | Copy a day | Day
+175 | it shows both days | Day
+176 | names what goes and what stays | Day
+177 | with nothing to copy says so | Day
+178 | keeps pinned blocks | Day
+179 | a child's copy is never pinned | Day
 180 | Start this day over | Day
-181 | Copy a day | Day
+181 | (history only: test list) | removed — owner OK needed
 184 | How was today? | Today
-185 | How was today? | Today
-186 | How was today? | Today
+185 | The reflect sheet takes its day | Today
+186 | a past day reflects from its Day 📋 sheet | Today
 187 | no Vibe card | Today
 188 | closing ritual | Day
-189 | How was today? | Today
+189 | (history only: test list) | removed — owner OK needed
 192 | now-marker stays inside | Today
 193 | now-marker stays inside | Today
 196 | Chores screen stays | Chores
@@ -184,7 +184,7 @@
 232 | Sister Sync is in the kid | Sister Sync (the sisters' timeline)
 233 | Sister Sync | Looks
 234 | copy button names the sister's day | Day
-235 | The Undo toast sits under every | Today
+235 | The Undo toast sits under the reflect sheet | Today
 236 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
 239 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
 240 | Closing ritual title names the child | Day
@@ -201,32 +201,32 @@
 253 | Switching | Looks
 254 | Shared in both looks | Looks
 255 | No typed colour | Looks
-256 | No typed colour | Looks
-259 | No typed colour | Looks
-260 | No typed colour | Looks
-261 | No typed colour | Looks
-262 | No typed colour | Looks
-263 | No typed colour | Looks
-264 | No typed colour | Looks
-265 | No typed colour | Looks
-266 | No typed colour | Looks
-269 | Pop look reads everywhere | Looks
-270 | Pop look reads everywhere | Looks
-271 | Pop look reads everywhere | Looks
+256 | (history only: section intro) | removed — owner OK needed
+259 | (history only: section intro) | removed — owner OK needed
+260 | Shared values are role-named tokens | Looks
+261 | Seven font tokens hold every font stack | Looks
+262 | One text scale | Looks
+263 | Only family data palettes and colour maths keep a typed colour | Looks
+264 | both looks define the same names | Looks
+265 | (history only: proven invisible) | removed — owner OK needed
+266 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+269 | (history only: section intro) | removed — owner OK needed
+270 | Each look's values live in one :root[data-look] block | Looks
+271 | Pop is cream graph paper with handwriting fonts and yellow buttons | Looks
 272 | Readable everywhere | Looks
 273 | Brighter palette | Looks
 274 | Brighter palette | Looks
 275 | Kid colours | Looks
 276 | Full week measures its own type | Week
-277 | Pop look reads everywhere | Looks
-280 | Calm look | Looks
-281 | Calm look | Looks
-282 | Calm look | Looks
-283 | Calm look | Looks
-284 | Calm look | Looks
+277 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+280 | both looks define the same names | Looks
+281 | Calm is cool paper with Lexend and purple buttons | Looks
+282 | Lexend and Baloo 2 loaded on first use | Looks
+283 | remembered per person on this device, never synced | Looks
+284 | a 🎨 tile in each kid's More and a 🎨 button in the parent portal | Looks
 285 | Calm look keeps the same boxes | Looks
-286 | Calm look keeps the same boxes | Looks
-287 | Calm look keeps the same boxes | Looks
+286 | 13px type floors | My money
+287 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
 290 | Warm surfaces follow the look | Looks
 291 | Warm surfaces follow the look | Looks
 292 | Parent portal in Calm | Looks
@@ -244,7 +244,7 @@
 310 | Every wallet writer mirrors into the | Data and rules
 311 | A correction is a reversing event | Data and rules
 312 | migration is read-only | Data and rules
-313 | What I own | My money
+313 | the words Everything I have are retired everywhere | My money
 316 | effective-dated versions | Data and rules
 317 | mrApplyEdits is the only versioned writer | Data and rules
 318 | Settled weeks are frozen | Data and rules
@@ -257,10 +257,10 @@
 325 | repair only ever adds | Data and rules
 326 | Competitions never paid | Grown-ups
 327 | $3 default is backfill only | Data and rules
-328 | Grandfather rule | Grown-ups
-329 | Grandfather rule | Grown-ups
-330 | Grandfather rule | Grown-ups
-331 | Grandfather rule | Grown-ups
+328 | credits weeks with no family meeting outside the 8-week window | Grown-ups
+329 | a dated rule (start week, amount) | Grown-ups
+330 | The catch-up banner offers the Grandfather credit | Grown-ups
+331 | The repair leaves a Grandfather-rule week alone | Grown-ups
 334 | One Record sheet, five records | Grown-ups
 335 | One Record sheet, five records | Grown-ups
 336 | A gift has a day it | Grown-ups
@@ -279,9 +279,9 @@
 353 | meeting is a full screen | The meeting
 354 | Three steps | The meeting
 355 | Three steps | The meeting
-356 | Redo is per girl | The meeting
+356 | (history only: retired list) | removed — owner OK needed
 357 | Redo is per girl | The meeting
-358 | Redo is per girl | The meeting
+358 | is withdrawn once money moves on her stream after the sign | The meeting
 361 | A kid's money head has two | My money
 362 | leads with a sentence | By month
 363 | leads with a sentence | By month
@@ -293,7 +293,7 @@
 369 | Skating star level | Data and rules
 372 | Every old Money rules section has | Grown-ups
 373 | Every old Money rules section has | Grown-ups
-374 | Weeks | Grown-ups
+374 | a Grandfather-rule row reads Grandfather rule $3 + meets with no steppers | Grown-ups
 375 | Loan edits never touch paid | Data and rules
 376 | ladder opens at 20 / 30 / 40 / 100% | Money school
 377 | three gate steppers | Grown-ups
@@ -331,7 +331,7 @@
 415 | Countdown | My money
 416 | Asked parents strip | My money
 417 | Loan wall | My money
-418 | What I own | My money
+418 | shut ones dashed with when they open | My money
 419 | Goal card | My money
 420 | Goal jars wait for Savings | Data and rules
 421 | Action buttons | My money
@@ -344,7 +344,7 @@
 428 | The ? explainer card gives What | My money
 429 | Move to the loan wall | My money
 430 | unfinished day is never forgiven | Data and rules
-431 | What I own | My money
+431 | The kid side names its places Savings, Locked away and Companies | My money
 432 | (history only: retired list and test list) | removed — owner OK needed
 433 | (history only: retired list and test list) | removed — owner OK needed
 436 | money step | Sunday steps
@@ -352,7 +352,7 @@
 438 | choices are a draft | Sunday steps
 439 | Sunday opens | Sunday steps
 440 | Guess | Sunday steps
-441 | Payday | Sunday steps
+441 | each line unfolding its working | Sunday steps
 442 | I choose | Sunday steps
 443 | Signed | Sunday steps
 444 | A new commitment or surprise cost | Sunday steps
@@ -369,8 +369,8 @@
 457 | Fix this row | Grown-ups
 458 | What they own | Parent portal
 459 | Lessons live in Rules | Grown-ups
-460 | Weeks | Grown-ups
-461 | Grandfather rule | Grown-ups
+460 | her Sundays in the passbook's grid with a tag | Grown-ups
+461 | Grandfather rule: start week, amount, Save in Rules | Grown-ups
 462 | Rule changes | Grown-ups
 463 | Rules save card | Grown-ups
 464 | fix sheets | Grown-ups
@@ -394,36 +394,36 @@
 486 | Parent Now lists Waiting for you | Parent portal
 487 | agreed amount | Parent portal
 488 | Rules is one screen | Grown-ups
-489 | Weeks | Grown-ups
+489 | a summary per girl | Grown-ups
 490 | (history only: core list and test list) | removed — owner OK needed
 491 | (history only: core list and test list) | removed — owner OK needed
 494 | meeting's head is two rows | The meeting
 495 | Passbook | My money
 496 | The doors' sheets | My money
 497 | Draw early | My money
-498 | Payday | Sunday steps
+498 | a My pile with coins and the loan-first line | Sunday steps
 499 | I choose has three equal columns | Sunday steps
 500 | Signed shows Money in & out | Sunday steps
 501 | meeting's head is two rows | The meeting
-502 | One reader for money my money | Data and rules
-503 | One reader for money my money | Data and rules
-504 | One reader for money my money | Data and rules
+502 | the ledger keeps ownedAfter | Data and rules
+503 | One reader for money my money made | Data and rules
+504 | Weeks' earned this year reads the ledger | Data and rules
 505 | (history only: core list, test list and retired list) | removed — owner OK needed
 506 | (history only: core list, test list and retired list) | removed — owner OK needed
 507 | (history only: core list, test list and retired list) | removed — owner OK needed
 510 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
 511 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
 512 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
-513 | Payday | Sunday steps
+513 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
 514 | I choose has three equal columns | Sunday steps
 515 | Signed shows Money in & out | Sunday steps
 516 | Now's count | Parent portal
 517 | Taken off is always shown negative | Sunday steps
-518 | Calm fits the iPad | Looks
+518 | Calm fits the iPad and phone | Looks
 519 | This fine is wrong | My money
 520 | Now's count | Parent portal
-521 | Calm fits the iPad | Looks
-522 | Calm fits the iPad | Looks
+521 | tight money labels step smaller in Calm but never under 13px | Looks
+522 | phone heads are two rows with words hidden under 768px | Looks
 523 | keeps the prototype's tip | My money
 524 | keeps the prototype's tip | My money
 525 | (history only: core, test and retired lists) | removed — owner OK needed

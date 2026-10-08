@@ -6,8 +6,10 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 ## Today
 
-- Today signposts a waiting invite in one line (one share, one watch, or N invites) and taps through to the Sister Sync inbox — Proof: anInviteWaitingShowsOnToday
+- Today signposts a waiting invite in one line (one share, one watch, or N invites) as a 44px row between the hero and Coming up, and taps through to the Sister Sync inbox — Proof: anInviteWaitingShowsOnToday
+- Today's invite note is for a child only, never counts a missed invite, shows no row when nothing waits and is gone on the next render once answered — Proof: anInviteWaitingShowsOnToday, aMissedInviteIsNotWaiting
 - A 🌙 row on Today asks How was today? from 8pm (or yesterday if unanswered); a past day reflects from its Day 📋 sheet — Proof: todayAsksHowTodayWent
+- The reflect sheet takes its day: How was today?, How was yesterday? or How was Tuesday?, and writes only that day's mood — Proof: todayAsksHowTodayWent
 - Today has no Vibe card; its fold reads To-dos and goals — Proof: todayIsWhereTheDayGetsDone
 - The ribbon's now-marker stays inside the strip at its first and last minute — Proof: aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon
 - Jobs I can do: a paid chore row on Today asks On time, Late or Had to redo it in place and then reads waiting — Proof: todayAnswersAJobInPlace, bothPlacesAgree, todayHandsOffRatherThanActing
@@ -22,7 +24,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Today's hero shows N day streak, and its level button opens My level with the privilege ladder — Proof: streakAndPrivilegesOnToday
 - My level opens from the hero, shows level, tier, XP and the privileges ladder, and has one Close button — Proof: streakAndPrivilegesOnToday
 - 📦 Open loops card lists unreleased boxed items; hidden when empty — Proof: openLoopsOnToday
-- The Undo toast sits under every sheet and dialog — Proof: reflectMoodsAre44pxTargets
+- The Undo toast sits under the reflect sheet: with the toast up, every mood dot on the sheet is still hit at 44px — Proof: reflectMoodsAre44pxTargets
 - Today is the front door: what now, what is next, free time, and a money row that agrees with My money — Proof: todayIsTheFrontDoor, todayAnswersWhatNow, todayLeadsWithWhatIsNext, todayNamesFreeTime, todayMoneyRowMatchesMyMoney
 - Today agrees with the Chores screen, and the reflection is her answer — Proof: todayAgreesWithTheChoreScreen, theReflectionIsHerAnswer
 - Today looks as in the reference picture, iPad Pop — Proof: picture tests/reference/today-jenn-ipad-pop.png
@@ -30,7 +32,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 ## Week
 
 - School-day offer: school days are offered, never assumed, up to 3 weeks ahead, when the school card is missing — Proof: theSchoolOfferIsAboveTheWeekGrid
-- The offer sits above the week grid in one banner (hidden in the preview view) — Proof: theSchoolOfferIsAboveTheWeekGrid
+- The offer sits above the week grid in one banner, its only host: the old below-grid host is gone from the markup (hidden in the preview view) — Proof: theSchoolOfferIsAboveTheWeekGrid, tests/check-dead-ids.js
 - The banner names the count, shows a chip per offered day and Add all N only when more than one is offered; one writer so a stale chip cannot add a duplicate — Proof: oneSchoolDayCanBeAddedOnItsOwn
 - A blank week offers its school days from the same banner, with no school button in the coach tip — Proof: aBlankWeekOffersItsSchoolDays
 - 🧹 Chores this week on the Week tab: read-only rows for the tab's week, closed by default and remembered — Proof: weekChoreReportOnWeek
@@ -45,6 +47,14 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 - The parent's Day badge is two short lines so the Day top bar keeps its height — Proof: parentDayTopBarStaysCompact
 - A sister can be invited to watch: a watch block earns nothing, is never chased for a result and keeps the meet's own travel — Proof: aWatchedMeetIsNeverChasedForAResult, aWatchInviteNamesTheMeet
+- A watch block reads 👀 Watching — <meet>, or what the block is when no meet name was typed — Proof: aWatchInviteNamesTheMeet
+- A watch block gives no training checks and no packing list — Proof: aWatchInviteNamesTheMeet
+- A watch block still counts as planned time in the week totals — Proof: none found
+- 👀 Invite my sister to watch shows for a kid and a parent on a competition block only; its confirm names the meet, and while the invite is live it reads <sister> is invited to watch and is disabled — Proof: aWatchedMeetIsNeverChasedForAResult, anInviteCannotBeSentTwice
+- 💌 Invite <sister> on the edit sheet shows for a kid and a parent on any block except a watch block — Proof: anInviteCannotBeSentTwice
+- Each edit-sheet invite button reads its own kind (💌 Invite sent to <sister>, 👀 <sister> is invited to watch); a share never marks the watch button sent, nor the reverse — Proof: anInviteCannotBeSentTwice
+- The public toggle on the edit sheet is parent-only — Proof: anInviteCannotBeSentTwice
+- The Day view's invite ghost is a second accept door: Accept or Ignore on a day ahead, Add it anyway or Decline on a day gone, writing the same block as the inbox — Proof: theDayViewAcceptFollowsTheSameRules
 - The 📋 sheet is Copy a day: it shows both days, keeps pinned blocks, names what goes and what stays, and a child's copy is never pinned — Proof: copyADayShowsBothDays, copyingADayNeverPinsForAChild, templatesAreGone
 - Start this day over keeps what is done, pinned or marked not done, and has no undo — Proof: startingADayOverKeepsWhatIsDone
 - The closing ritual counts what was done and names the child being viewed — Proof: theClosingRitualCountsWhatWasDone
@@ -58,16 +68,30 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Copy a day with nothing to copy says so and changes nothing — Proof: copyingNothingSaysSoAndChangesNothing
 - The copy confirm names a copied block that overlaps a kept pin — Proof: aCopyNamesItsOverlapWithAKeptPin
 - The hour ladder lines up with the schedule and only the schedule scrolls on the Day screen — Proof: theHourLadderLinesUpWithTheSchedule, onlyTheScheduleScrollsOnTheDayScreen
-- Travel and get-ready strips never cover a card, say when to leave, and are clipped the same way on the Day view — Proof: aBufferStripNeverCoversACard, theStripStillSaysWhenToLeave, theDayViewClipsItsBuffersTheSameWay, an overlapping neighbour eats the whole window
+- Travel and get-ready strips never cover a card, say when to leave, and are clipped the same way on the Day view — Proof: aBufferStripNeverCoversACard, theStripStillSaysWhenToLeave, theDayViewClipsItsBuffersTheSameWay, buffers.test.js "an overlapping neighbour eats the whole window"
 - The Day looks as in the reference picture, iPad Pop — Proof: picture tests/reference/day-jenn-ipad-pop.png
 
 ## Sister Sync (the sisters' timeline)
 
 - An invite has one writer and cannot be sent or accepted twice, and its day comes from the screen it was sent from — Proof: anInviteCannotBeSentTwice, anInviteFromSisterSyncIsDatedThatDay
+- An invite sent from the parent portal is recorded as the child's and stamps her own block — Proof: anInviteCannotBeSentTwice
+- A live invite of the same kind is refused before the confirm with a toast naming its state (she hasn't answered yet, or it's already on her plan); a declined one may be sent again, and a share and a watch of one block are both allowed — Proof: anInviteCannotBeSentTwice
+- A share of an activity the sister does not have is refused before it is sent — Proof: none found
+- The 💌 badge shows only on blocks really shared: a copied block, a repeated block and an extended series do not carry it — Proof: aSeriesInviteCoversEveryDayOrOne, anInviteCannotBeSentTwice
 - An invite carries the sender's travel and get-ready; a missed invite is not waiting and can be added anyway — Proof: anInviteCarriesTheSendersTravelAndGetReady, aMissedInviteIsNotWaiting, theDayViewAcceptFollowsTheSameRules
+- The invite confirm says what she gets: the same drive there and home and the get-ready time; with no buffers it says nothing about them — Proof: anInviteCarriesTheSendersTravelAndGetReady
+- Accepting a watch invite writes the watch block with the meet's own travel and get-ready and no warm-up; accepting a share gives her the sender's drive, get-ready and unpack — Proof: anInviteCarriesTheSendersTravelAndGetReady, aWatchedMeetIsNeverChasedForAResult
+- An invite sent before invites carried travel is placed exactly as before, with no migration — Proof: anInviteCarriesTheSendersTravelAndGetReady
+- The inbox lists missed invites under the waiting ones with 📌 Add it to my <Day> anyway and ❌ Decline, no Accept; one from before this week drops out of the list but stays stored — Proof: aMissedInviteIsNotWaiting
 - A repeating block asks Just this day, or all, as one series invite that gives her her own series — Proof: aSeriesInviteCoversEveryDayOrOne
+- The duplicate guard covers a series: one covered day or a second all is refused with a reason — Proof: aSeriesInviteCoversEveryDayOrOne
+- Accepting a series with days gone asks From <day> or Include the ones that passed; a fully missed series can be added anyway, unticked — Proof: aMissedInviteIsNotWaiting
+- A series invite shows its ghost on each covered day and reads every Thu (3) in the inbox and on Today — Proof: aSeriesInviteCoversEveryDayOrOne
 - A moved shared block says Send again? and stays live until the new day is sent — Proof: aMovedSharedBlockSaysSendAgain
 - Sister Sync shows a side-by-side timeline of both girls for the chosen day, to scale, with a private block as a grey Busy shape and a both-free stripe — Proof: sisterSyncIsATimeline
+- On the timeline your own blocks are at least 44px tall, since they are the invite control, and a block's height is its duration on one axis for both girls — Proof: sisterSyncIsATimeline
+- Both free counts each block with its travel, get-ready and warm-up, and school hours, as busy, and looks up each sister's own activities — Proof: sisterSyncIsATimeline
+- Tapping your own block on the timeline invites your sister for the day shown — Proof: sisterSyncIsATimeline
 - Sister Sync is in the kid house-rules sweep; its invite answer buttons are 44px — Proof: kidScreensMeetTheHouseRules
 - Sister Sync looks as in the reference picture, iPad Pop — Proof: picture tests/reference/sync-jenn-ipad-pop.png
 
@@ -98,7 +122,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - I was given something opens her gift sheet (amount, who, kind, day) and files a gift request; a grown-up's button opens the Record sheet — Proof: giftSheetSendsAGiftRequest
 - Passbook: the last four Sundays newest first with money in, wall, saved, cash, a bar per row, = Total, a note and how many Sundays are signed; a 📖 icon opens All my Sundays — Proof: passbookShowsTheLastFourSundays, passbookSharesSumToOneHundred
 - Calendar and Coming up: results with what they paid, planned competitions, money parents expect, in a month grid — Proof: calendarShowsComingUp
-- Stickers: six, lit when a signed Sunday earns them — Proof: stickers come from the signed week, not a stored key
+- Stickers: six, lit when a signed Sunday earns them — Proof: sunday.test.js "stickers come from the signed week, not a stored key"
 - The ? explainer card gives What, Why, Watch in the girls' words with a Take me to Money school door and a way back — Proof: explainerGoesToMoneySchoolAndBack
 - Move to the loan wall is filed as a request, approved by a parent, and applied as extra on Sunday once — Proof: aMoveToTheWallWaitsForSunday
 - Money screens at iPad width use the prototype's text size and never cut a label with an ellipsis — Proof: noLabelIsCutOnTheMoneyScreens
@@ -113,6 +137,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - This fine is wrong: a 44px button on each fine opens a dispute request with optional reasons; one open question per fine; a yes removes the fine — Proof: aGirlCanDisputeAFine
 - Draw early keeps the prototype's tip and fits one screen on iPad and phone, in both looks — Proof: requestSheetsSendEveryKind
 - A kid's money head carries 💰 My money · 🎓 Money school; no bottom bar on Money school, All my Sundays or By month — Proof: thePassbookOpensAllMySundaysAndByMonth
+- The kid side names its places Savings, Locked away and Companies on My money, Today's money bar, By month, the Money school ladder and the meeting — Proof: tests/check-money-words.js
 - The kid tour bolds its key words and ends with Tap a Sunday for its numbers; the checklist title reads Before we start — Proof: theKidPagesSayWhatTheRulesSay
 - Same thing, same look: title-row totals are one family coloured by meaning, money columns right-aligned, one round 44px stepper look, Her share is one 50% stepper, thick-border buttons and a darker scrim — Proof: theLooksKeepTheSameBoxes
 - Money screens do not spill or clip: Guess icon, loan-first words, Signed Money out column, badge off the face, result sheet icon, loans table, goal row on phone, wrapping tabs — Proof: noLabelIsCutOnTheMoneyScreens
@@ -142,7 +167,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 ## Sunday steps
 
 - The money step of the meeting is one girl at a time with her own head, four step chips, a sound switch, a Parent's card and a right pane — Proof: sundayLooksLikeThePrototype
-- The Sunday screens own no arithmetic: every figure comes from the core over the same input the sign uses — Proof: 8–20 Sundays, both girls: every invariant held every week
+- The Sunday screens own no arithmetic: every figure comes from the core over the same input the sign uses — Proof: sunday.test.js "8–20 Sundays, both girls: every invariant held every week"
 - Her choices are a draft kept on this device per girl per week, never synced — Proof: sundayRedoReturnsOnlyHer
 - Sunday opens once per girl per week: approved goals and wall moves apply, loan rows rescale if the monthly changed, the market wobble runs — Proof: aSkippedSundayStillRescalesHerRows
 - Guess: the story sentence, club job tile with a chip per session, chore, streak, competition and gift tiles, the guess stairs and Show me; parents' questions must be answered first — Proof: sundayGuessIsBlockedUntilDadAnswers, sundaySundayRoutineCounts
@@ -172,6 +197,8 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 - Competitions never paid: settled weeks whose competitions are worth more than the ledger says, previewed, confirmed and paid once — Proof: olderWeeksUnpaidMeetsArePaidOnce
 - Grandfather rule: a dated rule (start week, amount) that credits weeks with no family meeting outside the 8-week window, once, after a preview and confirm — Proof: theGrandmaRuleIsSavedAsADatedRule, grandmaPaysAMeetOnTop, grandmaListsTheWeeksWithNoMeetingOutsideTheWindow
+- The catch-up banner offers the Grandfather credit from the saved rule in one tap through the same confirm, never on its own; with no start week saved it points to 👴 Grandfather rule › — Proof: theGrandmaRuleIsSavedAsADatedRule
+- The repair leaves a Grandfather-rule week alone; a competition in it is paid once as its own late line — Proof: aLateMeetInADefaultedWeekIsPaidOnce
 - One Record sheet, five records: chore grade, competition, gift, fine, move; a child records only a gift and a move and only as a request — Proof: kidCannotTransact
 - A gift has a day it came and a week that decides it; a settled week hands the decision to the next open one — Proof: giftCanCoverAQuietWeek
 - Record-sheet entry points: Parent Now, the Grown-ups bar, Sunday's add buttons and a planned competition's result; every money control sits under one click host — Proof: everyMoneyActionHasAListener
@@ -241,7 +268,8 @@ Each line says what you see or what the app does, then the test that proves it. 
 - More holds exactly Chores and Switch (and the look tile), then the build number; Sisters, Money story and Money school tiles are gone — Proof: moreHasNoMoneySchool
 - Money school is reached from the money head's tab and every ? explainer's Take me to Money school; All my Sundays and By month open from the passbook — Proof: explainerGoesToMoneySchoolAndBack
 - The sync tab lands on the Sister Sync screen and old routes still work — Proof: navReachesEverythingAndOldRoutesStillWork
-- Every profile badge (Today, Week, Day, Chores, Sister Sync) is a button that switches profile and reads who is on screen, e.g. Parent (Jenn) or Jenn — Proof: everyProfileBadgeSaysTheSameThing, everyProfileBadgeSwitchesProfile
+- Every profile badge (Today, Week, Day, Chores, Sister Sync) is a button that opens the one profile switcher and reads who is on screen, e.g. Parent (Jenn) or Jenn — Proof: everyProfileBadgeSaysTheSameThing, everyProfileBadgeSwitchesProfile
+- One writer makes every badge's text; no badge spells it out — Proof: everyProfileBadgeSaysTheSameThing
 - Nothing is announced as a control that is not one, and the meeting lock hides only the two badges and lifts for a child — Proof: everyProfileBadgeSwitchesProfile
 - Sister Sync fits in the fallback font at 375px — Proof: sisterSyncTabFitsInTheFallbackFont
 - The profile picker looks as in the reference picture, iPad Pop — Proof: picture tests/reference/profile-any-ipad-pop.png
@@ -254,6 +282,11 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Switching: a 🎨 tile in each kid's More and a 🎨 button in the parent portal; instant, remembered per person on this device, never synced — Proof: theLookSurvivesAReload
 - Shared in both looks: money colours, the activity palette, kid colours, warnings, print — Proof: warningsReadAsWarningsInBothLooks
 - No typed colour, font or text size outside the look tokens; both looks define the same names — Proof: tests/check-look-tokens.js
+- Shared values are role-named tokens (surface, page, scrim, text, border, shadow, status, zone, kid, print) and the money --mny-* tokens — Proof: tests/check-look-tokens.js
+- Seven font tokens hold every font stack (--font-body, --font-text, --font-head, --font-display, --font-round, --font-hand, --font-script); print has its own --print-font-* tokens — Proof: tests/check-look-tokens.js
+- One text scale: every absolute font size in the CSS, generated markup and index.html multiplies --text-scale (composing with the parent Reading size --fs-scale); print forces it to 1 — Proof: tests/check-look-tokens.js, printIgnoresTheLook
+- Only family data palettes and colour maths keep a typed colour, each with a look: reason mark; the theme-color meta is the one named exemption — Proof: tests/check-look-tokens.js
+- Each look's values live in one :root[data-look] block, shared ones in :root; print keeps its own values and text size — Proof: tests/check-look-tokens.js, printIgnoresTheLook
 - Pop look reads everywhere: every visible text is at least 4.5:1 against its background on every kid screen and the five parent destinations — Proof: thePopLookReadsEverywhere
 - Readable everywhere: no white text on a pastel, in either look — Proof: thePopLookReadsEverywhere
 - Brighter palette: the 12 subgroups and 4 sports stay tell-apart-able and navy ink reads on every fill — Proof: everySubgroupTellsItselfApart
@@ -287,14 +320,14 @@ Each line says what you see or what the app does, then the test that proves it. 
 - SW_VERSION must be bumped on any deploy that changes a shell file — Proof: tests/check-sw-shell.js
 - A child may create or update a chore claim; never grade, settle or move money — Proof: kidCannotTransact
 - A claim in a settled week is refused with a sentence, for a child and a grown-up (the old known gap) — Proof: aSettledWeekCannotBeClaimed
-- Money is stored as movements in profile.events; balances are derived and a drift is reported on the parent page — Proof: a balance reads all of history, not just the span
-- Every wallet writer mirrors into the stream; a caller may label a movement and never redirect one — Proof: every pot the stream derives matches the movements, over 1000 histories
-- A correction is a reversing event, never an edit; events merge by id with their own tombstone scope — Proof: a reversal puts the balance back exactly
-- The migration is read-only until run, idempotent and re-prices nothing — Proof: re-merging the same stream changes no balance
-- Rules are effective-dated versions, so a lived week keeps the rules it was lived under — Proof: moneyRules newer version edit wins
-- mrApplyEdits is the only versioned writer and logs a line per field with a reason — Proof: moneyRules audit log unions both entries
+- Money is stored as movements in profile.events; balances are derived and a drift is reported on the parent page — Proof: stream.test.js "a balance reads all of history, not just the span"
+- Every wallet writer mirrors into the stream; a caller may label a movement and never redirect one — Proof: stream.test.js "every pot the stream derives matches the movements, over 1000 histories"
+- A correction is a reversing event, never an edit; events merge by id with their own tombstone scope — Proof: stream.test.js "a reversal puts the balance back exactly"
+- The migration is read-only until run, idempotent and re-prices nothing — Proof: merge.test.js "re-merging the same stream changes no balance"
+- Rules are effective-dated versions, so a lived week keeps the rules it was lived under — Proof: merge.test.js "moneyRules newer version edit wins"
+- mrApplyEdits is the only versioned writer and logs a line per field with a reason — Proof: merge.test.js "moneyRules audit log unions both entries"
 - Settled weeks are frozen in the ledger and never recomputed — Proof: ledgerFreezesTheWeek
-- mrStartWeek is derived from the earliest week on file and never written by being read — Proof: theGrandmaRuleIsSavedAsADatedRule
+- mrStartWeek is derived from the earliest week on file and never written by being read — Proof: theSystemDidNotBeginToday
 - Four house rules: homework earns XP not dollars; tone, borrowing, screens and asked-twice are free twice a week; one forgiving day a week; the year's pace divides by weeks elapsed — Proof: theFourHouseRulesHold
 - A household with a stored rulebook gets the house rules through a parent-only card, applied once from this Monday, never re-pricing a lived week — Proof: theHouseRulesReachAStoredRulebook
 - The year's-pace denominator is weeks elapsed, not weeks settled — Proof: theFourHouseRulesHold
@@ -309,42 +342,43 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Skating star level is how every money surface names the dance sport — Proof: danceReadsAsSkatingStarLevel
 - Loan edits never touch paid or payments; balance, pace, payoff date and weekly amount are derived on every render — Proof: loanWallMatchesTheDebts
 - A permanent click sweep presses every money control on every money surface and fails on any exception — Proof: everyMoneyControlClicksClean
-- The Sunday arithmetic (js/43) is pure: pile and hers, where money can be placed, presets, the sign, verdicts, forecast, clues, shares; every rate, cap and gate comes in as rules — Proof: 8–20 Sundays, both girls: every invariant held every week
-- The Sunday rules (6 per session, advance max 5, spend cap 20%, loan 1%, interest every 4 Sundays, extra bonus 10%, safety 10, lock 4 weeks, rates 1.5/4/7, gate 20) are in the shipped rulebook and added to an old one once, never rewritten — Proof: the Sunday rules are in the shipped rulebook (Plan v3 §C)
-- The assistant job: attendance is a grown-up's answer or the block, times the per-session rate; parent-only to set; flows into week, ledger, repair and year to date — Proof: all sessions missed: the assistant job pays $0 and nothing is fined
-- A result keeps its races and the parent's checked figure beside the rule's award; one function answers what a competition pays — Proof: competitions from both devices survive
-- Loan terms: weekly due, must-pay oldest first, shortfall carried with no interest, extra at 1 + bonus, balance interest every 4 Sundays — Proof: interest is charged on the whole balance left, earlier interest included
-- A 4-week lock comes back on the Saturday before the 4th-next Sunday — Proof: a locked 4 weeks comes back on the Saturday before the 4th-next Sunday
-- The goal jar is a Savings-kind holding with its own id and rate 0; Savings totals leave it out, counts include it — Proof: goal jar: one goal holding per goal, its newest value on both devices
-- A market dip is written once a week the way a holding losing value is — Proof: a company that went down is worth less, and says so
-- Requests (result, goal, advance, skip, dispute) live in one store with one reader and one answerer; only parents answer; a withdrawn request stays withdrawn — Proof: requests: a withdrawn request does not come back from the other device
-- Expected money is a parent-only list that merges and removes cleanly — Proof: expected: an edit travels and a removal stays removed
-- Club owes: the newest club-paid stamp wins; the owed amount is derived from sessions after that week — Proof: clubPaidThrough: a newer correction wins both ways
-- Two-device checks cover requests, expected, club paid, session answers and goal jars — Proof: requests: two devices, two asks — both survive
-- A Sunday random run (8 to 20 Sundays, both girls, 60 seeds) holds every invariant every week — Proof: the runs really ran (weeks, interest, locks coming back, gates crossed, weeks below 20%)
+- The Sunday arithmetic (js/43) is pure: pile and hers, where money can be placed, presets, the sign, verdicts, forecast, clues, shares; every rate, cap and gate comes in as rules — Proof: sunday.test.js "8–20 Sundays, both girls: every invariant held every week"
+- The Sunday rules (6 per session, advance max 5, spend cap 20%, loan 1%, interest every 4 Sundays, extra bonus 10%, safety 10, lock 4 weeks, rates 1.5/4/7, gate 20) are in the shipped rulebook and added to an old one once, never rewritten — Proof: sunday.test.js "the Sunday rules are in the shipped rulebook (Plan v3 §C)"
+- The assistant job: attendance is a grown-up's answer or the block, times the per-session rate; parent-only to set; flows into week, ledger, repair and year to date — Proof: sunday.test.js "all sessions missed: the assistant job pays $0 and nothing is fined"
+- A result keeps its races and the parent's checked figure beside the rule's award; one function answers what a competition pays — Proof: merge.test.js "competitions from both devices survive"
+- Loan terms: weekly due, must-pay oldest first, shortfall carried with no interest, extra at 1 + bonus, balance interest every 4 Sundays — Proof: sunday.test.js "interest is charged on the whole balance left, earlier interest included"
+- A 4-week lock comes back on the Saturday before the 4th-next Sunday — Proof: sunday.test.js "a locked 4 weeks comes back on the Saturday before the 4th-next Sunday"
+- The goal jar is a Savings-kind holding with its own id and rate 0; Savings totals leave it out, counts include it — Proof: merge.test.js "goal jar: one goal holding per goal, its newest value on both devices"
+- A market dip is written once a week the way a holding losing value is — Proof: stream.test.js "a company that went down is worth less, and says so"
+- Requests (result, goal, advance, skip, dispute) live in one store with one reader and one answerer; only parents answer; a withdrawn request stays withdrawn — Proof: merge.test.js "requests: a withdrawn request does not come back from the other device"
+- Expected money is a parent-only list that merges and removes cleanly — Proof: merge.test.js "expected: an edit travels and a removal stays removed"
+- Club owes: the newest club-paid stamp wins; the owed amount is derived from sessions after that week — Proof: merge.test.js "clubPaidThrough: a newer correction wins both ways"
+- Two-device checks cover requests, expected, club paid, session answers and goal jars — Proof: merge.test.js "requests: two devices, two asks — both survive"
+- A Sunday random run (8 to 20 Sundays, both girls, 60 seeds) holds every invariant every week — Proof: sunday.test.js "the runs really ran (weeks, interest, locks coming back, gates crossed, weeks below 20%)"
 - An approved goal switches the jar on only at the Sunday sign, once — Proof: sundayDataOwnersHold
 - A claim in a settled week is refused with a sentence for a child and a grown-up alike; own things are answered only for her own week — Proof: aSettledWeekCannotBeClaimed, ownThingsAnswerOnlyForHerOwnWeek
 - Goal jars wait for Savings: a shut jar says Goal jars open with Savings, at N% paid off — Proof: goalJarsWaitForSavings
 - An unfinished day is never forgiven mid-week: the streak stops at the first day still ahead — Proof: anUnfinishedDayIsNeverForgiven
 - One reader, mnyDueThisWeek, gives this Sunday's must-pay for the pool, the Sunday line and the payment — Proof: mustPayIsTakenFirst
-- Every on-screen sentence says parents or a parent, not Dad — Proof: noMeetsOnTheMoneyScreens
+- Every on-screen sentence says parents or a parent, not Dad — Proof: moneyWordsAndSmallFixes (the price card names no parent), myMoneyHasNoCashAccount ("My money still says Dad")
 - One reader for money my money made, the ledger keeps ownedAfter, and Weeks' earned this year reads the ledger — Proof: passiveIncomeIsCountedAndBaselined
 - The Loan per month rescale puts the rounding cent on the last row so the rows add up exactly — Proof: aSkippedSundayStillRescalesHerRows
 - Competitions, not meet, wherever it is read on the money screens — Proof: noMeetsOnTheMoneyScreens
 - A words check fails retired money words and a raw placeholder on screen — Proof: tests/check-money-words.js
-- The money week is Monday to Sunday everywhere; the Sunday to Saturday mapping stays only as tested code and its Rules card is gone — Proof: decision 15: the default rules never turn the Sun–Sat mapping on
+- The money week is Monday to Sunday everywhere; the Sunday to Saturday mapping stays only as tested code and its Rules card is gone — Proof: sunday.test.js "decision 15: the default rules never turn the Sun–Sat mapping on"
 - Price cards read Competitions and Box fine, and the quarterly review opens Rules — Proof: moneyWordsAndSmallFixes
 - The money fit check: on every money surface, both looks, 390 and 1194, short and long names, no label is clipped, spills out of its box or overlaps another — Proof: noLabelIsCutOnTheMoneyScreens
 - Rapid edits coalesce into one write, a dragged block is stamped so a merge cannot lose it, and stamps use server-corrected time — Proof: rapidEditsCoalesceIntoOneWrite, aDraggedBlockIsStampedSoAMergeCannotLoseIt, stampsUseServerCorrectedTime
 - A conflict is a parent's to decide, not the clocks'; cloud size warns before the ceiling — Proof: aConflictIsAParentsToDecideNotTheClocks, cloudSizeWarnsBeforeTheCeiling
-- Two devices merge: a deleted block does not come back, the newest edit wins, and both devices derive the same balance — Proof: deleted block not resurrected, newer-than-tombstone copy survives, two devices derive the same balance from the merged stream
-- XP: block XP is credited through one writer; the weekly cap is 260 and the level threshold 400 — Proof: addQuestXP is the only writer of the XP total, the weekly cap is the calibrated 260, the level threshold is the calibrated 400
-- Weekly pay: a chore on time and to standard pays $3, the daily cap is $3 and the streak pays the highest tier only — Proof: a chore on time and to standard pays $3, the daily chore cap is $3, the streak pays the highest tier only, never the sum
-- Fines: twice costs nothing, the third time costs $1 and a fine can never create debt — Proof: twice costs nothing, the third time costs $1, a fine can never create debt
+- Two devices merge: a deleted block does not come back, the newest edit wins, and both devices derive the same balance — Proof: merge.test.js "deleted block not resurrected", "newer-than-tombstone copy survives", "two devices derive the same balance from the merged stream"
+- XP: block XP is credited through one writer; the weekly cap is 260 and the level threshold 400 — Proof: xp.test.js "addQuestXP is the only writer of the XP total", "the weekly cap is the calibrated 260", "the level threshold is the calibrated 400"
+- Weekly pay: a chore on time and to standard pays $3, the daily cap is $3 and the streak pays the highest tier only — Proof: money.test.js "a chore on time and to standard pays $3", "the daily chore cap is $3", "the streak pays the highest tier only, never the sum"
+- Fines: twice costs nothing, the third time costs $1 and a fine can never create debt — Proof: money.test.js "twice costs nothing", "the third time costs $1", "a fine can never create debt"
 
 ## Shell and build number
 
 - Build number is on the page: APP_BUILD equals SW_VERSION and prints as Build <number> on the Today More sheet and the parent App landing — Proof: theBuildNumberIsOnThePage, tests/check-sw-shell.js
+- The build number shown is what that device loaded, its offline copy included: js/01-config.js is in the offline shell — Proof: tests/check-sw-shell.js
 - Build under the tiles of the More sheet (bottom nav, More) and under the list of the parent App landing, not on Setup — Proof: theBuildNumberIsOnThePage
 - The parent App landing and the Today More sheet show Build <APP_BUILD> — Proof: theBuildNumberIsOnThePage
 - Sheets are dialogs you can leave, every control has a name, and the app installs to the home screen — Proof: sheetsAreDialogsYouCanLeave, everyControlHasAName, installsToTheHomeScreen
@@ -354,6 +388,11 @@ Each line says what you see or what the app does, then the test that proves it. 
 ## Setup and working rules
 
 - Setup and working rules: see hz-claude-config (loaded by .claude/hz-loader.py).
+- CLAUDE.md is a pointer: the working rules come from hz-claude-config through .claude/hz-loader.py, and without the session-start line they are read by hand — Proof: CLAUDE.md
+- ARCHITECTURE.md holds this repository's own operating rules — Proof: CLAUDE.md
+- Every see CLAUDE.md comment in js/ and tests/ means ARCHITECTURE.md — Proof: CLAUDE.md
+- WORKING_RECORD.md is the request and deliverable ledger — Proof: CLAUDE.md
+- FEATURES.md is the list every regression table is checked against — Proof: CLAUDE.md
 
 ## References
 
@@ -385,8 +424,11 @@ The test map: for a change in the area or files named, the tests it needs before
 - Figures: each girl's Sunday totals (money in, wall, saved, cash) show on Payday, Signed, the passbook and the Sunday sheet; steady money shows in Grown-ups Commitments and Weeks; commitment % (share of steady money) shows in Grown-ups Commitments and on "New row on my wall"; loan balance shows on the My money loan wall, I choose "What I owe" and Weeks; pocket balances (Savings, Locked away, Companies, Waiting for Sunday) show on My money "What I own", I choose "What I own" and Parent Now "What they own".
 - Rules: AllowanceRulesJennJess-v2.md (each rule line names its test)
 
-## Regression table format (paste at the end of every edit)
-| Feature | v<old> → v<new> | Note |
-|---|---|---|
-| <feature> | kept / added / intentionally removed / missing | <why, if not kept> |
+## Regression table (paste at the end of every edit)
+| Regression table | Result |
+|---|---|
+| Kept | <n> features · Proof: pictures <n> screens × <sizes> sizes, <k> changed (all planned) · tests <passed>/<total> |
+| Added | … |
+| Intentionally removed | … |
+| Missing | … |
 
