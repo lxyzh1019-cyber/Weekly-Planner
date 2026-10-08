@@ -222,6 +222,30 @@ jobs:
         env:
           SMOKE_DATE: ${{ matrix.date }}
 
+      # The picture test (tests/pictures.js): every screen and state at both
+      # sizes in both looks, pixel-compared with tests/reference/. References
+      # are made and compared only here, on this runner with the pinned
+      # browser; a local run reports but does not gate. Here an empty
+      # tests/reference/ fails ("no references in tests/reference/"); the fresh
+      # set is uploaded below either way, to be copied into tests/reference/.
+      # Pictures set their own clock (Wed 2026-10-07 12:00 Edmonton) and ignore
+      # SMOKE_DATE, so they run once, on the matrix's 2026-10-07 job only; one
+      # job also keeps the artifact name `pictures` unique.
+      - name: Picture test
+        if: matrix.date == '2026-10-07'
+        run: npm run test:pictures
+
+      - name: Upload pictures
+        if: always() && matrix.date == '2026-10-07'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pictures
+          path: |
+            tests/out/pictures-new/
+            tests/out/pictures-diff/
+          if-no-files-found: warn
+          retention-days: 14
+
       # Screenshots make a layout regression visible in the run itself rather
       # than only as a failed assertion. The folder also holds
       # smoke-ran-<date>.json, each check's time (tools/smoke-times.js).

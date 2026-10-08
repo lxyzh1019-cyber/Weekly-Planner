@@ -109,6 +109,57 @@ clock runs on from there. CI runs the smoke job once per date in a matrix --
 `2026-10-15` (a weekday), `2026-10-11` (a Sunday), `2026-10-01` (the first of a
 month) and `2026-10-07` -- so a check that only passes on some days fails there.
 
+## The picture test
+
+`npm run test:pictures` (`tests/pictures.js`) opens every screen and state the
+consistency pass touches — the 13 screens, the Week view tabs, My money and
+Money school, All my Sundays, By month, each parent tab including Now and the
+Grown-ups tabs, each meeting step and the Sunday's steps, the four overlays
+(Sunday, Grown-ups, request, told), one info sheet, one confirm dialog, every
+other sheet (record, Sunday line, profile switch, slot picker, activity,
+training, block edit, routine and training quick sheets, copy day, reflect,
+custom activity / task / sport, weekly wins, level, ⋯ More, new challenge,
+parent activity, new rule, new routine, chore group) and the quest pop-up — for
+Jenn, Jess and the parent where the screen differs by user, at iPad 1194×834
+and phone 390×844, in Pop and Calm. The list is the `STATES` table in the file.
+
+Every picture boots from one fixed fixture (both girls, this week's plan, a
+signed Sunday last week, a loan each, waiting requests, a goal each) at a fixed
+clock, Wednesday 7 Oct 2026 12:00 in America/Edmonton, with a fixed
+`Math.random`, reduced motion, no transitions and no caret, after the fonts
+have loaded. Each picture is compared with `tests/reference/<state>-<user>-<ipad|phone>-<pop|calm>.png`
+on canvases in the browser (no extra package); only the pictures that differ
+are printed, with a diff in `tests/out/pictures-diff/`. A missing reference, or
+a reference no state makes, is a failure. Every run first checks the compare
+itself: a picture against itself gives 0 differences, and one planted changed
+pixel is caught.
+
+**Retries.** A picture that differs is shot again, alone, in a brand-new
+browser context (a new renderer process), up to 2 times. It passes only when a
+re-shot matches the reference exactly as the first shot must (2 levels per
+channel, 0 pixels); each such pass is printed as "matched on retry N: <name>"
+and counted in the summary. A picture that never matches fails with its diff.
+Why: on the CI Linux runner colour emoji are scaled from a bitmap font, and
+their edges came out a few levels apart between two runs of the same code. The
+self-check does not retry. `PICTURES_UPDATE=1` takes no retries.
+
+**Local vs CI.** References are made and compared only on the CI Linux runner;
+fonts and the browser build differ elsewhere. Without `CI` set the test reports
+differences and exits 0 ("local run — not gating"). In CI it gates, and an
+empty `tests/reference/` is a failure ("no references in tests/reference/");
+a local run with no references writes the fresh set and exits 0.
+
+**Refreshing references.** Every run writes the fresh set to
+`tests/out/pictures-new/`, and CI uploads it (with the diffs) as the artifact
+`pictures`. Download it from the CI run of the branch and copy
+`pictures-new/*.png` into `tests/reference/` in the same pull request as the
+change. `PICTURES_UPDATE=1 npm run test:pictures` writes references from this
+machine instead — for trying the test locally only; do not commit them.
+
+**One run in the date matrix.** The pictures keep their own clock and do not
+read `SMOKE_DATE`, so CI runs them once, in the smoke job's `2026-10-07` leg
+only; the other three dates skip the picture steps.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
