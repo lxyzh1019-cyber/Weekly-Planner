@@ -8237,6 +8237,10 @@ button.gu-loanrow {
   .gu-grid--rules { grid-template-areas: "index" "main" "side" "save"; }
   .gu-head { flex-wrap: wrap; }
   .gu-tabs { justify-content: flex-start; }
+  /* Owner decision 3: on phones the Record hint sits under the button row, so ✍️ Record stays on one line. */
+  .gu-tools { flex-wrap: wrap; justify-content: flex-end; }
+  .gu-tools .gu-record { white-space: nowrap; }
+  .gu-tools .rc-door-hint { order: 3; flex: 1 0 100%; max-width: none; }
   .gu-formrow { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .gu-exrow { grid-template-columns: minmax(0, 1fr) 44px; }
   .gu-exrow .gu-pair { grid-column: 1 / -1; }

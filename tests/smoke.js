@@ -26411,6 +26411,35 @@ function findChromium() {
       } catch (e) { bad.push('threw: ' + e.message); }
       return bad.length ? bad : true;
     });
+    // Phones (owner decision 3): the Grown-ups hint sits UNDER the button, and ✍️ Record stays on one line.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(100);
+    const phoneBad = [];
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      const r = await page.evaluate(() => {
+        const bad = [];
+        try {
+          GU_TABS.forEach(t => {
+            const wrap = guOpen(t.id);
+            const bar = wrap && wrap.querySelector('.gu-tabs');
+            const btn = bar && bar.querySelector('[data-mny-action="record-any"]');
+            const hint = bar && bar.querySelector('.rc-door-hint');
+            if (!btn || !hint) { bad.push(t.id + ': Record button or hint missing'); return; }
+            const rect = btn.getBoundingClientRect();
+            const range = document.createRange(); range.selectNodeContents(btn);
+            const lines = new Set([...range.getClientRects()].map(q => Math.round(q.top))).size;
+            if (lines > 1) bad.push(t.id + ': Record text is on ' + lines + ' lines');
+            if (hint.getBoundingClientRect().top < rect.bottom - 1) bad.push(t.id + ': hint is not below the Record button');
+          });
+        } catch (e) { bad.push('threw: ' + e.message); }
+        return bad;
+      });
+      r.forEach(m => phoneBad.push('390 ' + look + ' ' + m));
+    }
+    if (phoneBad.length) {
+      checks.bothRecordDoorsCarryTheHint = checks.bothRecordDoorsCarryTheHint === true ? phoneBad : [].concat(checks.bothRecordDoorsCarryTheHint, phoneBad);
+    }
     await guTeardown();
   }
 
