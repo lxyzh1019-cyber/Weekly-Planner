@@ -6700,14 +6700,23 @@ function findChromium() {
           });
           mnySavePlan(prev, kid, { planId: 'sunday', presetId: 'saving', guess: 35 });
           mnyAddDeposit(kid, wk, { amount: 30, from: 'A gift', giver: 'Uncle Mike', dayKey: mrWeekDayKeys(wk)[0] });   // money to place
-          const row = mnyAddDebt(kid, { name: 'Winter entry', icon: '🆕', principal: 27, monthly: 5 });
+          const row = mnyAddDebt(kid, { name: 'Winter entry', icon: '🆕', principal: 27, monthly: 20 });
           row.createdAt = Date.now();
+          renderMeetingMode();
+          /* PR 1 money re-check: under the $5 steady floor (chores $2 a week
+             here) the card shows the "not enough steady money" wording and
+             no share, so no "get back under half" ideas. */
+          const low = sdBody().querySelector('.sd-newrow');
+          if (!low) bad.push('the new-row card did not show');
+          else if (!/Not enough steady money yet to judge it/.test(low.textContent) || /How could I get back under half\?/.test(low.textContent)) bad.push('steady under $5: the card does not show the not-enough-steady wording alone (steady ' + guSteady(kid) + ')');
+          // Then $6 of steady money a week (chores $2 + learning $4): the loan is over half.
+          [prev, prev2].forEach(w => { const r = c.moneyLedger[w][kid]; r.learning = 4; r.gross += 4; r.net += 4; c.finalizedWeeks[w][kid] += 4; });
           renderMeetingMode();
           const card = sdBody().querySelector('.sd-newrow');
           if (!card) bad.push('the new-row card did not show');
           else {
             if (!/💡 Does it earn back\? My competitions pay me about \$12\.00 each\. This row is paid back by about 3 competitions./.test(card.textContent)) bad.push('no "Does it earn back?" line: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 200));
-            if (!/How could I get back under half\?/.test(card.textContent) || card.querySelectorAll('[data-mny-action="sd-newidea"]').length !== 3) bad.push('over half, the card does not ask how to get back under half with three ideas');
+            if (!/How could I get back under half\?/.test(card.textContent) || card.querySelectorAll('[data-mny-action="sd-newidea"]').length !== 3) bad.push('over half, the card does not ask how to get back under half with three ideas (steady ' + guSteady(kid) + ')');
             sdClick('[data-mny-action="sd-newok"]');
           }
           // Through to I choose.
