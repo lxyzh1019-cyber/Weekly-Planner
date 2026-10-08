@@ -222,30 +222,6 @@ jobs:
         env:
           SMOKE_DATE: ${{ matrix.date }}
 
-      # The picture test (tests/pictures.js): every screen and state at both
-      # sizes in both looks, pixel-compared with tests/reference/. References
-      # are made and compared only here, on this runner with the pinned
-      # browser; a local run reports but does not gate. Here an empty
-      # tests/reference/ fails ("no references in tests/reference/"); the fresh
-      # set is uploaded below either way, to be copied into tests/reference/.
-      # Pictures set their own clock (Wed 2026-10-07 12:00 Edmonton) and ignore
-      # SMOKE_DATE, so they run once, on the matrix's 2026-10-07 job only; one
-      # job also keeps the artifact name `pictures` unique.
-      - name: Picture test
-        if: matrix.date == '2026-10-07'
-        run: npm run test:pictures
-
-      - name: Upload pictures
-        if: always() && matrix.date == '2026-10-07'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pictures
-          path: |
-            tests/out/pictures-new/
-            tests/out/pictures-diff/
-          if-no-files-found: warn
-          retention-days: 14
-
       # Screenshots make a layout regression visible in the run itself rather
       # than only as a failed assertion. The folder also holds
       # smoke-ran-<date>.json, each check's time (tools/smoke-times.js).
@@ -255,5 +231,76 @@ jobs:
         with:
           name: smoke-screenshots-${{ matrix.date }}
           path: tests/out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The picture test (tests/pictures.js): every screen and state at both sizes
+  # in both looks, pixel-compared with tests/reference/. References are made
+  # and compared only here, on this runner with the pinned browser; a local run
+  # reports but does not gate. Here an empty tests/reference/ fails ("no
+  # references in tests/reference/"); the fresh set is uploaded below either
+  # way, to be copied into tests/reference/.
+  #
+  # Its own job, not a step of a smoke job: the pictures set their own clock
+  # (Wed 2026-10-07 12:00 Edmonton) and do not read SMOKE_DATE, so they run once
+  # per run, side by side with the four smoke jobs rather than after one of
+  # them. One job also keeps the artifact name `pictures` unique. It reuses the
+  # browser and system packages the `browser` job cached, as the smoke jobs do.
+  pictures:
+    name: Picture test (Wed 2026-10-07 12:00 Edmonton)
+    runs-on: ubuntu-latest
+    needs: [checks, browser]
+    # The picture step took 2:09-2:19 on 2026-10-07; with setup the job should
+    # take under 5 minutes. 15 leaves room for a slow runner.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read pinned playwright-core version and runner image
+        id: pw
+        run: |
+          echo "version=$(node -p "require('./package.json').devDependencies['playwright-core']")" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      # Restore only: the browser job above saved both caches.
+      - name: Restore Chromium
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Restore system packages
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/pw-debs
+          key: pw-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}
+          restore-keys: pw-debs-
+
+      - name: Install system packages
+        run: |
+          sudo cp ~/pw-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          npx --yes playwright@${{ steps.pw.outputs.version }} install-deps chromium
+
+      - name: Install Chromium
+        run: npx --yes playwright@${{ steps.pw.outputs.version }} install chromium
+
+      - name: Picture test
+        run: npm run test:pictures
+
+      - name: Upload pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pictures
+          path: |
+            tests/out/pictures-new/
+            tests/out/pictures-diff/
           if-no-files-found: warn
           retention-days: 14

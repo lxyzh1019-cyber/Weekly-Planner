@@ -14,8 +14,8 @@ each one pays a few minutes of setup on a laptop, so they are outside the
 3-minute short loop. The rules are in `ARCHITECTURE.md`, Verification.
 
 Before a pull request opens — the full suite green on GitHub: the `checks` job,
-the browser job (cleanup-tool tests) and one smoke job per date on all four
-dates, each smoke job about 8 minutes (accepted until a later stage brings every
+the browser job (cleanup-tool tests), the picture job, and one smoke job per
+date on all four dates, each smoke job about 8 minutes (accepted until a later stage brings every
 job under 5 minutes). A pull request starts the run by itself; on a branch,
 `gh workflow run ci.yml --ref <branch>`. `npm test` still runs all of it in one
 process, but the smoke suite alone is over 30 minutes on a laptop, so it is not
@@ -156,19 +156,22 @@ a local run with no references writes the fresh set and exits 0.
 change. `PICTURES_UPDATE=1 npm run test:pictures` writes references from this
 machine instead — for trying the test locally only; do not commit them.
 
-**One run in the date matrix.** The pictures keep their own clock and do not
-read `SMOKE_DATE`, so CI runs them once, in the smoke job's `2026-10-07` leg
-only; the other three dates skip the picture steps.
+**Its own CI job.** The pictures keep their own clock (Wed 2026-10-07 12:00
+Edmonton) and do not read `SMOKE_DATE`, so CI runs them once per run, in the
+`pictures` job, side by side with the four smoke jobs. It installs the browser
+from the caches the `browser` job saved, and uploads the `pictures` artifact
+whether it passes or fails.
 
 ## CI
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
 plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
 unit suite), `browser` (installs Chromium and its system packages once, caches
-both, runs the cleanup-tool tests), and `smoke`, one job per date, which
+both, runs the cleanup-tool tests), `smoke`, one job per date, which
 installs the browser from those caches and uploads `tests/out/` as an artifact
 (`smoke-screenshots-<date>`) so a layout regression is visible in the run
-itself.
+itself, and `pictures`, the picture test (above) on one fixed clock, which
+installs the browser from the same caches and uploads the artifact `pictures`.
 
 When asking Claude (or anyone) to change this app, ask them to **run the short
 loop and the map's tests before pushing, and attach the smoke-test screenshots
