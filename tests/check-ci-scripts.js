@@ -43,9 +43,30 @@ const suites = scripts.filter(n => n.startsWith('test:'));
 
 const problems = [];
 
+// The scripts a piece of text runs with `npm run <name>`, and the scripts those
+// run in turn: `test:fast` is a chain of other suites, so a suite reached
+// through it is reached.
+const runsIn = (text) => [...(text || '').matchAll(/npm run ([\w:-]+)/g)].map(m => m[1]);
+function reached(text) {
+  const seen = new Set();
+  const visit = (name) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    runsIn(pkg.scripts && pkg.scripts[name]).forEach(visit);
+  };
+  runsIn(text).forEach(visit);
+  return seen;
+}
+const ciRuns = reached(wf);
+// A chain made only of `npm run` steps (the short loop, `test:fast`) is run by
+// CI when every script in it is, although CI runs them as separate steps so
+// each one reports on its own.
+const isChain = (name) => /^\s*npm run [\w:-]+(\s*&&\s*npm run [\w:-]+)*\s*$/.test(pkg.scripts[name] || '');
+
 // 1. Every suite is invoked by some step.
 suites.forEach(name => {
-  if (!new RegExp(`npm run ${name}(?![\\w:-])`).test(wf)) {
+  const covered = ciRuns.has(name) || (isChain(name) && runsIn(pkg.scripts[name]).every(x => ciRuns.has(x)));
+  if (!covered) {
     problems.push(`package.json defines "${name}" and ci.yml never runs it`);
   }
 });
@@ -61,9 +82,9 @@ const invoked = [...wf.matchAll(/npm run ([\w:-]+)/g)].map(m => m[1]);
 
 // 3. `npm test` stays the local equivalent: a suite missing from it is one a
 //    contributor never runs before pushing.
-const aggregate = pkg.scripts && pkg.scripts.test ? pkg.scripts.test : '';
+const inTest = reached(pkg.scripts && pkg.scripts.test);
 suites.forEach(name => {
-  if (!new RegExp(`npm run ${name}(?![\\w:-])`).test(aggregate)) {
+  if (!inTest.has(name)) {
     problems.push(`"${name}" is not in the \`test\` script, so \`npm test\` skips it`);
   }
 });

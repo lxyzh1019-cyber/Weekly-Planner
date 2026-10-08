@@ -1,17 +1,31 @@
 # Tests
 
-Everything must pass before a change is pushed:
+Before a change is pushed — the short loop, `npm run test:fast`:
 
 ```bash
-npm ci      # once
-npm test    # check + merge tests + smoke test, stops at the first failure
+npm ci              # once
+npm run test:fast   # check + every unit suite (merge, buffers, stream, xp, money, sunday)
 ```
 
-The three parts, individually:
+The test map is the `Tests:` lines in `FEATURES.md` (`## References`): for each
+area or file, the tests a change there needs. The short loop plus the map's
+Node suites stays under 3 minutes. The `SMOKE_ONLY=…` lists there are optional:
+each one pays a few minutes of setup on a laptop, so they are outside the
+3-minute short loop. The rules are in `ARCHITECTURE.md`, Verification.
+
+Before a pull request opens — the full suite green on GitHub: the `checks` job,
+the browser job (cleanup-tool tests) and one smoke job per date on all four
+dates, each smoke job about 8 minutes (accepted until a later stage brings every
+job under 5 minutes). A pull request starts the run by itself; on a branch,
+`gh workflow run ci.yml --ref <branch>`. `npm test` still runs all of it in one
+process, but the smoke suite alone is over 30 minutes on a laptop, so it is not
+run locally.
+
+The parts, individually:
 
 ```bash
 # 1. Syntax + global-scope checks (no dependencies)
-npm run check         # tests/check-*.js: syntax, globals, shared-merge, escaping, look tokens, dead CSS, dead ids, dead actions
+npm run check         # tests/check-*.js: syntax, globals, shared-merge, escaping, look tokens, money words, dead CSS, dead ids, dead actions, CI scripts, SW shell
 
 # 2. Sync/merge unit tests (no dependencies, runs the real merge functions)
 npm run test:merge    # tests/merge.test.js — 112 assertions, must be 112/112
@@ -80,8 +94,14 @@ It is for iteration only. The checks share one page, and a skipped check's
 body does not run, so a subset can pass or fail where the full run would not.
 That is why it names itself `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a
 pass of the suite`, exits 1 on a name that matches no check, and refuses to run
-under CI. The full suite gates every push. Give a new check the same
-`if (want('name'))` prefix as its neighbours.
+under CI. Give a new check the same `if (want('name'))` prefix as its
+neighbours. A subset still pays all the setup between checks, a few minutes on
+a laptop, whatever it names.
+
+Every run times each check and the setup just before it, prints the slowest,
+and writes `tests/out/smoke-ran-<date>.json`. To see where a CI run's time went:
+`gh run download <run-id> -p 'smoke-screenshots-*' -D <folder>`, then
+`node tools/smoke-times.js <folder>`.
 
 The suite runs on a fixed date, never the real calendar: `SMOKE_DATE=YYYY-MM-DD`
 (default `2026-10-07`) starts every page at noon Edmonton on that day and the
@@ -91,10 +111,15 @@ month) and `2026-10-07` -- so a check that only passes on some days fails there.
 
 ## CI
 
-`.github/workflows/ci.yml` runs all three on every pull request and on pushes to
-`main`, plus nightly, and uploads `tests/out/` as an artifact so a layout
-regression is visible in the run itself.
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
+plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
+unit suite), `browser` (installs Chromium and its system packages once, caches
+both, runs the cleanup-tool tests), and `smoke`, one job per date, which
+installs the browser from those caches and uploads `tests/out/` as an artifact
+(`smoke-screenshots-<date>`) so a layout regression is visible in the run
+itself.
 
-When asking Claude (or anyone) to change this app, ask them to **run these
-tests and attach the smoke-test screenshots** before pushing. New features
+When asking Claude (or anyone) to change this app, ask them to **run the short
+loop and the map's tests before pushing, and attach the smoke-test screenshots
+from the GitHub run** before the pull request opens. New features
 should come with a new check in `smoke.js`.
