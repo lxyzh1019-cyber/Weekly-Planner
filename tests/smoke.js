@@ -99,7 +99,21 @@ function findChromium() {
      selectable the moment it is written. noConsoleErrors has no guard: an error
      raised by the checks being worked on is exactly what a subset must show. */
   const ONLY = (process.env.SMOKE_ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
-  const want = (name) => ONLY.length === 0 || ONLY.includes(name);
+  // Every run times each check: want() starts the clock and the check's first
+  // assignment to `checks` stops it. The setup that runs between checks is
+  // timed too (setupMs[name] = the setup just before that check). The times
+  // print at the end and go to tests/out/smoke-ran-<date>.json, which
+  // tools/smoke-times.js reads from a CI run's artifacts.
+  const checkMs = {}, setupMs = {};
+  let timing = null, setupFrom = Date.now();
+  const want = (name) => {
+    const now = Date.now();
+    setupMs[name] = now - setupFrom;
+    setupFrom = now;
+    const yes = ONLY.length === 0 || ONLY.includes(name);
+    if (yes) timing = { name, t0: now };
+    return yes;
+  };
   // A Set: a check may assign its own result twice (everyMoneyControlClicksClean
   // appends the errors caught outside the page), and that is still one check.
   const ALL_CHECKS = [...new Set([...fs.readFileSync(__filename, 'utf8')
@@ -116,6 +130,7 @@ function findChromium() {
     }
   }
 
+  const suiteStarted = Date.now();
   const outDir = path.join(__dirname, 'out');
   fs.mkdirSync(outDir, { recursive: true });
   const shot = (name) => path.join(outDir, name + '.png');
@@ -267,7 +282,14 @@ function findChromium() {
   await page.waitForTimeout(600);
   await page.screenshot({ path: shot('week_full') });
 
-  const checks = {};
+  // Stops the clock want() started when the check records its result.
+  const checks = new Proxy({}, {
+    set(target, name, value) {
+      if (timing && timing.name === name) { checkMs[name] = Date.now() - timing.t0; timing = null; setupFrom = Date.now(); }
+      target[name] = value;
+      return true;
+    },
+  });
 
   /* ── Looks stage 3: the same check in both looks ──────────────────────
      setLook puts one look on for everybody on this device the way the app
@@ -27322,6 +27344,31 @@ function findChromium() {
   // bug in the syntax check: a test that reports a problem and returns success.
   const failed = Object.entries(checks).filter(([, v]) => v !== true).map(([k]) => k);
   console.log(JSON.stringify({ checks, errors }, null, 2));
+
+  // Per-check times, slowest first; the longest setup gaps; one summary line.
+  // The run's wall time minus the checks' sum is the setup between checks.
+  setupMs['(the end of the run)'] = Date.now() - setupFrom;
+  const wallMs = Date.now() - suiteStarted;
+  const checkSum = Object.values(checkMs).reduce((sum, x) => sum + x, 0);
+  console.log('Check times (ms), slowest first:');
+  Object.entries(checkMs).sort((a, b) => b[1] - a[1])
+    .forEach(([name, ms]) => console.log(`  ${String(ms).padStart(7)}  ${name}`));
+  console.log('Longest setup between checks (ms, the setup just before the named check):');
+  Object.entries(setupMs).sort((a, b) => b[1] - a[1]).slice(0, 15)
+    .forEach(([name, ms]) => console.log(`  ${String(ms).padStart(7)}  before ${name}`));
+  const runLabel = ONLY.length ? 'only' : 'full';
+  console.log(`Smoke ${runLabel} run on ${SMOKE_DATE}: ${Math.round(wallMs / 1000)} s wall, `
+    + `${Math.round(checkSum / 1000)} s in ${Object.keys(checkMs).length} timed checks, `
+    + `${Math.round((wallMs - checkSum) / 1000)} s setup`);
+  fs.writeFileSync(path.join(outDir, `smoke-ran-${SMOKE_DATE}.json`), JSON.stringify({
+    date: SMOKE_DATE,
+    run: runLabel,
+    wallMs,
+    checks: Object.fromEntries(Object.entries(checks).map(([k, v]) => [k, v === true])),
+    ms: checkMs,
+    setup: setupMs,
+  }, null, 1));
+
   if (ONLY.length) {
     // A named check that recorded nothing is a failure, not a quiet skip.
     const neverRan = ONLY.filter(n => !(n in checks));

@@ -52,12 +52,28 @@ duplicate `function foo()` in two files means the later one silently wins. A
 `let`/`const` declared twice is a hard `SyntaxError` at load. Before adding a
 top-level name, grep for it across `js/`.
 
-## Verification — run all three before any push
+## Verification — the short loop before a push, the full suite on GitHub before a pull request
 
 ```bash
-npm ci      # once
-npm test    # runs everything below, stops at the first failure
+npm ci              # once
+npm run test:fast   # the short loop: npm run check + every unit suite
 ```
+
+**Before a push:** the short loop — `npm run test:fast` plus the tests the test
+map in `FEATURES.md` (`## References`, `Tests:` lines) names for the files
+changed, under 3 minutes on the owner's PC. The `SMOKE_ONLY=<checks>` lists the
+map gives for a screen (below) are optional: each pays a few minutes of setup on
+a laptop, so they are outside the 3-minute target.
+
+**Before a pull request opens:** the full suite green on GitHub — the `checks`
+job, the browser job (with the cleanup-tool tests) and one smoke job per date on
+all four dates. A smoke job takes about 8 minutes; that is accepted until a
+later stage brings every job under 5 minutes. Start a run on a branch with
+`gh workflow run ci.yml --ref <branch>`; a pull request starts one by itself.
+
+`npm test` still runs everything in one go (the short loop, the cleanup tool,
+then the whole smoke suite in one process). That is over 30 minutes on a laptop,
+so it is not the local gate: on the owner's PC it is never run.
 
 **The same commands run unchanged on Windows** — Git Bash or `cmd`, no
 environment variables, no copy of the tree (added 2026-09-25):
@@ -95,7 +111,8 @@ npm run test:xp
 npm run test:money
 
 # 4. Headless smoke test — boots the app, drives the main flows
-npm run test:smoke          # screenshots land in tests/out/
+npm run test:smoke          # screenshots land in tests/out/ (whole suite: GitHub only)
+SMOKE_ONLY=checkA,checkB npm run test:smoke   # a few checks, locally
 ```
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
@@ -172,11 +189,23 @@ between checks still runs — but a skipped check's own body does not, and the
 checks share one page, so a subset result is a hint, not a verdict. It is for
 iteration only and cannot stand in for the gate: an unknown name exits 1, the
 last line reads `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the
-suite`, and it refuses to run at all when `CI` is set. The full suite gates every
-push. A new check gets the same prefix, with its own name in both places.
+suite`, and it refuses to run at all when `CI` is set. The full suite on GitHub
+gates every pull request. A new check gets the same prefix, with its own name in
+both places.
 
-CI (`.github/workflows/ci.yml`) runs all three on every pull request and pushes
-to `main`, plus nightly, and uploads the smoke screenshots as an artifact.
+Every smoke run times each check (from its `want()` to its result) and the
+setup just before each check, prints both slowest first, and writes
+`tests/out/smoke-ran-<date>.json`. `node tools/smoke-times.js <folder>` reads
+those files from a CI run's artifacts and lists the slowest checks and setup.
+
+CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main`,
+plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and
+every unit suite), `browser` (installs Chromium and its system packages once,
+caches both, runs the cleanup-tool tests), then one smoke job per date, which
+installs the browser from those caches and uploads its screenshots as an
+artifact. The browser job exists because the system packages came from the
+Ubuntu mirror in every smoke job, and a slow mirror made one job take 20 minutes
+(2026-10-07, run 37671279692: 14 minutes in the install step).
 
 **The workflow ENUMERATES its npm scripts rather than running `npm test`.** That
 is deliberate — the fast gate runs without a browser and the smoke job installs
@@ -191,8 +220,10 @@ that state, the second for as long as it had existed — so a rates change in
 against the promise `tools/money-calibrate.js` is written to make.
 `tests/check-ci-scripts.js` (in `npm run check`) now fails the build on a
 `test:*` script the workflow does not run, on a workflow step naming a script
-that does not exist, and on a suite missing from the `test` chain. **Add the
-step in the same change that adds the suite.**
+that does not exist, and on a suite missing from the `test` chain. A suite
+reached through a chain counts (`test:fast` is a chain, so the `test` chain
+reaches `test:merge` through it, and CI runs `test:fast` by running each of its
+parts as its own step). **Add the step in the same change that adds the suite.**
 
 New features ship with a new check in `smoke.js`. The chore→money hand-off
 checks are the most valuable ones in there — when that join broke, every screen

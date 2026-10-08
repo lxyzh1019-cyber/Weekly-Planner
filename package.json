@@ -5,12 +5,13 @@
   "description": "Family weekly planner \u2014 static site, classic scripts, no build step.",
   "scripts": {
     "check": "node tests/check-syntax.js && node tests/check-globals.js && node tests/check-shared-merge.js && node tests/check-escaping.js && node tests/check-look-tokens.js && node tests/check-money-words.js && node tests/check-dead-css.js && node tests/check-dead-ids.js && node tests/check-dead-actions.js && node tests/check-ci-scripts.js && node tests/check-sw-shell.js",
+    "test:fast": "npm run check && npm run test:merge && npm run test:buffers && npm run test:stream && npm run test:xp && npm run test:money && npm run test:sunday",
     "test:merge": "node tests/merge.test.js",
     "test:buffers": "node tests/buffers.test.js",
     "test:stream": "node tests/stream.test.js",
     "test:smoke": "node tests/smoke.js",
     "test:cleanup": "node tests/cleanup-tool.test.js",
-    "test": "npm run check && npm run test:merge && npm run test:buffers && npm run test:stream && npm run test:cleanup && npm run test:xp && npm run test:money && npm run test:sunday && npm run test:smoke",
+    "test": "npm run test:fast && npm run test:cleanup && npm run test:smoke",
     "test:xp": "node tests/xp.test.js",
     "test:money": "node tests/money.test.js",
     "test:sunday": "node tests/sunday.test.js"
