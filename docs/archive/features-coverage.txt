@@ -1,0 +1,561 @@
+# Source: FEATURES.md at origin/main 6e04104 (now docs/archive/features-history.md; history line = field + 2). Format: <old line> | <phrase> | <section>
+3 | (history only: scope note, superseded by this list) | removed — owner OK needed
+5 | (history only: scope note, superseded by this list) | removed — owner OK needed
+6 | (history only: scope note, superseded by this list) | removed — owner OK needed
+7 | (history only: scope note, superseded by this list) | removed — owner OK needed
+8 | (history only: scope note, superseded by this list) | removed — owner OK needed
+9 | (history only: scope note, superseded by this list) | removed — owner OK needed
+12 | CLAUDE.md is a pointer | Setup and working rules
+13 | ARCHITECTURE.md holds this repository's own operating rules | Setup and working rules
+14 | Every see CLAUDE.md comment | Setup and working rules
+15 | WORKING_RECORD.md is the request and deliverable ledger | Setup and working rules
+16 | FEATURES.md is the list every regression table is checked against | Setup and working rules
+17 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+20 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+21 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+22 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+23 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+24 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+25 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+28 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+29 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+30 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+31 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+32 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+33 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+34 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+35 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+38 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+41 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+42 | (history only: central setup, now owned by hz-claude-config) | removed — owner OK needed
+43 | Smoke subset | Data and rules
+44 | Short loop | Data and rules
+45 | Dead-action guard | Data and rules
+46 | Gate runs on Windows | Data and rules
+48 | Picture test | Data and rules
+51 | (history only: section intro, replaced by this list) | removed — owner OK needed
+52 | (history only: section intro, replaced by this list) | removed — owner OK needed
+53 | (history only: section intro, replaced by this list) | removed — owner OK needed
+54 | Classic scripts | Data and rules
+55 | Load-order rule | Data and rules
+56 | One declaration per name | Data and rules
+57 | js/04-merge.js is frozen | Data and rules
+58 | merge decision | Data and rules
+59 | Three escaping helpers | Data and rules
+60 | Verification before a push | Data and rules
+61 | SW_VERSION must be bumped | Data and rules
+64 | APP_BUILD equals SW_VERSION | Shell and build number
+65 | Build under the tiles | Shell and build number
+66 | The build number shown is what that device loaded | Shell and build number
+67 | (history only: test list) | removed — owner OK needed
+68 | (history only: consolidation note) | removed — owner OK needed
+71 | Kid nav has five places | Profile and navigation
+72 | Sister Sync is a tab | Profile and navigation
+73 | never for a parent | Profile and navigation
+74 | More holds exactly | Profile and navigation
+75 | Money school is reached | Profile and navigation
+76 | The sync tab lands on the | Profile and navigation
+79 | School-day offer | Week
+80 | School-day offer | Week
+81 | The offer sits above the week | Week
+82 | the old below-grid host is gone from the markup | Week
+83 | hidden in the preview view | Week
+84 | Add all N | Week
+85 | Add all N | Week
+86 | blank week offers | Week
+87 | blank week offers | Week
+90 | Every profile badge | Profile and navigation
+91 | opens the one profile switcher | Profile and navigation
+92 | reads who is on screen | Profile and navigation
+93 | One writer makes every badge's text | Profile and navigation
+94 | parent's Day badge | Day
+95 | Nothing is announced as a control | Profile and navigation
+96 | the meeting lock hides only the two badges | Profile and navigation
+97 | (history only: test list) | removed — owner OK needed
+98 | (history only: test list) | removed — owner OK needed
+99 | parent's Day badge | Day
+102 | A sister can be invited to | Day
+103 | a watch block earns nothing | Day
+104 | A watch block reads 👀 Watching | Day
+105 | A watch block gives no training checks | Day
+106 | keeps the meet's own travel | Day
+107 | An invite sent from the parent portal is recorded as the child's | Sister Sync (the sisters' timeline)
+108 | Accepting a watch invite writes the watch block | Sister Sync (the sisters' timeline)
+109 | 👀 Invite my sister to watch shows for a kid and a parent | Day
+110 | A watch block still counts as planned time | Day
+111 | (history only: test list) | removed — owner OK needed
+114 | An invite has one writer | Sister Sync (the sisters' timeline)
+115 | its day comes from the screen it was sent from | Sister Sync (the sisters' timeline)
+116 | An invite sent from the parent portal is recorded as the child's | Sister Sync (the sisters' timeline)
+117 | A live invite of the same kind is refused | Sister Sync (the sisters' timeline)
+118 | A live invite of the same kind is refused | Sister Sync (the sisters' timeline)
+119 | A share of an activity the sister does not have is refused | Sister Sync (the sisters' timeline)
+120 | cannot be sent or accepted twice | Sister Sync (the sisters' timeline)
+121 | Each edit-sheet invite button reads its own kind | Day
+122 | The 💌 badge shows only on blocks really shared | Sister Sync (the sisters' timeline)
+123 | 💌 Invite <sister> on the edit sheet shows for a kid and a parent | Day
+124 | The public toggle on the edit sheet is parent-only | Day
+125 | (history only: test list) | removed — owner OK needed
+128 | Today signposts a waiting invite | Today
+129 | never counts a missed invite | Today
+130 | Today's invite note is for a child only | Today
+131 | in one line (one share, one watch, or N invites) | Today
+132 | as a 44px row between the hero and Coming up | Today
+133 | taps through to the Sister Sync inbox | Today
+134 | gone on the next render once answered | Today
+135 | (history only: test list) | removed — owner OK needed
+138 | An invite carries the sender's travel | Sister Sync (the sisters' timeline)
+139 | The invite confirm says what she gets | Sister Sync (the sisters' timeline)
+140 | Accepting a watch invite writes the watch block | Sister Sync (the sisters' timeline)
+141 | An invite sent before invites carried travel is placed exactly as before | Sister Sync (the sisters' timeline)
+142 | a missed invite is not waiting | Sister Sync (the sisters' timeline)
+143 | The inbox lists missed invites under the waiting ones | Sister Sync (the sisters' timeline)
+144 | can be added anyway | Sister Sync (the sisters' timeline)
+145 | The Day view's invite ghost is a second accept door | Day
+146 | (history only: test list) | removed — owner OK needed
+147 | the drawn span stretches to every ghost | Day
+150 | this day, or all | Sister Sync (the sisters' timeline)
+151 | as one series invite | Sister Sync (the sisters' timeline)
+152 | The duplicate guard covers a series | Sister Sync (the sisters' timeline)
+153 | gives her her own series | Sister Sync (the sisters' timeline)
+154 | Accepting a series with days gone asks | Sister Sync (the sisters' timeline)
+155 | A series invite shows its ghost on each covered day | Sister Sync (the sisters' timeline)
+156 | The 💌 badge shows only on blocks really shared | Sister Sync (the sisters' timeline)
+157 | Send again? | Sister Sync (the sisters' timeline)
+158 | (history only: test list) | removed — owner OK needed
+161 | Sister Sync shows a side-by-side timeline | Sister Sync (the sisters' timeline)
+162 | On the timeline your own blocks are at least 44px tall | Sister Sync (the sisters' timeline)
+163 | no white text on a pastel | Looks
+164 | (history only: DOM contract, kept in ARCHITECTURE.md) | removed — owner OK needed
+165 | with a private block as a grey Busy shape | Sister Sync (the sisters' timeline)
+166 | Both free counts each block with its travel | Sister Sync (the sisters' timeline)
+167 | a both-free stripe | Sister Sync (the sisters' timeline)
+168 | Tapping your own block on the timeline invites your sister | Sister Sync (the sisters' timeline)
+169 | Sister Sync is in the kid house-rules sweep | Sister Sync (the sisters' timeline)
+170 | (history only: test list) | removed — owner OK needed
+171 | a short own card is drawn taller than its minutes | Sister Sync
+174 | Copy a day | Day
+175 | it shows both days | Day
+176 | names what goes and what stays | Day
+177 | with nothing to copy says so | Day
+178 | keeps pinned blocks | Day
+179 | a child's copy is never pinned | Day
+180 | Start this day over | Day
+181 | (history only: test list) | removed — owner OK needed
+184 | How was today? | Today
+185 | The reflect sheet takes its day | Today
+186 | a past day reflects from its Day 📋 sheet | Today
+187 | no Vibe card | Today
+188 | closing ritual | Day
+189 | (history only: test list) | removed — owner OK needed
+192 | now-marker stays inside | Today
+193 | now-marker stays inside | Today
+196 | Chores screen stays | Chores
+197 | Chores screen stays | Chores
+198 | A child may create or update | Data and rules
+199 | Jobs I can do | Today
+200 | I did something else today | Today
+201 | Routines card | Today
+202 | Own things · helping out | Today
+203 | Training card after training ends | Today
+204 | Mum answered | Today
+205 | Catch up card | Today
+206 | On her behalf | Parent portal
+207 | Every Today control is at least | Today
+208 | Jobs I can do | Today
+209 | Add to an earlier day | Today
+210 | A claim in a settled week | Data and rules
+213 | Chore readers are week-parameterised and shared | Chores
+214 | Chore readers are week-parameterised and shared | Chores
+215 | day streak | Today
+216 | My level | Today
+217 | (history only: retired rows of the chore relocation, recorded as intentionally removed) | removed — owner OK needed
+218 | (history only: retired rows of the chore relocation, recorded as intentionally removed) | removed — owner OK needed
+219 | Open loops | Today
+220 | Chores this week | Week
+221 | Before the new system | Parent portal
+222 | Every Today control is at least | Today
+223 | day streak | Today
+226 | (history only: section intro) | removed — owner OK needed
+227 | 😌 Rest on the 📋 sheet | Day
+228 | The reflect sheet's mood dots are | Day
+229 | empty day draws its invite ghosts | Day
+230 | A child's remove all in series | Day
+231 | Sister details | Parent portal
+232 | Sister Sync is in the kid | Sister Sync (the sisters' timeline)
+233 | Sister Sync | Looks
+234 | copy button names the sister's day | Day
+235 | The Undo toast sits under the reflect sheet | Today
+236 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+239 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+240 | Closing ritual title names the child | Day
+241 | invite buttons are 44px | Day
+242 | Copy a day with nothing | Day
+243 | The copy confirm names a copied | Day
+244 | Sister Sync | Looks
+245 | fits in the fallback font | Profile and navigation
+246 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+247 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+248 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+251 | Two looks, Pop and Calm | Looks
+252 | Pop | Looks
+253 | Switching | Looks
+254 | Shared in both looks | Looks
+255 | No typed colour | Looks
+256 | (history only: section intro) | removed — owner OK needed
+259 | (history only: section intro) | removed — owner OK needed
+260 | Shared values are role-named tokens | Looks
+261 | Seven font tokens hold every font stack | Looks
+262 | One text scale | Looks
+263 | Only family data palettes and colour maths keep a typed colour | Looks
+264 | both looks define the same names | Looks
+265 | (history only: proven invisible) | removed — owner OK needed
+266 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+269 | (history only: section intro) | removed — owner OK needed
+270 | Each look's values live in one :root[data-look] block | Looks
+271 | Pop is cream graph paper with handwriting fonts and yellow buttons | Looks
+272 | Readable everywhere | Looks
+273 | Brighter palette | Looks
+274 | Brighter palette | Looks
+275 | Kid colours | Looks
+276 | Full week measures its own type | Week
+277 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+280 | both looks define the same names | Looks
+281 | Calm is cool paper with Lexend and purple buttons | Looks
+282 | Lexend and Baloo 2 loaded on first use | Looks
+283 | remembered per person on this device, never synced | Looks
+284 | a 🎨 tile in each kid's More and a 🎨 button in the parent portal | Looks
+285 | Calm look keeps the same boxes | Looks
+286 | 13px type floors | My money
+287 | (history only: build line, docs/comment or dead-code notes) | removed — owner OK needed
+290 | Warm surfaces follow the look | Looks
+291 | Warm surfaces follow the look | Looks
+292 | Parent portal in Calm | Looks
+293 | Print ignores the look | Looks
+294 | Parent screens are held in both | Looks
+295 | One font everywhere | Looks
+296 | One font everywhere | Looks
+298 | (history only: open item, now done by this list) | removed — owner OK needed
+302 | (history only: section intro) | removed — owner OK needed
+303 | (history only: section intro) | removed — owner OK needed
+304 | (history only: section intro) | removed — owner OK needed
+305 | (history only: section intro) | removed — owner OK needed
+306 | (history only: section intro) | removed — owner OK needed
+309 | Money is stored as movements | Data and rules
+310 | Every wallet writer mirrors into the | Data and rules
+311 | A correction is a reversing event | Data and rules
+312 | migration is read-only | Data and rules
+313 | the words Everything I have are retired everywhere | My money
+316 | effective-dated versions | Data and rules
+317 | mrApplyEdits is the only versioned writer | Data and rules
+318 | Settled weeks are frozen | Data and rules
+319 | mrStartWeek | Data and rules
+320 | Four house rules | Data and rules
+321 | Four house rules | Data and rules
+322 | A household with a stored rulebook | Data and rules
+323 | year's-pace denominator | Data and rules
+324 | rules change log | Data and rules
+325 | repair only ever adds | Data and rules
+326 | Competitions never paid | Grown-ups
+327 | $3 default is backfill only | Data and rules
+328 | credits weeks with no family meeting outside the 8-week window | Grown-ups
+329 | a dated rule (start week, amount) | Grown-ups
+330 | The catch-up banner offers the Grandfather credit | Grown-ups
+331 | The repair leaves a Grandfather-rule week alone | Grown-ups
+334 | One Record sheet, five records | Grown-ups
+335 | One Record sheet, five records | Grown-ups
+336 | A gift has a day it | Grown-ups
+337 | A competition and its calendar block | Data and rules
+338 | A settled week does not block | Data and rules
+339 | A settled week does not block | Data and rules
+340 | Record-sheet entry points | Grown-ups
+341 | Record-sheet entry points | Grown-ups
+342 | A refused move says why | Grown-ups
+343 | A refused move says why | Grown-ups
+346 | Pots never touch | Data and rules
+347 | Pots never touch | Data and rules
+348 | A child proposes | Data and rules
+349 | One route decision | Data and rules
+350 | One route decision | Data and rules
+353 | meeting is a full screen | The meeting
+354 | Three steps | The meeting
+355 | Three steps | The meeting
+356 | (history only: retired list) | removed — owner OK needed
+357 | Redo is per girl | The meeting
+358 | is withdrawn once money moves on her stream after the sign | The meeting
+361 | A kid's money head has two | My money
+362 | leads with a sentence | By month
+363 | leads with a sentence | By month
+364 | Kid rule copy | My money
+365 | What things pay | Money school
+366 | What things pay | Money school
+367 | Every kid money screen | My money
+368 | (history only: retired pot-opening card, recorded as intentionally removed) | removed — owner OK needed
+369 | Skating star level | Data and rules
+372 | Every old Money rules section has | Grown-ups
+373 | Every old Money rules section has | Grown-ups
+374 | a Grandfather-rule row reads Grandfather rule $3 + meets with no steppers | Grown-ups
+375 | Loan edits never touch paid | Data and rules
+376 | ladder opens at 20 / 30 / 40 / 100% | Money school
+377 | three gate steppers | Grown-ups
+378 | loan-season row | Parent portal
+379 | The parent App landing and the | Shell and build number
+380 | parent tour | Parent portal
+381 | permanent click sweep | Data and rules
+384 | (history only: stage intro) | removed — owner OK needed
+385 | The Sunday arithmetic | Data and rules
+386 | The Sunday rules | Data and rules
+387 | assistant job | Data and rules
+388 | keeps its races | Data and rules
+389 | Loan terms | Data and rules
+390 | 4-week lock | Data and rules
+391 | goal jar is a Savings-kind holding | Data and rules
+392 | A market dip is written once | Data and rules
+393 | Requests | Data and rules
+394 | Expected money | Data and rules
+395 | Club owes | Data and rules
+396 | Two-device checks | Data and rules
+397 | Sunday random run | Data and rules
+400 | Grown-ups is the parent's Money tab | Grown-ups
+401 | Approve | Parent portal
+402 | Commitments | Grown-ups
+403 | Fines | Grown-ups
+404 | Expected | Grown-ups
+405 | Rules tab | Grown-ups
+406 | Her request sheets | My money
+407 | An approved goal switches the jar | Data and rules
+408 | Parent Now counts what is waiting | Parent portal
+409 | A claim in a settled week | Data and rules
+410 | (history only: test list; names used as proofs in the lines above) | removed — owner OK needed
+411 | (history only: test list; names used as proofs in the lines above) | removed — owner OK needed
+414 | My money | My money
+415 | Countdown | My money
+416 | Asked parents strip | My money
+417 | Loan wall | My money
+418 | shut ones dashed with when they open | My money
+419 | Goal card | My money
+420 | Goal jars wait for Savings | Data and rules
+421 | Action buttons | My money
+422 | This week so far | My money
+423 | I was given something | My money
+424 | Passbook | My money
+425 | Calendar and Coming up | My money
+426 | Stickers | My money
+427 | The ? explainer card gives What | My money
+428 | The ? explainer card gives What | My money
+429 | Move to the loan wall | My money
+430 | unfinished day is never forgiven | Data and rules
+431 | The kid side names its places Savings, Locked away and Companies | My money
+432 | (history only: retired list and test list) | removed — owner OK needed
+433 | (history only: retired list and test list) | removed — owner OK needed
+436 | money step | Sunday steps
+437 | The Sunday screens own no arithmetic | Sunday steps
+438 | choices are a draft | Sunday steps
+439 | Sunday opens | Sunday steps
+440 | Guess | Sunday steps
+441 | each line unfolding its working | Sunday steps
+442 | I choose | Sunday steps
+443 | Signed | Sunday steps
+444 | A new commitment or surprise cost | Sunday steps
+445 | Parent's card | Sunday steps
+446 | The sign | Sunday steps
+447 | One reader | Data and rules
+448 | On the meeting Sunday the routine | Sunday steps
+449 | In the core | Sunday steps
+450 | (history only: retired list and test list) | removed — owner OK needed
+451 | (history only: retired list and test list) | removed — owner OK needed
+454 | Grown-ups is Commitments | Grown-ups
+455 | What things pay lives in Rules | Grown-ups
+456 | This Sunday | Parent portal
+457 | Fix this row | Grown-ups
+458 | What they own | Parent portal
+459 | Lessons live in Rules | Grown-ups
+460 | her Sundays in the passbook's grid with a tag | Grown-ups
+461 | Grandfather rule: start week, amount, Save in Rules | Grown-ups
+462 | Rule changes | Grown-ups
+463 | Rules save card | Grown-ups
+464 | fix sheets | Grown-ups
+465 | On screen the Grandma rule is | Grown-ups
+466 | express catch-up | Sunday steps
+467 | (history only: test list) | removed — owner OK needed
+470 | (history only: Sun-Sat money week withdrawn by decision 15 (see Monday to Sunday below)) | removed — owner OK needed
+471 | Money screens at iPad width use | My money
+472 | Late costs are said once | Sunday steps
+473 | Dates read | My money
+474 | Tell parents a result | My money
+475 | Sunday's right panes | Sunday steps
+476 | Fix this row has What it | Grown-ups
+477 | (history only: test list) | removed — owner OK needed
+480 | The parent portal is one row | Parent portal
+481 | My money on iPad has three | My money
+482 | No cash account | My money
+483 | Every calendar day is a button | My money
+484 | Each passbook Sunday is a button | My money
+485 | Every on-screen sentence says parents or | Data and rules
+486 | Parent Now lists Waiting for you | Parent portal
+487 | agreed amount | Parent portal
+488 | Rules is one screen | Grown-ups
+489 | a summary per girl | Grown-ups
+490 | (history only: core list and test list) | removed — owner OK needed
+491 | (history only: core list and test list) | removed — owner OK needed
+494 | meeting's head is two rows | The meeting
+495 | Passbook | My money
+496 | The doors' sheets | My money
+497 | Draw early | My money
+498 | a My pile with coins and the loan-first line | Sunday steps
+499 | I choose has three equal columns | Sunday steps
+500 | Signed shows Money in & out | Sunday steps
+501 | meeting's head is two rows | The meeting
+502 | the ledger keeps ownedAfter | Data and rules
+503 | One reader for money my money made | Data and rules
+504 | Weeks' earned this year reads the ledger | Data and rules
+505 | (history only: core list, test list and retired list) | removed — owner OK needed
+506 | (history only: core list, test list and retired list) | removed — owner OK needed
+507 | (history only: core list, test list and retired list) | removed — owner OK needed
+510 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
+511 | closes with the × top-right | My money (request sheets)
+512 | Draw early offers three reasons | My money (request sheets)
+513 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
+514 | I choose has three equal columns | Sunday steps
+515 | Signed shows Money in & out | Sunday steps
+516 | Now's count | Parent portal
+517 | Taken off is always shown negative | Sunday steps
+518 | Calm fits the iPad and phone | Looks
+519 | This fine is wrong | My money
+520 | Now's count | Parent portal
+521 | tight money labels step smaller in Calm but never under 13px | Looks
+522 | phone heads are two rows with words hidden under 768px | Looks
+523 | keeps the prototype's tip | My money
+524 | keeps the prototype's tip | My money
+525 | (history only: core, test and retired lists) | removed — owner OK needed
+526 | (history only: core, test and retired lists) | removed — owner OK needed
+527 | (history only: core, test and retired lists) | removed — owner OK needed
+530 | One pile figure | Sunday steps
+531 | One pile figure | Sunday steps
+532 | what I owe → after | Sunday steps
+533 | Loan per month rescale | Data and rules
+534 | The money week is named Mon | The meeting
+535 | A commitment under $5 a week | Grown-ups
+536 | (history only: test list) | removed — owner OK needed
+538 | (history only: v28 to v29 regression table) | removed — owner OK needed
+539 | (history only: v28 to v29 regression table) | removed — owner OK needed
+540 | (history only: v28 to v29 regression table) | removed — owner OK needed
+541 | (history only: v28 to v29 regression table) | removed — owner OK needed
+542 | (history only: v28 to v29 regression table) | removed — owner OK needed
+543 | (history only: v28 to v29 regression table) | removed — owner OK needed
+544 | (history only: v28 to v29 regression table) | removed — owner OK needed
+545 | (history only: v28 to v29 regression table) | removed — owner OK needed
+546 | (history only: v28 to v29 regression table) | removed — owner OK needed
+547 | (history only: v28 to v29 regression table) | removed — owner OK needed
+548 | (history only: v28 to v29 regression table) | removed — owner OK needed
+551 | Competitions, not meet | Data and rules
+552 | Money school's chips read the same | Money school
+553 | Grown-ups figures | Looks
+554 | Settled without a sign | Sunday steps
+555 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+557 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+558 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+559 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+560 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+561 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+562 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+563 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+564 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+565 | (history only: test list and v29 to v30 regression table) | removed — owner OK needed
+568 | Money sizes are tokens | Looks
+569 | Money sizes are tokens | Looks
+570 | A words check fails retired money | Data and rules
+572 | (history only: v30 to v31 regression table) | removed — owner OK needed
+573 | (history only: v30 to v31 regression table) | removed — owner OK needed
+574 | (history only: v30 to v31 regression table) | removed — owner OK needed
+575 | (history only: v30 to v31 regression table) | removed — owner OK needed
+576 | (history only: v30 to v31 regression table) | removed — owner OK needed
+577 | (history only: v30 to v31 regression table) | removed — owner OK needed
+578 | (history only: v30 to v31 regression table) | removed — owner OK needed
+579 | (history only: v30 to v31 regression table) | removed — owner OK needed
+580 | (history only: v30 to v31 regression table) | removed — owner OK needed
+583 | The money week is Monday to | Data and rules
+584 | The money week is Monday to | Data and rules
+585 | meeting Sunday is pre-marked | Sunday steps
+586 | meeting Sunday is pre-marked | Sunday steps
+588 | (history only: v31 to v32 regression table) | removed — owner OK needed
+589 | (history only: v31 to v32 regression table) | removed — owner OK needed
+590 | (history only: v31 to v32 regression table) | removed — owner OK needed
+591 | (history only: v31 to v32 regression table) | removed — owner OK needed
+592 | (history only: v31 to v32 regression table) | removed — owner OK needed
+593 | (history only: v31 to v32 regression table) | removed — owner OK needed
+594 | (history only: v31 to v32 regression table) | removed — owner OK needed
+595 | (history only: v31 to v32 regression table) | removed — owner OK needed
+596 | (history only: v31 to v32 regression table) | removed — owner OK needed
+597 | (history only: v31 to v32 regression table) | removed — owner OK needed
+598 | (history only: v31 to v32 regression table) | removed — owner OK needed
+601 | A kid's money head carries 💰 | My money
+602 | All my Sundays | All my Sundays
+603 | By month | By month
+604 | Money school | Money school
+605 | The Chores tab has one My | Chores
+606 | The kid tour bolds its key | My money
+607 | Price cards read Competitions and Box | Data and rules
+608 | (history only: test list) | removed — owner OK needed
+610 | (history only: v32 to v33 regression table) | removed — owner OK needed
+611 | (history only: v32 to v33 regression table) | removed — owner OK needed
+612 | (history only: v32 to v33 regression table) | removed — owner OK needed
+613 | (history only: v32 to v33 regression table) | removed — owner OK needed
+614 | (history only: v32 to v33 regression table) | removed — owner OK needed
+615 | (history only: v32 to v33 regression table) | removed — owner OK needed
+616 | (history only: v32 to v33 regression table) | removed — owner OK needed
+617 | (history only: v32 to v33 regression table) | removed — owner OK needed
+618 | (history only: v32 to v33 regression table) | removed — owner OK needed
+619 | (history only: v32 to v33 regression table) | removed — owner OK needed
+620 | (history only: v32 to v33 regression table) | removed — owner OK needed
+621 | (history only: v32 to v33 regression table) | removed — owner OK needed
+622 | (history only: v32 to v33 regression table) | removed — owner OK needed
+623 | (history only: v32 to v33 regression table) | removed — owner OK needed
+624 | (history only: v32 to v33 regression table) | removed — owner OK needed
+625 | (history only: v32 to v33 regression table) | removed — owner OK needed
+626 | (history only: v32 to v33 regression table) | removed — owner OK needed
+627 | (history only: v32 to v33 regression table) | removed — owner OK needed
+628 | (history only: v32 to v33 regression table) | removed — owner OK needed
+629 | (history only: v32 to v33 regression table) | removed — owner OK needed
+630 | (history only: v32 to v33 regression table) | removed — owner OK needed
+633 | Every passbook row and every All | All my Sundays
+634 | Same thing, same look | My money
+635 | Sunday sheet reads one frozen row | All my Sundays
+636 | (history only: cleanup and test list) | removed — owner OK needed
+637 | (history only: cleanup and test list) | removed — owner OK needed
+639 | (history only: v33 to v34 regression table) | removed — owner OK needed
+640 | (history only: v33 to v34 regression table) | removed — owner OK needed
+641 | (history only: v33 to v34 regression table) | removed — owner OK needed
+642 | (history only: v33 to v34 regression table) | removed — owner OK needed
+643 | (history only: v33 to v34 regression table) | removed — owner OK needed
+644 | (history only: v33 to v34 regression table) | removed — owner OK needed
+645 | (history only: v33 to v34 regression table) | removed — owner OK needed
+646 | (history only: v33 to v34 regression table) | removed — owner OK needed
+647 | (history only: v33 to v34 regression table) | removed — owner OK needed
+648 | (history only: v33 to v34 regression table) | removed — owner OK needed
+649 | (history only: v33 to v34 regression table) | removed — owner OK needed
+650 | (history only: v33 to v34 regression table) | removed — owner OK needed
+651 | (history only: v33 to v34 regression table) | removed — owner OK needed
+652 | (history only: v33 to v34 regression table) | removed — owner OK needed
+653 | (history only: v33 to v34 regression table) | removed — owner OK needed
+654 | (history only: v33 to v34 regression table) | removed — owner OK needed
+655 | (history only: v33 to v34 regression table) | removed — owner OK needed
+656 | (history only: v33 to v34 regression table) | removed — owner OK needed
+657 | (history only: v33 to v34 regression table) | removed — owner OK needed
+660 | money fit check | Data and rules
+661 | Money screens do not spill or | My money
+662 | Guess stairs have no reserved band | Sunday steps
+663 | clash note ink | Looks
+665 | (history only: v34 to v35 regression table) | removed — owner OK needed
+666 | (history only: v34 to v35 regression table) | removed — owner OK needed
+667 | (history only: v34 to v35 regression table) | removed — owner OK needed
+668 | (history only: v34 to v35 regression table) | removed — owner OK needed
+669 | (history only: v34 to v35 regression table) | removed — owner OK needed
+670 | (history only: v34 to v35 regression table) | removed — owner OK needed
+671 | (history only: v34 to v35 regression table) | removed — owner OK needed
+672 | (history only: v34 to v35 regression table) | removed — owner OK needed
+673 | (history only: v34 to v35 regression table) | removed — owner OK needed
+674 | (history only: v34 to v35 regression table) | removed — owner OK needed
+675 | (history only: v34 to v35 regression table) | removed — owner OK needed
+676 | (history only: v34 to v35 regression table) | removed — owner OK needed
+677 | (history only: v34 to v35 regression table) | removed — owner OK needed

@@ -1,7 +1,7 @@
 // Weekly-Planner — duplicate top-level declaration guard.
 //
 // index.html loads js/01-*.js .. js/99-main.js as classic scripts sharing ONE
-// global scope (see MODULARIZATION_PLAN.md and CLAUDE.md). That makes duplicate
+// global scope (see docs/archive/MODULARIZATION_PLAN.md and CLAUDE.md). That makes duplicate
 // top-level names a real hazard, and one that per-file `node --check` cannot see:
 //
 //   - two `function foo()` declarations: the later file silently wins, and any

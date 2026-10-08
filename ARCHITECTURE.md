@@ -21,8 +21,8 @@ short attention, assume the reader is 9–13.
 
 **Classic scripts, not ES modules.** `index.html` loads `js/01-*.js` …
 `js/99-main.js` as plain `<script src>` tags sharing one global scope. This is a
-deliberate decision, documented in `MODULARIZATION_PLAN.md`. Do not "modernise"
-it. Three things break if you do:
+deliberate decision, documented in `docs/archive/MODULARIZATION_PLAN.md`. Do not "modernise"
+it. Three things break if you do: (text only)
 
 - `tests/smoke.js` opens the app over `file://`; Chrome blocks ES module imports
   there, so the entire smoke suite dies.
@@ -37,7 +37,7 @@ No bundler, no npm build, no framework. Files must stay directly loadable.
 `const` data tables, `let` state. All top-level *executable* code (Firebase boot,
 event wiring, first render) lives in `js/99-main.js`, loaded last. Function
 hoisting means a declaration in `05` may freely *call* something declared in
-`22`; it just must not *run* at load time.
+`22`; it just must not *run* at load time. (text only)
 
 Current permitted exceptions (do not add more): `js/08-day-view.js:1351-1352`
 (two `window.addEventListener` calls that only register), `js/17-ui-misc.js:159`
@@ -50,7 +50,7 @@ subsystem below.)
 **One declaration per name, globally.** All 36 files share one scope, so a
 duplicate `function foo()` in two files means the later one silently wins. A
 `let`/`const` declared twice is a hard `SyntaxError` at load. Before adding a
-top-level name, grep for it across `js/`.
+top-level name, grep for it across `js/`. (checked by tests/check-globals.js)
 
 ## Verification — the short loop before a push, the full suite on GitHub before a pull request
 
@@ -63,20 +63,20 @@ npm run test:fast   # the short loop: npm run check + every unit suite
 map in `FEATURES.md` (`## References`, `Tests:` lines) names for the files
 changed, under 3 minutes on the owner's PC. The `SMOKE_ONLY=<checks>` lists the
 map gives for a screen (below) are optional: each pays a few minutes of setup on
-a laptop, so they are outside the 3-minute target.
+a laptop, so they are outside the 3-minute target. (text only)
 
 **Before a pull request opens:** the full suite green on GitHub — the `checks`
 job, the browser job (with the cleanup-tool tests) and one smoke job per date on
 all four dates. A smoke job takes about 8 minutes; that is accepted until a
 later stage brings every job under 5 minutes. Start a run on a branch with
-`gh workflow run ci.yml --ref <branch>`; a pull request starts one by itself.
+`gh workflow run ci.yml --ref <branch>`; a pull request starts one by itself. (text only)
 
 `npm test` still runs everything in one go (the short loop, the cleanup tool,
 then the whole smoke suite in one process). That is over 30 minutes on a laptop,
 so it is not the local gate: on the owner's PC it is never run.
 
 **The same commands run unchanged on Windows** — Git Bash or `cmd`, no
-environment variables, no copy of the tree (added 2026-09-25):
+environment variables, no copy of the tree (added 2026-09-25): (text only)
 
 - `.gitattributes` (`* text=auto eol=lf`) checks text files out with LF even
   where `core.autocrlf=true`. The static checks (`npm run check`) read the
@@ -151,7 +151,7 @@ check*, at eight to ten minutes each. `meetingMoneyFlowEndToEnd`,
 `tabBarOnEveryMoneySurface` and `newAffordancesActuallyNavigate` are converted;
 the rest are the same shape and the same fix — build a `problems` array, push a
 sentence naming the surface and the expectation, `return problems.length ?
-problems : true`.
+problems : true`. (text only)
 
 **A control with no code behind it fails the build.** `tests/check-dead-actions.js`
 holds two rules. Every function an `onclick` calls — in `index.html` and in the
@@ -167,7 +167,7 @@ apart. A prefix nothing reads fails outright. A value compared in a reader that
 no markup emits is dead handler code, but a value may be built at runtime, so
 that is a **warning**, not a failure. The one known dead control, `pm/edit`, is
 exempt by name, and the exemption **expires**: once nothing emits it, the check
-fails until the entry is deleted.
+fails until the entry is deleted. (checked by tests/check-dead-actions.js)
 
 `tests/check-globals.js` enforces the one-declaration-per-name rule above,
 covering `function`, `async function` and top-level `let`/`const`/`var`
@@ -191,7 +191,7 @@ iteration only and cannot stand in for the gate: an unknown name exits 1, the
 last line reads `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the
 suite`, and it refuses to run at all when `CI` is set. The full suite on GitHub
 gates every pull request. A new check gets the same prefix, with its own name in
-both places.
+both places. (text only)
 
 Every smoke run times each check (from its `want()` to its result) and the
 setup just before each check, prints both slowest first, and writes
@@ -212,7 +212,7 @@ is deliberate — the fast gate runs without a browser and the smoke job install
 one — but it makes `package.json` and the workflow two lists that have to agree,
 and nothing made them. A suite added to one and not the other is a suite CI
 never runs: green on a laptop, absent from every pull request, reporting nothing
-while the code it guards rots. The same shape as the `|| break` loop above.
+while the code it guards rots. The same shape as the `|| break` loop above. (checked by tests/check-ci-scripts.js)
 
 Not hypothetical: `tests/buffers.test.js` and `tests/money.test.js` were both in
 that state, the second for as long as it had existed — so a rates change in
@@ -234,7 +234,7 @@ still rendered and only the numbers were wrong.
 `js/04-merge.js` implements conflict-aware sync: id-keyed unions, deletion
 tombstones (30-day pruning), deep object merge, per-week chore arbitration, and
 a forward-only `lastGradeSeen` watermark. It has 112 unit tests running the real
-shipped functions.
+shipped functions. (checked by tests/merge.test.js)
 
 Do not refactor it for style. Change it only to fix a demonstrated sync bug, and
 only with a failing test written first. Writing the test first also tells you
@@ -247,7 +247,7 @@ did not move.
 `mergeSharedState` (`js/04-merge.js`) merges `state.shared` as
 `{ ...ls, ...rs, <named keys> }`. **A key it does not name is replaced wholesale
 by the remote copy on every snapshot** — so a local edit that has not been
-pushed is simply gone, silently, with nothing on any screen to say so.
+pushed is simply gone, silently, with nothing on any screen to say so. (checked by tests/check-shared-merge.js)
 
 Four keys were added by later feature work and none got a decision:
 `parentDayConfirm` (which days a grown-up has reviewed — losing it also jams
@@ -276,7 +276,7 @@ does *not* have included. An **unstamped** week keeps the grow-only union
 exactly as before, so no stale device can un-record a meeting that predates the
 mechanism. Same idiom as `goalsByWeek` and `mergeEarnings`: the unstamped case
 keeps the union. The guard checks this too; mark a genuine exception
-`// safe-delete: <why>`.
+`// safe-delete: <why>`. (checked by tests/check-shared-merge.js)
 
 ## A conflict is a parent's to decide, not the clock's
 
@@ -284,7 +284,7 @@ Whole-record arbitration keeps the higher stamp. That is the right **display**
 rule — something has to be on screen, and the girls must never be shown a
 warning about a sync — but it is the wrong final answer: **a timestamp orders
 two writes and says nothing about which one is right.** The loser used to be
-discarded with no trace.
+discarded with no trace. (checked by tests/merge.test.js and smoke: aConflictIsAParentsToDecideNotTheClocks)
 
 Detection is **causal, not chronological**. Every write records `opId` (this
 write) and `baseOpId` (the version it was made from), stamped by
@@ -317,11 +317,11 @@ that owns it. Two rules learned from tests rather than from thinking:
 
 - **The cards quote her own words.** A summary that counts ("2 things that went
   well") reads identically for both versions, so the screen would ask a parent
-  to choose between two things it refused to show them.
+  to choose between two things it refused to show them. (text only)
 - **A resolution's content is the version chosen; its `baseOpId` is the version
   that was on SCREEN** (`shownOpId`). Descending from the chosen one looks
   natural and raises a *second* conflict about the question just settled,
-  because the other device is not holding that version.
+  because the other device is not holding that version. (text only)
 
 ## Backup Replace is authoritative — `dataEpoch`
 
@@ -331,14 +331,14 @@ arbitration and went straight back up. `_meta`-adjacent `state.shared.dataEpoch`
 is incremented by `bkApplyBackup(…, 'replace')` and nowhere else;
 `mergeRemoteState` takes a **higher** incoming epoch wholesale with no merging
 at all, and it is a `Math.max` high-water mark in the merge so it can never go
-backwards.
+backwards. (checked by tests/merge.test.js)
 
 ## Two devices, or it isn't tested
 
 Every check in this repo ran on one device for a long time — `tests/smoke.js`
 blocks every Firebase host at the network layer — so "two devices disagree" was
 not under-tested, it was **invisible to the harness**. That is most of why the
-defects above survived a suite of 300-odd checks.
+defects above survived a suite of 300-odd checks. (checked by tests/merge.test.js)
 
 `tests/merge.test.js` now carries a two-device harness: `makeDevice`, `on`,
 `receive`, `sync`. Each device owns a whole `state`, edits it offline, and
@@ -361,7 +361,7 @@ launched browser inherit it). A new Node suite starts with the same line.
 
 ## Escaping
 
-All three helpers live in `js/05-helpers.js`. Pick by **context**, not by habit:
+All three helpers live in `js/05-helpers.js`. Pick by **context**, not by habit: (checked by tests/check-escaping.js and smoke: hostileNamesCannotBecomeCode, escapingMatchesTheDomReference)
 
 | Context | Helper |
 |---|---|
@@ -398,11 +398,11 @@ Kid-facing copy is a product surface, not filler. The rules:
 
 - No performance-identity framing ("the good from the great", "masterpiece").
   Lead with autonomy, curiosity and joy. This was a deliberate correction; do
-  not regress it.
+  not regress it. (text only)
 - Off days are a valid state. Never build all-or-nothing streaks without a rest
-  state, a grace token, and partial-progress celebration.
-- Money is a financial-literacy lesson, not a payment for being good.
-- Cross-sibling data is collaboration, never a leaderboard, in kid views.
+  state, a grace token, and partial-progress celebration. (text only)
+- Money is a financial-literacy lesson, not a payment for being good. (text only)
+- Cross-sibling data is collaboration, never a leaderboard, in kid views. (text only)
 - **There is no word budget.** There was one — a hard ≤200 visible words per
   kid screen, enforced by `kidScreensMeetTheHouseRules` — and the owner removed
   it, because of what it actually bought. It did not produce brevity; it pushed
@@ -411,7 +411,7 @@ Kid-facing copy is a product surface, not filler. The rules:
   That is not licence to pad. Every rule above still holds, and they are
   judgement — which is exactly what a word count was standing in for and could
   never measure. Ask whether a sentence earns its place, not whether the screen
-  has run out of allowance.
+  has run out of allowance. (checked by smoke: kidScreensMeetTheHouseRules)
 
 ## UI rules
 
@@ -442,12 +442,12 @@ Kid-facing copy is a product surface, not filler. The rules:
   12.96px (floored at 13px).
   Scope target rules to the **component**, not the screen: `.ck-navbtn` is both a
   kid's week arrow and the parent portal's, and screen-scoping it left the portal
-  copy at 36×36.
+  copy at 36×36. (checked by smoke: kidScreensMeetTheHouseRules)
 - **Minimum font size 13px**; 15px for anything a child must read to act. Also
   enforced by the same check. Roughly 147 declarations in `css/app.css` compute
   below 13px, but most are print, dark-mode or parent surfaces where the kid floor
   does not apply — the floor is a scoped block at the end of `css/app.css` listing
-  only what actually rendered too small.
+  only what actually rendered too small. (checked by smoke: kidScreensMeetTheHouseRules)
 - **No word budget** — see *Writing for children*. The count and its per-screen
   ratchets are gone from `tests/smoke.js`; the 44px and 13px floors stay,
   because reach and legibility are not editorial taste.
@@ -456,19 +456,19 @@ Kid-facing copy is a product surface, not filler. The rules:
   pattern: closed by default, remembered in `localStorage` (never synced state —
   every state write is a full-document upload). What changed is the reason. It
   is now a judgement about what a child came to the screen for, not a way of
-  getting under a number, so a thing worth reading may lead rather than hide.
+  getting under a number, so a thing worth reading may lead rather than hide. (text only)
 
 ### Two looks (Pop and Calm)
 
 Each kid and the parent pick a look: **Pop** (cream graph paper, handwriting
 fonts, text 10% larger) or **Calm** (cool page, Lexend and Baloo 2). A look is
 only a different set of VALUES for the same names. This is the one statement of
-how that holds; the design is `docs/handoff/looks-calm-pop.md`.
+how that holds; the design is `docs/handoff/looks-calm-pop.md`. (checked by tests/check-look-tokens.js)
 
 - **Where values live.** `css/app.css`'s top `:root` holds what both looks
   share; `:root[data-look="pop"]` and `:root[data-look="calm"]` hold what
   differs, and both define exactly the same names (107 today).
-  `<html data-look="pop">` is the static starting value in `index.html`.
+  `<html data-look="pop">` is the static starting value in `index.html`. (text only)
 - **A colour or font is added or changed only as a token** — in `:root` when it
   is shared, in BOTH look blocks when it differs by look. Nothing outside a
   token block types a colour or names a font. What must keep a typed hex — a
@@ -479,7 +479,7 @@ how that holds; the design is `docs/handoff/looks-calm-pop.md`.
   `/* look: <reason> */` on its line, or once on the first line of its table.
   The `theme-color` meta is the one named exemption: the browser reads it
   before any CSS, so it holds Pop's `--bg` (as `manifest.json` does) and
-  `applyLook` rewrites it from the live `--bg`.
+  `applyLook` rewrites it from the live `--bg`. (checked by tests/check-look-tokens.js)
 - **Decoration differs by look; meaning does not.** A look may change the page,
   paper, cards, shadows, fonts, heading weight, figures, text scale, accents,
   main button, tick, selected tab and pill, time-of-day zones and the warm
@@ -496,46 +496,46 @@ how that holds; the design is `docs/handoff/looks-calm-pop.md`.
   fill knobs (`--now-fill`, `--row-fill`, `--tile-fill`, `--block-fill`): the
   Now card's `--now-c` (the running block's colour, only where navy reads on it
   at 4.5:1), a Today row's `--cw` wash (`colourWash`), the Full week's block
-  fill (`lookBlockFill`).
+  fill (`lookBlockFill`). (text only)
 - **`applyLook(look)` (`js/05-helpers.js`) is the one way a look reaches the
   screen.** It sets `<html data-look>`, loads Calm's fonts, writes
   `wp_look_last`, sets `theme-color` from the live `--bg`, relabels the
   parent's 🎨 button and, on a change, re-measures the week
   (`wfTypeInvalidate`) and redraws the current screen — no reload. Nothing else
   writes `data-look`. `lookToggle(who)` is behind the kid's 🎨 tile in ⋯ More
-  and the parent's `#parentLookBtn`.
+  and the parent's `#parentLookBtn`. (text only)
 - **Stored per person, per device, never synced:** `localStorage`
   `wp_look_jenn`, `wp_look_jess`, `wp_look_parent`, `wp_look_last`, every access
   in try/catch (unreadable storage means Pop). Boot and the profile picker use
   the last look; picking a kid applies hers; entering the portal applies the
   parent's. A look is a device preference, not family state: it never goes
-  into `state` and needs no merge decision.
+  into `state` and needs no merge decision. (text only)
 - **Calm's fonts load on first use** — one injected Google Fonts
   `<link id="lookCalmFonts">` (`display=swap`), not in the offline shell. Each
   Calm stack ends in the system sans, which meets the floors offline, and the
   `document.fonts` listeners in `js/99-main.js` re-measure the week when the
-  fonts arrive.
+  fonts arrive. (text only)
 - **`--text-scale` (Pop 1.1, Calm 1) multiplies every absolute font size** — in
   css, generated markup and `index.html`: `calc(<size> * var(--text-scale, 1))`.
   em and % inherit it; the parent Reading size (`--fs-scale`) multiplies on top.
   Anything hand-measured against the type is measured on the page instead (see
   *The week grid measures its own type* under Navigation), and a label Calm's
-  smaller type could take under 13px is floored with `max(13px, …)`.
+  smaller type could take under 13px is floored with `max(13px, …)`. (checked by tests/check-look-tokens.js)
 - **Print ignores the look.** `@media print { :root, :root[data-look] {
   --text-scale: 1 } }` sits after the look blocks so it out-ranks them; the
   print sheet reads its own `--print-*` tokens (font, figures, heading weight),
   `printTextColor` does not follow the live ink, and print-sheet sizes carry
-  `/* look: print sheet ignores the look (L12) */`.
+  `/* look: print sheet ignores the look (L12) */`. (text only)
 - **Controls inherit the look's font:** `button, input, select, textarea {
   font-family: inherit; font-variant-numeric: inherit; }`. Without it the
   browser draws every control in the system font and drops Calm's tabular
   figures. Only those two properties; sizes, weights and line heights set
-  elsewhere stand.
+  elsewhere stand. (text only)
 - **`--accent` is decorative only** (Pop `#ff7b54`, Calm `#7b70e4`). White text
   on it, selected controls and informational accent text use `--accent-strong`
   (Pop `#b8441f`, Calm `#5b4fd6`; each ≥ 4.9:1 under white and as text on
   `--bg2` — Pop's was `#c14a24`, 4.50:1, until Looks stage 2B-2). This is the
-  AA contrast fix; don't undo it.
+  AA contrast fix; don't undo it. (text only)
 - **What holds it.** `tests/check-look-tokens.js` (`npm run check`): a typed
   colour or font outside a token block, a `look:` mark with no reason, a stale
   exemption, an absolute font size that does not multiply `--text-scale`, a
@@ -554,12 +554,12 @@ how that holds; the design is `docs/handoff/looks-calm-pop.md`.
   `theLookFlipsWithNoReload` and `theLookSurvivesAReload`; and the house-rules
   sweeps (`kidScreensMeetTheHouseRules`, `parentScreensMeetTheHouseRules`) run
   in both looks. Every kid screen is saved in both looks as
-  `tests/out/look-<look>-<screen>-<w>.png`.
+  `tests/out/look-<look>-<screen>-<w>.png`. (checked by tests/check-look-tokens.js and smoke: thePopLookReadsEverywhere, theCalmLookReadsEverywhere, theLooksKeepTheSameBoxes, everyTextUsesTheLooksFonts, printIgnoresTheLook, warningsReadAsWarningsInBothLooks, todayAndSelectedDifferInBothLooks, everySubgroupTellsItselfApart, theLookFlipsWithNoReload, theLookSurvivesAReload, kidScreensMeetTheHouseRules, parentScreensMeetTheHouseRules)
 - **Ongoing cost.** Every screen change must pass these in BOTH looks — a fix
   that reads in Pop can fail in Calm (smaller type, white rows, cool
   surfaces). The checks cover colours, fonts, contrast, targets, text floors
   and boxes; layout, and whether the two looks still feel different, still
-  need a look on the iPad.
+  need a look on the iPad. (text only)
 
 ## Navigation
 
@@ -567,7 +567,7 @@ how that holds; the design is `docs/handoff/looks-calm-pop.md`.
 through one nav — **Today · Week · Money · Sister Sync · More** — which is a
 single fixed element outside the screens, filled by `tdRenderNav`. Do not add a
 second nav row to a screen: the six-button shortcut row that used to sit in three
-different topbars is exactly how their labels drifted apart, and it is gone.
+different topbars is exactly how their labels drifted apart, and it is gone. (text only)
 
 **Five places, not four — the owner's decision of 2026-09-24.** Sister Sync
 (👯, `openSisterSync`, `screen-sync`) became a nav tab, the fourth of five,
@@ -588,7 +588,7 @@ labels give "Sister Sync" the room a fifth did not (held by
 `sisterSyncTabFitsInTheFallbackFont`, which cuts the font hosts off). The
 fallback label, if it ever stops fitting, is "Sisters". A parent sees no change: the kid nav hides
 for a parent, and `openSisterSync` still refuses one. Held by
-`sisterSyncIsABottomTab`, `moreHasNoMoneySchool` and `kidNavIsUsableAndScoped`.
+`sisterSyncIsABottomTab`, `moreHasNoMoneySchool` and `kidNavIsUsableAndScoped`. (checked by smoke: sisterSyncTabFitsInTheFallbackFont, sisterSyncIsABottomTab, moreHasNoMoneySchool, kidNavIsUsableAndScoped)
 
 **The hero owns the block she is in, and owns it alone.** The screen used to draw
 the running block twice — a NOW card saying "now · started 8:15am" with a green
@@ -597,7 +597,7 @@ own. Two controls for one action, two glyphs for one meaning, and nothing to tel
 a child which tick did what. The running block is now absent from the list
 entirely (not even as a passive marker), and the hero's button is the `🎯` the
 cards carry — same green, same border, same offset, 56px only because it sits at
-the card's edge. `theHeroIsTheOnlyPlaceTheRunningBlockAppears` holds both halves.
+the card's edge. `theHeroIsTheOnlyPlaceTheRunningBlockAppears` holds both halves. (checked by smoke: theHeroIsTheOnlyPlaceTheRunningBlockAppears)
 
 The hero carries the block's **window and what is left of it** (`8:15–9:00am · 22m
 left`) with the countdown drawn under it, and `tdTick` (js/99-main.js starts the
@@ -611,12 +611,12 @@ first pre-buffer, which is `wfBufferSegments` and therefore the week grid's own
 arithmetic — is what the card leads with, what the hero's NEXT names, and what the
 list sorts by. `.quest-time` carries it at full size on the `--next` card, a plain
 card and a folded one alike: a get-ready time shrunk to a footnote is exactly the
-case where it matters most.
+case where it matters most. (checked by smoke: aBlockYouTravelToStartsWhenYouStartGettingReady)
 
 **A gap is a break or free time, never both.** Under `TD_FREE_MIN` it is a chip on
 the hero's NEXT line and a connector between two cards; from `TD_FREE_MIN` up it is
 the free-time card that already existed. `tdGapBefore` is the one place that line
-is drawn, and it measures to `tdActionableStart`, not to the block's start.
+is drawn, and it measures to `tdActionableStart`, not to the block's start. (checked by smoke: todayNamesFreeTime, aShortGapReadsAsABreak)
 
 **A strip stops where the next card starts, and never says more than it can
 show.** Two defects, one fixture — a School Day with 15m travel + 15m get-ready
@@ -624,7 +624,7 @@ running into Homework at three o'clock. A buffer strip was drawn at its full
 length whatever was in the way, straight over the top of the next card, so
 neither the strip nor the card's name and tick could be read; and at 0.72px per
 minute a 15-minute strip is 10.8px tall while the kid readability floor sets its
-text to 13.1px, so two stacked strips each printed a label through the other.
+text to 13.1px, so two stacked strips each printed a label through the other. (checked by tests/buffers.test.js)
 
 `bufferClip` (`js/05-helpers.js`) is the one owner of **how much of a buffer
 window is real, unoccupied time** — pure numbers, with a `module.exports` guard,
@@ -659,7 +659,7 @@ clock time reached the Full week at all. `time` (`🚗 7:40a` out, `🏠 3:20p`
 back, about 59px) sits between them and is what a strip picks whenever it is
 tall enough for a line; `short` is not on that ladder, being both wider and less
 use, and survives only because the print sheet picks tiers by block height and
-does want it.
+does want it. (text only)
 
 **A LABEL NAMES THE EVENT, NOT JUST THE TIME.** One figure per side was the
 first answer and it was a figure short: School Day at 8:10 with fifteen minutes
@@ -668,7 +668,7 @@ starts *getting ready* — the right number wearing the wrong icon, and the car
 does not leave until 7:55. Going out there are **two** facts and a parent acts
 on both, so the full form is `👕 7:40 🏠→🚗 7:55`. Coming back it is
 `🚗→🏠 3:05 🧺 3:20`, and the arrow is what says which end of the trip this
-is.
+is. (text only)
 
 **What each side drops first is decided by which fact has a DEADLINE.** Getting
 ready before a block has to be finished when the car leaves, so both figures
@@ -679,7 +679,7 @@ grid. Unpacking afterwards has no deadline at all, so coming home it is the
 somebody is waiting on. `wfSideTimeForms` is the one ladder, widest rung first;
 `wfSideEdgeRel` and `wfKindEdgeRel` are what it reads. Coming back the travel
 edge is the end of the last **travel** segment, when you are through the door,
-never the end of the put-the-gear-away that follows it.
+never the end of the put-the-gear-away that follows it. (text only)
 
 **The after-buffer is UNPACKING, and says so everywhere.** The two get-ready
 buffers are different jobs — preparation with a deadline, unloading with none —
@@ -688,7 +688,7 @@ the post side read "Get ready" on the print sheet and in every tooltip while
 `seg.side` sat in scope at each of them unasked. `bufferKindLabel` and
 `bufferKindIcon` (`js/07-week-view.js`) are the one owner: 👕 **Get ready**
 before, 🧺 **Unpack** after. Today is deliberately untouched — `tdPrepFor`
-filters `side === 'pre'`, so it is only ever talking about getting ready.
+filters `side === 'pre'`, so it is only ever talking about getting ready. (checked by smoke: theAfterBufferIsNotCalledGettingReady)
 
 **The tooltip is the full sentence at every width.** A visible label that has
 fallen to its bare rung drops the meridiem and one of its two figures; the
@@ -696,7 +696,7 @@ fallen to its bare rung drops the meridiem and one of its two figures; the
 which is also what a screen reader gets. `bufferSegLabels(seg, 'long')` is that
 sentence, and its pre-get-ready form says **from** 7:40 rather than "done by
 7:55" — the deadline is already said by the travel label beside it, and the
-moment she has to start was the one figure nothing anywhere carried.
+moment she has to start was the one figure nothing anywhere carried. (text only)
 
 **A zone name is drawn where it is NEWS.** `labelledCol` was
 `!isSchoolDay(key) || key !== axisKey`, which silences the axis day itself and
@@ -711,7 +711,7 @@ segments rather than as `isSchoolDay(key) === isSchoolDay(axisKey)`, which is
 equivalent today only because `schoolHours()` takes no day argument. So the
 school columns of a term week say nothing, a Saturday inside one still speaks,
 a PD day speaks, and a week that is all holiday says it once on the axis.
-`aZoneNameIsDrawnOnlyWhereItIsNews` holds all four.
+`aZoneNameIsDrawnOnlyWhereItIsNews` holds all four. (checked by smoke: aZoneNameIsDrawnOnlyWhereItIsNews)
 
 **A zone name is not drawn where a buffer strip speaks.** The bands print their
 own name at the top of each stretch — `🏫 SCHOOL`, `🎒 AFTER SCHOOL` — and a
@@ -722,7 +722,7 @@ prevent. The **time wins**: it is the one figure on this surface a parent acts
 on, and the zone is still said twice over, by the band's tint and by the left
 axis. Pure arithmetic on inline pixel values (`wfBandLabelPx()`, another
 measurement), so it costs no reflow. A screenshot found this — the suite was
-green.
+green. (text only)
 
 **And the fact never disappears.** A lone fifteen-minute buffer is 10.8px and
 cannot hold a line at any width, so its side goes silent and the time is simply
@@ -736,7 +736,7 @@ they **printed**, `wfSideTimeUnsaid` answers what is missing from it, and the
 card carries the remainder. `theStripStillSaysWhenToLeave` holds the fact rather
 than the mechanism: both figures visible in a full column, the leave-by one
 visible in a split lane with the other spelled out in a tooltip, at one lane and
-at two, without overflowing what draws them.
+at two, without overflowing what draws them. (checked by smoke: theStripStillSaysWhenToLeave)
 
 **`wfTextPx` is how wide a label will be, and it is a MEASUREMENT.** (What
 follows is the glyph table it used to be; it now measures the text itself —
@@ -751,7 +751,7 @@ failure the width cap exists to prevent. Measured in
 **emoji 21**, an **arrow 12**, a **digit 7.3**, a **lowercase letter 9.6**, an
 **uppercase 10.6**, a **space 1**, a **colon or bracket 4**. The letters are
 rounded up, because over-estimating only refuses a label that would have fitted
-while under-estimating draws one that does not.
+while under-estimating draws one that does not. (text only)
 
 **The space is the load-bearing row, and it is charged 1 rather than its own
 3.6.** Every space in a label on this surface follows an emoji, whose advance
@@ -760,7 +760,7 @@ already carries it — and charging it in full put the two-figure form
 really fits in, so a phone silently dropped the get-ready time. These numbers
 were re-derived once already against real rendered widths, which is the reason
 they are written here rather than left in the code: a first calibration that
-looks reasonable is exactly what ships wrong.
+looks reasonable is exactly what ships wrong. (text only)
 
 `.wf-travel-band-label` is in the overflow sweep for the same reason: it is the
 element that actually carries a band's text, and while it was left out a label
@@ -787,7 +787,7 @@ A name reserves a second line only when its measured width is wider than a
 one-lane card's text width, not when it is over 13 characters.
 `wfTypeInvalidate()` drops every cached answer and redraws the week if it is on
 screen and the answers changed: `js/99-main.js` calls it on `document.fonts`
-`loadingdone` and `ready`, and a look or text-scale change calls it too.
+`loadingdone` and `ready`, and a look or text-scale change calls it too. (text only)
 
 **The minutes that did not fit are drawn, not just described.** `.wf-overrun`
 lays the shortfall over the card it runs into at a quarter strength, exactly as
@@ -802,7 +802,7 @@ card keeps the plain `!`. `clashWorstShort` and `clashTitle`
 (**`js/05-helpers.js`**) are the one pair that answers "how far am I run into,
 and by what", because the shortfall is recorded against the block whose window
 is short — so a card must read its PARTNERS' figures, not its own.
-`tdClashText` is the same sentence on Today.
+`tdClashText` is the same sentence on Today. (text only)
 
 **Both schedule surfaces say it, and say the same thing.** That pair lived in
 `js/07-week-view.js`, so the week grid was the only screen that could name the
@@ -817,7 +817,7 @@ card does not — the same named sentence, and the same quarter-strength
 alone, which is what made the surface unable to explain its own warning.
 `theDayViewSaysTheSameThingAboutAClash` seeds one fixture and asserts both
 screens report the same number and the same partner — the failure worth guarding
-is disagreement, not absence.
+is disagreement, not absence. (checked by smoke: theDayViewSaysTheSameThingAboutAClash)
 
 The week banner lists **one line per clashing pair**, deduped on the sorted id
 pair. It used to join every affected name on a day into one chain — "School Day
@@ -833,7 +833,7 @@ Evening Routine while the arithmetic said they were clear. Measuring the floored
 pixels instead fixed that and broke the other direction — a 3:40pm routine and a
 4:00pm piano lesson, which share not one minute, came out as two half-width
 cards with their names erased, while the day view drew both full width and was
-right.
+right. (text only)
 
 `wfCardBoxes` (`js/07-week-view.js`) settles it, and is **the one geometry** the
 lane pass, the cards and the overrun layer all read: a lane decided on one set
@@ -854,7 +854,7 @@ what a short card draws.
 a cell appended to the grid at the END of its own iteration. It was **always 0**,
 so the `|| 120` fallback was always the answer. The day headers are already in
 the grid and sit in the same tracks, so one of them measures every column once,
-with no per-cell reflow.
+with no per-cell reflow. (text only)
 
 `.placed-block { min-height: 22px }` applied to buffer strips too, so every strip
 under about seventeen minutes was silently grown and pushed past the block it
@@ -867,20 +867,20 @@ carries its own 6px floor, matching the JS.
 `partners` map exists so a screen can say *which* activity a block runs into
 without a second overlap test growing somewhere else. Both blocks it names take
 the frame, and the wording states the fact — the plan is what does not fit, and a
-child did not write it.
+child did not write it. (text only)
 
 **Today is where a day gets done; the day screen is where one gets built.** That
 split is the whole design. Today carries the quest cards, the 🎯 completion, the
 XP strip, the mood, the to-dos, the goals, the sticker collection and the note to
 grown-ups. `screen-day` is a planning tool — one schedule, **one layout**. It has
 no mode toggle, and there is no `dayViewMode`: a mode that survives navigation is
-a mode a child never chose, which is what Quest mode became.
+a mode a child never chose, which is what Quest mode became. (checked by smoke: dayScreenIsPlanningOnly)
 
 **Four** renderings of one day have now been retired for the same reason —
 Checklist mode, the Quest Board's own list, day-view Quest mode, and finally the
 Quest Board screen itself. If you find yourself adding a fifth place that lists
 today's blocks with ticks beside them, that is the mistake, and Today is the
-place that already does it.
+place that already does it. (text only)
 
 **The week has two tabs, and only one of them is a week you can plan.** Full is
 what the screen opens on: the cards, the quick-complete `.wf-card-check` ticks,
@@ -894,7 +894,7 @@ is a read-only preview of the printed sheet, and it is a second **host** for
 takes `(host, { weekOffset, profile, window })` and sets `--print-slot` on the
 host, because two live copies on one page would otherwise fight over one element
 and one variable. `setWeekView` folds any unknown value into `'full'`, so a stale
-`'timegrid'` lands somewhere you can plan.
+`'timegrid'` lands somewhere you can plan. (checked by smoke: weekOpensOnTheLayoutYouCanPlanIn, theSecondWeekTabPreviewsThePrintedSheet)
 
 Day Blocks was the third rendering and was the default, which is the only reason
 replacing it needed a default flip: landing on a read-only surface is worse than
@@ -914,7 +914,7 @@ how much was ticked and nothing about what any of it was. Colour is now
 moved to the border: **dashed not confirmed, solid confirmed**, and every cell
 stays solid-filled at full strength. A child does not get to tick things every
 hour, so an unconfirmed block must never be drawn faded or hollow as though she
-had failed it — which is why `--missed` is gone rather than restyled.
+had failed it — which is why `--missed` is gone rather than restyled. (text only)
 
 **One owner for a block's colour, and one for its name.** Both were written out
 more than once, and the colour had already drifted: an unknown category came out
@@ -930,7 +930,7 @@ and "Block 2" could not live there. Both went with the Day Blocks layout.)
 **Meals are the one exception**: they used
 to render as a bare `🍳`/`🥗`/`🍽` beside the block's own icon, so a cell said the
 same glyph twice and named nothing. Words win — the budget exists to stop a typed
-competition name being crammed in, not to stop a meal being readable.
+competition name being crammed in, not to stop a meal being readable. (text only)
 
 **A competition is called what a parent typed.** `blockDisplayName` returns
 `b.compName` when there is one, which is what reaches the day view, both week
@@ -939,7 +939,7 @@ layouts, Today and print — the Full week and the print sheet each used to deri
 wrongly on the two you actually pin up. The weekly meeting then reads the meet
 off the plan (`mmPlannedCompetitions`, `js/23-money-meeting.js`) instead of
 asking for it twice; it takes facts only — which meet, which day, which sport —
-and `mrScoreCompetition` still decides what the result is worth.
+and `mrScoreCompetition` still decides what the result is worth. (text only)
 
 **WATCHING IS NOT COMPETING, and `blockIsCompetition` is the one seam that says
 so.** A sister can be invited to come and watch a meet, and the danger is the
@@ -951,7 +951,7 @@ chased at Sunday's meeting for a result she never swam — and an unrecorded
 planned meet **disables the confirm bar**, so the week could not settle and
 nothing on screen would say why; and `mrPlaceCompetitionBlock`'s orphan
 adoption (`js/18-rules.js`) would have taken her watch block as the meet's own,
-`compId` and all, which is the link to the money tab.
+`compId` and all, which is the link to the money tab. (text only)
 
 `blockIsCompetition(b)` (`js/08-day-view.js`) returns **false** when
 `blockIsWatching(b)`. That is a deliberate narrowing, not an oversight to
@@ -1011,7 +1011,7 @@ share and a watch of the same block are different questions. `declineInvite`
 acts only on a `pending` invite, and `acceptInvite` only on one
 `inviteAcceptable` says yes to (pending, and not missed — below) — a
 double-tap on ✅ Accept used to put a second block on her day — and otherwise
-they return quietly and redraw the list.
+they return quietly and redraw the list. (checked by smoke: anInviteCannotBeSentTwice)
 
 Both edit-sheet buttons read their sent-state from `sisterInviteFor` **for
 their own kind**. `invitedTo` on the source block is a bare list of names that
@@ -1032,7 +1032,7 @@ guessed: the sender, the day, then the buffers — a share arrived with no drive
 and no get-ready, and a watch block always got 15 minutes each way however far
 away the meet was. The repair, chosen over re-linking invites to their source
 block (copy semantics are the owner's choice, and a link would change a
-`state.shared` shape and need a migration on both iPads):
+`state.shared` shape and need a migration on both iPads): (text only)
 
 - `inviteSnapshot(block, dayKey, members)` (`js/10-social.js`) owns **what an invite
   carries**: `actId`, `day`, `startMin`, `durationMin`, `sourceBlockId`, and
@@ -1082,12 +1082,12 @@ the days **from today on**; when some have gone, the accept asks **From 6 Oct
 last day, and 📌 Add it anyway on a missed series places all of its days.
 Time and buffers are the tapped block's for every day. Her ghost shows on each
 covered day (`inviteCoversDay`), and Today and the inbox read `📖 Reading ·
-every Tue (12)` (`inviteFacts` → `inviteSeriesShort`).
+every Tue (12)` (`inviteFacts` → `inviteSeriesShort`). (text only)
 
 **The 💌 is only where something was shared.** `weekCloneBlock`,
 `createSeriesFromBlock` and `seriesExtendTo` strip `invitedTo` and
 `sentInviteIds`, so a copy, a repeat or an extension of a shared block does not
-claim to be shared.
+claim to be shared. (text only)
 
 **A dragged shared block says "Send again?"** (the owner's decision,
 2026-09-24). A cross-day drag re-ids the block (`moveBlockToDay`,
@@ -1101,7 +1101,7 @@ invite for the new day; the guard then matches there and refuses a second. The
 sister's old invite is not changed — if pending she can still answer it, and
 when its day passes it is missed. A same-day drag keeps the id and changes
 nothing. (`attachBlockDrag` had a `block.inviteId && !block.inviteAccepted`
-guard that nothing ever wrote the fields for; it was removed in Plan v7.)
+guard that nothing ever wrote the fields for; it was removed in Plan v7.) (checked by smoke: anInviteCarriesTheSendersTravelAndGetReady, aMissedInviteIsNotWaiting, theDayViewAcceptFollowsTheSameRules, aSeriesInviteCoversEveryDayOrOne, aMovedSharedBlockSaysSendAgain)
 
 Invites stay in `state.shared.invites`, merged whole-record by `mergeArrayById`
 with no tombstone scope — an invite is never deleted. Held by
@@ -1125,7 +1125,7 @@ count or name an invite differently. Below the waiting ones, the inbox keeps a
 small **Missed** group (`invitesMissedFor(p)`): `💌 Jenn invited you to 📖
 Reading · Wed — that day has passed`, with **📌 Add it to my Wed anyway** and
 **Decline**, no Accept. A missed invite whose (last) day is before this week's
-Monday drops out of the list and stays stored.
+Monday drops out of the list and stays stored. (text only)
 
 **There is a second accept door, on the same owners:** the pending ghost on the
 Day view (`renderPendingInvitesOnTimeline`, `js/08-day-view.js`). It shows ✅
@@ -1141,11 +1141,11 @@ block's ✓ and every ghost button hit where drawn; a 9:30pm ghost stays inside
 the canvas). **Kid only**: the
 inbox works on `profile`, `acceptInvite` writes to `profile`, the ghost is not
 drawn for a parent, and `openSisterSync` refuses a parent, so a parent-facing
-note would lead to a refusal. `anInviteWaitingShowsOnToday` holds the note.
+note would lead to a refusal. `anInviteWaitingShowsOnToday` holds the note. (checked by smoke: kidScreensMeetTheHouseRules, anEmptyDayDrawsItsInviteGhost, anInviteWaitingShowsOnToday)
 
 **A watch block still counts as ordinary planned time.** `computeWeekTotals`
 does not filter it out, deliberately: a Saturday she really spent at the rink
-must not read as free. What it does not do is earn.
+must not read as free. What it does not do is earn. (checked by smoke: aWatchedMeetIsNeverChasedForAResult, aWatchInviteNamesTheMeet)
 
 `aWatchedMeetIsNeverChasedForAResult` and `aWatchInviteNamesTheMeet`
 (`tests/smoke.js`) hold both halves — the first is the one that makes the
@@ -1162,7 +1162,7 @@ are left off so nothing competes with the green stripe), `wfBufferSegments`
 `wfCardBoxes` / `wfAssignColumns` (sizes and lanes), `buildHourGrid`
 (`layer: 'lines'`), `blockColour(b, p)` and `blockDisplayName(b, p)` with the
 explicit sister. **Not** `buildDayColumn` or `renderBlockPixel`, which are bound
-to the active profile. Block text is ink, never white on a pastel.
+to the active profile. Block text is ink, never white on a pastel. (checked by smoke: anInviteCannotBeSentTwice, anInviteFromSisterSyncIsDatedThatDay, aMovedSharedBlockSaysSendAgain, sisterSyncIsATimeline)
 
 *What is busy has one owner: `syncBusyMinutes(profile, dayKey)`.* One boolean
 per minute of the drawn day (index 0 = `START_MIN`, length `DAY_MIN_SPAN`).
@@ -1259,7 +1259,7 @@ before 7:00pm, the end of its fixture's span: 532px into 529px at 6:59pm
 `clamp(3.5px, pct%, calc(100% - 6.5px))`, and both the render and `tdTick`'s
 minute patch call it, so they cannot place the marker differently. The check now
 pins the clock to the span's first and last minute every run and measures the
-strip's overflow and the arrow's edges there.
+strip's overflow and the arrow's edges there. (checked by smoke: aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon)
 
 **The day screen scrolls as one surface, and that surface has to be BOUNDED.**
 It was three nested scrollers (`.day-workspace` → `.day-center-lane` →
@@ -1275,7 +1275,7 @@ only at ≥980px landscape, and `body.has-kid-nav #screen-day.screen.active` has
 specificity it always needed. `dayScreenScrollsAsOneSurface` only walks INSIDE
 `#screen-day` and cannot see this; `onlyTheScheduleScrollsOnTheDayScreen` watches
 the document — and seeds a day tall enough to scroll rather than assuming one,
-because a workspace that does not overflow is a short day, not a defect.
+because a workspace that does not overflow is a short day, not a defect. (checked by smoke: onlyTheScheduleScrollsOnTheDayScreen)
 
 **The day STOPS where the day stops.** The schedule was drawn 6am–10pm whatever
 was on it, and `.timeline` carried `min-height: 1344px` with 200px of padding
@@ -1291,7 +1291,7 @@ at `DAY_MIN_TAIL_MIN` so a blank day is still a canvas you can plan on, and
 rounds to a **multiple of 15** because `buildSlotGrid` tiles the canvas in
 quarter-hour rows. `tlShowEvening` (`localStorage`, never synced state) opens
 the rest, through `.tl-later` — which also says which state the canvas is in,
-since a day that stops at nine looks exactly like a day with no evening.
+since a day that stops at nine looks exactly like a day with no evening. (checked by smoke: theDayEndsWhereTheDayEnds)
 
 The span is **on the canvas** (`dataset.spanMin`, read back by `canvasSpanMin`),
 not passed down five signatures and never taken from the global: the gutter's
@@ -1311,14 +1311,14 @@ back in phase, so at 2 and 3 days every hour label named a line **46px, about 33
 minutes, below itself**. One day has no header, which is the only reason it was
 ever invisible. `.tl-headrow` stays inside `.day-workspace`, sticky at its top, so
 panning sideways keeps each header over its column with no `scrollLeft` mirroring
-and no second scroller. `focusDayColumn` marks both trees.
+and no second scroller. `focusDayColumn` marks both trees. (text only)
 
 **`.tl-canvas` draws its edge with an inset shadow, not a border**, and gets
 `z-index: 0`. The border was 2px on a border-box element whose height JS set to
 exactly the day, so the padding box was 4px short — the 10pm rule and the tail of
 a 10pm block were clipped, and taps measured 2px off what was drawn
 (`getBoundingClientRect` reports the border box). The stacking context is what
-stops `.placed-block` (z10) painting over the sticky header and gutter.
+stops `.placed-block` (z10) painting over the sticky header and gutter. (text only)
 
 **No rule is drawn across a card.** Print reads well because its rules are the
 borders of 15-minute cells: a block sits on top of them, so a line cannot cross
@@ -1327,7 +1327,7 @@ BEHIND the cards**, and the only thing drawn over one is the short hour mark at
 the gutter edge, because "where is four o'clock" is a question a card must not be
 able to hide. The rule and that mark used to be ONE element with the mark as its
 `::before`, which is why the hour could not go behind without taking its own
-answer with it.
+answer with it. (checked by smoke: noRuleIsDrawnAcrossACard)
 
 **Two surfaces, two builders, because they are drawn at different scales.**
 `buildSlotGrid` (`js/05-helpers.js`) is Print's mechanism — real 15-minute rows —
@@ -1338,7 +1338,7 @@ where the absolutely-positioned blocks expect them.
 `buildHourGrid` still serves the **Full week** at the 30-minute interval, with
 `layer: 'lines'` the rules (behind) and `layer: 'ticks'` the marks (above): at
 0.72px/min a 15-minute row is under 11px, and four rules an hour read as hatching
-rather than as a scale. Do not "unify" these — the split IS the decision.
+rather than as a scale. Do not "unify" these — the split IS the decision. (checked by smoke: noRuleIsDrawnAcrossACard, theHourLadderLinesUpWithTheSchedule)
 
 Blocks, drag arithmetic, `renderBlocksWithCollision`, the buffers and the now-line
 know nothing about any of it; only the background changed. Both layers are
@@ -1355,7 +1355,7 @@ you tap (`openSlotPicker`) — the interaction that was already doing the work.
 `buildTray` and `setDayFocusPane` were retired with it, and `selectedActivity` is
 now transient: set by `pickFromSlot`, cleared on placement. A caller that already
 knows which activity — the tutorial, a level-up reward, a mascot suggestion —
-calls `startPlacingActivity` (`js/09-sheets.js`).
+calls `startPlacingActivity` (`js/09-sheets.js`). (text only)
 
 **1 / 2 / 3 days is a column count, not a mode.** `dayViewDays` lives in
 `localStorage` only, nothing about what a block says or how it is edited changes
@@ -1364,12 +1364,12 @@ with it, and a narrow viewport is served one column whatever is stored.
 edited, and every writer downstream (`placeBlock`, `setDayMood`, `clearDay`, the
 edit sheet) still reads that one global — a tap in another column points it there
 first (`focusDayColumn`). Anything that renders a block must take its day key
-from the canvas's `dataset.dayKey`, never from the global.
+from the canvas's `dataset.dayKey`, never from the global. (text only)
 
 **Two thresholds, two questions.** `BLOCK_TIERS` answers *how much may a block
 say at this height*; `BLOCK_STACK_MIN` (46px) answers *when can the day view
 stack it on two lines*. Conflating them is what sliced a 30-minute Breakfast's
-own title in half — 40px of block, 30px of content box, two lines needing 34.
+own title in half — 40px of block, 30px of content box, two lines needing 34. (text only)
 
 **A tier is permission, not a fit.** On the Full week the two disagreed:
 `detail` starts at 64px and a stacked card needs 66 before it draws a single
@@ -1382,7 +1382,7 @@ real figures are 66 and 17, because the kid readability floor lifted
 `.wf-card-time`, `-dur` and `-sum` to 13.1px and nothing re-measured. On top of
 that `.wf-card--tall .wf-card-name` is allowed two lines and the budget counted
 one. Every stacked card overflowed by 7–21px, which is how a training block's
-goals came to run through the duration underneath them.
+goals came to run through the duration underneath them. (checked by smoke: theStackedCardFitsWhatItDraws)
 
 Priority on a stacked card: icon and name always, then the duration (the one
 thing position and size do not already say), then goal lines, then the
@@ -1414,12 +1414,12 @@ only a settled week moves money. Every surface a child answers on — the chore
 tab, Today and its catch-up card, the Day view's claim prompt on a finished
 chore block — writes a claim and nothing else. `mrSetClaim` refuses a child
 answering for anyone but herself (`kid !== activeProfile()`); a parent may claim
-on her behalf ("she told us at the door"). This was written only in `PLAN.md`
+on her behalf ("she told us at the door"). This was written only in `docs/archive/PLAN.md`
 and a header comment in `js/31-today.js` until 2026-09-24 (R5 §5 C1). Known gap,
 not closed here: `mrSetClaim` has no lock for a week already settled, so a
 claim can still be written into one from the chore tab's week paging; the lock
 belongs to the pocket-money handoff, with a comparison first, because claims
-feed pay. Today's catch-up card offers only unsettled weeks.
+feed pay. Today's catch-up card offers only unsettled weeks. (text only)
 
 **Chores answered in their new homes (R5 §5 C1, 2026-09-24).** Every action
 the Chores screen had now has a home outside it, and each home calls the SAME
@@ -1433,29 +1433,29 @@ core (named kid, week/day) and the chore tab's wrapper (its own kid, `ctWeekKey`
 (+ `ckRoutineChanged`, the sync-and-award tail), `ckRateSelfFor`,
 `ctCyclePersonalFor`, `ctBumpLearningFor`, and the readers `ckRoutineBlocksOn`,
 `ckTrainingBlockOn`, `ckOwnLaneItems`, `ckUnlistedChoresFor`. Behaviour of the
-chore tab is unchanged.
+chore tab is unchanged. (checked by smoke: bothPlacesAgree)
 - **Row 1 — a job's answer, on Today.** A job row in "Jobs I can do" (paid
   `chores` lane only; `tdJobsToday`) carries `data-td-chore` and asks in place:
   `tdClaimJob` → `openChoreClaimPrompt` → `mrSetClaim`. The family-chores chip
-  (the same `data-td-action="chore"`, no chore) still opens the chore tab.
+  (the same `data-td-action="chore"`, no chore) still opens the chore tab. (text only)
 - **Row 2 — ＋ I did something else**, under "Jobs I can do" for today and
   inside the catch-up card for an earlier day (`tdElseBlock` →
-  `ckUnlistedChoresFor` → `tdClaimJob`).
+  `ckUnlistedChoresFor` → `tdClaimJob`). (text only)
 - **Row 3 — routines** (`tdRoutinesCard`): today's routine blocks, each opening
   to its items, plus "all N done" — `ckWriteRoutineItem` / `ckWriteAllRoutines`,
-  so `ctSyncMandatoryFromRoutine` still owns the "kept" mark.
+  so `ctSyncMandatoryFromRoutine` still owns the "kept" mark. (text only)
 - **Row 4 — own things / helping out** (`tdLanesCard`): `ctCyclePersonalFor` →
   `mrCyclePersonal`, none → done → nobody asked (XP) → none. The standing lanes
-  left "Jobs I can do", which now holds only paid chores.
+  left "Jobs I can do", which now holds only paid chores. (text only)
 - **Row 5 — her training rating** (`tdTrainingCard`): 1–5 once today's training
   block has ended (`blockHasEnded`), `ckRateSelfFor` → `mrSetAttitude 'self'`;
-  Mum's rating is shown, never set.
+  Mum's rating is shown, never set. (text only)
 - **Row 6 — ✨ answered**: the ✨ chip (and an answered job row) opens "✨ Mum
   answered" on Today (`tdShowAnswered` / `tdAnsweredCard`), capturing the list
   and then calling `mrMarkGradesSeen` — the chore tab's own stamp — so ✨
-  clears from Today alone. A parent looking consumes nothing.
+  clears from Today alone. A parent looking consumes nothing. (text only)
 - **Rows 7 and 8 — Parent › Now, "On her behalf"** (`pnAnswerCard`, see *The
-  parent portal*): per child, per day of this week up to today.
+  parent portal*): per child, per day of this week up to today. (text only)
 - **Row 19 — 🕓 Catch up** (`tdCatchUpCard`), in Today's day column directly
   after the ✏️ Modify my plan button (R12, owner 2026-09-27: "just below Modify
   my plan" — today's schedule leads, the earlier days follow it as a group):
@@ -1474,7 +1474,7 @@ chore tab is unchanged.
   repair, express catch-up). Not today, not a day to come, not a sick day, not a
   block recorded as not done. On a Monday there is no earlier day, so no card.
   A day with nothing unanswered is not listed; "something else" for such a day
-  goes through the next row.
+  goes through the next row. (text only)
 - **C1b — ＋ Add to an earlier day** (`tdEarlierElseRow`, Plan v6,
   2026-09-25): one collapsed row (`data-td-action="else-earlier"`,
   `aria-expanded`, ≥44px, words 16px) directly under the catch-up card — or on
@@ -1486,7 +1486,7 @@ chore tab is unchanged.
   "＋ I did something else on Tue" through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
   `mrSetClaim` — the owner the chore tab's `ckPickElse` uses. A claim on that
   day and nothing else. Closed again by `goToday()`. This closes the C1 gap
-  noted in `docs/chore-relocation-map.md` row 2.
+  noted in `docs/chore-relocation-map.md` row 2. (checked by smoke: todayAnswersAJobInPlace, somethingElseWorksForAnyOpenDay, somethingElseOnAFullyAnsweredEarlierDay, catchUpListsOnlyUnansweredDaysOfOpenWeeks, routinesTickFromToday, ownThingsFromToday, attitudeAfterTraining, answeredGradesClearFromToday, learningFromThePortal, parentAnswersForHerFromThePortal, bothPlacesAgree, todayHandsOffRatherThanActing)
 - View state (open catch-up day, open picker, open routine, the ✨ list) is in
   memory only; `goToday()` starts it closed.
 Held by `todayAnswersAJobInPlace`, `somethingElseWorksForAnyOpenDay`,
@@ -1509,36 +1509,36 @@ instead of reading `ctWeekKey` / `ctDay`: `ckCapBarFor` (the old `ckCapBar`
 wrapper went, nothing else called it), `ckEarnBoard` (total, bar, ledger),
 `ckEightWeeks` (the eight bars and their titles), `ckOpenLoops` +
 `ckLoopState`, `ckWeekGridData` (the grid's cells; `ckWeekGrid` renders it),
-and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`.
+and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`. (text only)
 - **Row 9 — 🔥 streak on Today's hero** (`tdQuestHero`, `.dq-hero-streak`):
   `mrStreakWeek(this week)`, the chore tab header's number, grace day and sick
-  pause included. Zero reads "no streak yet".
+  pause included. Zero reads "no streak yet". (text only)
 - **Row 10 — My level**: the hero's level is a button (`.dq-hero-level`,
   `data-td-action="level"`, ≥44px) opening `#tdLevelOverlay` (`tdOpenLevel` /
   `tdLevelSheet`): level and tier and XP from `mrXpLevelInfo`, and the WHOLE
   ladder from `mrPrivileges` — "yours" or "level N" per row. Close is its one
-  control.
+  control. (text only)
 - **Row 11 — Earned this week on My money** (`mnyEarnBoardCard` — **retired in
   Sunday v15 Stage 3**, Plan v5 §K: My Money v2's ☀️ countdown and "This week"
   card answer it; the chore tab's rail keeps the board), after the Today card: `ckEarnBoard` for the page's week and today — total kept after
   fines, today's ceiling bar (fines, kept, waiting, → XP) with its keys, the
   "one more fine" line and the room line, and the ledger by channel. No bar
-  when today is not in the week showing.
+  when today is not in the week showing. (text only)
 - **Row 12 — Your last 8 weeks on Money story** (`mnyEightWeeksCard`, between
   the Flow and Week by week): `ckEightWeeks(this week)`, each bar titled
   exactly as the rail's. The week-by-week list was already there and is not
-  repeated.
+  repeated. (text only)
 - **Row 13 — Open loops on Today** (`tdLoopsCard`, side column after the
   lanes): `ckOpenLoops` with `ckLoopState`'s words ("in the box" / "again this
   week · −$1"); no card when the box is empty. Boxing and releasing stay with a
-  grown-up in the portal.
+  grown-up in the portal. (text only)
 - **Row 14 — 🧹 Chores this week on the Week tab** (`renderWeekChores`,
   `#weekChores`, toggle `#weekChoresToggle`, body `#weekChoresBody`): the week
   grid as a report from `ckWeekGridData` for the week the tab shows — the same
   rows and cells, with no control but the toggle (answering an earlier day is
   the catch-up card's job). Closed by default, remembered in `localStorage`
   (`wp_week_chores_open`), scrolls inside itself at phone width. Not drawn for a
-  pre-system week.
+  pre-system week. (text only)
 - **Row 15 — Parent › History › 🗂️ Before the new system**: a third history
   view (`PARENT_HISTORY_VIEWS` `before`, offered only when a child in scope has
   a week in `moneySnapshots`), a chip per week (`data-parent-preweek`,
@@ -1551,7 +1551,7 @@ Held by `streakAndPrivilegesOnToday`, `earningsBarOnMyMoney`,
 `eightWeekBarsOnMoneyStory`, `openLoopsOnToday`, `weekChoreReportOnWeek` and
 `preSystemWeekReadableInHistory` — each compares its home with the chore tab on
 one fixture and asserts it carries no control; all pin the clock and run at
-390×844. Screenshots `c2_*` at phone and iPad width.
+390×844. Screenshots `c2_*` at phone and iPad width. (checked by smoke: streakAndPrivilegesOnToday, openLoopsOnToday, weekChoreReportOnWeek, preSystemWeekReadableInHistory)
 
 Today's vibe, to-do, goals, sticker and note panels ship collapsed behind one
 `localStorage` flag (`tdExtrasOpen`), and finished blocks fold away behind its
@@ -1567,7 +1567,7 @@ worse.
 **Today leads with what is next.** The list splits at `tdNowMin()` — upcoming in
 time order, then everything finished under a closed "earlier today" fold. In
 `QUIET_HOURS` (9pm–7am, `js/01-config.js`) with nothing running, the NOW card
-reads as wind-down rather than "the rest of today is yours".
+reads as wind-down rather than "the rest of today is yours". (checked by smoke: todayLeadsWithWhatIsNext, thereIsExactlyOneListOfToday)
 
 **A waiting invite is named on Today, and the tap lands on it.** `tdInviteNote`
 draws one `.td-row` button in the day column, between the hero and "Coming up",
@@ -1580,22 +1580,22 @@ invite (its day gone) is not waiting, so it never gets one. The tap
 of that screen, and landing at its top would be the school banner under a 700px
 grid again. It goes away on the next Today render after she answers: the nav's
 Today tab re-renders (`goToday`), and a snapshot from the other device does too
-(`refreshCurrentScreen`). There is no polling.
+(`refreshCurrentScreen`). There is no polling. (checked by smoke: anInviteWaitingShowsOnToday)
 
 **A card must never render blank.** "Jobs I can do" listed only what was still
 claimable, so the day a child finished everything her reward was an empty box —
 and a week with no chore pool gave the same blank for a different reason.
 `tdJobsToday` returns every job with its state, and the three empty cases each
-say which one they are.
+say which one they are. (checked by smoke: jobsCardIsNeverBlank)
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
-  `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
+  `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`. (text only)
 - Colours, fonts, font sizes and `--accent` / `--accent-strong`: see
-  *Two looks (Pop and Calm)* under UI rules — the one statement of those rules.
+  *Two looks (Pop and Calm)* under UI rules — the one statement of those rules. (text only)
 - "Today" markers read `--today-mark` (navy in both looks, L9); in Calm,
   Parent › Now keeps today (white, navy frame) apart from the selected day
-  (navy fill) — `todayAndSelectedDifferInBothLooks`.
-- Never white text on the pastel category colors (all fail contrast).
-- Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`.
+  (navy fill) — `todayAndSelectedDifferInBothLooks`. (checked by smoke: todayAndSelectedDifferInBothLooks)
+- Never white text on the pastel category colors (all fail contrast). (text only)
+- Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`. (text only)
 
 **IF IT LOOKS LIKE A CONTROL AND IS ANNOUNCED AS ONE, IT HAS TO BE ONE.** Three
 of the five `.profile-badge`s — Today, the chore tab, Sister Sync — were bare
@@ -1611,7 +1611,7 @@ aria-label="Switch profile">` now, and the aria pass only labels a badge that
 has a click path, so the next inert one cannot re-tell the lie.
 `everyProfileBadgeSwitchesProfile` asserts it by **activating** each badge and
 watching for `#profileSwitchOverlay`: a control can carry every attribute on the
-list and still open nothing.
+list and still open nothing. (checked by smoke: everyProfileBadgeSwitchesProfile)
 
 ## One answer per question — `js/36-status.js`
 
@@ -1619,7 +1619,7 @@ Six screens each worked out "is this done?" for themselves, and the copies had
 drifted far enough that a parent could not tell which one was lying. This file
 is the vocabulary now. **It owns no data**: every function reads through
 whichever accessor already owned that fact, and every write goes to the function
-that already owned that write. Ask it; do not re-derive it.
+that already owned that write. Ask it; do not re-derive it. (checked by smoke: oneRoutineAnswerOnEveryScreen)
 
 | Question | Function |
 |---|---|
@@ -1653,7 +1653,7 @@ routine against Jess's items; and the day-level "kept" mark was sticky by design
 so unticking could never take anything back. `routineItemsFor` is the one item
 list, counted by id, per child. `ctSyncMandatoryFromRoutine` sets **and clears**
 — but only clears a mark the app itself made, because a parent's tick in the
-meeting is her assertion and a child unticking must not overrule it.
+meeting is her assertion and a child unticking must not overrule it. (text only)
 
 **A day cannot be reviewed before it has happened.** `canReviewDay` is the one
 decision, asked by the parent day banner, the meeting's step 1 rows (and its
@@ -1667,7 +1667,7 @@ day stays reviewable — a quiet Sunday is a real answer — but says "nothing w
 recorded" out loud first. `reviewBlockedReason` is the sentence a refused control
 says: it could previously only ever be "Confirm the blocks first", so a day
 refused for not having happened told a parent to confirm blocks that did not
-exist.
+exist. (checked by smoke: aDayIsNotReviewableUntilItHasHappened)
 
 **Today is `'open'`, and that is a third thing.** An empty PAST day is a real
 answer; today holding nothing at nine in the morning is not — it is a day that
@@ -1675,14 +1675,14 @@ has not been lived, and signing it off reviews the swimming nobody has put on it
 yet. Nor is it only about emptiness: a today whose blocks have all ENDED is the
 same case. So today reports `'open'` — reviewable, but only through an explicit
 "nothing else is planned", the way an empty day already asks before it is signed
-off blank — and until somebody says that, it holds the week open.
+off blank — and until somebody says that, it holds the week open. (text only)
 
 **Only a day that has not happened is excused from closing a week.**
 `canCloseWeek` used to excuse a **running** day alongside a future one, so a
 Sunday sitting held while the swimming was still in the pool counted six of six
 and closed. `mmCloseSummary` carried the same exclusion, so the figure a parent
 read agreed with the gate they pressed while both were wrong together —
-`weekDaysAwaitingReview` is that one decision now, and both ask it.
+`weekDaysAwaitingReview` is that one decision now, and both ask it. (checked by smoke: aRunningDayHoldsTheWeekOpen, closingAWeekShowsWhatItStandsAt)
 
 **A week does not close over a blank reflection, nor over a conversation nobody
 had.** Step 5 showed `0/3` and closed anyway. Two questions, deliberately kept
@@ -1694,7 +1694,7 @@ conversation to confirm, and a skip must never be able to trap the family. Since
 `reflEdit` clears the tick whenever her answers move, reworking an answer after
 they talked correctly re-opens the week — which is why step 5 says *complete ·
 conversation not confirmed* rather than just "complete". Money settlement stays
-independent of all of it, deliberately.
+independent of all of it, deliberately. (checked by smoke: aReflectionCannotBeSkippedAndComplete, aWeekDoesNotCloseOnAConversationThatDidNotHappen, aBlankReflectionHoldsTheWeekOpen)
 
 **Closing a week that has not ended is offered, not refused.** Every elapsed day
 being reviewed is not the same as the week being over: with today signed off
@@ -1703,7 +1703,7 @@ only two readers — step 5's own UI and `reflIsLocked` — the money is frozen 
 settlement rather than by closure, and `mmReopenWeek` is the way back, so this
 is a confirmation rather than a prohibition. `mmDaysStillAhead` names the days
 still to come and is empty on the last day, so the ordinary Sunday-afternoon
-meeting is never asked to justify itself.
+meeting is never asked to justify itself. (checked by smoke: closingAWeekEarlyIsAnExplicitChoice)
 
 **Confirming is not completing, and neither is reviewing.** A parent may confirm
 an unfinished routine and it must not start reading as finished. `confirmAllBlocksForChild`
@@ -1711,7 +1711,7 @@ marks blocks *completed and confirmed* for **one named child** — only blocks t
 have already started, so a nine o'clock press cannot mark the evening's swim
 done — and never touches `parentDayConfirm`. `markDayReviewedForChild` is the
 other fact and changes no completion. Reviewing a day is **per child**: the
-meeting's day rows carry a control each plus an explicit Both.
+meeting's day rows carry a control each plus an explicit Both. (checked by smoke: confirmingIsNotReviewing)
 
 **"It was planned and it did not happen" is a THIRD answer.** `confirmed` and
 its absence were the whole vocabulary, so a plan that was not carried out had
@@ -1719,7 +1719,7 @@ nowhere to be recorded, and every route out stated something false: "Confirm
 all" marks the blocks done *and* grades their chores at "on time", the edit
 sheet's confirm toggle graded a chore nobody claimed, and deleting the blocks
 rewrites the plan the reflection reads. The day then held the whole week open
-through `canCloseWeek`, for the one reason a parent had no move against.
+through `canCloseWeek`, for the one reason a parent had no move against. (checked by smoke: aSkippedBlockIsRecordedNotDeleted)
 
 `isBlockNotDone` is not "unconfirmed" and not "completed" — it is a parent's
 account of the day. It completes nothing and earns no XP, but it **reaches the
@@ -1736,7 +1736,7 @@ out at read time. Blocks merge whole-record newest-wins through `mergeArrayById`
 so a block carrying both flags survives a sync intact and every predicate
 downstream then disagrees with the next. Both writers `delete` the other flag,
 and both stamp `markItemUpdated` — `setDayBlocks` does NOT stamp, which is why
-`toggleConfirm` could previously lose a confirmation to a stale remote copy.
+`toggleConfirm` could previously lose a confirmation to a stale remote copy. (text only)
 
 Drawn as a **marker, never a fade**, on the day view, the week card and Today's
 ribbon. `--missed` was removed deliberately because an *unconfirmed* block must
@@ -1750,7 +1750,7 @@ one block somebody has.
 fulfilled. The kid surfaces measure `stillNeedsADay` and stay forward-voiced and
 current-week; the **review voice** (owed / fulfilled / unfulfilled) lives on the
 parent and meeting screens, where a past week's shortfall is always shown. No
-shortfall is carried into the next week.
+shortfall is carried into the next week. (text only)
 
 ## Category › subgroup › activity — the third question
 
@@ -1759,7 +1759,7 @@ FOR** — the eight rows every hours chart and the XP gate read. Neither is a sh
 a person can navigate: a picker with nine flat chips, three of which mean the
 same thing to a ten-year-old, is a list you scroll rather than a place you know
 your way around. "Learning" held a school day, a French lesson and a piano
-practice, and all three drew in the same blue.
+practice, and all three drew in the same blue. (checked by smoke: everyActivityHasASubgroup)
 
 So `ACTIVITY_CATEGORIES` (`js/01-config.js`): **six categories, each holding one
 or more subgroups**, and every shipped activity names one with `sub:`.
@@ -1780,20 +1780,20 @@ and got brighter; each category's main subgroup sits on the handoff's value
 (School `#4aa3ff`, Training `#f2597d`, Meals `#ffc83d`, Routine `#3cc9b9`, Play
 `#4cc46a`). Outings stays orchid — the handoff's orange "Active/Explore"
 `#fb8a2e` is `CAT_HEX.active`'s, not a new hue for a subgroup a family already
-knows. The measurements, all with `colourDistance` and WCAG luminance:
+knows. The measurements, all with `colourDistance` and WCAG luminance: (text only)
 
 - **Worst cross-category pair 15.6** — Helping hands vs Language (was Arts vs
   Outings at 15.0). Floor 14, unchanged. Helping hands moved least (ΔE00 2.4):
   a deep cyan that must carry ink has almost no room to brighten, and the obvious
-  bluer step fell to 13.9 from Language.
+  bluer step fell to 13.9 from Language. (text only)
 - **Navy on every fill ≥ 4.81:1** (Training, unchanged hex; it was 4.78 against
   the old ink). The navy and the old brown ink have almost the same luminance
-  (0.0175 vs 0.0180), so every ink contrast in the app moves by under 1%.
+  (0.0175 vs 0.0180), so every ink contrast in the app moves by under 1%. (text only)
 - **The wash** (`colourWash`, `js/05-helpers.js`) is a rule, not a table: 18% of
   the fill mixed into white — `color-mix(in srgb, <fill> 18%, white)` — within
   ΔE00 1.6 of every wash the handoff drew, and it reaches a sport's colour or a
   hand-picked one where a table would not. Navy on every subgroup's wash ≥
-  12.65:1, Pop's secondary text `#4d5575` ≥ 5.96:1.
+  12.65:1, Pop's secondary text `#4d5575` ≥ 5.96:1. (text only)
 - `CAT_HEX` moved with them (school `#4aa3ff`, active `#fb8a2e`, free `#4cc46a`,
   daily `#ffc83d`, training `#f2597d`, routine `#3cc9b9`; sleep, custom,
   appointment and competition as corrected in stage 2B-3 below), and every value
@@ -1813,7 +1813,7 @@ active → Body, appointment → Fuel & Care), `competition` with the shipped
 Competition activity's (Body), every sport with Training's (Body). Every
 cross-category pair ≥ 14, navy ≥ 4.5:1 on every fill, navy and `#4d5575` ≥ 4.5:1
 on every wash. A category's colour against its own subgroup is the same idea
-(School and `CAT_HEX.school` are one hex) and is not floored. Six moved:
+(School and `CAT_HEX.school` are one hex) and is not floored. Six moved: (checked by smoke: everySubgroupTellsItselfApart)
 
 | Colour | Was (stage 2) | Now | Why |
 |---|---|---|---|
@@ -1843,19 +1843,19 @@ from `#ef476f` would have turned every training block already placed into a
 chosen `#ef476f` — every skating session the old pink instead of skating's
 purple. `TRAINING_DEFAULT_HEXES` holds the current and every retired sentinel
 and, like `RETIRED_SEEDED_HEXES`, only grows; the smoke check places a skating
-block carrying each and asserts it draws the sport's colour.
+block carrying each and asserts it draws the sport's colour. (text only)
 
 **The ink follows the look.** `isLightColour` measured against a hard-coded
 `#2a2320`; it now asks `inkContrast` (`js/08-day-view.js`), which reads `--ink`
 off `:root` — cached per `<html data-look>`, so a look switch re-reads it with
 no invalidation hook to forget. `everySubgroupTellsItselfApart` measures with
 the same function and asserts it scores the live ink against itself at exactly
-1:1. `printTextColor` does not follow: print ignores the look.
+1:1. `printTextColor` does not follow: print ignores the look. (checked by smoke: everySubgroupTellsItselfApart)
 
 **`--cat-*` in the stylesheet are copies; `CAT_HEX` owns them.** Only the five
 something reads are kept (sleep, school, free, daily, custom — `--cat-free` had
 already drifted to Play's `#7fca79` while `CAT_HEX.free` said `#95d5b2`), and the
-smoke check fails when a copy disagrees with the table.
+smoke check fails when a copy disagrees with the table. (text only)
 
 **Kid colours** (§7): `--jenn` `#ff5c8a` / `--jenn-strong` `#c81d5a` /
 `--jenn-wash` `#ffe4ec`; `--jess` `#3d8bfd` / `--jess-strong` `#1a5fd0` /
@@ -1863,7 +1863,7 @@ smoke check fails when a copy disagrees with the table.
 fills give white 2.94 / 3.33). The chore-pay trends draw each kid's series in
 her `-strong` (5.46 / 5.74:1 on the paper, where the fills would be under 3:1)
 and her card head in her wash — Jenn's line was amber `#cf8f22` until then; the
-four `--mny-trend-*` tokens are gone.
+four `--mny-trend-*` tokens are gone. (text only)
 
 **Measure colour distance the way an eye does — CIEDE2000, never CIE76.** The
 first separation of this table used CIE76, which overstates the distance between
@@ -1873,7 +1873,7 @@ still had two *different* categories reading as one colour on an iPad. Worse,
 the "fix" it endorsed — deepening Play — walked it *toward* Helping hands,
 because both are greens. `colourDistance` (`js/05-helpers.js`) is CIEDE2000 and
 `everySubgroupTellsItselfApart` (`tests/smoke.js`) holds the table to it, so the
-check measures the same way the palette was chosen.
+check measures the same way the palette was chosen. (checked by smoke: everySubgroupTellsItselfApart)
 
 **The figure that matters is the worst CROSS-category pair.** Two subgroups
 inside one category are *meant* to look related — Meals and Appointments are both
@@ -1881,7 +1881,7 @@ Fuel & Care and sit at 8.3 (9.8 before stage 2), which is the design working. Tw
 different categories reading as one colour is the defect, and that pair was
 **2.9**: Helping hands and Play, a chore and an afternoon of Minecraft, the same
 colour to any eye. The floor is 14 on cross-category pairs only; within a
-category all that is required is that two are not literally the same hex.
+category all that is required is that two are not literally the same hex. (text only)
 
 Five of the twelve were crowded into one green-teal corner, so **Helping hands
 left it entirely** (chores are not a shade of rest) and **Explore left the greens
@@ -1899,7 +1899,7 @@ frozen at the old hue **forever**. No migration can fix it: `deepMergeObj` lets 
 remote scalar win, so a device serving an older bundle out of a Pages cache would
 push the old colours straight back. `RETIRED_SEEDED_HEXES` (`js/01-config.js`)
 must **grow on every recolour and never be pruned**, and the guard asserts both
-halves — a retired hue re-derives, a hand-picked one is left alone.
+halves — a retired hue re-derives, a hand-picked one is left alone. (text only)
 
 **One owner, and the recolour is what proves it.** `ACTIVITY_GROUPS` carried its
 own `hex` on every row, four of them repeating a subgroup value exactly, so
@@ -1910,7 +1910,7 @@ directly — the week and day buffer strips and the sibling preview — which ta
 the SEEDED value `blockColour` exists to ignore, so a card would have drawn in
 the new hue with its own travel strip still in the old one. All three call
 `blockColour`. `CAT_COLOUR`, a third copy of the same table with zero consumers,
-is gone.
+is gone. (text only)
 
 **The week legend draws the colours the cards actually wear.** It listed the
 eight chart groups, then the six categories — closer, but still not what a card
@@ -1919,7 +1919,7 @@ Everyday movement, Seasonal treats) appeared in no key at all, one of them the
 very colour a parent could not tell from Play. All twelve now, grouped under
 their category so it still reads as six ideas. `.tg-legend-cat` sits at the kid
 floor of 13.1px, not below it — this is a kid screen, and "it is only a heading"
-is not an exemption.
+is not an exemption. (text only)
 
 **The subgroup is the hue; the category picks it.** `blockColour` reads
 `activitySub(act).hex`. A stored `b.colour` counts only when somebody CHOSE it:
@@ -1930,7 +1930,7 @@ already placed wearing the one it replaced. A block whose activity **nothing
 resolves** keeps the grey `#888`, explicitly: `activitySub`'s neutral landing is
 Meals, which is right for filing an hours total vaguely and wrong for colour. A
 block nobody can name drawn in Breakfast amber does not say "unknown", it says
-"breakfast".
+"breakfast". (text only)
 
 **The chart rows do not move.** A subgroup names a default `group`, and an
 explicit `group:` on an activity still wins — that is how Muscle Relaxation sits
@@ -1938,7 +1938,7 @@ with the movement activities where it belongs in her week and still earns
 nothing, and how Family Meeting sits beside the routines without ever being
 counted as a routine session. Eight ids, same prices; three labels changed to
 match the words on the picker (Daily → Fuel & Care, Free → Play & Rest, Chores →
-Helping hands).
+Helping hands). (text only)
 
 **Derived, never migrated.** Every custom activity already in Firestore carries a
 `cat` and no `sub`, and `deepMergeObj` lets a remote scalar win, so a device
@@ -1947,13 +1947,13 @@ over a stamped one. `activitySub` answers at read time — the same answer whate
 has run, however often, in any merge order — and writes nothing. The same
 reasoning as `xp2` and `achievementActivityId`. `cat` is still WRITTEN on a new
 record (`catForSub`) because the sticker conditions, the Athlete achievement and
-`ACTIVITY_OBJECTIVES_BY_CAT` all key on it.
+`ACTIVITY_OBJECTIVES_BY_CAT` all key on it. (text only)
 
 **The Family Hero chores are archived.** They named four specific jobs the paid
 pool already holds row by row — and `mrChoreTagsForDay` keys on
 `actId !== 'chores'`, so a Family Hero block was never a claimable chore at all: a
 child could do the washing-up under Kitchen Helper Quest and be paid nothing for
-it. House Chore plus a pool row is the one way to say it.
+it. House Chore plus a pool row is the one way to say it. (text only)
 
 ## The picker asks what time it is
 
@@ -1961,7 +1961,7 @@ it. House Chore plus a pool row is the one way to say it.
 this family, wherever it was filed" — a different question from all six, and the
 only way to find the thing you made). Seasonal is a subgroup now, not a chip:
 `_locked` still keeps Beach Day out of January, so nothing about availability
-changed, only where it is filed.
+changed, only where it is filed. (checked by smoke: everyCategoryIsReachable)
 
 **It leads with what fits, and "fits" is a SCORE against the clock.** Every
 activity has carried `suitableTime` since the catalog was written and the picker
@@ -1972,7 +1972,7 @@ whatever — and 47 of the 70 entries declare `'weekend'`, so they all matched
 equally and the real ordering fell through to `slotPickerRecentActIds`, which is
 placement frequency over four weeks. Tapping **12:30 offered Evening Routine,
 Morning Routine and Dinner ahead of Lunch**, in exactly the household's
-most-placed order. The hour changed nothing but the heading text.
+most-placed order. The hour changed nothing but the heading text. (text only)
 
 Two questions, two owners. `clockZoneForMin` (`js/17-ui-misc.js`) is the band
 regardless of what KIND of day it is; `zoneForGap` stays the calendar answer.
@@ -2002,20 +2002,20 @@ school day, where the only match for the school band is School Day itself and it
 is far too long to fit. It says *Nothing obvious for 12:30pm* rather than saying
 nothing. `theSuggestionsAnswerTheClock` asserts the ORDERING, not the presence of
 a heading: the previous check asserted only that "Good for" existed, which was
-true throughout, and is why this shipped.
+true throughout, and is why this shipped. (checked by smoke: theSuggestionsAnswerTheClock)
 
 **Inside a category the list is grouped by subgroup**, with the subgroup's colour
 on the heading and on each tile's edge. The per-chip "last time" lift is drawn
 **above every heading and removed from its own group**: grouping re-sorts into
 table order, so a lifted House Chore landed back at the bottom under Helping hands
-and the memory silently stopped working.
+and the memory silently stopped working. (text only)
 
 **Fixed height, fixed chip row.** `.slot-picker-list` was a `max-height`, so the
 sheet was as tall as whichever category happened to be open and the whole dialog
 jumped on every chip — moving the chips out from under her thumb. It is
 `min(336px, 50vh)`, five rows of 56px tiles, which holds the largest category on
 an iPad and scrolls inside itself on a phone. The chip row is one line that
-scrolls sideways rather than wrapping, for the same reason.
+scrolls sideways rather than wrapping, for the same reason. (text only)
 
 **Both add-activity dialogs are rendered from the one table.** `#customCat` and
 `#paCat` held a hardcoded list of eight each, copied byte for byte, so a category
@@ -2025,14 +2025,14 @@ subgroup. The kid dialog **opens on the chip she came from** and stamps the wind
 she is standing in, so the thing she just invented turns up in the suggestions at
 the time she invented it for. The parent editor sets the four windows and
 `travels` by hand, and refuses an activity that fits nowhere — one that can never
-be suggested reads as a mistake rather than a choice.
+be suggested reads as a mistake rather than a choice. (text only)
 
 ## Eight activity groups — what the time is FOR
 
 `ACTIVITY_GROUPS` and `activityGroup(act)` in `js/01-config.js`. **Routine ·
 Brain Construction · Body Construction · Chores · Daily · Free · Everyday
 movement · Explore**, each with a `short` form because the week grid compresses
-a label to about seven characters.
+a label to about seven characters. (text only)
 
 **Move and Explore were the two the table could not say.** A Saturday swim was
 filed under Body beside a coached session, so the hours chart said a length of
@@ -2041,12 +2041,12 @@ time", which is what the app calls doing nothing. `cat: 'active'` maps to
 `move`; `explore` has no category behind it and is set explicitly, because `cat`
 is busy answering the other question. `relax` carries an explicit `group:'free'`
 for the same reason in reverse: rest that scores is rest turned into another
-thing to perform.
+thing to perform. (text only)
 
 **`groupDef`'s fallback is by id, not by position.** It used to return
 `ACTIVITY_GROUPS[4]` — `daily`, but only because daily happened to be the fifth
 row, so adding a group above it would have silently re-pointed every
-unknown-group lookup. Nothing tested it until `mealsAreNotChores` did.
+unknown-group lookup. Nothing tested it until `mealsAreNotChores` did. (checked by smoke: mealsAreNotChores)
 
 **`tools/xp-calibrate.js` reads the group list from the source.** It summed over
 a hand-written six-id array, so adding a group left it reporting the economy the
@@ -2054,7 +2054,7 @@ app no longer had — no error, just the wrong numbers, which makes "change a
 number and re-run the tool" a no-op. `tests/xp.test.js` now also asserts the
 other direction: every group the app prices must be one the test has an opinion
 about, because iterating its own `want` map is a whitelist that a new group
-passes unnoticed.
+passes unnoticed. (checked by tests/xp.test.js)
 
 `cat` still drives the picker's filters, and `CAT_HEX` survives only as
 `blockColour`'s last fallback — the SUBGROUP is what decides a block's colour. This answers a different question, and it is the only one
@@ -2083,7 +2083,7 @@ so the app's answer to "you have planned ten things" was to hand back the right
 to plan an eleventh *kind* of thing. `unlockedActs`, `manualPlacedCount` and
 `unlockedThisWeek` are no longer seeded; a stored document that still carries
 them is left alone, because `deepMergeObj` cannot express a deletion and a
-tidy-up would churn the document on every sync to no effect.
+tidy-up would churn the document on every sync to no effect. (checked by smoke: noActivityHasToBeEarned, aLegacyActivityRewardDrainsAway)
 
 Two things survive this and must not be swept up with it. **`_locked` still has
 a writer** — the seasonal out-of-season rule in `getAllActivities` — and it is
@@ -2105,7 +2105,7 @@ planned an after-school routine was permanently marked down for one.
 blocks when there are any, otherwise **three on a school day and two on a
 weekend or school-free day** — there is no after-school routine on a day with no
 school. Which kind of day it is comes from `isSchoolDay`, never from the day of
-the week, so the family's own calendar decides it.
+the week, so the family's own calendar decides it. (checked by smoke: onlyThePlannedRoutinesAreEvaluated)
 
 `routineSessionsByDay` and `routineSessionDayCount` are derivations for the week
 grids, which need a denominator: `n/7` measured a session against seven days
@@ -2121,7 +2121,7 @@ unsettled old week re-prices from the live plan. `mrRoutineSessionsFor`
 (`js/18-rules.js`) is the money-side gate, and `mrStreakDayDone` and
 `mrStreakWeek` both ask it so they cannot disagree about the same week.
 `ctWeekHasData` and the legacy import still say `CT_SESSIONS` on purpose, with a
-reason at each site.
+reason at each site. (checked by smoke: theRoutineRulePricesEveryWeekAlike)
 
 School lives inside Brain and is ~32 hours a week, so the Brain row **names how
 much of itself was the school day** — otherwise homework can never be seen to
@@ -2131,14 +2131,14 @@ move. `getWeeklyHours` returns `schoolMin` for exactly that.
 against a single maximum across both girls and every week shown. Each bar used to
 be normalised to its own kid's planned total, so two equal bars meant different
 amounts and no bar could be compared week to week. Labelled **"planned hours
-completed"** — the app records no elapsed time and must not imply it does.
+completed"** — the app records no elapsed time and must not imply it does. (text only)
 
 ## XP: one ledger, one gate, calibrated
 
 `tools/xp-calibrate.js` replays the rules over synthetic quiet / ordinary /
 strong weeks and reports levels gained; `tests/xp.test.js` locks the values and
 re-runs it. **Change a number and re-run the tool** — the first set of values
-tried here levelled a child every half-week, and the tool is what said so.
+tried here levelled a child every half-week, and the tool is what said so. (checked by tests/xp.test.js)
 
 Every completed block used to earn a flat `QUEST_XP_PER_TASK` (20) against 100
 per level: five blocks was a level, an ordinary day was two, and a bowl of cereal
@@ -2160,7 +2160,7 @@ remote **scalar** win, so a device still serving the old bundle out of a Pages
 cache could push an un-rescaled total over a rescaled one, or two devices could
 rescale the same figure twice. `progress.xp2` holds the new scale and, when it is
 absent, the answer is **derived** from the legacy `questXP` — the same answer
-whatever has run, however often, in any merge order.
+whatever has run, however often, in any merge order. (text only)
 
 ## Three steps, and they have IDS
 
@@ -2168,7 +2168,7 @@ It was five — *Check the week · Reflect · What I earned · What I do with it
 Close & plan*. Eight weeks went unsettled, and the reason was never that any
 one step is hard: **five is the wrong shape for a Sunday with two children in
 the room.** Three of the five merged in pairs that were always about the same
-thing.
+thing. (text only)
 
 | Step | Was |
 |---|---|
@@ -2180,7 +2180,7 @@ thing.
 appeared eleven times, `mmGoStep(4)` eight, across the app and the suite.
 Renumbering would have silently re-pointed every one at a different screen —
 the same defect as `groupDef` returning `ACTIVITY_GROUPS[4]` because daily
-happened to be the fifth row.
+happened to be the fifth row. (text only)
 
 So a step has an **id**, and three functions keep the two numberings apart:
 
@@ -2205,14 +2205,14 @@ length.
 **A step is a list of panels, not a rewrite.** `mmRenderReview`,
 `mmRenderReflect`, `mnyRenderEarned` and `mnyRenderDecide` each still own
 exactly what they owned; a step concatenates them. Rewriting four renderers
-into two would have been four chances to lose a rule only one of them knew.
+into two would have been four chances to lose a rule only one of them knew. (text only)
 
 **One set of chrome per screen.** Each money panel drew its own page head,
 five-page bar and kid tabs, so merging them stacked **two identical five-tab
 navs** on the screen whose whole purpose is to be less to wade through — the
 six-button-shortcut-row defect again. `opts.chrome === false` drops a panel's
 head in favour of a section heading, and the step renders the bar once. A
-chrome flag is not a second renderer.
+chrome flag is not a second renderer. (text only)
 
 **THE MONEY STEP'S FOOTER IS THE COMMIT, not a Next.** `mmMoneyFooter` owns it.
 The commit was a bar somewhere in the middle of a long scrolling panel, and on
@@ -2220,7 +2220,7 @@ this screen that is not a matter of taste: it is the one control in the app that
 moves real money, and one you have to go looking for is one that gets missed on
 a Sunday and one that gets pressed while scrolling past it. In the footer it is
 always visible, always in the same place, and it says what it will do or why it
-cannot.
+cannot. (text only)
 
 It is **still a separate gated act**: putting "what I earned" and "what I do
 with it" on one screen must not make scrolling to the bottom a commit. The
@@ -2231,7 +2231,7 @@ a child is how a week comes to be half-settled with nothing saying so.
 **`mnyCommitRefusal` is the one owner of why a split cannot commit.** Two things
 ask it now — the panel where the plan is edited, and the footer button — and two
 copies of a rule about moving money has a worst case worth naming: a button
-offering to commit while the panel above it says it cannot.
+offering to commit while the panel above it says it cannot. (text only)
 
 ## The meeting is a SCREEN, not a pop-up
 
@@ -2240,7 +2240,7 @@ with its own scrollbar. A Sunday sitting is the **longest task in this app**:
 two children, a week of days, a reflection each and a money split. Inside a
 sheet that meant scrolling a small window up and down the whole way through,
 which is the owner's own report of using it. **A task that takes twenty minutes
-is not a dialog.**
+is not a dialog.** (text only)
 
 It is `screen-meeting` now and `showScreen` opens it. That is not a second
 dialog mechanism growing beside `openSheet`/`closeSheet` — it is **one fewer**.
@@ -2251,7 +2251,7 @@ answered and gone.
 sites across seven files each spelled out their own
 `document.getElementById('familyMeetingOverlay').classList.contains('open')` —
 the six-copies defect this file keeps recording, and exactly what would have
-made this a nineteen-place edit with nineteen chances to miss one.
+made this a nineteen-place edit with nineteen chances to miss one. (text only)
 
 | Question | Function |
 |---|---|
@@ -2265,18 +2265,18 @@ closing revealed whatever had been behind it — and a screen has to remember, s
 someone is on is not the family's data, and every state write is a full-document
 upload). It never records the meeting as its own origin: `mmShow` is called
 again by every path that re-enters a sitting already open, and a self-reference
-would trap the Close control on this screen.
+would trap the Close control on this screen. (text only)
 
 **`closeSheet` stopped carrying one caller's knowledge.** It held a special case
 for this one id — refresh the parent hub when the meeting closes — and that is
-`mmHide`'s now. A general mechanism should not know about one of its callers.
+`mmHide`'s now. A general mechanism should not know about one of its callers. (text only)
 
 **The layout is unchanged, and that is why the move was cheap.** The meeting was
 already a flex column with `.mm-body` as its one scroller and the head and foot
 as real flex children taking layout space (never sticky, which floats a band
 over a card). It only had to stop being 88% of the viewport inside a floating
 box and start being `100dvh` of the screen. `theMeetingKeepsItsHeadAndFeet`
-asserts the same properties against `.mm-screen`.
+asserts the same properties against `.mm-screen`. (checked by smoke: theMeetingKeepsItsHeadAndFeet)
 
 The kid nav and the parent bar both hide themselves here without any change:
 `TD_NAV_SCREENS` does not list `screen-meeting`, and `parentRenderNav` shows
@@ -2291,7 +2291,7 @@ closes. Both parent banners share `parentBannerBackButton()`, which reads "Back
 to weekly meeting" while one is waiting and "◀ Hub" otherwise. `applyMeetingLock`
 **hides the Hub link and both child switchers** while a sitting is open: three
 controls that each silently abandoned the meeting is worse than one that says
-where it goes.
+where it goes. (text only)
 
 **A lock that cannot be lifted is not a lock, it is damage.** Two things were
 wrong with it. It swept the whole document for `.profile-badge`, so a sitting on
@@ -2304,7 +2304,7 @@ to a kid, and every badge stayed hidden for the rest of the session on all five
 screens. `locked` is `isParent() && mmHasReturn()`, and `renderWeek` and
 `openDay` call it **outside** their `isParent()` branches, so a child's own
 render is what puts the control back. `mmClearReturn()` only nulls the variable
-— it un-hides nothing, and never could.
+— it un-hides nothing, and never could. (text only)
 
 **A day refused only for `unconfirmed` is the one refusal a SITTING may talk its
 way past.** `mmOverridableRefusal` names it: blocks nobody answered, which is
@@ -2312,7 +2312,7 @@ exactly what makes an old week stick. `future` and `running` are refused over
 time, which no amount of agreeing changes, so they stay hard everywhere — and so
 does the parent day banner, because the offer belongs to a sitting where a
 grown-up is working through a week on purpose, not to the day screen where a
-stray tap would record a review nobody meant.
+stray tap would record a review nobody meant. (text only)
 
 The offer is **inline on the row, never a modal**: a three-button sheet would be
 a second dialog mechanism beside `openSheet`/`closeSheet`, which own focus and
@@ -2333,18 +2333,18 @@ settled week costs nothing and is still allowed, so a whole week does not become
 unrecordable to protect one grade. An earlier draft offered to "reopen her week"
 and called `mnyReopenWeek`, which returns false for exactly this case, then
 toasted that it had — a button announcing something it had not done, which is
-the defect this file keeps recording. The check that guards it is what found it.
+the defect this file keeps recording. The check that guards it is what found it. (checked by smoke: settledMoneyCannotBeQuietlyTakenBack)
 
 **Step 1 had no route to the day or the week at all**, on any week: `openkidday`
 was dispatched with no button anywhere rendering it, and the only `openweek`
 button was in step 2. Both steps carry the per-child pair now, from one writer
-with one set of labels.
+with one set of labels. (text only)
 
 **Fines are entered on step 1, where the day key already is.** `mrAddFine` takes
 a `dayKey`, step 1 walks the week day by day, and step 3 is a totals screen that
 would have to ask which day. `cpFines` stays as the day-to-day surface. Two
 entry points, one writer (`mrAddFine`), one arithmetic owner (`mrFinesWeek`) —
-not the "six copies" defect, which was six places each deciding the answer.
+not the "six copies" defect, which was six places each deciding the answer. (text only)
 
 **A planned competition must be scored before the week settles.** A meet could
 be planned and never recorded, and the answer was unsayable: `$0` in the totals
@@ -2353,14 +2353,14 @@ reads identically for "no meet", "a meet worth nothing", "a voided channel" and
 a one-tap **No criteria met · $0**, which `mrAddCompetition` persists cleanly
 (unlike `mrSetChoreGrade`, which DELETES at zero). `mmUnrecordedCompetitions`
 matches on day **and** name, or two meets on one Saturday are both satisfied by
-recording either.
+recording either. (checked by smoke: aPlannedCompetitionMustBeScored)
 
 **Step 2 asks the child; it does not tell her about herself.** `js/37-reflection.js`
 owns the record and nothing else. Three questions in this order — *What went
 well? · What problem did you notice? · What will you do next time?* — because a
 child asked what went wrong before she is asked what went right has been told
 what the conversation is about. The second tab is **Needs work**, never "Bad": a
-behaviour can need work, a child cannot.
+behaviour can need work, a child cannot. (text only)
 
 The record is `state.shared.chore.reflections[weekKey][kid]`, the same shape and
 container as `weekConfirms` and `weekPlans`, and `mergeSharedChore` arbitrates it
@@ -2375,11 +2375,11 @@ markup — a `disabled` attribute is a hint to the pointer, not a rule:
 
 - **evidence never selects an answer.** It is offered *underneath* her own, and
   folded by default. The app answering for her is the one thing this screen must
-  not do.
+  not do. (text only)
 - at most **two** things went well, exactly **one** problem, exactly **one**
   action.
 - **naming a cause does not finish the second tab.** An explanation is not a
-  solution; "I need help finding one" is a real answer where silence is not.
+  solution; "I need help finding one" is a real answer where silence is not. (text only)
 - the parent's tick records **that the conversation happened**. It asserts no
   agreement and changes no completion, grade, XP or money. It is offered only
   once there is something to have talked about — complete, or explicitly
@@ -2388,13 +2388,13 @@ markup — a `disabled` attribute is a hint to the pointer, not a rule:
 - **skipping is explicit and reversible**, and never blocks the settlement. It is
   offered only while something is still unanswered: setting aside a reflection
   that is already finished is a contradiction, and finishing one clears
-  `skippedAt`.
+  `skippedAt`. (text only)
 - **no two of those states may disagree.** `reflStampAnswered` owns the derived
   marks so no caller has to remember them: completing clears the skip, and any
   change to *her answers* clears `parentReviewedAt` — a tick describes the
   answers that were on screen when they talked, so it cannot survive her
   rewriting one. `reflAnswerSignature` is what draws that line, which is how the
-  tick survives its own write and the parent's own observation field.
+  tick survives its own write and the parent's own observation field. (text only)
 
 **Evidence counts what has ENDED, and names what is waiting.** Needs Work read
 the week from midnight, so a swim at six was offered to a child at breakfast as a
@@ -2403,7 +2403,7 @@ not yet had the chance to do. It measures `blockHasEnded` now, the same
 arithmetic `canReviewDay` uses. And a chore she had DONE and claimed read as
 "still owed" while it sat in a parent's queue: `getFamilyChoreStatus` already
 separates `waiting` from `fulfilled` and outstanding, so the evidence says which
-is which rather than blaming a child for somebody else's inbox.
+is which rather than blaming a child for somebody else's inbox. (text only)
 
 **A recorded action keeps its own words.** `actionText` was written and read by
 nothing — the display rebuilt the label from the current answer list, so
@@ -2412,7 +2412,7 @@ appears to say. `reflActionLabel` derives the live label and is what gets STORED
 `reflActionText` prefers the stored words and falls back to the label only for a
 record written before the field carried anything. `actionTextId` says which
 answer the stored words belong to, so picking a different action rewrites them
-and rewording the list never does.
+and rewording the list never does. (checked by smoke: aRecordedActionKeepsItsOwnWords)
 
 **The action is saved either way; putting it in a plan is a separate act.** She
 picks it and it is in the record immediately. Carrying it forward is offered, not
@@ -2421,7 +2421,7 @@ and what will appear. `reflTargetWeek` decides where it lands, and **not** by
 taking the week after the one on screen: a current week plans into next week, and
 anything older plans into the week we are actually in — a sitting held six weeks
 late must not write into a week that has already happened, which is the defect
-that retired `mmPlanNextWeek`.
+that retired `mmPlanNextWeek`. (text only)
 
 **Choosing a routine decides what the to-do is TIED TO, not whether one exists.**
 Attaching used to write no to-do at all — only `linkedRoutineId` into the
@@ -2433,7 +2433,7 @@ real to-do now; picking a routine additionally sets `linkType:'activity'` and
 `linkActId`, which is what `getTodoLinkStats` (`js/12-goals.js`) already read, so
 the to-do carries that routine's progress beside it. `carriedTodoId` names what
 was created; `reflCarryLabel` is the one sentence saying where it went, which is
-what step 5 reports.
+what step 5 reports. (text only)
 
 **`carriedTodoId` is the only evidence a carry actually happened.**
 `reflCarriedForward` accepts it, and accepts the legacy `linkedBlockId` because
@@ -2446,14 +2446,14 @@ never existed while never offering the button again. Read as not carried, the
 offer returns and the next tap writes the real thing, so the record repairs
 itself with no migration. `addKidExtra` is deliberately NOT used: it reads the active
 profile rather than the child being reviewed, and a routine checklist item is a
-standing rule rather than one week's action.
+standing rule rather than one week's action. (text only)
 
 **A closed week's reflection is a record.** `reflIsLocked` gates every edit path —
 chips, keyboard, the parent tick, the skip and the carry-forward — because the
 money and the grades are already frozen when a week closes and a reflection that
 could still be rewritten would be the odd one out. Paging through it stays
 available; reopening the week on step 5 is the way back in, the same door every
-other frozen fact uses.
+other frozen fact uses. (checked by smoke: aClosedWeeksReflectionCannotBeRewritten)
 
 **Two things are kept apart from her own words.** `inputMode` records *how* the
 answer was given — spoken, or scribed by whoever held the iPad — and nothing
@@ -2462,14 +2462,14 @@ making her type it to make it count turns a conversation into a form.
 `parentObservation` is a second account of the week in its own labelled field,
 and it can never overwrite hers. `evidenceIds` keeps what the app was *offering*
 when she answered, never what she picked — nothing on this screen selects an
-answer.
+answer. (text only)
 
 **A tap edits a draft, not the document.** Every write is a full-document upload
 and this is the tap-heaviest screen in the app, so `reflDraft` is device-local
 and `reflCommitDraft` writes on the moves that mean she has finished with a tab —
 switching tab or child, leaving for her week, changing step, closing the meeting.
 Three writes per child per sitting instead of twenty, and the smoke check counts
-them rather than trusting it.
+them rather than trusting it. (text only)
 
 **A past week cannot plan forward.** `mmWeekPosition(wk)` decides what step 5
 offers. Current: close the week (`canCloseWeek` refuses until both girls' days
@@ -2478,23 +2478,23 @@ return to the present — no copy. Future: cannot be reviewed or closed.
 `mmPlanNextWeek` is **gone**; it read whichever week the meeting pointed at and
 then did `weekOffset += 1`, so a six-week-old sitting wrote its plan over the
 following historical week. Copying belongs in the planner, beside the week it
-would land on.
+would land on. (checked by smoke: aPastWeekCannotPlanForward)
 
 **One undo snapshot per week, taken by whichever commit comes first.**
 `mmTakeUndoSnapshot` ran once per child, so settling Jess overwrote the picture
 taken before Jenn; undo put Jess back, left Jenn's money moved, and printed
 "nothing was recorded". It is idempotent per week now, and the message says what
 actually happened. It is withdrawn once money moves after the commit — see
-"Plan v8 B8–B10" below.
+"Plan v8 B8–B10" below. (text only)
 
 **Celebrate reads live sources only.** It counted chores through `ctGetOptional`
 — `optionalByWeek`, the retired chore-group store — so a week of real graded work
 was celebrated as zero, and it showed the preliminary money figure as though it
-had been recorded.
+had been recorded. (text only)
 
 **One scroller, both ends pinned.** `.mm-head` sticks to the top of the sheet and
 `.mm-nav` to the bottom, inside the sheet's own scroll area — nesting a second
-scroller would mean a flick on an iPad moves the wrong one.
+scroller would mean a flick on an iPad moves the wrong one. (text only)
 
 ## Buffer defaults: you go to some things
 
@@ -2504,7 +2504,7 @@ and School Day carry it. Both sheets started every buffer off, so a swim was
 planned as though it happened at the kitchen table and `tdActionableStart` — the
 get-ready time Today leads with — had nothing to compute from until somebody
 remembered the toggle. The default comes from the **activity**, never globally:
-a global default would put a fifteen-minute car journey in front of Breakfast.
+a global default would put a fifteen-minute car journey in front of Breakfast. (text only)
 
 ## Travel is two legs, not one figure mirrored
 
@@ -2513,7 +2513,7 @@ ordinary Tuesday could not be said at all: **school, then straight on to
 training, then home.** There is no drive home from school that day; the drive to
 training leaves from the school gates rather than the house; the drive home
 afterwards is longer than either. The activity you are going TO owns the travel,
-so the fact is **per leg**.
+so the fact is **per leg**. (checked by smoke: aBlockCanGoStraightOnWithoutComingHome)
 
 `travelTo` / `travelHome` and `readyBefore` / `readyAfter`, each with its own
 minutes. **Derived, never migrated:** absent means fall back to the symmetric
@@ -2547,7 +2547,7 @@ means symmetric — which is what the two **placement** sheets pass, because a
 block being placed genuinely is symmetric until somebody edits it. A block that
 goes straight on says *Going straight on — no travel home* out loud, because a
 missing line reads as "nobody set it" rather than as the answer. The function
-also replaced seven byte-identical call sites.
+also replaced seven byte-identical call sites. (checked by smoke: aBlockCanGoStraightOnWithoutComingHome)
 
 `aBlockCanGoStraightOnWithoutComingHome` asserts the legacy shape is untouched,
 that the Tuesday draws no post segments, that the sheet names 35m and 25m rather
@@ -2561,7 +2561,7 @@ clash.
 and `openEditSheet` (`js/09-sheets.js`) showed them for a **training** block
 only — everything else fell into an `else` branch that set both to
 `display:none`. So travel could be adjusted on any block and get-ready on almost
-none.
+none. (checked by smoke: getReadyIsEditableOnAnythingThatCarriesIt, changingTravelDoesNotRewriteGetReady)
 
 Exactly backwards, because of the buffer default above: placing an activity sets
 `getReadyBuffer: activityTravels(act)`, so School Day, all five appointments,
@@ -2582,21 +2582,21 @@ every path, not on one branch of two.
 **Warm-up stays training-only.** It is a training-specific idea with its own
 20-minute default, and a warm-up in front of Breakfast is what the buffer-default
 rule exists to prevent. `getReadyIsEditableOnAnythingThatCarriesIt` and
-`changingTravelDoesNotRewriteGetReady` hold both halves.
+`changingTravelDoesNotRewriteGetReady` hold both halves. (checked by smoke: getReadyIsEditableOnAnythingThatCarriesIt, changingTravelDoesNotRewriteGetReady)
 
 ## Writing a plan for this repo
 
 Problems and fixes in **plain language** — what is wrong, what it will do
 instead, which files. Not code, not line numbers. Mark what changed since the
 previous revision of the plan with a ```` ```diff ```` block so it carries a
-background colour and can be found at a glance. Keep the whole thing scannable.
+background colour and can be found at a glance. Keep the whole thing scannable. (text only)
 
 ## Naming
 
 New user-created Claude skills for this ecosystem use the `HZ-` prefix
 (e.g. `HZ-web-app-audit`). Repo files, CSS classes and JS functions keep the
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
-`wf-*` for the Full week grid, `wpp-*` for the week's print preview.
+`wf-*` for the Full week grid, `wpp-*` for the week's print preview. (text only)
 
 ## The parent portal is six destinations
 
@@ -2605,7 +2605,7 @@ existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 (Stage 6d, "Header space"); it was Setup › Money rules. The header is one
 row (`.parent-bar`): 🔒 Parent ▾ (`parentMenuToggle` — PIN, the look's
 `#parentLookBtn`, Exit), the destinations, the day, ⚙️ App, the switcher. It was ten flat tabs in a wrapping row, which on a phone
-was three lines and no order worth learning.
+was three lines and no order worth learning. (checked by smoke: everyOldTabIsStillReachable)
 
 **One panel renders at a time.** `renderParentHome()` used to call all ten panel
 renderers on every invocation, including every kid switch, in an app where a
@@ -2613,24 +2613,24 @@ render can trigger a full-document write. `PARENT_PANEL_RENDERERS` maps panel id
 to renderer and `setParentTab` invokes only the one being opened. **Every entry
 is an arrow, not a bare reference** — this file loads at `11` and most renderers
 are declared at `24`–`30`, so naming them directly would read them before their
-script has run.
+script has run. (text only)
 
 **A destination owns a home panel; anything else is a detail** reached from that
 home with one back link. `PARENT_PANEL_DEST` says which destination owns each
 panel, and `everyOldTabIsStillReachable` asserts the mapping rather than leaving
 it to a person walking a checklist — a panel that quietly stops being reachable
-is the failure a restructure produces.
+is the failure a restructure produces. (checked by smoke: everyOldTabIsStillReachable)
 
 **The boundary test decides where anything new goes:** *does changing this alter
 what the girls are asked to do, or what it is worth?* Yes → **Setup**. No →
-**App**. Change history sits in Setup, next to the things it logs.
+**App**. Change history sits in Setup, next to the things it logs. (text only)
 
 **Change history is its own Money rules section** (`changes` in
 `MNY_PARENT_SECTIONS`), and Setup › 🕰️ Change history opens it. It used to land
 on the week ledger while the real log sat at the bottom of Lessons.
 `changeHistoryIsItsOwnSection` holds both halves and asserts the log is drawn in
 exactly one section (it was under Lessons and Loans); 📖 Week history keeps its
-name and its ledger.
+name and its ledger. (text only)
 
 **A log line is words, never a stringified object.** `mrLogSummary(from, to)`
 (`js/18-rules.js`) is the one summariser: a list of records with ids reads
@@ -2638,7 +2638,7 @@ name and its ledger.
 a size. `mrLogAppend` stores that from now on, and `mnyChangeHistory` passes any
 non-scalar it finds through the same function — entries already on the family's
 devices hold whole `chorePool` arrays, which printed fifteen `[object Object]`
-for one chore added.
+for one chore added. (text only)
 
 **`parentScope` is not `parentViewing`.** The switcher has a **Both** state, but
 that value must never reach `parentViewing`: 27 places read that global and most
@@ -2646,22 +2646,22 @@ are outside the portal — `activeProfile`, the week view, block grading, the qu
 strip — and every one assumes a real child. Scope is a separate flag read only by
 the portal; `parentViewing` always holds a real kid. Anything that changes which
 child is shown goes through `setParentScope`, never straight at the global — that
-is what left three switchers disagreeing with each other.
+is what left three switchers disagreeing with each other. (text only)
 
 **The phone gets a bottom bar** (`parentRenderNav`), the kid nav's shape and 44px
 floor, below the 700px breakpoint only; the iPad keeps the top strip. It drives
-`setParentTab`, not `showScreen` — the portal is one screen with panels.
+`setParentTab`, not `showScreen` — the portal is one screen with panels. (text only)
 
 **A backlogged week has a short road** (`mmOpenExpress`): totals, two ticks,
 close, next. It is not a second way to move money — it commits through
 `commitFamilyMeeting` like step 4, and `mmMarkWeekMet` stays the separate record
 of having sat down. `mmMaxStep` never leaves 1 while it is on, which is what
-keeps `mmCloseMeeting` from marking a week met that was only recorded.
+keeps `mmCloseMeeting` from marking a week met that was only recorded. (text only)
 
 **Now counts and routes; it never decides.** Every number on it is read through
 the accessor the owning screen uses, and there is deliberately no control on it
 that grades, settles or approves. A second place that decides how a chore is
-graded is a second place that can disagree with the first.
+graded is a second place that can disagree with the first. (text only)
 
 **One card on Now writes, and only her answers: "On her behalf"** (R5 §5 rows 7
 and 8, 2026-09-24; `pnAnswerCard` / `pnAnswerClick`, `js/32-parent-now.js`).
@@ -2674,7 +2674,7 @@ which only a grown-up does (`ctBumpLearningFor` → `mrSetLearning`, refused for
 child). A graded chore shows as graded and is not reopened; grading stays in
 Chores and pay in the meeting; a week already settled for her
 (`mnyWeekSettled`) offers nothing. Held by `learningFromThePortal` and
-`parentAnswersForHerFromThePortal`.
+`parentAnswersForHerFromThePortal`. (checked by smoke: learningFromThePortal, parentAnswersForHerFromThePortal)
 
 **Copying a plan shows its work first.** Setup › Copy a plan
 (`js/34-parent-copyweek.js`) does a whole week or a single day — a span toggle,
@@ -2682,7 +2682,7 @@ not a second screen, because `pcwPlan()` stays the one decision either way. In
 day mode the two weekday pickers may differ: "put Tuesday's shape on Thursday" is
 a real thing to want. It owns no clone rule: `weekCloneBlock` (`js/07-week-view.js`)
 still decides what a copy arrives as — not done, not confirmed, no XP, no ticked
-checklist, no gear or training ticks, a stopwatch at zero, and **no `seriesId`**.
+checklist, no gear or training ticks, a stopwatch at zero, and **no `seriesId`**. (text only)
 
 That last one is the load-bearing part. A copy used to inherit the original's
 series, and `countSeriesBlocks` scans every week of a profile — so editing a
@@ -2699,7 +2699,7 @@ srcP, dstP)` is the one engine; the kid's 📋 sheet drives it for last / this /
 next week on her own days, and cross-child is parent-only because a day copy
 REPLACES the destination. Unplaceable blocks are dropped through
 `placeableActivityIds` (`js/05-helpers.js` — one owner, shared with `pcw`) and
-the count of what was left behind is always said out loud.
+the count of what was left behind is always said out loud. (text only)
 
 **The 📋 sheet is "Copy a day", and it shows both days before either is
 chosen** (R5 §7 Q1–Q2, 2026-09-24). The 🏫 School Day and 🌈 Weekend templates
@@ -2710,14 +2710,14 @@ its old ids, `#templateOverlay` / `openTemplateSheet`). `#copyDayNow`
 (`renderCopyDayNow`) lists what is on the target day now, each source-day row
 opens to list its blocks as `4:00–5:00pm 🏊 Swimming` (`copyDayBlockLine`, one
 line shared by the rows, the top box and the confirm) with the copy button
-inside, and the confirm names what it replaces and what stays.
+inside, and the confirm names what it replaces and what stays. (text only)
 
 **A parent-pinned block on the target day is kept, whoever copies.**
 `copyDayPlan(src, dst, srcP, dstP)` is the decision and only reads: `{ copy,
 replace, keep, dropped }`. Pinned target blocks are `keep` (never tombstoned); a
 source block the kept pin already covers — same `actId`, `tag` and `startMin` —
 is not copied again. The confirm reads the plan, and `copyDayInto` carries it
-out, so the two cannot disagree (the `pcwPlan` discipline).
+out, so the two cannot disagree (the `pcwPlan` discipline). (text only)
 
 **A pin is a parent's, so only a parent's copy keeps it.** `weekCloneBlock`
 drops `parentPinned` when `!isParent()` — a child cannot move or remove a pinned
@@ -2726,7 +2726,7 @@ clone rule, not in a caller, so every path obeys it: the 📋 day copy (child �
 unpinned, parent → pinned), `fillWeekFromNearest` / `copyWeekInto` (same; it
 only fills a blank week, so there is no target pin to keep), and `pcwCommit`
 (parent-only, so pins kept — unchanged; its "replace" still replaces a pinned
-day, because the parent chose it in a preview).
+day, because the parent chose it in a preview). (text only)
 
 **"Remove all in series" keeps a child's hands off pins too** (Plan v6 C4).
 `removeBlock` already refused one pinned block to a child; its "remove all"
@@ -2736,25 +2736,25 @@ remove and says how many stay (`seriesPinnedCount`: "📌 2 are pinned by a
 grown-up and stay. OK = remove the other 3"); a parent still removes them all.
 The series' own `sr:` tombstone is written **only when nothing was kept** —
 `blockTombstoned` drops every member older than it on the next merge, a kept
-pin included — so a child's partial remove tombstones only the ids it took.
+pin included — so a child's partial remove tombstones only the ids it took. (checked by smoke: removeAllInSeriesKeepsPins)
 
 **The copy button names whose day it lands on** (Plan v6 C8):
 `copyDayOntoWords(dstKid)` — "onto this day" for her own, "onto Jess's Tue" when
-a parent has picked the sister — used by the button and the confirm alike.
+a parent has picked the sister — used by the button and the confirm alike. (checked by smoke: copyADayNamesTheSistersDay)
 
 **Copying nothing asks nothing** (Plan v7). When `copyDayPlan` would copy no
 block — each one is already here under a kept pin, or is not on the sister's
 list — `confirmCopyDay` raises no dialog and changes nothing; a toast says why
 ("Nothing to copy from Thursday — it's already here, pinned"). It used to ask
 "Copy Thursday's 0 things onto this day?", and OK then replaced the day's
-unpinned blocks with nothing. Held by `copyingNothingSaysSoAndChangesNothing`.
+unpinned blocks with nothing. Held by `copyingNothingSaysSoAndChangesNothing`. (checked by smoke: copyingNothingSaysSoAndChangesNothing)
 
 **A copy that lands across a kept pin says so** (Plan v7). The confirm adds
 `⚠️ These would overlap a pinned one:` and one line per pair —
 `4:30–5:30pm 📖 Reading overlaps 📌 4:00–5:00pm 🎹 Piano Practice` — for every
 copied block whose time crosses a kept pin's (block times, not buffers). Words
 only: what is copied, replaced and kept is still `copyDayPlan`'s decision,
-unchanged, and both blocks stay. Held by `aCopyNamesItsOverlapWithAKeptPin`.
+unchanged, and both blocks stay. Held by `aCopyNamesItsOverlapWithAKeptPin`. (checked by smoke: aCopyNamesItsOverlapWithAKeptPin)
 
 **Clearing a day is "🗑 Start this day over", last on the 📋 sheet, and it keeps
 what is done, pinned or marked not done** (R5 §7 Q4, 2026-09-24). It was 🗑 on the Day view's top
@@ -2766,13 +2766,13 @@ didn't happen" money verdict; deleting it would erase that record) — tombstone
 the rest, and its confirm lists what goes and what stays (✅ / 📌 / 🚫) with
 `copyDayBlockLine`, then says there is no undo. There is deliberately **no undo**: the ids are tombstoned by the frozen
 merge layer, so an undo would mean re-adding blocks under new ids. A day with
-nothing to take off says so in a toast and asks nothing.
+nothing to take off says so in a toast and asks nothing. (text only)
 
 **How a day went is asked on Today, and the reflect sheet is TOLD its day**
 (R5 §7 Q3, 2026-09-24). The day's mood (`profile.dayMoods`) had two doors — 🌙
 on the Day view's top bar and "Today's Vibe" folded away in Today's
 `#tdExtrasBody` — and both wrote `dayMoods[currentDayKey]`, the global behind the
-invite wrong-day bug (PR #93): it outlives the Day view that set it. Now:
+invite wrong-day bug (PR #93): it outlives the Day view that set it. Now: (checked by smoke: todayAsksHowTodayWent)
 - `openReflectSheet(dayKey)` / `saveReflection(dayKey)` (`js/09-sheets.js`)
   take the day as an argument and **never read `currentDayKey`**; no day, or a
   day still to come, opens nothing. The Save button is bound to that day when
@@ -2791,23 +2791,23 @@ invite wrong-day bug (PR #93): it outlives the Day view that set it. Now:
   still evening, it reads "Today felt 😄" and reopens the sheet to change it,
   which the Vibe card allowed. `tdTickKey` includes what it asks, so the row
   appears at 8pm on a screen left open. Shown to whoever is viewing Today, as
-  the Vibe card was.
+  the Vibe card was. (text only)
 - **The 🌙 left the Day view's top bar** (it is 📋 · profile badge). A past
   day is still reflected on from its own screen: its 📋 sheet shows **🌙 How was
   Tuesday?** (`#reflectDayWrap` / `#reflectDayBtn`, `renderReflectDayButton`)
   for a day before today only — today's door is on Today, and a future day has
   nothing to look back on. The sheet captures the day when it opens and passes
-  it; the Day view's evening toast now points to Today.
+  it; the Day view's evening toast now points to Today. (text only)
 - **"Today's Vibe" is folded into the row**: the card, `renderVibe`,
   `setDayMood`, `#vibeMoods`, `#vibeSubtext`, `.vibe-card` and `.vibe-title` are
   gone. `.vibe-moods` / `.vibe-mood` stay (the sheet and the ritual). Today's
-  fold is now "To-dos and goals".
+  fold is now "To-dos and goals". (text only)
 - **The sheet's moods are 44px targets** (Plan v6 C2 — they were 36px for the
   day and 28px, inline, for each block): `#reflectOverlay .vibe-mood`, with a
   gap wide enough that a chosen dot's 1.2× stays off its neighbour. Each block's
   row (`.refl-block-row`) wraps, so on a phone the name sits above its five
   moods; the name is 15px. The ritual's and the edit sheet's dots are unchanged.
-  Held by `reflectMoodsAre44pxTargets`.
+  Held by `reflectMoodsAre44pxTargets`. (checked by smoke: reflectMoodsAre44pxTargets)
 - **The closing ritual** still reads `currentDayKey` and writes that day's
   mood from its own picker, and follows a reflection only when the day
   reflected on is today and `currentDayKey` is today, so it never says
@@ -2820,7 +2820,7 @@ invite wrong-day bug (PR #93): it outlives the Day view that set it. Now:
   for a day with any block on it. Held by `theClosingRitualCountsWhatWasDone`.
 Held by `todayAsksHowTodayWent` (clock pinned to a local time on Thursday of
 this week; `currentDayKey` is left on another day before every tap) and
-`todayIsWhereTheDayGetsDone` (the Vibe card stays gone).
+`todayIsWhereTheDayGetsDone` (the Vibe card stays gone). (checked by smoke: theClosingRitualCountsWhatWasDone, todayAsksHowTodayWent, todayIsWhereTheDayGetsDone)
 
 **A repeat is materialised, and it remembers what it is.** `seriesDayKeys`
 (`js/05-helpers.js`) is the one place that answers which days a repeat covers —
@@ -2833,7 +2833,7 @@ shift which weeks are on. Horizon capped at `SERIES_MAX_WEEKS` (26) and
 `SERIES_MAX_BLOCKS` (120), because one press must not write a year of blocks into
 a document that uploads whole on every change. Moving the end date runs
 `seriesExtendTo`, which adds and removes real blocks — but never a day already
-ticked or confirmed, which is a record rather than a line in a plan.
+ticked or confirmed, which is a record rather than a line in a plan. (text only)
 
 The other two week copies are not general enough to replace `pcw` and are
 deliberately left alone:
@@ -2869,7 +2869,7 @@ kid pages and inside the meeting.
 is Breakfast, so every achievement anyone added arrived reading **"🍳 Breakfast ·
 count target 1"**. Nobody chose that; it was alphabetical accident presented as a
 decision. New ones start `activityId: null`, but the records already written were
-never corrected and still read as somebody's decision.
+never corrected and still read as somebody's decision. (checked by smoke: aSeededAchievementIsNotAChoice, achievementsStartUnassigned)
 
 `achievementActivityId(a)` (`js/12-goals.js`) is the one place that answers *which
 activity did somebody actually choose*, and every reader goes through it —
@@ -2882,7 +2882,7 @@ and never `updatedAt`, while every edit path — `setAchievementActivity`,
 `setAchievementMode`, `setAchievementTarget` — goes through `markItemUpdated`. So
 an `activityId` on a record with **no `updatedAt`** can only have come from the
 seeder, and a parent who genuinely picked Breakfast stamped `updatedAt` in doing
-so and is left alone.
+so and is left alone. (text only)
 
 **Derived, never migrated** — the same reasoning as `xp2`. `achievements` is an
 **array**, and `deepMergeObj` treats an array as a scalar, so a device still
@@ -2890,7 +2890,7 @@ serving an old bundle out of a Pages cache could push the un-cleaned array back
 over a cleaned one. Answering at read time gives the same answer whatever has run,
 however often, in any merge order, and writes nothing.
 `aSeededAchievementIsNotAChoice` asserts both halves, and that reading twice
-changes nothing.
+changes nothing. (checked by smoke: aSeededAchievementIsNotAChoice)
 
 ## History is a record, not a working set
 
@@ -2902,7 +2902,7 @@ built-in be retired; `findActivity` already passed `includeArchived`, so the
 read-back half always worked. Same pick-vs-read-back split
 `getTrainingTags`/`getTrainingTopic` uses for a sport the family has dropped.
 `theCatalogResolvesEveryBlockItEverNamed` holds every retired id to three
-answers: gone from the pickers, still resolvable, still able to say its name.
+answers: gone from the pickers, still resolvable, still able to say its name. (checked by smoke: theCatalogResolvesEveryBlockItEverNamed)
 
 An activity is **archived, never deleted** (`archiveParentActivity`,
 `js/11-parent.js`). Deleting used to sweep both kids' `weeks` with no date
@@ -2926,7 +2926,7 @@ That splits one lookup into two, and the split is load-bearing:
 drill goes into `state.shared.customTasks` with `addedBy` and `pendingApproval`,
 is usable in the session she typed it for, and waits in Setup › Activities and
 sports for a parent to keep or drop it. Rejecting **archives**; the record stays,
-for the same reason `rejectKidActivity` archives.
+for the same reason `rejectKidActivity` archives. (checked by smoke: retiringAnActivityKeepsItsHistory)
 
 Get it the wrong way round and either a retired activity is offered in a picker
 (visible, harmless) or every block that ever used it stops rendering (invisible,
@@ -2940,7 +2940,7 @@ only once **both** kids have finished step 4. So a family that opened the
 meeting, reviewed the week, celebrated it and agreed the numbers on step 3
 recorded nothing at all, and the catch-up list called every one of the last eight
 weeks "never settled" — saturating at its own ceiling, which is where the
-reported "missing 8 weeks" came from after two real meetings.
+reported "missing 8 weeks" came from after two real meetings. (checked by smoke: meetingMetIsNotMeetingSettled)
 
 The same press credits the money, so the wallet reading `$0.00` while the meeting
 showed real figures was not a second bug: step 3 displays `ctWeekMoney`, a live
@@ -2963,7 +2963,7 @@ the same class of wrongness as the bug it was meant to help.
 `SCHOOL_HOURS`, `SCHOOL_TERM` and `NO_SCHOOL_DAYS` in `js/01-config.js` are the
 **fallback** — what a family that has set nothing gets, and what the app carries
 in the public repo, which is **dates only**: no school name, no district, no
-source document. That has not changed.
+source document. That has not changed. (checked by smoke: schoolCalendarIsRight, schoolHoursAreTheParentsToSet)
 
 What has: a family can now say otherwise, and their answer lives in
 `state.shared.schoolCal` (synced state, never committed). **Never read the
@@ -2986,7 +2986,7 @@ bands the day view actually draws.
 **A season can be more than one season.** `season` took a single string and the
 garden does not stop in June, so `inSeason(act, season)` is the one comparison
 and `seasonLabel(act)` is what the three "🔒 Unlocks in …" toasts print — a bare
-array would have read "spring,summer".
+array would have read "spring,summer". (text only)
 
 `isSchoolDay(dayKey)` / `schoolDayInfo(dayKey)` go through those, and are still
 the only way to ask — never by checking the day of the week: a Tuesday in July
@@ -3001,7 +3001,7 @@ the preview is literally what `paSchoolCardPlan`'s companion will do. A complete
 or confirmed card never moves, a past day is not touched, only `startMin` and
 `durationMin` change, and a clash is reported rather than resolved. The sweep ends
 in **one** `saveAll()` — `setDayBlocks` saves on every call, so reconciling
-fourteen cards through it would upload the whole family document fourteen times.
+fourteen cards through it would upload the whole family document fourteen times. (checked by smoke: schoolCalendarIsRight, schoolHoursAreTheParentsToSet)
 
 `SCHOOL_TEMPLATE` became **`schoolTemplate()`**, and the reason still holds
 though the template is retired (R5 §7 Q1): a top-level `const` is evaluated when
@@ -3017,7 +3017,7 @@ school at 9am–3pm, an hour later than `SCHOOL_HOURS`, selected by
 `dow === 0 || dow === 6`, so Christmas Day, every PD day and every day of July
 drew a "🏫 School" band. The two vertical axes (the Full week's sideband, the
 print sheet's) describe seven days with one column, so they describe the week's
-**first school day** and say so plainly when a week has none.
+**first school day** and say so plainly when a week has none. (text only)
 
 **School days are offered, never assumed — but offered whenever they are
 missing.** The band and the card are different things and neither replaces the
@@ -3025,7 +3025,7 @@ other: the pale `🏫 School` band is a **time-zone**, business hours, and what
 makes the summer and winter breaks legible; the card is the plan. So the offer
 asks whether the school **card** is missing, not whether the day is empty. It
 used to ask the second, and only on a wholly blank week, so one breakfast on a
-Monday disqualified that Monday from ever getting its school card.
+Monday disqualified that Monday from ever getting its school card. (text only)
 
 `renderSchoolDayBanner` owns it, as its own banner,
 inside `SCHOOL_FILL_HORIZON_WEEKS` (3). One School Day block each on one
@@ -3042,7 +3042,7 @@ under the fold. The blank-week coach tip carried a second copy and was the wrong
 one to rely on — it needed the whole week blank, so it vanished the moment a
 block landed, and the stale-calendar branch pre-empted it. `#tgSchoolBanner`
 under the retired 🧱 Day Blocks tab was the other host, and losing it with the
-tab is how the offer came to live only below the fold.
+tab is how the offer came to live only below the fold. (checked by smoke: theSchoolOfferIsAboveTheWeekGrid)
 
 `#weekSchoolBannerTop`, a **sibling** of `#weekFull` directly under
 `#weekCoachTip`, is now the only host. `#weekSchoolBanner` is gone from the
@@ -3066,7 +3066,7 @@ day. The banner draws a `.wsb-day` chip per offered day beside the count, and
 the bulk `Add all N` only when there is more than one — with a single day left
 the chip **is** the action. The smallest true answer has to be available: a week
 whose Thursday is a PD day the family is away for must not have to refuse the
-other four school days to say so.
+other four school days to say so. (text only)
 
 **Importing** (`js/35-school-calendar.js`) reads a `.ics` file or URL. It is a
 hand-written parser because there is no build step and the CSP allows no
@@ -3077,12 +3077,12 @@ and **every all-day entry is listed, not only the ones that match a keyword** �
 "Christmas Day" contains none of the day-off words, so a list that gated
 visibility hid the most obvious day off in a school calendar. Nothing is written
 until it is ticked, and term dates arrive unticked because they are a year-long
-guess.
+guess. (text only)
 
 **Replace the shipped dates each August.** Past `schoolTerm().nextStart` the app
 stops claiming to know: bands fall back to weekday shape and
 `schoolCalendarIsStale()` puts a note on the week — *to a parent only*. A child
-is never told the app's data is out of date; she cannot act on it.
+is never told the app's data is out of date; she cannot act on it. (checked by smoke: schoolCalendarIsRight, everyWeekViewFollowsTheSchoolCalendar, schoolHoursAreTheParentsToSet, aBlankWeekOffersItsSchoolDays, anIcsFileBecomesDaysOffOnlyAfterReview, theSchoolOfferIsAboveTheWeekGrid, oneSchoolDayCanBeAddedOnItsOwn)
 
 `schoolCalendarIsRight` counts the instructional days the **shipped** calendar
 yields and asserts the published total (177 for K-8) — a mistyped date moves that
@@ -3102,7 +3102,7 @@ matches the day it claims to describe.
 
 **There is one date, `state.shared.chore.programStartDate`, it is DERIVED when
 nobody has set it, and it is never written by being read.** `mrStartWeek()`
-(`js/18-rules.js`) is the one owner.
+(`js/18-rules.js`) is the one owner. (text only)
 
 Three stores used to answer three versions of this question —
 `programStartDate`, `moneyModelStartWeek`, `routineRuleStartWeek` — and every
@@ -3130,7 +3130,7 @@ placed blocks — and **writes nothing**. So it costs no sync, it cannot be froz
 wrong by whichever device happened to look first, and it moves back on its own
 the moment an older week arrives from another device. A parent can still say the
 family began earlier (Setup › Weeks on record), and that is the only way a
-household whose real beginning predates anything on file can say so.
+household whose real beginning predates anything on file can say so. (text only)
 
 This exact derivation was tried once as the **catch-up floor** and removed,
 because there it suppressed genuinely open weeks whenever the first record
@@ -3142,7 +3142,7 @@ seed of "today" it can only ever reach further back.
 **unstamped** value counts as 0 deliberately — it can only have come from a
 build that seeded this, and a deliberate choice must always beat a seed. Without
 it `deepMergeObj` lets a remote scalar win and a stale device pushes its own
-idea straight back, putting the whole backlog out of reach again.
+idea straight back, putting the whole backlog out of reach again. (text only)
 
 `moneyModelStartWeek` and `routineRuleStartWeek` are retired but **not deleted**:
 a delete inside `state.shared.chore` cannot propagate (`deepMergeObj` iterates
@@ -3154,7 +3154,7 @@ to no effect. Same reasoning as the retired `unlockedActs`.
 `mrUsesNewModel` is **gone**, and with it the legacy branch of `ctWeekMoney`,
 the legacy step 3 and step 4, `buildHowIEarnCardLegacy` and its CSS,
 `ctGroupEarned`, and the `newModel` skip in `commitKidWeek` that took the ledger
-freeze, the XP credit, the arrears, the loan transfer and the Sunday Box with it.
+freeze, the XP credit, the arrears, the loan transfer and the Sunday Box with it. (text only)
 
 The reasoning for having two models was right — history must not move when the
 family switches to graded chores — but the **mechanism was never what made that
@@ -3178,12 +3178,12 @@ Money page. Four rules, each load-bearing:
 1. **Each week prices under ITS OWN rules.** `mrWeekBreakdown` resolves that
    week's effective-dated rule version, so a price edited last month cannot
    restate a week from March. Repairing is not re-pricing under today's
-   rulebook, and that difference is the whole reason a parent can agree to it.
+   rulebook, and that difference is the whole reason a parent can agree to it. (text only)
 2. **It only ever ADDS.** A week the old branch happened to pay *more* for keeps
-   what it paid. Money already in a child's hand is hers.
-3. **A week frozen at the original migration is never touched.**
+   what it paid. Money already in a child's hand is hers. (text only)
+3. **A week frozen at the original migration is never touched.** (text only)
 4. **Idempotent by a derived id**, because two devices will each run it and then
-   sync.
+   sync. (text only)
 
 The frozen ledger is corrected alongside the wallet and stamped `repricedAt`, or
 the money story and `mrYearToDate` would keep quoting the figure the retired
@@ -3193,7 +3193,7 @@ two-answers-to-one-question defect this file keeps recording.
 **A defaulted week says so.** `defaulted` was written and read nowhere, so a
 week credited at the flat default because nobody sat down read as "typed in" —
 the same label as a week a parent entered from memory. They are different facts
-and the history says which, alongside "re-priced".
+and the history says which, alongside "re-priced". (text only)
 
 **The $3 default is offered where the backlog is.** `mmUnsettledWeeks` stops at
 eight, so anything older was invisible there AND unsettleable — the only door
@@ -3201,12 +3201,12 @@ was a card in Setup that a parent had no reason to open. The catch-up banner now
 carries the older weeks — "N weeks left the review window", the Grandma rule's
 own plan from the start week saved in its section, or a pointer to that section
 when none is saved. Still a tap, still previewed, still moves no money until
-`mnyRunDefaultSweep` confirms.
+`mnyRunDefaultSweep` confirms. (text only)
 
 ## A gift has a date, and a correction is not an edit
 
 **`dayKey` is when it came; `weekKey` is which Sunday decides where it goes.**
-Two questions, and a gift needs both answered separately.
+Two questions, and a gift needs both answered separately. (text only)
 
 `mnyAddDeposit` hardcoded `dayKey: todayKey()` and **no form anywhere offered a
 date**, so a birthday recorded a fortnight later sat in the wrong month of her
@@ -3226,7 +3226,7 @@ clock; `ctWeekKey` comes from `getWeekStart`, which goes through the app's
 timezone. This file already records that those disagree for part of every day.
 A gift filed under the raw-clock Monday while every money surface reads the
 planner's would be invisible in its own week — so for today the planner's name
-wins, and only an older day takes the date-walking path.
+wins, and only an older day takes the date-walking path. (text only)
 
 **The wallet and the stream move by the SAME amount, always.** The first attempt
 at `mnyEditDeposit` reversed the original event in full and then moved the
@@ -3235,7 +3235,7 @@ behind the stored one by the whole gift, on every correction. A full reversal is
 not what an edit *is*: $50 corrected to $30 is a twenty-dollar adjustment, not a
 fifty-dollar undo followed by a thirty-dollar re-gift. The original row stays
 exactly as written, which is what keeps the mistake readable; the correction
-sits beside it saying what changed.
+sits beside it saying what changed. (text only)
 
 **A removal cannot be `evReverse` either, and the floor is why.**
 `moneyTakeBackCash` floors at zero, so a gift already spent gives back only what
@@ -3243,7 +3243,7 @@ is there — while a reversal copies the original's amount. Removing a spent gif
 through `evReverse` would debit the stream by more than the wallet could give
 back, forever. It goes through `moneyTakeBackCash`, which mirrors what actually
 left, and carries `reverses` **only when the whole gift came back**; when the
-floor bit it is a partial correction and does not claim otherwise.
+floor bit it is a partial correction and does not claim otherwise. (text only)
 
 **`mrUpdateCompetition` keeps the id and re-scores.** There was no edit path at
 all, so a wrong figure meant delete-and-re-add — which minted a new id, broke
@@ -3252,7 +3252,7 @@ the link to the block, and made the planned meet read as unrecorded again.
 it, so an edit is a new entry of the same fact and must re-score; mutating
 `points` in place would leave the record saying one thing and its money another.
 Moving the date moves the block with it — a face left behind on the old Saturday
-is a second meet nobody held.
+is a second meet nobody held. (text only)
 
 ## The Record sheet — one door, five records
 
@@ -3260,22 +3260,22 @@ is a second meet nobody held.
 HTML, body filled by JS — the `familyMeetingOverlay` pattern), opened by
 `openRecordSheet({ kind, kid, dayKey, id })` through `openSheet`/`closeSheet`,
 which own focus and Escape. **Do not add a second dialog mechanism beside
-them.**
+them.** (checked by smoke: everyRecordHasOneDoor)
 
 **Five facts had five entry roads and none of them met.** A meet could only be
 recorded inside the Sunday meeting or through `ctPromptCompetition`'s chain of
 **eleven sequential prompts**; a gift went through `mnyPromptGift`'s four; a
 fine was a numbered list typed into a prompt box; a chore grade was reachable
 only from the chore tab, on the week and day that tab happened to be showing;
-a move had no door at all until Stage 3 built one.
+a move had no door at all until Stage 3 built one. (text only)
 
 **A prompt chain is the worst shape a form can have.** You cannot see what you
 have already answered, you cannot change an earlier answer, and abandoning it
 halfway leaves nothing. Every one of these is four to six fields on one screen,
-which is what this sheet is.
+which is what this sheet is. (text only)
 
 **It owns no rules.** Every row calls the function that already owned that
-write — the same contract Today keeps, *call an owner, never contain one*:
+write — the same contract Today keeps, *call an owner, never contain one*: (text only)
 
 | Record | Writes through |
 |---|---|
@@ -3300,7 +3300,7 @@ button, so a keystroke there updates **only the button**, in place
 (`rcSyncSave`), from the same `rcSaveState` that `rcRender` draws it with. It
 used to redraw the whole sheet per digit, which on an iPad closed the keyboard
 after every digit; `typingAnAmountKeepsTheCaret` types with real key events and
-asserts the input node and its focus survive.
+asserts the input node and its focus survive. (checked by smoke: typingAnAmountKeepsTheCaret)
 
 **A child gets two of the five, and both as proposals** — a gift she was given
 and a move between her own pots. `mnyAddDeposit` and `mnyRequestMove` already
@@ -3308,23 +3308,23 @@ carry the propose/approve gate, so the sheet adds no rule of its own; it just
 does not offer her the three that are a grown-up's judgement about her week.
 `rcSaveLabel` is what says so: the button reads *Ask a grown-up* rather than
 *Save*, because a button that says less than it knows is how a child learns the
-app is not telling her things.
+app is not telling her things. (text only)
 
 **The tables are read, never restated.** `CP_GRADES` is the parent grader's own
 four grades and `mrRulesForWeek(...).fines.items` is the week's own catalog —
 two tables of grades is how the wording on two screens comes apart, and a fine
-entered against an old day must be the amount that was live then.
+entered against an old day must be the amount that was live then. (text only)
 
 **Retired by it:** `ctPromptCompetition` and `mnyPromptGift`, deleted rather
 than left unreachable — a retired chain still callable is a second entry road
 with different rules. `ctRemoveCompetition` stays: removing is not recording.
 The meeting's inline competition and deposit **cards stay** too; they are where
-the conversation happens on a Sunday, and they call the same writers.
+the conversation happens on a Sunday, and they call the same writers. (text only)
 
 **Correcting goes through the same door.** A parent taps a gift row or a meet
 row to open the sheet on that record, carrying its id — so a typo is a
 correction rather than the delete-and-retype that debited the wallet,
-re-credited it, and left two rows nobody could explain.
+re-credited it, and left two rows nobody could explain. (text only)
 
 Entry points: parent **Now** (a dashed ✍️ that routes, because Now counts and
 routes and never decides), the parent **Money rules** head, **meeting step 3**,
@@ -3338,11 +3338,11 @@ existed: they carry `data-mny-action`, and the hand-written list in
 `99-main.js` never included `#mnyRulesWrap`. `everyMoneyActionHasAListener`
 renders every money surface and fails on any `data-mny-action` outside a listed
 host; `everyMoneyControlClicksClean` presses every money control, one at a time
-from a restored snapshot, and fails on any exception, sync or async.
+from a restored snapshot, and fails on any exception, sync or async. (checked by smoke: everyMoneyActionHasAListener, everyMoneyControlClicksClean)
 
 **A refused move says why on the save button**, before the tap, in
 `mnyMoveRefusal`'s own sentence; the destination defaults to the first pot
-other than the source that is open to her (`rcDefaultMoveTo`).
+other than the source that is open to her (`rcDefaultMoveTo`). (text only)
 
 ## Money can move between Sundays
 
@@ -3350,7 +3350,7 @@ other than the source that is open to her (`rcDefaultMoveTo`).
 existed went one way — kept-ready back to cash, a company back to cash — and
 both were buried on the parent's Money rules page. So a $50 birthday gift that
 arrived on a Tuesday sat in cash until the following Sunday whatever anybody
-wanted, which is the "nowhere to put it" this redesign started from.
+wanted, which is the "nowhere to put it" this redesign started from. (text only)
 
 **`mnyMoveMoney(kid, from, to, amount, opts)` is THE one writer** (`js/40-stream.js`),
 and it owns no arithmetic: it routes to the primitives that already own each
@@ -3358,7 +3358,7 @@ movement — `moneyDeposit`, `moneyWithdraw`, `moneyOpenGIC`, `mnyBuyChosenFund`
 `moneySellStock`. Three of those took no `opts`, so a movement through them
 could not be labelled; they take one now, with the structural fields still
 applied **after** it per the Stage-1 rule — a caller may label a movement, never
-redirect one.
+redirect one. (text only)
 
 **Pots do not touch; money goes through cash.** `ready → locked` and
 `ready → invest` are a withdrawal and then a purchase, **two recorded
@@ -3366,7 +3366,7 @@ movements**, because that is what actually happens. One movement pretending the
 pots are adjacent is a row the flow cannot explain. `invest → cash` converts
 dollars to shares newest-holding-first, once, beside the only caller that needs
 it — `moneySellStock` takes shares and everything else on this surface is
-dollars.
+dollars. (text only)
 
 **One route decision.** `MNY_MOVE_ROUTES` / `mnyMoveRoute(from, to)` is the
 only answer to "can money go this way", and both `mnyMoveRefusal` and
@@ -3377,12 +3377,12 @@ writer, and a child could file that request and nobody could approve it. They
 now go through cash (`mnyMoveViaCash`), which moves on **only what the first
 leg actually raised**, measured on the wallet — a sale can raise less than
 asked, and cash she already had is not part of the move.
-`everyMoveEitherMovesOrSaysWhy` walks all sixteen ordered pairs.
+`everyMoveEitherMovesOrSaysWhy` walks all sixteen ordered pairs. (checked by smoke: everyMoveEitherMovesOrSaysWhy)
 
 **No loan is every pot open.** `mnyPaidPct` returns **100** when nothing is
 owed; 0 pinned a debt-free child at stage 0 with every pot shut. Anything that
 would then say "paid off" checks the principal itself — the ladder card reads
-"Nothing to pay back, so everything is open".
+"Nothing to pay back, so everything is open". (text only)
 
 **The stage gates are not optional.** Every destination is checked with
 `mnyIsOpen` against `MNY_BUCKETS` — the same predicate `mnySplitFor` uses when
@@ -3391,31 +3391,31 @@ to its bucket's **stage id** rather than restating a percentage: two tables
 naming one gate is how they come to disagree (see *The gates* below). A sheet that could put money in a pot Money
 school has not opened would make the whole ladder decorative. And the gate must
 block the **action**, not just grey the row — a `disabled` attribute is a hint
-to the pointer, not a rule.
+to the pointer, not a rule. (text only)
 
 **A refusal is a SENTENCE, not a false.** `mnyMoveRefusal` returns the words or
 `null`, so a row can be greyed *and say why beside it*. Locked money is the one
 refusal that is a lesson rather than a limit: it comes back on its own date
 (`mnySimCatchUp`), and letting it out early teaches the opposite of what locking
-it away is for.
+it away is for. (text only)
 
 **A child proposes; a grown-up approves.** A proposal is **not a movement**, so
 it must never be a stream event — the stream records money that moved, and a
 request on it would make every derived balance wrong until somebody said no.
 Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
-`mergeProfileState`, with their own two-device check.
+`mergeProfileState`, with their own two-device check. (text only)
 
 - **`mnyRequestMove` refuses for the same reasons a parent's move would**, in
   the same sentence, so a child is never told to ask about something a grown-up
-  could not do either.
+  could not do either. (text only)
 - **The move runs at APPROVAL, never pre-authorised at the ask.** What she had
   on Tuesday is not what she has on Sunday, so `mnyApproveMove` re-checks every
   refusal against the wallet as it is now, and stamps `approvedAt` only once the
   money actually moved. Approving twice moves nothing — two devices will each
-  see the row.
+  see the row. (text only)
 - **A rejection is kept, not deleted.** "We talked about it and decided not to"
   is a real answer, and a child should see her request was answered rather than
-  find it simply gone.
+  find it simply gone. (text only)
 
 `moneyCanTransact` is called by two functions and **none of the primitives check
 `isParent()` themselves**, so `mnyMoveMoney` carries that gate explicitly.
@@ -3427,7 +3427,7 @@ instead of balances **for this screen**, and until Stage 4 nothing read them:
 `evFlow`, `evMonths` and `evTypicalMonth` were unit-tested and had no caller
 (the `evMonths` / `evTypicalMonth` wrappers are gone since Money fit and logic
 PR 5; the pure `evMonthsOf` / `evTypicalMonthOf` stay, unit-tested).
-A calculation with no reader is a calculation nobody finds out is wrong.
+A calculation with no reader is a calculation nobody finds out is wrong. (text only)
 
 **It does not lead with a total, and that is the whole design.** The owner's
 instruction, in their words: *I do not want the kids to see the end money, they
@@ -3439,7 +3439,7 @@ left, **in that order, in one sentence, before any bar is drawn** — the
 movement is the headline and the balance is its consequence.
 `theFlowSaysWhereItWent` asserts the ORDER, not merely that both appear: a
 screen whose first figure is a balance has quietly become the thing it
-replaced, and nothing else in the suite would notice.
+replaced, and nothing else in the suite would notice. (checked by smoke: theFlowSaysWhereItWent)
 
 `mnyWalletCard` still leads with *Everything I have*, unchanged and correct.
 That is the page where she checks a figure before deciding something; this is
@@ -3448,17 +3448,17 @@ the page where she finds out how it got there. Two questions, two screens.
 **It owns no arithmetic.** Every number comes from the pure functions in
 `js/40-stream.js`. This file arranges and labels; it never sums a movement
 itself. A second place deciding what "came in" means is a second place that can
-disagree with the first.
+disagree with the first. (text only)
 
 **"Left" is a balance, never in-minus-out.** She may have had money before the
 span started, and putting $30 into kept-ready is not money gone. The screen
 says so out loud rather than leaving a child to do arithmetic that does not
-come out.
+come out. (text only)
 
 **Each group scales to its own biggest ribbon, not to a grand total.** One
 scale across "in" and "out" draws a $2 fine as an invisible sliver beside $40
 of jobs — the one row she most needs to see. The group totals are what compare
-the halves.
+the halves. (text only)
 
 **Every caption is the sum of the bars under it.** Three groups: ⬇️ what came
 in (`inTotal`), ➡️ what went out (`outTotal` — spent, fine, loan, given back,
@@ -3469,13 +3469,13 @@ live as $0.00 above a $30.00 bar — and `returned` was counted and never drawn.
 `savedTotal` is computed in `evFlowOf` / `evTypicalMonthOf` (unit-tested in
 `tests/stream.test.js`), so the Flow still sums nothing;
 `theFlowCaptionsEqualTheirBars` checks each caption against its rows on every
-period.
+period. (checked by tests/stream.test.js and smoke: theFlowCaptionsEqualTheirBars)
 
 **Three periods, and the third is the honest one.** *This month* · *All of it* ·
 *A typical month*, which `evTypicalMonthOf` divides by the months that have
 **elapsed**, empty ones included. Dividing by months holding events turns a
 quiet summer into a good one — the same mistake `mrYearToDate` makes with
-settled weeks, deliberately not repeated.
+settled weeks, deliberately not repeated. (text only)
 
 **The history strip keeps its empty months.** One 44px column per calendar
 month, oldest left, stacked by where that month's money came from, scrolling
@@ -3483,7 +3483,7 @@ sideways rather than wrapping — a wrapped timeline stops being a timeline. An
 empty month is drawn as a dashed empty frame: a gap is a fact, and a month
 dropped from a chart reads as a month that did not happen. Tapping a column
 selects **both** the month and the period, because selecting a month while the
-screen still reads "all of it" is a control that appears to do nothing.
+screen still reads "all of it" is a control that appears to do nothing. (text only)
 
 **The Flow leads and the settled weeks follow.** The week list reads the frozen
 `moneyLedger`, so it can only show weeks a meeting settled — a gift on a
@@ -3491,7 +3491,7 @@ Tuesday, a spend, a move between pots are all invisible to it. Leading with the
 narrower answer is how a child comes to believe the money she was given is not
 part of her money story. Both stay: the ledger rows are the week-by-week record
 a parent checks a meeting against, and the Flow cannot replace a record of what
-each settlement paid.
+each settlement paid. (text only)
 
 `screen-moneystory` joined `KID_SCREENS` in the same change. It is a kid screen
 and was never in that audit, which is how the strip's 26px columns could have
@@ -3503,7 +3503,7 @@ by having nothing on it.
 
 `js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived
 from them.** This is Stage 1 of the money redesign and the thing the rest of it
-rests on.
+rests on. (checked by tests/stream.test.js)
 
 What it replaces: `wallet.cash` was one number written by **eight** separate
 functions — `js/14-money.js`'s six, the loan's four paths, the maturity payout,
@@ -3533,18 +3533,18 @@ round and `mnyRemoveDeposit` passing the gift's own mirror fields turned a debit
 from her cash into `gift → returned`, and then into `cash → cash`: the wallet
 dropped $50 and the stream did not, silently, forever. Both were caught by
 `theMoneyStreamAgreesWithTheWallet` on its first two runs, which is exactly what
-that check is for.
+that check is for. (checked by smoke: theMoneyStreamAgreesWithTheWallet)
 
 **A marker is a ZERO-AMOUNT event, not a kind of event.** `settle` names both
 the dollars a week paid and the fact that it was settled, so deciding markerhood
 by `kind` nulled the from/to on every settlement and credited nothing. The
 amount decides; `EV_MARKER_KINDS` only says which zero-amount rows are
 legitimate. A week settled at $0 still has to be answerable as settled, which is
-the reason markers exist.
+the reason markers exist. (text only)
 
 **A movement says both ends, always.** `mnyGiftMirror` named no destination and
 the migration's own arithmetic read that as "went nowhere", which put every gift
-on the stream twice over.
+on the stream twice over. (text only)
 
 **Shadow mode, and what licenses retiring the old stores.** Nothing on any
 screen reads the stream yet. `evMirror` is called beside every existing writer,
@@ -3555,7 +3555,7 @@ gift, money aside and back, a lock, a company bought and revalued, a gift taken
 back) and checks drift after *every* step, including before anything has
 happened: a base case that agrees is what would otherwise hide a sign error in
 every case after it. The old stores are retired in Stage 2, only after that
-drift has been zero on real household data.
+drift has been zero on real household data. (checked by smoke: theMoneyStreamAgreesWithTheWallet)
 
 **The migration reconstructs history, then plugs the gap.** `evMigrationPlan`
 reads the frozen `moneyLedger` and the applied `deposits`, dates each row to the
@@ -3565,7 +3565,7 @@ balance equals the stored balance **by construction**, on any household however
 incomplete its history, rather than by hoping the reconstruction is exhaustive.
 Whatever the old stores cannot account for lands in one honest line a child can
 read — *What she already had* — instead of as a drift nobody can see. A negative
-gap is written as money leaving, the same way a holding losing value is.
+gap is written as money leaving, the same way a holding losing value is. (text only)
 
 It is **read-only and idempotent**: `evMigrationPlan` writes nothing, so the
 preview a parent approves is literally what runs, and every row carries a
@@ -3579,17 +3579,17 @@ preview.
 contract, so newest-wins per id never has to arbitrate anything real: a
 correction is a **reversing event** (`evReverse`), never an edit. Without the
 tombstone a correction would undo itself on the next sync, which is money
-appearing from nowhere.
+appearing from nowhere. (text only)
 
 **Pure core, app wrapper.** `evBalanceOf`, `evFlowOf`, `evSpanOf`, `evMonthsOf`,
 `evTypicalMonthOf` take an array and return numbers, with a `module.exports`
 guard; the `kid`-taking wrappers just fetch the array. Same split and same
 reason as `bufferClip` — a calculation reachable only from a browser is one no
-unit test can hold, and the money layer has been burned by exactly that twice.
+unit test can hold, and the money layer has been burned by exactly that twice. (checked by tests/stream.test.js)
 
 **A typical month divides by the months that PASSED**, not by the months that
 happen to hold events — the same mistake `mrYearToDate` makes with settled
-weeks, deliberately not repeated: a quiet summer must not read as a good one.
+weeks, deliberately not repeated: a quiet summer must not read as a good one. (checked by tests/stream.test.js)
 
 ## Money: a start date, a default, and gifts
 
@@ -3598,7 +3598,7 @@ and `programStartDate` both self-seed to the current Monday on first read, which
 is why a household running for months has no floor and the catch-up list
 saturates at its own ceiling. Both are set together from Setup › Weeks on
 record, as a parent-visible date rather than a constant — hardcoding one would
-ship a household's date in a public repo.
+ship a household's date in a public repo. (text only)
 
 **Weeks older than the catch-up reach get a flat default.** `mmUnsettledWeeks`
 looks back eight weeks and stops, so anything older is invisible AND
@@ -3611,17 +3611,17 @@ uses, so two devices in any merge order credit once; it previews every week and
 the total before moving anything; and the ledger row is marked `defaulted` so
 the money story can say "no meeting was held" rather than presenting the figure
 as a week's earnings. Weeks the catch-up list can still reach are left alone —
-those hold real data and belong on their own numbers.
+those hold real data and belong on their own numbers. (text only)
 
 **Gifts are `profile.deposits`, which already existed.** A new store would
 duplicate it and fight the one-pool rule: which door a dollar came in through
-has no bearing on which door it leaves by. What changed:
+has no bearing on which door it leaves by. What changed: (text only)
 
 - a **giver** field beside the category chip, because `from` names a kind of
   money and never a person, and a red pocket is from somebody;
 - **Sports scholarship** and **Academic scholarship** as categories, kept apart
   from the competition channel so a grandparent's cheque never reads as prize
-  money the rules produced;
+  money the rules produced; (text only)
 - recorded **any time and credited at once**, and **dated** — see *A gift has
   a date* above. It was dated today into whatever week the planner was showing,
   which is the defect that section exists to record;
@@ -3642,7 +3642,7 @@ restating a price, and mirrors the four places money is actually decided: the
 first two chores are free and are the CHEAPEST, the daily cap bites per day, the
 streak pays the longest run at the highest tier only, and a fine is floored at
 what that day earned. `tests/money.test.js` locks the result, so changing a rate
-and not re-running shows up as a failing test rather than at a Sunday meeting.
+and not re-running shows up as a failing test rather than at a Sunday meeting. (checked by tests/money.test.js)
 
 It also settles a number that is easy to get wrong: **routines are worth at most
 $3 per child per week.** They pay nothing directly, and the $1 weekly goal bonus
@@ -3654,7 +3654,7 @@ model. The streak is the whole routine channel.
 Four rules the family agreed, each landed in `MR_DEFAULT_RULES` and read
 through `mrRulesForWeek`, so **a week already lived keeps the rules that were
 live when it was lived**. Nothing is retroactive; that is the owner's own
-constraint and it is what effective-dated rule versions are for.
+constraint and it is what effective-dated rule versions are for. (checked by smoke: theFourHouseRulesHold)
 
 **1 · Homework earns XP, not dollars.** All four `learning` items are `xpOnly`
 now. Homework is her own work, not a job the household is paying to have done —
@@ -3662,7 +3662,7 @@ the whole reason this app prices chores is that a chore is a share of running a
 home somebody would otherwise have to do. Paying for homework teaches that
 learning is something you do for money. The work still **counts**:
 `mrWeekBreakdown` credits XP on an `xpOnly` line, the Sunday check still
-applies, the hours charts are unchanged. Only the dollars stop.
+applies, the hours charts are unchanged. Only the dollars stop. (text only)
 
 **2 · Twice is a conversation; the third time costs.** `freeRepeats: 2` on
 tone, borrowing, screens and being asked twice. Every occurrence is **recorded**
@@ -3671,7 +3671,7 @@ week take no money. The **third and every one after it** costs its amount.
 `reflEvidence` offers the forgiven ones in her reflection's **Needs work** tab,
 named individually rather than counted ("3 things this week" reads as a score
 and says nothing she can act on), and it offers the incident and never an
-answer, which is the rule the whole reflection is built on.
+answer, which is the rule the whole reflection is built on. (text only)
 
 Not a pure conversation, and not a flat fine either. A first slip is something
 to talk about: charging a child a dollar for how she spoke to her sister prices
@@ -3682,34 +3682,34 @@ nine-year-old correctly reads as no rule.
 
 **Per item, per week.** Three *different* slips is three conversations; it is
 one behaviour repeating that this is about. The count is per WEEK, so two on one
-Tuesday are still the week's first two — a bad Tuesday is not three Tuesdays.
+Tuesday are still the week's first two — a bad Tuesday is not three Tuesdays. (text only)
 
 **The free repeats cannot be decided a day at a time.** Monday's is free because
 it is the first and Friday's is charged because it is the third, so
 `mrFinesWeek` makes one pass over the whole week sorted by day then `at`, marks
-which occurrences are chargeable, and only then applies the daily floor.
+which occurrences are chargeable, and only then applies the daily floor. (text only)
 
 **`mrFineStanding` is the one owner of the count**, asked by the reflection so
 it can say what happens next — a rule a child finds out about by being charged
 is a rule she was never given a chance to keep. Two counts of the same thing is
-how two screens come to disagree.
+how two screens come to disagree. (text only)
 
 **`box_repeat` keeps its dollar from the first.** It is not about character: a
 thing was left out, it was boxed, and it was left out again in the same week.
 It **is** the repeat, so free repeats on top would count the same forgiveness
-twice.
+twice. (text only)
 
 **The calibration asserts the threshold directly.** None of the three modelled
 weeks holds three of the same behaviour — which is the point of the rule and
 also means the week models cannot exercise it, and a rule the calibration never
-reaches is a rule it is not calibrating.
+reaches is a rule it is not calibrating. (text only)
 
 **3 · One grace day a week.** `streak.graceDays: 1`. An off day is a valid
 state, and a streak with no rest state is the all-or-nothing shape *Writing for
 children* forbids. The grace carries the run **across** a miss without crediting
 the day — so six kept days with one miss reads 6, not 7, and a clean week still
 means seven. A second miss ends the run. Read from the rules and defaulted to 0,
-so an older rule version prices its week exactly as it did.
+so an older rule version prices its week exactly as it did. (text only)
 
 **4 · The pace divides by the weeks that PASSED.** `mrYearToDate` divided by
 the number of weeks with a **finalised record**, which is the defect behind "she
@@ -3721,14 +3721,14 @@ self-selected sample. `mrWeeksElapsed()` is the one owner, counting from
 week that paid nothing, which is what it is. This file recorded it as a known
 defect before it was fixed. `theFourHouseRulesHold` asserts the denominator
 itself — ten weeks elapsed, two settled, the pace divides by ten — because its
-earlier assertions all still passed with `/ weeks.length` put back.
+earlier assertions all still passed with `/ weeks.length` put back. (checked by smoke: theFourHouseRulesHold)
 
 ### A rulebook already on file
 
 The rules landed in `MR_DEFAULT_RULES`, and `mrEnsure` seeds that only when a
 household has **no** versions — so a family with a stored rulebook never
 received the first three. Copying the template over is not the fix: the
-rulebook also holds the family's own chore pool, prices, caps and targets.
+rulebook also holds the family's own chore pool, prices, caps and targets. (checked by smoke: theHouseRulesReachAStoredRulebook)
 
 `mrHouseRulesPending()` lists only the fields the rules change, resolving each
 item **by id** in the rules live today (never by position — a stored order can
@@ -3748,7 +3748,7 @@ with the old prices, a custom pool and a reordered list.
 Homework was carrying about **half the economy**. With it gone and the chore
 rates left where they were — the owner's decision, asked and answered — an
 ordinary week goes **$21 → $11**, a quiet week **$3 → $0**, and a realistic term
-reaches **51%** of Jenn's $1000 target instead of ~100%.
+reaches **51%** of Jenn's $1000 target instead of ~100%. (checked by tests/money.test.js)
 
 `tests/money.test.js` asserts that 51% rather than the old 85–115% band. The
 assertion was **not deleted and not widened to whatever passes today** — either
@@ -3760,7 +3760,7 @@ a description.
 **That gap is the family's to close, not the code's:** raise the chore rates
 (`tools/money-calibrate.js` says exactly where they land — $6/$4/$2 with a $9
 cap and one free chore reaches 111%), or lower the targets to what the rates
-pay.
+pay. (text only)
 
 **Read that 51% correctly.** It is the projection from a modelled TERM — five
 ordinary weeks, two quiet, one strong — not from a ceiling. The rates are not
@@ -3772,7 +3772,7 @@ $3. Competition points are **uncapped** on top, with a $20 qualifying bonus. (Th
 line used to say "$15 after the two free", which is only true at one chore a day.) The `strong` fixture is $24 because it
 models one chore a day and a six-point meet that did not qualify, so the cap
 never bites. What 51% says is that the term SHAPE does not reach the target,
-which is a different and much smaller claim than "she cannot earn it".
+which is a different and much smaller claim than "she cannot earn it". (text only)
 
 **The $3 default is backfill, never a floor.** `mnyDefaultSweepPlan` starts one
 week beyond the catch-up reach and walks BACKWARDS, so it can never touch the
@@ -3781,7 +3781,7 @@ weeks being lived. Going forward a quiet week pays what she earned, which may
 be nothing, and that is the earn-and-spend system working.
 `theDefaultSweepCreditsOldWeeksOnce` asserts it cannot reach the current week or
 a future one, because that failure would be silent and generous — money
-appearing for a week she is still living.
+appearing for a week she is still living. (checked by smoke: theDefaultSweepCreditsOldWeeksOnce)
 
 ## Plan v6 PR B — the Grandma rule, the loan season, the gates (2026-09-22)
 
@@ -3808,7 +3808,7 @@ week" on her story. A meet already on file for the week is paid **on top**, as
 its own `prize` line ("…, week of … — on top of the Grandma rule"): the row's
 `competition` is that total and its gross/net and `finalizedWeeks` are
 amount + competition. Her story's flat segment is `gross − competition`, so the
-meet is drawn once.
+meet is drawn once. (text only)
 
 **The start week and amount are a dated rule, entered once.**
 `grandma.from` / `grandma.amount` in the rulebook, written only through
@@ -3821,12 +3821,12 @@ dragging its prices forward. A rulebook without it falls back to
 is credited until a start week is saved: the section shows no credit button and
 the hub row points to 👵 Grandma rule instead (`data-mm-catch="grandma"`). The
 form is a module draft (`mnyGrandmaDraft`) until Save, so typing writes nothing;
-there is no to-date. No new synced key — the rulebook already syncs.
+there is no to-date. No new synced key — the rulebook already syncs. (text only)
 
 **A defaulted week is priced by its rule, so the repair leaves it alone.**
 `evRepairPlanFor` skips a ledger row marked `defaulted`: re-pricing a Grandma
 week to its chores would pay on top of the flat amount the owner chose. Its meets
-belong to the late-meet owner below.
+belong to the late-meet owner below. (text only)
 
 **🌟 "Skating star level" is a relabel of `dance`.** The sport id, the rule key
 `competition.dance` and `mrScoreCompetition` are unchanged, so every stored
@@ -3834,7 +3834,7 @@ result reads under the new name. `mnySportLabel` / `mnySportIcon` are the words
 wherever a recorded meet is shown (including the parent chore page, which used
 to print the raw id). The Record sheet offers it by name because a skating block
 seeds a skating competition. `danceReadsAsSkatingStarLevel` holds every money
-surface to it — money surfaces only; the activity catalog may have real dance.
+surface to it — money surfaces only; the activity catalog may have real dance. (checked by smoke: danceReadsAsSkatingStarLevel)
 
 **🎿 The loan season is worked out, never stored.** `pnLoanSeason()`
 (`js/32-parent-now.js`) is a row at the top of Now from 1 Aug to 30 Sep, unless a
@@ -3842,7 +3842,7 @@ debt has `createdAt` on or after 1 Jul that year. No reminder key, no dismissal.
 It routes to Money rules › Loans and decides nothing. Debts that existed before
 `createdAt` did (added 2026-07-28) were stamped on their first read after it, so
 on this family's devices the row most likely stays hidden in 2026 and first
-shows on 1 Aug 2027 — the season it is for.
+shows on 1 Aug 2027 — the season it is for. (checked by smoke: theLoanSeasonRowFollowsTheCalendar)
 
 **The gates.** `MNY_STAGES` carries ids (`start · ready · locked · stock · mix`)
 and no numbers. `MNY_BUCKETS`, `MNY_PLANS` and `MNY_CONCEPTS` name a `stage`;
@@ -3856,28 +3856,21 @@ change is a dated, logged version; `mnyStagePctRefusal` refuses a broken order
 (ready ≤ locked ≤ stock ≤ 100) with a sentence at the stepper **and** in
 `mnySavePending`. The override (`school.unlockStage`) is unchanged.
 `theGatesComeFromOneTable` sweeps 0–100% and compares ladder row, pot (split and
-move gate), lesson card and chip, and each pot against its own lesson.
+move gate), lesson card and chip, and each pot against its own lesson. (checked by smoke: theGatesComeFromOneTable)
 
-**🔓 A pot opening is a moment.** *(Retired in Sunday v15 Stage 3: the Sunday
-milestone — "🔓 20% paid back! Savings is open", Plan v5 Deviation 33 — says it
-at the moment it happens, and the card would have said it twice.)* On her own My money, `mnyStageOpenedCard`
-showed one card when her stage is above the stage last acknowledged on this
-device (`localStorage`, `wp_mny_stage_seen_<kid>`, every access in try/catch,
-never synced). It names the pots and shows each new idea's what / why / watch
-through `mnyConceptCard` — never restated. First sight records the current stage
-silently; a stage that drops is recorded silently too. A grown-up sees nothing.
+*Moved to `docs/archive/architecture-history.md`: 🔓 A pot opening is a moment (retired).*
 
 **The build stamp.** `APP_BUILD` (`js/01-config.js`) is shown on the parent
 portal's App landing and under the tiles of the Today More sheet (the full
 description is under the service-worker rule below). `tests/check-sw-shell.js`
-fails when it differs from `SW_VERSION` — **bump both together**.
+fails when it differs from `SW_VERSION` — **bump both together**. (checked by tests/check-sw-shell.js)
 
 ## A settled week does not block a meet — Plan v7 (2026-09-22)
 
 The owner: *"a settled week only discusses routine, fine, chore money, and how
 the money is spent (the split); a settled week does not block the competition
 and gift."* Settling closes a week's chores, routines, fines and split. It does
-not close its meets or its gifts.
+not close its meets or its gifts. (checked by smoke: aSettledWeekDoesNotBlockALateMeet)
 
 It used to close its meets. The meeting's commit was the only thing that paid a
 meet, and `finalizedWeeks[wk][kid] == null` refuses a second commit, so a meet
@@ -3895,12 +3888,12 @@ gift form says, from one string, `MNY_SETTLED_WEEK_SENTENCE`.
 `mrUpdateCompetition` and `mrDeleteCompetition` call it through a `typeof` guard;
 a meet moved between weeks is two changes, out of one and into the other. A week
 that is **not** settled is left exactly as it was: the meeting pays its meets,
-and nothing is paid early.
+and nothing is paid early. (text only)
 
 **The settled week is kept in step**, and that is what stops the repair paying
 the same meet twice: its ledger `competition`, `gross`, `net` and
 `finalizedWeeks` move with every late payment, and `finalizedWeeks` is what
-`evRepairPlanFor` measures a week against.
+`evRepairPlanFor` measures a week against. (text only)
 
 **Why it cannot pay twice.** A week whose ledger row's competition figure is the
 plain sum of its meets is synced by **total**: `mrCompetitionWeek(wk,kid).paid −
@@ -3916,13 +3909,13 @@ the meet's award after the write minus before, keyed on the meet's id and the
 write (`add`, `del`, or its opId) — nothing is guessed from a total. A week whose
 competition channel the honesty rule voided stays void.
 `aLateMeetPaidOnTwoDevicesIsPaidOnce` runs both devices through the real
-`mergeRemoteState`.
+`mergeRemoteState`. (checked by smoke: aLateMeetPaidOnTwoDevicesIsPaidOnce)
 
 **A gift into a Grandma week had the same hole.** `mnyGiftWeekFor` asked only
 whether the week's split was committed, and the Grandma rule commits no plan, so
 a gift dated into a Grandma week was filed under that week — which no meeting
 will ever sit for. `mnyWeekSettled` (committed **or** credited) is the question
-now, so it is decided at the next open meeting like any other.
+now, so it is decided at the next open meeting like any other. (text only)
 
 ## Plan v8 B8–B10 — Undo, older weeks' meets, a $3 week's record (2026-09-22)
 
@@ -3945,7 +3938,7 @@ rather than a movement between two commits. A withdrawn undo stays withdrawn
 for that week in that sitting. Where the button was, the meeting says
 `MM_UNDO_GONE_SENTENCE` — "Undo is gone — money moved after this meeting;
 correct the item itself." — with what moved. The undo itself still does not
-reverse the stream lines of the commit it undoes; that is unchanged.
+reverse the stream lines of the commit it undoes; that is unchanged. (checked by smoke: moneyMovedAfterTheMeetingWithdrawsTheUndo)
 
 **B9 · Older weeks' unpaid meets are caught up, once.** The repair card gains
 "🏆 Meets never paid" (`mnyUnpaidMeetsPlan`, js/21): settled weeks with a
@@ -3956,7 +3949,7 @@ weeks the repair itself lists (it re-prices meets with the rest of the week),
 stay with the repair, so the two lists never offer the same dollars. Previewed
 in the same card (shown even when the repair has nothing), confirmed through
 `showConfirm`, and paid by `mnyPayUnpaidMeets` through `mnyLateCompSync`'s
-no-change mode — so a second tap pays nothing.
+no-change mode — so a second tap pays nothing. (checked by smoke: olderWeeksUnpaidMeetsArePaidOnce, aLateMeetInADefaultedWeekIsPaidOnce)
 
 **B10 · A $3 week's record stays true to its money.** A `defaulted` row's
 money is already in her wallet and `finalizedWeeks` says the same figure, so
@@ -3966,23 +3959,11 @@ dropping the flat amount). Week history shows it as "👵 Grandma rule $3 + meet
 $X" or "No meeting — default $3 + meets $X" from the row's own figures, with no
 steppers and no remove button. Its meets correct through the meet itself (B6).
 Grandma rows still carry `handEntered`; `defaulted` is read first. Hand-typed
-rows without `defaulted` keep the editor unchanged.
+rows without `defaulted` keep the editor unchanged. (checked by smoke: aDefaultedWeekIsNotEditedByHand)
 
 ## Small fixes R6 — Plan v6 C (2026-09-25, build 2026-09-25a)
 
-Eight small fixes, each held by a smoke check that failed on the code before
-it. The rules they set are written in place above; this is the index.
-
-| # | What | Where the rule lives | Check |
-|---|---|---|---|
-| C1 | 😌 Rest on the 📋 sheet is a 44px target (it was 38px) | `#restDayBtn` joins `.day-over-btn, .reflect-day-btn` in `css/app.css` | `restButtonIsA44pxTarget` |
-| C2 | Reflect-sheet moods are 44px, day and blocks; block names 15px | "How a day went is asked on Today" | `reflectMoodsAre44pxTargets` |
-| C3 | An empty day's canvas stretches to its pending invite ghosts | "The day STOPS where the day stops" | `anEmptyDayDrawsItsInviteGhost` |
-| C4 | A child's "remove all in series" keeps pinned copies | "A pin is a parent's" | `removeAllInSeriesKeepsPins` |
-| C5 | 👯 Sister details is a grown-up's to change; kids see it | "Sister Sync is a timeline" › *showAll* | `sisterDetailsAreTheParentsToChange` |
-| C6 | Sister Sync is in the kid-screen sweep; each row proves its screen showed | UI rules | `kidScreensMeetTheHouseRules` |
-| C7 | The R5 screens read in dark mode | below | `theR5ScreensReadInDarkMode` |
-| C8 | The copy button names the sister's day | "A pin is a parent's" | `copyADayNamesTheSistersDay` |
+*Moved to `docs/archive/architecture-history.md`: the Small fixes R6 introduction and index table.*
 
 **Dark mode (C7).** There is no dark theme: `css/app.css` has three
 `prefers-color-scheme: dark` rules (the week's clash and to-do banners) and no
@@ -4000,102 +3981,19 @@ opacity ("Friday" at 1.4:1 — now dashed and in `--ink-light`, not faded), and
 Parent › Now's today square was white on `--accent` (2.6:1 — now
 `--accent-strong`, the portal's own "go" colour, 4.9:1). "On her behalf" is
 measured with Parent › Now since the merge with `main`, and Today's 🕓 Catch up
-card (a day open) since Plan v7, which found nothing to fix there.
+card (a day open) since Plan v7, which found nothing to fix there. (checked by smoke: theR5ScreensReadInDarkMode)
 
-**C6 found** the 💌 inbox's ✅ Accept / ❌ Decline / 📌 Add it anyway at
-`.pill-btn`'s 38px (`.invite-actions .pill-btn` is 44px now). Before the
-screen-on-show guard, the new Sister Sync row measured nothing: the sweep ran
-with a parent signed in and `openSisterSync` refused.
+*Moved to `docs/archive/architecture-history.md`: the "C6 found" note of Small fixes R6.*
 
-## Small fixes R7 — Plan v7 (2026-09-26, build 2026-09-26a)
-
-Eight small deferred fixes, each held by a check that failed on the code
-before it — except item 5, whose check found nothing to fix and was shown to
-bite by a fault planted in a scratch run, and items 7 and 8, which change no
-behaviour and are held by a scripted grep. The rules are written in place
-above; this is the index.
-
-| # | What | Where the rule lives | Check |
-|---|---|---|---|
-| 1 | The closing ritual counts what is done and names the child being viewed | "How a day went is asked on Today" | `theClosingRitualCountsWhatWasDone` |
-| 2 | The Day view's invite buttons are 44px and the ghost never covers a block (lanes, empty minutes, inside the canvas); the Day view is in the sweep (which also found its top bar, ✓ tick and meta line) | UI rules; "There is a second accept door" | `kidScreensMeetTheHouseRules` (Day view rows), `anEmptyDayDrawsItsInviteGhost` |
-| 3 | Copy a day with nothing to copy says so and changes nothing | "Copying nothing asks nothing" | `copyingNothingSaysSoAndChangesNothing` |
-| 4 | The copy confirm names a copied block that overlaps a kept pin | "A copy that lands across a kept pin says so" | `aCopyNamesItsOverlapWithAKeptPin` |
-| 5 | 🕓 Catch up is in the dark-mode contrast check (nothing to fix; a low-contrast title planted in a scratch run failed it) | Small fixes R6 › Dark mode | `theR5ScreensReadInDarkMode` |
-| 6 | "Sister Sync" stays one line in the fallback font at 375px | Navigation, "Five places" | `sisterSyncTabFitsInTheFallbackFont` |
-| 7 | "90/90" → 112 here and in `tests/README.md`; the four stale "6am–9pm" comments (`js/08-day-view.js`, `js/16-print.js` ×2, `css/app.css`) say 6am–10pm | — | `grep -rn "6am.9pm" js css` finds nothing |
-| 8 | Dead code removed: the drag `inviteId` guard (`js/39-block-drag.js`), the orphan 👯 aria-label entry (`js/99-main.js`), the Chores options `export` branch (`js/29-chore-options.js`); the 12 dead chore-tab branches wait for C3 | — | grep; `check-dead-actions` reverse warnings 27 → 26 |
+*Moved to `docs/archive/architecture-history.md`: the whole "Small fixes R7 — Plan v7" section.*
 
 ## The money week runs Sunday to Saturday — Plan v6 Deviation 34 (2026-10-04)
 
-**Withdrawn 2026-10-06 by decision 15 (Money fit and logic, Plan v2):** the money week is Monday–Sunday everywhere; the Sunday routine is counted as kept at the meeting; the Sun–Sat mapping code stays for the record and is tested with explicit rules only. `MR_DEFAULT_RULES.week` is `{ startsOn: 'monday' }` (no `from`); `mrMoneyWeekRuleOn` reads the STORED rules only (no default fallback), so only a stored `week.startsOn: 'sunday'` with a stored `week.from` could turn the mapping on. The pending-rule card (`mrMoneyWeekRulePending` / `mrApplyMoneyWeekRule`, `MR_MONEY_WEEK_NOTE`, Grown-ups `guMoneyWeekCard`) is removed, and so are the smoke checks `theMoneyWeekRunsSundayToSaturday` and `aDayIsNeverPaidTwiceAcrossTheSwitch`. The pre-mark (replacing owner decision #93) is one pure rule, `mrStreakRunPure` (js/18, read by `mrStreakWeek`): in a week not yet settled, its meeting Sunday (day 6) counts as kept once it has come; a settled week is read whole as before. The text below is the record of the withdrawn rule.
+**Withdrawn 2026-10-06 by decision 15 (Money fit and logic, Plan v2):** the money week is Monday–Sunday everywhere; the Sunday routine is counted as kept at the meeting; the Sun–Sat mapping code stays for the record and is tested with explicit rules only. `MR_DEFAULT_RULES.week` is `{ startsOn: 'monday' }` (no `from`); `mrMoneyWeekRuleOn` reads the STORED rules only (no default fallback), so only a stored `week.startsOn: 'sunday'` with a stored `week.from` could turn the mapping on. The pending-rule card (`mrMoneyWeekRulePending` / `mrApplyMoneyWeekRule`, `MR_MONEY_WEEK_NOTE`, Grown-ups `guMoneyWeekCard`) is removed, and so are the smoke checks `theMoneyWeekRunsSundayToSaturday` and `aDayIsNeverPaidTwiceAcrossTheSwitch`. The pre-mark (replacing owner decision #93) is one pure rule, `mrStreakRunPure` (js/18, read by `mrStreakWeek`): in a week not yet settled, its meeting Sunday (day 6) counts as kept once it has come; a settled week is read whole as before. The record of the withdrawn rule is in `docs/archive/architecture-history.md`. (checked by tests/sunday.test.js)
 
 The exact withdrawn pair (`startsOn: 'sunday'`, `from: '2026-10-11'`), copied into rulebooks seeded on builds 2026-10-04a–05f, is ignored by `mrMoneyWeekRuleOn`; any other stored sunday + `from` pair still counts.
 
-The owner's answer to S1-6 was "Money week only": from the meeting of
-**Sun 11 Oct 2026** the meeting pays the seven FINISHED days before it —
-Sun..Sat — for chores, the routine streak, fines and club sessions. The
-planner, every stored `weekKey` and every per-day record stay Monday–Sunday.
-
-**A dated rule, not a new key.** `MR_DEFAULT_RULES.week = { startsOn:
-'sunday', from: '2026-10-11' }`, read per key through `mrRuleOr`, so a stored
-rulebook that predates it reads the same answer; `mrMoneyWeekRulePending` /
-`mrApplyMoneyWeekRule` (marker `MR_MONEY_WEEK_NOTE`, card on Grown-ups ›
-⚙️ Rules) append it as one dated version from this week's Monday, the Sunday
-rules' way. A week is Sun–Sat when its rules say `sunday` and its meeting
-Sunday (Monday + 6) is on or after `from` (`mrMoneyWeekRuleOn`). No
-`state.shared` key was added, so no merge decision was needed.
-
-**The mapping (js/18-rules.js, `mrMoneyDays`).** Storage identity is
-(planner Monday W, dayIdx 0 = Mon … 6 = Sun). The money week keyed by W is:
-
-| Rule | Days paid | Storage refs |
-|---|---|---|
-| Mon–Sun (before the switch) | Mon(W)..Sun(W+6) | (W,0)..(W,6) — exactly as before |
-| Sun–Sat | Sun(W−1)..Sat(W+5) | (W−7, 6), (W,0)..(W,5) |
-
-The meeting on Sun(W+6) still settles weekKey W (`ctThisWeekKey()` names the
-coming meeting's week on every day under either rule); that Sunday itself is
-day 0 of the next money week, W+7. `mrMoneyWeekOf(dayKey)` answers "which
-money week pays this day" for today's surfaces. Every reader asks
-`mrMoneyDays` / `mrMoneyDayKeys` instead of `mrWeekDayKeys`: `mrChoreWeek`
-(its `days[]` now carry `dayKey`, `wk`, `d`, `taken`), `mrStreakWeek`,
-`mrFinesWeek` (and `mrFineStanding`), `mrSessionsWeek` (an attendance answer
-kept at the day's planner week is still read). A Sun–Sat week has no "unticked
-Sunday counts on its own Sunday" case (owner decision #93 stays for Mon–Sun
-weeks): its meeting comes after its last day, so Sunday's step 1 no longer
-asks for the Sunday routine (`sdSundayRoutine`). Competitions, learning and
-gifts keep their Mon–Sun week.
-
-**A day is never paid twice.** `mrFreezeWeekLedger` writes the row's
-covered days (`days`). A settled week keeps exactly the days it froze; a row
-frozen before `days` existed covered its own nominal days. The only day two
-weeks can both name is the switch Sunday (Sun 4 Oct 2026: day 6 of the last
-Mon–Sun week, day 0 of the first Sun–Sat one). An open week marks `taken` any
-of its days a settled neighbour covers, so whichever of the two settles first
-pays it — normally the old week, at the meeting of 4 Oct, leaving the first
-Sun–Sat week six days (Mon 5 – Sat 10). A `taken` day is paused for the
-streak (neither kept nor missed). Held by tests/sunday.test.js (the pure
-`mrMoneyDaysPure`, all 120 settle orders over five weeks: every day paid
-exactly once) and smoke `theMoneyWeekRunsSundayToSaturday`,
-`aDayIsNeverPaidTwiceAcrossTheSwitch`.
-
-**Readers that changed** (today's day belongs to the next money week on a
-Sunday): the ☀️ countdown (`mnyCountdownData`: on a meeting Sunday, before
-her meeting, the finished week with "Sunday is today!"), Today's 🔥 streak,
-`mrChoreWouldPay` / `mnyEarnLeftToday` (through `mrChoreDay`), the chore tab's
-cap bar, earn board, header streak and free-chore marks (kid and parent), the
-parent day cards and fines list, Grown-ups › 📦 Fines (Day row =
-the coming meeting's money days, plus today when it is not one of them; each
-fine's cost from the week that pays its day), the dispute amount, Sunday's
-"My week" strip and `mnyWorking` day names. **Unchanged on purpose:** every
-`ctWeekMoney` / `mrWeekBreakdown(W)` caller that means "the meeting at the end
-of planner week W" (week view, passbook, story, meeting, stream, Approve's
-This Sunday, the club sessions sheet).
-
-`tools/money-calibrate.js` prices its modelled weeks in the rule's order
-(Sunday first); the figures do not move (day order only moves ties), which
-tests/money.test.js now asserts — nothing was re-pinned.
+*Moved to `docs/archive/architecture-history.md`: the record of the withdrawn Sunday-to-Saturday rule (Deviation 34).*
 
 ## The money screens use the prototype's text size — Plan v6 Deviation 35
 
@@ -4107,7 +4005,7 @@ Calm was already 1; the phone keeps the house 1.1 in Pop; the 13px floor
 still measures the result. A name on those screens is never cut with "…":
 the old ellipsis rules wrap instead, and smoke `noLabelIsCutOnTheMoneyScreens`
 fails on any ellipsis-truncated element there at 1194 (seeded My money, her
-sheets, Sunday's four steps, Grown-ups' six tabs, both looks).
+sheets, Sunday's four steps, Grown-ups' six tabs, both looks). (checked by smoke: noLabelIsCutOnTheMoneyScreens)
 
 ## Stage 6d — the approved redesigns (Plan v9 §N, build 2026-10-04b)
 
@@ -4118,26 +4016,26 @@ sheets, Sunday's four steps, Grown-ups' six tabs, both looks).
   redraws Now while Now is on screen. Now still decides nothing of its own.
   Its Jenn · Jess · Both and By girl / By kind toggles are device-local
   (`wp_now_scope`, `wp_now_groupby`, try/catch), separate from the portal's
-  `parentScope`.
+  `parentScope`. (checked by smoke: nowIsWhereQuestionsAreAnswered)
 - **No cash account** (Deviation 37). `wallet.cash` is unchanged and still
   joins her Sunday pile; screens show it only as "📥 Waiting for Sunday"
   above $0, never as a place. Savings is drawn with her goal jars inside it;
-  the jars stay `goalId` holdings (`mnyGoalHolding` is still their reader).
+  the jars stay `goalId` holdings (`mnyGoalHolding` is still their reader). (checked by smoke: myMoneyHasNoCashAccount)
 - **`agreed {value, by, at}`** (Deviation 41) is the one new data field, on a
   request record in its own store (`req:`, `mvq:`, `dep:`). It rides the
   whole-record merge; tests/merge.test.js proves it two-device and the merge
   layer did not change. The pure core writes it (`sdWithAgreed`) and agrees it
   (`sdAgreeInto`: the owner's field takes the agreed figure, `agreed.asked`
-  keeps what she asked), so every owner keeps reading its own field.
+  keeps what she asked), so every owner keeps reading its own field. (checked by tests/merge.test.js)
 - **A calendar day adds through the planner's own sheet** (Deviation 39):
   My money never places a block; `mnyCalDay` opens the day
-  (`openDayFromWeekCard`) and `pickFromSlot('competition')`.
+  (`openDayFromWeekCard`) and `pickFromSlot('competition')`. (text only)
 - **Weeks reads, never stores**: a Sunday's record is the frozen ledger row
   plus the records that week used (fines, requests by `appliedWeek`,
   overrides read without `mnyOverrides`' ensure). The saving line is the
-  core's `sdSavingLine`; "typical week" is `guSteady`, the Commitments reader.
+  core's `sdSavingLine`; "typical week" is `guSteady`, the Commitments reader. (text only)
 - "Dad" is "parents" in every on-screen sentence (Deviation 38); stored
-  `by` values and the fines' "Logged by Mom / Dad" stay.
+  `by` values and the fines' "Logged by Mom / Dad" stay. (checked by tests/check-money-words.js)
 
 ## Stage 6h — the money screens to the final reference (Plan v17, build 2026-10-04c)
 
@@ -4151,34 +4049,34 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   handwriting lines Caveat; Calm keeps its own fonts (Lexend everywhere,
   tabular figures). Patrick Hand has no equal-width digits, so every money
   column is right-aligned. No new font and no new host: the four Pop fonts
-  were already loaded by `index.html`.
+  were already loaded by `index.html`. (text only)
 - **My money is one screen with doors.** No kid bottom bar on it
   (`TD_NAV_SCREENS`); ◀ goes to Today. Extras open read-only information
   sheets through the request sheet's chrome (`mnyOpenInfoSheet`,
   `MNY_INFO_KINDS`, bodies in js/22). Which goal the card shows is
   device-local (`wp_mny_goalcard_<kid>`). ⏪ Draw early is a mode of the
   Move · Cash sheet; `mnyOpenRequestSheet('adv')` opens it there; the
-  `advance.maxPerWeek` cap is enforced and not shown.
+  `advance.maxPerWeek` cap is enforced and not shown. (text only)
 - **The meeting's head is two rows** (`mmHead`, js/15; `sdMeetingAvatars` /
   `sdMeetingStepRow`, js/44) and the money step has **no footer**: the girls
   switch in the head and 3·Close is a pill. `mmWeekBar` and `mmMoneyFooter`
-  are gone.
+  are gone. (text only)
 - **The owe-vs-own chart reads the ledger, it stores nothing new in
   `state.shared`.** The past is each signed row's `debtBalanceAfter` (loan
   left) and `ownedAfter` (what she owned — a field the sign now writes on the
   frozen row, which rides the existing ledger merge). A row without both is
   left out and the chart says so. The forecast rule and the label thinning
   are pure (`sdOweOwnForecast`, `sdOweOwnSeries`, `sdThinLabels`, js/43, with
-  tests in tests/sunday.test.js).
+  tests in tests/sunday.test.js). (checked by tests/sunday.test.js)
 - **"Money my money made" has one reader**, `mnyPassiveSinceLastMeeting`:
   the stream's value-change lines into her pots since the baseline
   (`baselineAt` on her holdings, stamped by `mnyStampPassiveBaseline`).
   It used to be the change in each holding's value, which counted every
-  dollar moved in or out between Sundays as "made".
+  dollar moved in or out between Sundays as "made". (checked by smoke: passiveIncomeIsCountedAndBaselined)
 - **Cash from home is her bank, never a gift** (`sdIsHomeCash`): the sign
-  writes it to `groups.bank`, not `deposits` / `groups.given`.
+  writes it to `groups.bank`, not `deposits` / `groups.given`. (text only)
 - **"Earned this year" is the ledger's** (`guEarnedThisYear`, js/46), the
-  same rows the Weeks list shows; Sunday's earning target reads it too.
+  same rows the Weeks list shows; Sunday's earning target reads it too. (text only)
 
 ## Stage 7 — the comparison fixes, three rules, Calm and the phone (Plan v18 §W, build 2026-10-05c)
 
@@ -4188,48 +4086,48 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   each card now carries its category tag, `sdRequestTag(kind, to)` (js/43:
   🏆 Result · ⛸️ Club · 🔀 Move · 💵 Cash out · 🏦 Cash in · ⏪ Draw early ·
   🎁 Gift · 🎯 Goal · 📦 Fine — a move to `cash` is a cash out). Held by smoke
-  `everyMoneyRequestIsAnsweredInNow` (one of each kind, tag, answered there).
+  `everyMoneyRequestIsAnsweredInNow` (one of each kind, tag, answered there). (checked by smoke: everyMoneyRequestIsAnsweredInNow)
 - **Taken off is always negative.** A fine, money drawn early and early cash
   agreed at the meeting go through `sdOff$(v, fmt)` (js/43): a minus whatever
   sign the caller holds, never "−$0.00". Payday, My last 4 Sundays, Signed's
   money out, the passbook's "This week so far", Weeks' record (one line per
   early draw: "Drawn early −$1.00 · School book fair (asked $2, agreed $1)"),
-  Now's card and the meeting's agree card. Smoke `takenOffIsAlwaysNegative`.
+  Now's card and the meeting's agree card. Smoke `takenOffIsAlwaysNegative`. (checked by smoke: takenOffIsAlwaysNegative)
 - **Spare room → bigger text.** Where a card has height to fill, its rows'
   text grows first (Coming up by row count `mv2-coming--n*`, the passbook by
   Sundays `mv2-booktable--n*`), within the house sizes; the passbook keeps
-  the reference's 426px and Coming up takes the rest (≥1100px).
+  the reference's 426px and Coming up takes the rest (≥1100px). (text only)
 - **Lines wrap in Calm instead of spilling.** Calm's Lexend is wider than
   Patrick Hand, so a label that fits in Pop must be allowed to wrap (payday
   tiles, From Savings / From home, the legend chips, What I own's names, the
   column notes, Coming up's dates). No look-specific layout rule was added;
-  in Calm the money step can grow past 834px and scrolls in `.mm-body`.
+  in Calm the money step can grow past 834px and scrolls in `.mm-body`. (text only)
 - **The "gap $X" label is placed, not assumed** (`sdGapLabelSpot` /
   `sdSegHitsBox`, js/43): in the shaded gap of the newest past segment that
   fits, else beside or above/below the signed point, box-checked against
-  every line. **The own line is the reference green**, `--sd-own` (#2f7f62).
+  every line. **The own line is the reference green**, `--sd-own` (#2f7f62). (checked by tests/sunday.test.js)
 - **The request sheet closes with its ×** (`.rq-x`, drawn by `rqRender`
   inside `#requestBody` so the delegated listener hears it); the doors'
   sheets have no "Done", the Move · Cash sheet has no "Not now" and one title
   for its four modes. ⏪ Draw early is the reference's compact body
-  (`rqAdvBody`: one plain line, How much −/+, three reasons).
+  (`rqAdvBody`: one plain line, How much −/+, three reasons). (text only)
 - **Calm's tight labels read a fit factor, not a second layout.** `--mny-fit`
   (Pop 1, Calm 0.82) multiplies the font size of the money screens' tight
   labels, always as `max(13px, calc(<size> * var(--mny-fit, 1) *
   var(--text-scale, 1)))`, so Pop is unchanged, Calm's wider Lexend fits the
   same boxes and the 13px floor holds. Two widths are look tokens too
   (`--sd-legend-w`, `--sd-own-name-w`). A new tight label on these screens
-  takes the same form.
+  takes the same form. (text only)
 - **Phone heads are two rows; a describing word is `.ph-word`.** Under 768px
   it hides and the icon, number or picture stays; the control carries its
   full name in `aria-label`. My money's head breaks into rows with an
-  `::after` row break and `order`.
+  `::after` row break and `order`. (text only)
 - **A floored fine says so.** Fines can zero a day, never create debt, so a
   fine listed at its cost (−$1.00) can take nothing; the row keeps the minus
   and adds `sdFineFloorNote` ("nothing taken — the day was $0"), read through
-  `mnyFineFloorNote` from the week that pays the day.
+  `mnyFineFloorNote` from the week that pays the day. (checked by tests/sunday.test.js)
 - **Now's count has one reader**, `pnOpenCount(kids)` (js/32): the badge and
-  "N open" agree.
+  "N open" agree. (checked by smoke: parentNowCountsWhatIsWaiting)
 - **Clock- and calendar-dependent smoke checks are pinned.**
   `todayIsWhereTheDayGetsDone` pins `new Date()` to midday (its "always
   ahead" block was clamped at 11pm, so it failed between 11pm and midnight).
@@ -4237,7 +4135,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   `grownupsFinesLogEvenWhenFree` and `anUnfinishedDayIsNeverForgiven` test
   the Monday–Sunday money week. They pinned it with `pinMonSunMoneyWeek`
   while the Sun–Sat switch was planned; decision 15 (2026-10-06) made every
-  week Monday–Sunday, so the pin is removed.
+  week Monday–Sunday, so the pin is removed. (checked by smoke: todayIsWhereTheDayGetsDone, sundaySundayRoutineCounts, theFourHouseRulesHold, grownupsFinesLogEvenWhenFree, anUnfinishedDayIsNeverForgiven)
 
 ### Money fit and logic, PR 1 — money rules (build 2026-10-05d)
 
@@ -4251,7 +4149,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   rows. `mmWeekLabel` and its planner callers stay Mon–Sun — do not swap them.
   **Decision 15 (2026-10-06):** with the Sun–Sat switch withdrawn, `mrMoneyWeekLabel`
   reads Monday–Sunday for every week — "Mon 5 – Sun 11 Oct" for the week of
-  5 Oct; the Sun–Sat labels above are tested only with explicit rules.
+  5 Oct; the Sun–Sat labels above are tested only with explicit rules. (checked by tests/sunday.test.js and smoke: theMoneyHeadNamesTheMoneyWeek)
 - **A too-big commitment needs the parent's tick.** `sdCommitPlan` (js/43) is
   the one answer for a commitment's numbers, read by the "Can she afford it?"
   card and by `mnyAddCommitment`: steady money under $5 a week shows no share,
@@ -4259,18 +4157,18 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   ticked (`guCommitDraft.tickFor`, form state tied to the figures — no stored
   field, nothing in `state.shared`). The 10 % down comes out of Savings only
   above the 🛟 safety line; the rest stays on the new row. A 🌧️ surprise cost is
-  unchanged: the 🛟 pays it first (decision 8).
+  unchanged: the 🛟 pays it first (decision 8). (checked by tests/sunday.test.js and smoke: aBigCommitmentNeedsAParentTick)
 - **One pile figure.** Payday's 💰 My pile, I choose's chip ("$X left" beside
   it), Signed's money in less taken off and My last 4 Sundays' total
   (`sdHistGroups`, moved to js/43 so it is node-tested) are all `sdPile().tp`.
   🏦 From my bank lists "📥 Waiting for Sunday" as its own line, so its lines add
   up to its total. I choose's "what I owe → after" is `sdOweAfterPlan` — the
   sign's own loan arithmetic (`sdLoanPlan`, which `sdSign` now calls).
-  `sdRescaleLoanRows` puts the rounding cent on the last row (`sdRescaleMonthly`).
+  `sdRescaleLoanRows` puts the rounding cent on the last row (`sdRescaleMonthly`). (checked by tests/sunday.test.js and smoke: onePileFigureOnEveryStep)
 - **Grown-ups figures read the body font in Pop** (`.gu, #grownupsOverlay` join the
   `--font-round: var(--font-body)` rule beside `.mv2` and `.sd`), and the Story's
   ribbon colours (`FL_COLOURS`, js/42) read the v15 meaning tokens that My money
-  uses (`--mny-v15-bar/gold/saved/wall/cash/made`).
+  uses (`--mny-v15-bar/gold/saved/wall/cash/made`). (text only)
 
 ### Money fit and logic, PR 3 — the money sections' sizes are tokens (build 2026-10-05f)
 
@@ -4278,7 +4176,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   the "SUNDAY v15 — GROWN-UPS AND HER REQUEST SHEETS" banner) and
   `/* money-tokens:end */` (the last line) bound the money sections: Grown-ups,
   the request sheets, My money v2, Sunday and the `.pn-` "Waiting for you"
-  rules. New money rules go inside them. The old `.mny-` section joins in PR 4.
+  rules. New money rules go inside them. The old `.mny-` section joins in PR 4. (text only)
 - **Inside the markers a size is a token.** Corners: `--radius-md` 14px
   (cards), `--radius-btn` 11px (buttons, inputs), `--radius-bar` 6px (bars),
   `--radius-xs` 4px (tiny pills), `--radius-full` (chips and round things).
@@ -4291,13 +4189,13 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   per-look meaning is the R11 4A hazard. Selected fills `--sel-tab`/`--sel-tab-ink`
   (Grown-ups tabs) and `--sel-opt`/`--sel-opt-ink` (teal options); the main
   button `--btn-main`/`--btn-main-ink` and its resting state
-  `--btn-off`/`--btn-off-ink` (`.gu-save`, `.rq-send`, `.sd-go`, `.sd-sign.ready`).
+  `--btn-off`/`--btn-off-ink` (`.gu-save`, `.rq-send`, `.sd-go`, `.sd-sign.ready`). (text only)
 - **What holds it.** `tests/check-look-tokens.js` rule 5 (the plan's "rule 6"):
   between the markers every `border-radius`, `box-shadow`, `border`,
   `border-width` and `border-<side>(-width)` value carries its size only as
   `var(--…)` (a bare `0`, `none`, `transparent`, `currentColor` pass); an inset
   or comma-list shadow passes only by a named `SIZE_EXEMPT` entry (the coin face
-  and the `sdGlow` keyframes today); a missing marker or a stale entry fails.
+  and the `sdGlow` keyframes today); a missing marker or a stale entry fails. (checked by tests/check-look-tokens.js)
 - **The words check.** `tests/check-money-words.js` (in `npm run check`) scans
   string and template text in `js/*.js` and visible text in `index.html` for
   the retired money words — dad, meet(s), prizes, stocks, locking money,
@@ -4305,19 +4203,19 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   code filled (`mnyConceptSwap`'s own source and the words it fills inside
   `MNY_CONCEPTS` pass). Identifiers, comments, hyphenated classes and actions,
   and lowercase quoted keys (`kind: 'meet'`) never match. Allowances are named
-  (`ALLOW`, `EXEMPT` with the PR that fixes the hit); a stale one fails.
+  (`ALLOW`, `EXEMPT` with the PR that fixes the hit); a stale one fails. (checked by tests/check-money-words.js)
 - **⚙️ Rules builds its groups once per render.** `guRender('rules')` calls
   `guRuleSections()` once and hands the result to `guRuleIndex(secs)` and
   `guRulesMain(secs)`; each still builds its own when called alone
   (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
-  counts one build per render.
+  counts one build per render. (checked by smoke: theGrandfatherRuleReadsAsItselfEverywhere)
 - **Two selected fills, two meanings (PR 5, decision 5 kept both).** Teal
   `--sel-opt` marks **a picked option** (`.sd-btn.on`, `.sd-chip.on`,
   `.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
   `.fl-col.on`); red `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
   `.mm-step-cur`, `.sd-rung.on`, `.pn-segbtn.on`, `.gu-toggle.on`); ink
   `--sel-tab` is a Grown-ups tab. A new selected state picks the one that
-  says what it means; it never invents a third.
+  says what it means; it never invents a third. (text only)
 
 ### Money fit and logic, PR 4 part B — the old money pages read the new rules (build 2026-10-06b)
 
@@ -4330,16 +4228,16 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   (`mnySundaysPage` — every settled Sunday from the frozen ledger row through
   `sdHistGroups`, labelled with `mrMoneyWeekLabel`) and **📊 By month ▸**
   (`bymonth`) opens the Flow (`flRenderFlow`, js/42). `mnyRenderHistory` draws
-  whichever is open. No bottom bar on any money page (`TD_NAV_SCREENS`).
+  whichever is open. No bottom bar on any money page (`TD_NAV_SCREENS`). (text only)
 - **One explainer table.** An idea's words live only in `MNY_CONCEPTS` (js/21).
   The idea sheet (`mnyOpenInfoSheet('idea', {id})`, kind in `MNY_INFO_KINDS`),
   Money school's 💡 rows, the '?' card (`mnyShowConcept`) and 📥 Waiting for
   Sunday's sheet all read it; `mnyIdeaBody` is the one body. Rule numbers in an
   idea are `mnyConceptSwap` tokens — `{lockWeeks}` (`mnyLockWeeks`) and
-  `{stockDrop}` (`mnyStockDrop`, the Companies chart's own fall).
+  `{stockDrop}` (`mnyStockDrop`, the Companies chart's own fall). (text only)
 - **The old pages wear the new look.** Money school (`.mv2-school`) and the
   two passbook pages (`.mv2-hist`, `.mv2-flow`) are `.mv2-card`s inside the
-  `money-tokens` markers, the Flow's `.fl-*` rules included.
+  `money-tokens` markers, the Flow's `.fl-*` rules included. (checked by smoke: moneySchoolWearsTheNewLook)
 
 ### Money fit and logic, PR 5 — the Sunday sheet, same thing same look (build 2026-10-06d)
 
@@ -4352,23 +4250,23 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   body `mnySundayBody`) draws it, opened by action `sunday-sheet` on every
   passbook row and All my Sundays row (`mnySundayDoorAttrs`). A screen that
   shows one settled Sunday to a kid reads this reader; `guWeekRecord` stays
-  the parents' fuller record.
+  the parents' fuller record. (checked by tests/sunday.test.js and smoke: aSundayRowOpensItsSheet)
 - **A total in a title row** wears `.mny-total` plus `--owe` (`--sd-purple`),
   `--own` (`--sd-own-ink`, the spec green darkened to read at 4.5:1 on the sky
   card) or `--pile` (`--mny-v15-red`) — one family for My money and the Sunday
-  screens. Money in is teal wherever it shows.
+  screens. Money in is teal wherever it shows. (text only)
 - **One stepper.** `.sd-step`, `.gu-step` and `.mny-step` (`rqOpt` / `guOpt`
   add it to a − or +) share one rule: a 44px round button, ink border, button
   shadow. The value between them is `.mny-stepval`, plain text, never a
-  button.
+  button. (text only)
 - **Tap buttons vs information boxes.** Inside the money markers a tap button
   has `--bw-btn` and `--mny-shadow-btn`; an information box, a door or a list
   row keeps a thin edge or none (BUILD-SPEC §0). The two selected meanings are
-  under PR 3 above.
+  under PR 3 above. (text only)
 - **The sheet scrim** `--mny-v15-scrim` is 0.62 in both looks, so the page's
-  numbers do not read beside a sheet.
+  numbers do not read beside a sheet. (text only)
 - **Held by** smoke `aSundayRowOpensItsSheet` and the unit case in
-  `tests/sunday.test.js`.
+  `tests/sunday.test.js`. (checked by tests/sunday.test.js and smoke: aSundayRowOpensItsSheet)
 - **The money fit check (PR 5 part 2, build 2026-10-06e)** is smoke
   `noLabelIsCutOnTheMoneyScreens`: every money screen and sheet, both looks,
   390×844 and 1194×834, seeded twice — the usual names, then long names
@@ -4380,25 +4278,25 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   not past the screen's side), **no overlap** (no two line boxes cross; 1px
   allowed). A scroll container may scroll. A failure is fixed in the Stage 7
   order: `--mny-fit`, bigger text where there is room, shorter words, a box
-  that grows — never a cut.
+  that grows — never a cut. (checked by smoke: noLabelIsCutOnTheMoneyScreens)
 
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs
-  (`README.md`, `SECURITY_TODO.md`) still say `index.html` — they're stale.
-- `MULTI_ROLE_REVIEW.md` cites `index.html` line numbers from the pre-split
-  monolith. Those line numbers are meaningless now; treat that file as history.
+  (`README.md`, `SECURITY_TODO.md`) still say `index.html` — they're stale. (text only)
+- `docs/archive/MULTI_ROLE_REVIEW.md` cites `index.html` line numbers from the pre-split
+  monolith. Those line numbers are meaningless now; treat that file as history. (text only)
 - Every mutation currently triggers a full-document Firestore write with no
-  debounce. Be aware before adding anything that mutates in a loop.
+  debounce. Be aware before adding anything that mutates in a loop. (text only)
 - `refreshCurrentScreen()` fires on every remote snapshot, including the echo of
-  the device's own write. Don't assume a render happens once.
+  the device's own write. Don't assume a render happens once. (text only)
 - GitHub Pages caches aggressively. After a deploy that changes `js/*.js`,
   hard-refresh or bump a `?v=` query on the script tags. `sw.js` is the other
   cache: it is **network-first** so being online always gets the deployed code,
   and the shell it holds only answers offline — but **bump `SW_VERSION` on every
   deploy that changes a shell file**, or an installed device keeps the old
   offline copy. Bump `APP_BUILD` (`js/01-config.js`) to the same value: it is the
-  stamp a parent reads on App, and the shell check fails when they differ. There is no build step to do it for you.
+  stamp a parent reads on App, and the shell check fails when they differ. There is no build step to do it for you. (checked by tests/check-sw-shell.js)
 
   `tests/check-sw-shell.js` (in `npm run check`) is what makes that enforceable.
   `index.html`'s script tags and `sw.js`'s `SHELL` are two hand-written lists
@@ -4430,4 +4328,4 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
   (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and
   Escape for sheets live in `openSheet`/`closeSheet` (`js/17-ui-misc.js`) — do
-  not add a second dialog mechanism beside them.
+  not add a second dialog mechanism beside them. (text only)
