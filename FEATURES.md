@@ -166,7 +166,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 - By month leads with a sentence in four groups (earned, given, my money made, taken off), then what went out and what was put away; each caption equals the sum of its bars; numbers come from the frozen ledger — Proof: theFlowSaysWhereItWent, theFlowCaptionsEqualTheirBars
 - By month is the Flow in cards: What came in (earned with Home, Club job and Competitions under it, given, made, taken off), What went out, Put away to grow, and month bars along the bottom — Proof: theFlowSaysWhereItWent
-- This month is the calendar month (a picked month stays picked); before any Sunday of this month is signed it reads Nothing has landed this month yet. — Proof: none found
+- This month is the calendar month (a picked month stays picked); before any Sunday of this month is signed it reads Nothing has landed this month yet. — Proof: thisMonthSaysNothingHasLandedYet, thePassbookOpensAllMySundaysAndByMonth
 - By month looks as in the reference picture, iPad Pop — Proof: picture tests/reference/by-month-jenn-ipad-pop.png
 
 ## Sunday steps
@@ -215,7 +215,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Grown-ups is the parent's Money tab: Commitments, Fines, Expected, Rules and Weeks, with Record and ? at the start; 44px targets, one column under 768px — Proof: grownupsEveryOldSectionHasAHome
 - Commitments: each girl's rows with bars, her must-pay against steady money, a new commitment form with an affordability pane, a Club owes card and a one-off club session — Proof: grownupsCommitmentsAddARow
 - The loan card's share of steady money is the core's (sdSteadyShare): under $5 a week of steady money it shows — — Proof: tests/check-steady-share.js, sunday.test.js "fix 1: a share of steady money is null under the $5 floor, else weekly ÷ steady × 100"
-- Both ✍️ Record doors (the Grown-ups bar and Parent › Now) carry the same hint, Write down money that came in or went out., from one source (rcDoorHint) — Proof: none found
+- Both ✍️ Record doors (the Grown-ups bar and Parent › Now) carry the same hint, Write down money that came in or went out., from one source (rcDoorHint) — Proof: bothRecordDoorsCarryTheHint
 - Fines: choose girl, item, day and who logged it; this week's list with free or charged amounts, standing and remove; every fine is logged even when free — Proof: grownupsFinesLogEvenWhenFree
 - Expected: per girl the next five months, move, step $5, remove and add chips — Proof: grownupsExpectedMoneyMoves
 - Rules tab: rule rows with the girls' words, a changed value shown with was, an impact pane, Save starts next Sunday as one version, Undo, and the last five changes — Proof: grownupsRulesSaveFromNextSunday

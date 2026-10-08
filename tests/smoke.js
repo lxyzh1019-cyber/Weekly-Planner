@@ -5957,6 +5957,10 @@ function findChromium() {
       const borders = (c) => ['Top', 'Right', 'Bottom', 'Left'].map(s => (c['border' + s + 'Style'] === 'none' ? 0 : parseFloat(c['border' + s + 'Width']) || 0));
       // A box has a border on all four sides; a single rule (a dashed line, a head's underline) is not one.
       const boxed = (c) => borders(c).every(v => v > 0);
+      /* Lines from every root on show are compared with each other: a screen's
+         head and its body are separate money roots, and a head drawn over the
+         body is still an overlap. */
+      const lines = [];
       for (const root of roots) {
         const shown = (el) => {
           for (let e = el; e; e = e.parentElement) {
@@ -5966,7 +5970,6 @@ function findChromium() {
           }
           return true;
         };
-        const lines = [];
         const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
         for (let n; (n = tw.nextNode());) {
           const text = n.textContent.replace(/\s+/g, ' ').trim();
@@ -6027,15 +6030,6 @@ function findChromium() {
           if (rects.some(r => inView(r) && (shownPart(r).right > vw + 1 || shownPart(r).left < -1))) out.add(`spill · ${tag} past the screen edge`);
           rects.forEach(r => lines.push({ r, tag, n, scroller, seen: inView(r) }));
         }
-        for (let i = 0; i < lines.length; i++) {
-          for (let j = i + 1; j < lines.length; j++) {
-            const a = lines[i], b = lines[j];
-            if (a.n === b.n || (a.scroller !== b.scroller && !(a.seen && b.seen))) continue;
-            const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
-            const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
-            if (ix > 1 && iy > 1) out.add(`overlap · ${a.tag} × ${b.tag}`);
-          }
-        }
         // A bordered box past the screen's side (a card edge peeking in or out).
         root.querySelectorAll('*').forEach(el => {
           if (!shown(el) || !boxed(cs(el))) return;
@@ -6055,6 +6049,15 @@ function findChromium() {
             if (scrolls(e)) break;
           }
         });
+      }
+      for (let i = 0; i < lines.length; i++) {
+        for (let j = i + 1; j < lines.length; j++) {
+          const a = lines[i], b = lines[j];
+          if (a.n === b.n || (a.scroller !== b.scroller && !(a.seen && b.seen))) continue;
+          const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+          const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+          if (ix > 1 && iy > 1) out.add(`overlap · ${a.tag} × ${b.tag}`);
+        }
       }
       return [...out];
     };
@@ -26172,6 +26175,7 @@ function findChromium() {
       const bad = [];
       const active = () => (document.querySelector('.screen.active') || {}).id;
       const kid = 'jenn';
+      const savedPeriod = flPeriod, savedMonth = flMonth;
       try {
         const seeded = mv2Seed(kid); if (seeded) bad.push(seeded);
         // One Sunday with a fine, so ➖ has something to say.
@@ -26242,14 +26246,25 @@ function findChromium() {
           wrap.querySelector('[data-mny-action="sundaysmode"][data-mny-mode="week"]').click();
           underMyMoney('📖 All my Sundays');
         }
+        flPeriod = 'month'; flMonth = null;
         if (!door('bymonth')) bad.push('the passbook has no 📊 By month door');
         else {
-          if (!wrap.querySelector('.fl-story')) bad.push('📊 By month did not draw the Flow');
+          const ledRows = mnyLedgerRows(kid);
+          const newest = ledRows[0];
+          /* PR 1 money re-check: "This month" is the calendar month. On a date
+             whose month has no settled Sunday yet (CI's 2026-10-01) the page
+             says so in one line; the newest month with a Sunday is then picked
+             on the strip, as she would. */
+          const nowMonth = todayKey().slice(0, 7);
+          if (!ledRows.some(r => flSundayMonth(r.weekKey) === nowMonth)) {
+            if (!/Nothing has landed this month yet\./.test(wrap.textContent)) bad.push('📊 By month on an empty calendar month does not say "Nothing has landed this month yet."');
+            const col = wrap.querySelector(`.fl-col[data-fl-month="${flSundayMonth(newest.weekKey)}"]`);
+            if (col) col.click(); else bad.push('the newest month with a Sunday is not on the strip');
+          }
+          if (!wrap.querySelector('.fl-story')) { bad.push('📊 By month did not draw the Flow'); return bad; }
           /* Build 2026-10-06c: the months come from the frozen Sundays, so the
              newest month says what its Sundays earned, split as drawn, and
              the month bars fill the one card (no empty band). */
-          const ledRows = mnyLedgerRows(kid);
-          const newest = ledRows[0];
           const g = mnySundayGroups(newest);
           const same = ledRows.filter(r => flSundayMonth(r.weekKey) === flSundayMonth(newest.weekKey)).map(mnySundayGroups);
           const earned = money2(same.reduce((a, x) => a + x.earned, 0));
@@ -26265,7 +26280,126 @@ function findChromium() {
           underMyMoney('📊 By month');
         }
       } catch (e) { bad.push('threw: ' + e.message); }
-      finally { goToday(); }
+      finally { flPeriod = savedPeriod; flMonth = savedMonth; goToday(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* ── 📊 This month is the calendar month (PR 1 money re-check, fix 6) ──
+     Before: "This month" quietly showed the newest month with a Sunday, so in
+     the first days of a month the page headed "This month" read last month.
+     Asserted on a ledger with Sundays two and one months back and none this
+     month: the page picks this month, says "Nothing has landed this month
+     yet." in one line with no story and no $0 groups, and keeps the strip; a
+     month she picks stays picked; All of it has no such line; and once a
+     Sunday of this month is signed the story is back. */
+  if (want('thisMonthSaysNothingHasLandedYet')) {
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await guSetup();
+    checks.thisMonthSaysNothingHasLandedYet = await page.evaluate(() => {
+      const bad = [];
+      const kid = 'jenn';
+      const savedPeriod = flPeriod, savedMonth = flMonth;
+      const EMPTY = 'Nothing has landed this month yet.';
+      try {
+        profile = kid; parentViewing = kid;
+        ctEnsureShared();
+        const c = state.shared.chore;
+        const now = todayKey().slice(0, 7);
+        const [yy, mm] = now.split('-').map(Number);
+        const back = (n) => { let y = yy, m = mm - n; while (m < 1) { m += 12; y -= 1; } return y + '-' + String(m).padStart(2, '0'); };
+        const put = (day, row) => {
+          const wk = ctWeekKeyForDate(day);
+          c.moneyLedger[wk] = { [kid]: Object.assign({ at: 1, chores: 0, learning: 0, streak: 0, competition: 0, sessionsPaid: 0, fines: 0,
+            groups: { given: 0, made: 0, bank: 0, takenOff: 0 }, loan: { paid: 0 }, ready: 0, gic: 0, stock: 0, spend: 0 }, row) };
+          return wk;
+        };
+        c.moneyLedger = {};
+        put(back(2) + '-15', { chores: 40 });
+        put(back(1) + '-15', { chores: 25 });
+        const host = document.getElementById('mnyStoryWrap');
+        const empties = () => [...host.querySelectorAll('.fl-empty')].filter(e => e.textContent.trim() === EMPTY).length;
+
+        flPeriod = 'month'; flMonth = null; mnyOpenByMonth();
+        if (flCurrentMonth(flMonthsFor(kid)) !== now) bad.push('This month picks ' + flCurrentMonth(flMonthsFor(kid)) + ', not the calendar month ' + now);
+        if (empties() !== 1) bad.push(`an empty calendar month shows "${EMPTY}" ${empties()} times`);
+        if (host.querySelector('.fl-story')) bad.push('an empty calendar month still tells a story: ' + host.querySelector('.fl-story').textContent);
+        if (host.querySelector('.fl-group')) bad.push('an empty calendar month still draws the $0 groups');
+        const chip = host.querySelector('[data-fl-action="period"][data-fl-id="month"]');
+        if (!chip || chip.getAttribute('aria-pressed') !== 'true' || chip.textContent.trim() !== 'This month') bad.push('the "This month" chip is not the pressed one');
+        const onCol = host.querySelector('.fl-col.on');
+        if (!onCol || onCol.getAttribute('data-fl-month') !== now) bad.push('the strip does not mark ' + now + ' as the month on show');
+        if (host.querySelectorAll('.fl-col').length < 3) bad.push('the strip lost months: ' + host.querySelectorAll('.fl-col').length);
+
+        // A month she picks stays picked, and it is not "nothing yet".
+        const picked = host.querySelector(`.fl-col[data-fl-month="${back(1)}"]`);
+        if (!picked) bad.push('last month is not on the strip');
+        else {
+          picked.click();
+          if (flMonth !== back(1)) bad.push('tapping last month did not pick it');
+          if (empties()) bad.push(`a picked month with a Sunday says "${EMPTY}"`);
+          const story = host.querySelector('.fl-story');
+          if (!story || !/I earned \$25\.00/.test(story.textContent)) bad.push('the picked month does not say I earned $25.00: ' + (story ? story.textContent : 'no story'));
+          mnyRenderHistory();
+          if (flMonth !== back(1) || flCurrentMonth(flMonthsFor(kid)) !== back(1)) bad.push('the picked month did not stay picked on a redraw');
+        }
+
+        // All of it is never "nothing yet".
+        flPeriod = 'all'; flMonth = null; mnyRenderHistory();
+        if (empties()) bad.push(`All of it says "${EMPTY}"`);
+        if (!host.querySelector('.fl-story')) bad.push('All of it tells no story');
+
+        // A Sunday of this month signed: the story is back.
+        let sunday = null;
+        for (let d = 1; d <= 7 && !sunday; d++) {
+          const day = now + '-0' + d;
+          if (sdSundayOf(ctWeekKeyForDate(day)) === day) sunday = day;
+        }
+        if (!sunday) bad.push('precondition: no Sunday found in the first week of ' + now);
+        else {
+          put(sunday, { chores: 12 });
+          flPeriod = 'month'; flMonth = null; mnyRenderHistory();
+          if (empties()) bad.push(`this month with a signed Sunday still says "${EMPTY}"`);
+          const story = host.querySelector('.fl-story');
+          if (!story || !/I earned \$12\.00/.test(story.textContent)) bad.push('this month with a signed Sunday does not say I earned $12.00: ' + (story ? story.textContent : 'no story'));
+        }
+      } catch (e) { bad.push('threw: ' + e.message); }
+      finally { flPeriod = savedPeriod; flMonth = savedMonth; goToday(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* ── ✍️ Both Record doors carry one hint (PR 1 money re-check) ──
+     The Grown-ups bar and Parent › Now each have a ✍️ Record door. Asserted:
+     beside each, on show, the same sentence (rcDoorHint's), so the two doors
+     cannot drift apart. */
+  if (want('bothRecordDoorsCarryTheHint')) {
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await guSetup();
+    checks.bothRecordDoorsCarryTheHint = await page.evaluate(() => {
+      const bad = [];
+      const WANT = 'Write down money that came in or went out.';
+      try {
+        if (RC_DOOR_HINT !== WANT) bad.push('rcDoorHint reads "' + RC_DOOR_HINT + '"');
+        const look = (where, root, doorSel) => {
+          if (!root) { bad.push(where + ': not drawn'); return; }
+          const door = root.querySelector(doorSel);
+          if (!door || !door.getClientRects().length) { bad.push(where + ': no ✍️ Record door on show'); return; }
+          const hints = [...root.querySelectorAll('.rc-door-hint')];
+          if (hints.length !== 1) { bad.push(where + ': ' + hints.length + ' Record hints'); return; }
+          const h = hints[0];
+          if (h.textContent.trim() !== WANT) bad.push(where + ': the hint reads "' + h.textContent.trim() + '"');
+          if (!h.getClientRects().length || getComputedStyle(h).visibility === 'hidden') bad.push(where + ': the hint is not on show');
+          if (h.parentElement !== door.parentElement) bad.push(where + ': the hint does not sit beside the ✍️ Record door');
+        };
+        GU_TABS.forEach(t => {
+          const wrap = guOpen(t.id);
+          look('Grown-ups › ' + t.id, wrap && wrap.querySelector('.gu-tabs'), '[data-mny-action="record-any"]');
+        });
+        look('Parent › Now', guOpen('approve'), '.pn-sidebtns [data-pn-action="record"]');
+      } catch (e) { bad.push('threw: ' + e.message); }
       return bad.length ? bad : true;
     });
     await guTeardown();
