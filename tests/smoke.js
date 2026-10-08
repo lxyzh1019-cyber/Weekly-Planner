@@ -16429,6 +16429,20 @@ function findChromium() {
         const names = new Set();
         let clashNotes = 0;
         for (const [id, nav, label] of KID_SCREENS) {
+          /* Today is seeded under a clock pinned to 9:30 (seedTodayAudit), but its
+             undo puts the real clock back before anything is measured. Later in
+             the day the next redraw then finds a different "now" and draws Today
+             again from the restored blocks, and the seeded clash note is gone
+             before its ink is read. So the same 9:30 stays pinned here until
+             Today has been measured and shot, whatever the hour of the run. */
+          if (id === 'screen-today') await ev('pin Today', () => {
+            const RealDate = Date;
+            const when = new RealDate(); when.setHours(9, 30, 0, 0);
+            Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+            Date.prototype = RealDate.prototype;
+            Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+            window.__lookTodayUnpin = () => { Date = RealDate; };
+          });
           const seeded = await ev(label || id, `(${nav.toString()})()`);
           if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
           await page.waitForTimeout(250);
@@ -16443,6 +16457,7 @@ function findChromium() {
           while (names.has(name)) name += '-2';
           names.add(name);
           await snap(name, w);
+          if (id === 'screen-today') await ev('unpin Today', () => { window.__lookTodayUnpin(); window.__lookTodayUnpin = null; });
         }
         // The seeded Today always carries an overlap; a run that measured no clash note measured nothing of it.
         if (clashNotes < 1) bad.push(`screen-today@${w}: no .quest-conflict-note was on show, so its ink was not measured`);
@@ -16535,6 +16550,9 @@ function findChromium() {
         await ev('edit close', () => { closeSheet('editOverlay'); setDayBlocks(todayKey(), window.__popHad, 'jenn'); });
       }
     } finally {
+      /* Backstop: a throw between pinning Today and its unpin above would leave
+         the 9:30 clock pinned for every later check. */
+      await ev('unpin Today (backstop)', () => { if (window.__lookTodayUnpin) { window.__lookTodayUnpin(); window.__lookTodayUnpin = null; } });
       try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
       await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
       if (was) await page.setViewportSize(was);

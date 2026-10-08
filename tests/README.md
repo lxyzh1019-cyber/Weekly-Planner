@@ -14,8 +14,8 @@ each one pays a few minutes of setup on a laptop, so they are outside the
 3-minute short loop. The rules are in `ARCHITECTURE.md`, Verification.
 
 Before a pull request opens — the full suite green on GitHub: the `checks` job,
-the browser job (cleanup-tool tests) and one smoke job per date on all four
-dates, each smoke job about 8 minutes (accepted until a later stage brings every
+the browser job (cleanup-tool tests), the picture job, and one smoke job per
+date on all four dates, each smoke job about 8 minutes (accepted until a later stage brings every
 job under 5 minutes). A pull request starts the run by itself; on a branch,
 `gh workflow run ci.yml --ref <branch>`. `npm test` still runs all of it in one
 process, but the smoke suite alone is over 30 minutes on a laptop, so it is not
@@ -109,15 +109,69 @@ clock runs on from there. CI runs the smoke job once per date in a matrix --
 `2026-10-15` (a weekday), `2026-10-11` (a Sunday), `2026-10-01` (the first of a
 month) and `2026-10-07` -- so a check that only passes on some days fails there.
 
+## The picture test
+
+`npm run test:pictures` (`tests/pictures.js`) opens every screen and state the
+consistency pass touches — the 13 screens, the Week view tabs, My money and
+Money school, All my Sundays, By month, each parent tab including Now and the
+Grown-ups tabs, each meeting step and the Sunday's steps, the four overlays
+(Sunday, Grown-ups, request, told), one info sheet, one confirm dialog, every
+other sheet (record, Sunday line, profile switch, slot picker, activity,
+training, block edit, routine and training quick sheets, copy day, reflect,
+custom activity / task / sport, weekly wins, level, ⋯ More, new challenge,
+parent activity, new rule, new routine, chore group) and the quest pop-up — for
+Jenn, Jess and the parent where the screen differs by user, at iPad 1194×834
+and phone 390×844, in Pop and Calm. The list is the `STATES` table in the file.
+
+Every picture boots from one fixed fixture (both girls, this week's plan, a
+signed Sunday last week, a loan each, waiting requests, a goal each) at a fixed
+clock, Wednesday 7 Oct 2026 12:00 in America/Edmonton, with a fixed
+`Math.random`, reduced motion, no transitions and no caret, after the fonts
+have loaded. Each picture is compared with `tests/reference/<state>-<user>-<ipad|phone>-<pop|calm>.png`
+on canvases in the browser (no extra package); only the pictures that differ
+are printed, with a diff in `tests/out/pictures-diff/`. A missing reference, or
+a reference no state makes, is a failure. Every run first checks the compare
+itself: a picture against itself gives 0 differences, and one planted changed
+pixel is caught.
+
+**Retries.** A picture that differs is shot again, alone, in a brand-new
+browser context (a new renderer process), up to 2 times. It passes only when a
+re-shot matches the reference exactly as the first shot must (2 levels per
+channel, 0 pixels); each such pass is printed as "matched on retry N: <name>"
+and counted in the summary. A picture that never matches fails with its diff.
+Why: on the CI Linux runner colour emoji are scaled from a bitmap font, and
+their edges came out a few levels apart between two runs of the same code. The
+self-check does not retry. `PICTURES_UPDATE=1` takes no retries.
+
+**Local vs CI.** References are made and compared only on the CI Linux runner;
+fonts and the browser build differ elsewhere. Without `CI` set the test reports
+differences and exits 0 ("local run — not gating"). In CI it gates, and an
+empty `tests/reference/` is a failure ("no references in tests/reference/");
+a local run with no references writes the fresh set and exits 0.
+
+**Refreshing references.** Every run writes the fresh set to
+`tests/out/pictures-new/`, and CI uploads it (with the diffs) as the artifact
+`pictures`. Download it from the CI run of the branch and copy
+`pictures-new/*.png` into `tests/reference/` in the same pull request as the
+change. `PICTURES_UPDATE=1 npm run test:pictures` writes references from this
+machine instead — for trying the test locally only; do not commit them.
+
+**Its own CI job.** The pictures keep their own clock (Wed 2026-10-07 12:00
+Edmonton) and do not read `SMOKE_DATE`, so CI runs them once per run, in the
+`pictures` job, side by side with the four smoke jobs. It installs the browser
+from the caches the `browser` job saved, and uploads the `pictures` artifact
+whether it passes or fails.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
 plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
 unit suite), `browser` (installs Chromium and its system packages once, caches
-both, runs the cleanup-tool tests), and `smoke`, one job per date, which
+both, runs the cleanup-tool tests), `smoke`, one job per date, which
 installs the browser from those caches and uploads `tests/out/` as an artifact
 (`smoke-screenshots-<date>`) so a layout regression is visible in the run
-itself.
+itself, and `pictures`, the picture test (above) on one fixed clock, which
+installs the browser from the same caches and uploads the artifact `pictures`.
 
 When asking Claude (or anyone) to change this app, ask them to **run the short
 loop and the map's tests before pushing, and attach the smoke-test screenshots
