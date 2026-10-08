@@ -1,3 +1,4 @@
+# Source: FEATURES.md at origin/main 6e04104 (now docs/archive/features-history.md; history line = field + 2). Format: <old line> | <phrase> | <section>
 3 | (history only: scope note, superseded by this list) | removed — owner OK needed
 5 | (history only: scope note, superseded by this list) | removed — owner OK needed
 6 | (history only: scope note, superseded by this list) | removed — owner OK needed
@@ -112,7 +113,7 @@
 144 | can be added anyway | Sister Sync (the sisters' timeline)
 145 | The Day view's invite ghost is a second accept door | Day
 146 | (history only: test list) | removed — owner OK needed
-147 | (history only: fixed known defect) | removed — owner OK needed
+147 | the drawn span stretches to every ghost | Day
 150 | this day, or all | Sister Sync (the sisters' timeline)
 151 | as one series invite | Sister Sync (the sisters' timeline)
 152 | The duplicate guard covers a series | Sister Sync (the sisters' timeline)
@@ -132,7 +133,7 @@
 168 | Tapping your own block on the timeline invites your sister | Sister Sync (the sisters' timeline)
 169 | Sister Sync is in the kid house-rules sweep | Sister Sync (the sisters' timeline)
 170 | (history only: test list) | removed — owner OK needed
-171 | (history only: known-defect note) | removed — owner OK needed
+171 | a short own card is drawn taller than its minutes | Sister Sync
 174 | Copy a day | Day
 175 | it shows both days | Day
 176 | names what goes and what stays | Day
@@ -412,8 +413,8 @@
 506 | (history only: core list, test list and retired list) | removed — owner OK needed
 507 | (history only: core list, test list and retired list) | removed — owner OK needed
 510 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
-511 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
-512 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
+511 | closes with the × top-right | My money (request sheets)
+512 | Draw early offers three reasons | My money (request sheets)
 513 | (history only: layout polish for the comparison fixes, covered by the fit and picture tests) | removed — owner OK needed
 514 | I choose has three equal columns | Sunday steps
 515 | Signed shows Money in & out | Sunday steps

@@ -60,7 +60,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - The closing ritual counts what was done and names the child being viewed — Proof: theClosingRitualCountsWhatWasDone
 - 😌 Rest on the 📋 sheet is a 44px target — Proof: restButtonIsA44pxTarget
 - The reflect sheet's mood dots are 44px targets and each block row wraps on a phone — Proof: reflectMoodsAre44pxTargets
-- An empty day draws its invite ghosts, and the ghost never covers a block — Proof: anEmptyDayDrawsItsInviteGhost
+- An empty day draws its invite ghosts, the drawn span stretches to every ghost (a 4pm ghost on an empty day is drawn), and the ghost never covers a block — Proof: anEmptyDayDrawsItsInviteGhost
 - A child's remove all in series keeps parent-pinned copies and says how many stay — Proof: removeAllInSeriesKeepsPins
 - The copy button names the sister's day (onto Jess's Tue) — Proof: copyADayNamesTheSistersDay
 - Closing ritual title names the child being viewed and counts done blocks (none done reads Nothing ticked off today) — Proof: theClosingRitualCountsWhatWasDone
@@ -77,6 +77,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - An invite sent from the parent portal is recorded as the child's and stamps her own block — Proof: anInviteCannotBeSentTwice
 - A live invite of the same kind is refused before the confirm with a toast naming its state (she hasn't answered yet, or it's already on her plan); a declined one may be sent again, and a share and a watch of one block are both allowed — Proof: anInviteCannotBeSentTwice
 - A share of an activity the sister does not have is refused before it is sent — Proof: none found
+- Known limit: a short own card is drawn taller than its minutes; the printed start–end and the stripe are exact — Proof: none found (known limit, not a test)
 - The 💌 badge shows only on blocks really shared: a copied block, a repeated block and an extended series do not carry it — Proof: aSeriesInviteCoversEveryDayOrOne, anInviteCannotBeSentTwice
 - An invite carries the sender's travel and get-ready; a missed invite is not waiting and can be added anyway — Proof: anInviteCarriesTheSendersTravelAndGetReady, aMissedInviteIsNotWaiting, theDayViewAcceptFollowsTheSameRules
 - The invite confirm says what she gets: the same drive there and home and the get-ready time; with no buffers it says nothing about them — Proof: anInviteCarriesTheSendersTravelAndGetReady
@@ -136,6 +137,8 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Move / Cash sheet has four modes: Move, Cash out, Put cash in, Draw early; the weekly cap still holds — Proof: requestSheetsSendEveryKind
 - This fine is wrong: a 44px button on each fine opens a dispute request with optional reasons; one open question per fine; a yes removes the fine — Proof: aGirlCanDisputeAFine
 - Draw early keeps the prototype's tip and fits one screen on iPad and phone, in both looks — Proof: requestSheetsSendEveryKind
+- Every request sheet closes with the × top-right; no Done button — Proof: aGirlCanDisputeAFine
+- Draw early offers three reasons (School book fair · Treat · Something else), and no Move · Cash mode has a Not now button — Proof: none found
 - A kid's money head carries 💰 My money · 🎓 Money school; no bottom bar on Money school, All my Sundays or By month — Proof: thePassbookOpensAllMySundaysAndByMonth
 - The kid side names its places Savings, Locked away and Companies on My money, Today's money bar, By month, the Money school ladder and the meeting — Proof: tests/check-money-words.js
 - The kid tour bolds its key words and ends with Tap a Sunday for its numbers; the checklist title reads Before we start — Proof: theKidPagesSayWhatTheRulesSay
