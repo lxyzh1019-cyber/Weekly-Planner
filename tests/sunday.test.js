@@ -817,6 +817,18 @@ function fill(w, k) {
     check('L5 over 50 % of steady money needs a parent\'s ✓; under it does not',
       over.over === true && over.needsTick === true && under.over === false && under.needsTick === false && Math.round(under.r1) === 28
         ? true : JSON.stringify([over, under].map(x => [x.r1, x.over, x.needsTick])));
+    /* PR 1 money re-check, fix 1: the one division by steady money. Grown-ups'
+       loan card and her "New row on my wall" pop-up read these, so a $1 week
+       of steady money shows no "300%" anywhere. */
+    const sh = [s.sdSteadyShare(3, 1), s.sdSteadyShare(3, 4.99), s.sdSteadyShare(3, 0), s.sdSteadyShare(2.5, 5), s.sdSteadyShare(10, 40)];
+    check('fix 1: a share of steady money is null under the $5 floor, else weekly ÷ steady × 100',
+      sh[0] === null && sh[1] === null && sh[2] === null && sh[3] === 50 && sh[4] === 25 ? true : JSON.stringify(sh));
+    const cs = [s.sdCommitShares(16.15, 17.19, 4), s.sdCommitShares(20, 20.01, 40), s.sdCommitShares(20, 20, 40)];
+    check('fix 1: the pop-up\'s shares and its 50 % line are sdCommitPlan\'s',
+      cs[0].lowSteady === true && cs[0].over === false && cs[0].r1 === null
+      && cs[1].over === true && cs[2].over === false && cs[2].r0 === 50
+      && JSON.stringify(s.sdCommitShares(a.p0, a.p1, a.steady)) === JSON.stringify({ r0: a.r0, r1: a.r1, lowSteady: a.lowSteady, over: a.over })
+        ? true : JSON.stringify(cs));
   }
 
   /* L4 · the money week's name: its first and last day. */

@@ -127,6 +127,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - The ? explainer card gives What, Why, Watch in the girls' words with a Take me to Money school door and a way back — Proof: explainerGoesToMoneySchoolAndBack
 - Move to the loan wall is filed as a request, approved by a parent, and applied as extra on Sunday once — Proof: aMoveToTheWallWaitsForSunday
 - Money screens at iPad width use the prototype's text size and never cut a label with an ellipsis — Proof: noLabelIsCutOnTheMoneyScreens
+- Every money root (My money and its head, Money school, All my Sundays, By month, the Sunday step and the meeting's head, Grown-ups, Parent › Now, the request, Parent's card, She told me and Grown-ups sheets) carries data-money-surface; one rule gives them --text-scale 1 at 768px and wider and one gives them the body font for figures — Proof: tests/check-money-surface.js, noLabelIsCutOnTheMoneyScreens
 - Dates read like Tue 29 Sep; the loan wall has no gate flags and What I own has one row per place with a hint — Proof: loanWallMatchesTheDebts
 - Tell parents a result lists the planner's competitions of the last 4 weeks, asks First, is it one of these? and allows one open result per competition — Proof: requestSheetsSendEveryKind
 - My money on iPad has three columns: passbook, calendar and stickers on the left; countdown, loan wall, What I own and goals in the middle; Ask parents and gifts on the right — Proof: myMoneyMatchesFinalReference
@@ -165,6 +166,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 - By month leads with a sentence in four groups (earned, given, my money made, taken off), then what went out and what was put away; each caption equals the sum of its bars; numbers come from the frozen ledger — Proof: theFlowSaysWhereItWent, theFlowCaptionsEqualTheirBars
 - By month is the Flow in cards: What came in (earned with Home, Club job and Competitions under it, given, made, taken off), What went out, Put away to grow, and month bars along the bottom — Proof: theFlowSaysWhereItWent
+- This month is the calendar month (a picked month stays picked); before any Sunday of this month is signed it reads Nothing has landed this month yet. — Proof: none found
 - By month looks as in the reference picture, iPad Pop — Proof: picture tests/reference/by-month-jenn-ipad-pop.png
 
 ## Sunday steps
@@ -178,6 +180,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - I choose: Loan, Spend and Save & grow with waterfall bars; first tap picks, tap adds $1, hold adds $5; three starts; what I owe and what I own on the right; hold to sign — Proof: sundayHoldAddsFive, sundayCannotSignWithMoneyUnplaced
 - Signed: money in and out with In = Out, two verdicts, the milestone at 20 / 30 / 40, Say it out loud, Redo, signature, sticker, Next Sunday; timeline and forecast on the right — Proof: sundayInEqualsOut, sundayMilestoneOpensAPot
 - A new commitment or surprise cost since her last signed Sunday shows a card over step 1 with before and after and the share of steady money — Proof: aBigCommitmentNeedsAParentTick
+- New row on my wall reads its shares and the 50% line from the core (sdCommitShares): under $5 a week of steady money it says not enough steady money yet instead of a %, Left for me to choose is never negative, and the one-more-club-session idea uses the same division — Proof: tests/check-steady-share.js, sunday.test.js "fix 1: the pop-up's shares and its 50 % line are sdCommitPlan's"
 - Parent's card: ASK, SAY and WAIT per step with a checklist and Back to her — Proof: sundayLooksLikeThePrototype
 - The sign is refused if money is unplaced or In differs from Out, then moves every dollar through its own owner and writes one ledger row — Proof: sundaySignMovesEveryDollarThroughItsOwner
 - On the meeting Sunday the routine is pre-marked as kept without a tick in a week not yet settled; mid-week an unfinished day still stops the run — Proof: sundaySundayRoutineCounts
@@ -211,6 +214,8 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Rules, Pots has three gate steppers that save as a dated version; a step that breaks ready <= locked <= stock <= 100 is refused — Proof: theGatesComeFromOneTable
 - Grown-ups is the parent's Money tab: Commitments, Fines, Expected, Rules and Weeks, with Record and ? at the start; 44px targets, one column under 768px — Proof: grownupsEveryOldSectionHasAHome
 - Commitments: each girl's rows with bars, her must-pay against steady money, a new commitment form with an affordability pane, a Club owes card and a one-off club session — Proof: grownupsCommitmentsAddARow
+- The loan card's share of steady money is the core's (sdSteadyShare): under $5 a week of steady money it shows — — Proof: tests/check-steady-share.js, sunday.test.js "fix 1: a share of steady money is null under the $5 floor, else weekly ÷ steady × 100"
+- Both ✍️ Record doors (the Grown-ups bar and Parent › Now) carry the same hint, Write down money that came in or went out., from one source (rcDoorHint) — Proof: none found
 - Fines: choose girl, item, day and who logged it; this week's list with free or charged amounts, standing and remove; every fine is logged even when free — Proof: grownupsFinesLogEvenWhenFree
 - Expected: per girl the next five months, move, step $5, remove and add chips — Proof: grownupsExpectedMoneyMoves
 - Rules tab: rule rows with the girls' words, a changed value shown with was, an impact pane, Save starts next Sunday as one version, Undo, and the last five changes — Proof: grownupsRulesSaveFromNextSunday
@@ -226,6 +231,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - On screen the Grandma rule is the Grandfather rule everywhere; stored keys are unchanged — Proof: theGrandfatherRuleReadsAsItselfEverywhere
 - Fix this row has What it bought, Each month, Bonus for paying early and Add another loan; Rules has Find a price — Proof: rulesFindAPriceAndListRuleChangesOnly
 - Rules is one screen: an index with find a price, the open group in the middle, What this changes on the right and a save strip along the bottom — Proof: rulesAndWeeksAreOneScreenEach
+- The Rules index keeps 300px at every two-column width, so the search box's placeholder Find a price or rule… is not cut in either look — Proof: none found
 - Weeks: a summary per girl (earned this year, loan left, typical week, loan payments, saving line), every Sunday with both girls side by side, and a tap opens the whole record of that Sunday — Proof: rulesAndWeeksAreOneScreenEach
 - A commitment under $5 a week of steady money, or over 50% of it, is saved only with the parent's I checked this with her tick; the 10% down payment comes from Savings only above the safety line — Proof: aBigCommitmentNeedsAParentTick
 - Grown-ups Rules looks as in the reference picture, parent iPad Pop — Proof: picture tests/reference/grownups-rules-parent-ipad-pop.png
@@ -309,7 +315,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 ## Data and rules
 
 - Smoke subset: SMOKE_ONLY=a,b runs only the named smoke checks, refuses an unknown name, prints PARTIAL RUN and never counts as a pass of the suite — Proof: tests/check-ci-scripts.js
-- Short loop: npm run test:fast runs the static checks and the six unit suites; npm test adds cleanup and smoke; CI runs checks, browser and one smoke job per date — Proof: tests/check-ci-scripts.js
+- Short loop: npm run test:fast runs the static checks (steady-share and money-surface included) and the six unit suites; npm test adds cleanup and smoke; CI runs checks, browser and one smoke job per date — Proof: tests/check-ci-scripts.js
 - Dead-action guard: an onclick or data-action in the markup must name a function or handler that exists — Proof: tests/check-dead-actions.js
 - Gate runs on Windows: npm test passes in a Windows checkout with no environment variables (LF files, Node suites set UTC themselves) — Proof: none found
 - Picture test: every screen and state is shot at iPad 1194x834 and phone 390x844 in Pop and Calm and compared with tests/reference, on CI only — Proof: picture tests/reference/today-jenn-ipad-pop.png
@@ -370,7 +376,8 @@ Each line says what you see or what the app does, then the test that proves it. 
 - A words check fails retired money words and a raw placeholder on screen — Proof: tests/check-money-words.js
 - The money week is Monday to Sunday everywhere; the Sunday to Saturday mapping stays only as tested code and its Rules card is gone — Proof: sunday.test.js "decision 15: the default rules never turn the Sun–Sat mapping on"
 - Price cards read Competitions and Box fine, and the quarterly review opens Rules — Proof: moneyWordsAndSmallFixes
-- The money fit check: on every money surface, both looks, 390 and 1194, short and long names, no label is clipped, spills out of its box or overlaps another — Proof: noLabelIsCutOnTheMoneyScreens
+- The money fit check: on every money surface, both looks, 390 and 1194, short and long names, no label is clipped, spills out of its box or overlaps another; it finds its roots by data-money-surface and includes Parent › Now — Proof: noLabelIsCutOnTheMoneyScreens
+- Her share of steady money is divided in one place, js/43 (sdSteadyShare, sdCommitShares, sdCommitPlan), with the $5 floor and the 50% line — Proof: tests/check-steady-share.js
 - Rapid edits coalesce into one write, a dragged block is stamped so a merge cannot lose it, and stamps use server-corrected time — Proof: rapidEditsCoalesceIntoOneWrite, aDraggedBlockIsStampedSoAMergeCannotLoseIt, stampsUseServerCorrectedTime
 - A conflict is a parent's to decide, not the clocks'; cloud size warns before the ceiling — Proof: aConflictIsAParentsToDecideNotTheClocks, cloudSizeWarnsBeforeTheCeiling
 - Two devices merge: a deleted block does not come back, the newest edit wins, and both devices derive the same balance — Proof: merge.test.js "deleted block not resurrected", "newer-than-tombstone copy survives", "two devices derive the same balance from the merged stream"
@@ -401,7 +408,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 The test map: for a change in the area or files named, the tests it needs before a push. The short loop is `npm run test:fast` (about 30 s) plus the Node suites named below (all inside `test:fast`), under 3 minutes. The `SMOKE_ONLY=…` lists are optional and outside that 3-minute target: a `SMOKE_ONLY` run pays a few minutes of setup on a laptop whatever it names. The full suite runs on GitHub before the pull request.
 
-- Tests: any `js/`, `css/app.css`, `index.html`, `sw.js` → `npm run test:fast` (static checks: syntax, globals, shared-merge, escaping, look tokens, money words, dead CSS/ids/actions, CI scripts, SW shell)
+- Tests: any `js/`, `css/app.css`, `index.html`, `sw.js` → `npm run test:fast` (static checks: syntax, globals, shared-merge, escaping, look tokens, money words, steady share, money surface, dead CSS/ids/actions, CI scripts, SW shell)
 - Tests: `js/03-sync.js`, `js/04-merge.js`, `js/02-state.js`, `js/38-conflicts.js` → `npm run test:merge`; `SMOKE_ONLY=rapidEditsCoalesceIntoOneWrite,aDraggedBlockIsStampedSoAMergeCannotLoseIt,stampsUseServerCorrectedTime,aConflictIsAParentsToDecideNotTheClocks,cloudSizeWarnsBeforeTheCeiling`
 - Tests: money rules and data (`js/18-rules.js`, `js/19-pocket.js`, `js/20-loan.js`, `js/21-money-data.js`, `js/40-stream.js`, `js/41-record.js`, `js/42-flow.js`, `js/43-sunday-core.js`) → `npm run test:money`, `test:stream`, `test:sunday`, `test:xp`; `SMOKE_ONLY=meetingMoneyFlowEndToEnd,sundayInEqualsOut,sundayPaydayAddsUp,onePileFigureOnEveryStep,fromMyBankAddsUp,takenOffIsAlwaysNegative,theMoneyStreamAgreesWithTheWallet`
 - Tests: money screens (`js/14-money.js`, `js/15-meeting.js`, `js/22-…25-money-*.js`, `js/44-sunday.js`, `js/45-requests.js`, `js/46-grownups.js`) → the money line above plus `SMOKE_ONLY=everyMoneyControlClicksClean,noLabelIsCutOnTheMoneyScreens` (about 2 minutes on CI on their own)
@@ -421,6 +428,7 @@ The test map: for a change in the area or files named, the tests it needs before
 - Tests: `tests/pictures.js`, `tests/reference/`, or any screen change (`js/`, `css/app.css`, `index.html`) → the GitHub run's `pictures` job (`gh workflow run ci.yml --ref <branch>`); it gates only on CI, so do not run it locally. References change only from that job's `pictures` artifact
 - Tests: a change across several areas, or one the map does not name → the full suite on GitHub (`gh workflow run ci.yml --ref <branch>`)
 - Tools: `tools/smoke-times.js <artifact folder> [top]` lists, from a CI run's `smoke-ran-<date>.json` files (`gh run download <run-id> -p 'smoke-screenshots-*' -D <folder>`), each date's wall time, time in checks and setup, then the slowest checks and the longest setup gaps over every date.
+- Tools: `tools/picture-diff-page.js <artifact folder> <out.html> [title]` makes the difference page: for every picture in a CI `pictures` artifact's `pictures-diff/`, the old reference (from `tests/reference/`, so run it before copying the new set in) and the new picture side by side, numbered, embedded in one HTML file (`gh run download <run-id> -n pictures -D <folder>`).
 - Sizes: iPad 1194×834, phone 390×844
 - Looks: Pop, Calm
 - Figures: the picture-test fixture week (tests/pictures.js FIXTURE, clock Wed 7 Oct 2026 12:00 America/Edmonton, the Sunday signed 4 Oct 2026 19:00). Inputs read from the code: Jenn loan $1000, $336 paid, $70 a month, chores dishes / mop / vacuum / bins graded 3, gift $5 (Grandma), goal New skate guards $35, skating; Jess loan $600, $120 paid, $40 a month, chores dishes / bins / vacuum graded 2, gift $10 (Uncle Mike), goal Book set $50, swimming; each has one assistant-job session; Jess has a tone fine on Tuesday (Mom); Jenn expects $20 at Christmas. Outputs are computed by the app when the pictures are taken and are not written in the code, so each is named with where it shows:

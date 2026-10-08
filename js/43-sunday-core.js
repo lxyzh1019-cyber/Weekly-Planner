@@ -975,6 +975,22 @@ function sdRescaleMonthly(monthlies, now) {
    is allowed — both only with a parent's ✓ (`needsTick`). */
 const SD_COMMIT_MIN_STEADY = 5;     // below $5 a week of steady money, no share is shown
 const SD_COMMIT_MAX_SHARE = 50;     // over 50 % of steady money needs a parent's ✓
+/* The one division by steady money in the app (PR 1 money re-check): a
+   weekly figure as a % of her steady money, or null under the $5 floor.
+   `tests/check-steady-share.js` fails on a division by steady anywhere
+   else, so every screen that shows the share reads it from here. */
+function sdSteadyShare(v, steady) {
+  const s = sdR2(steady);
+  return s >= SD_COMMIT_MIN_STEADY ? sdR2(v) / s * 100 : null;
+}
+/* Her loan payment before and after a new row, as shares of steady money:
+   what Grown-ups' "Can she afford it?" card and her "New row on my wall"
+   pop-up both show, with the same 50 % line. */
+function sdCommitShares(p0, p1, steady) {
+  const r0 = sdSteadyShare(p0, steady), r1 = sdSteadyShare(p1, steady);
+  const lowSteady = r1 == null;
+  return { r0, r1, lowSteady, over: !lowSteady && r1 > SD_COMMIT_MAX_SHARE };
+}
 function sdCommitPlan(o) {
   const x = o || {};
   const her = sdR2((Number(x.cost) || 0) * (Number(x.sharePct) || 0) / 100);
@@ -987,9 +1003,7 @@ function sdCommitPlan(o) {
   const weekly = sdR2(monthly * 12 / 52);
   const p0 = sdR2(x.weeklyNow), p1 = sdR2(p0 + weekly);
   const steady = sdR2(x.steady);
-  const lowSteady = !(steady >= SD_COMMIT_MIN_STEADY);
-  const r0 = lowSteady ? null : p0 / steady * 100, r1 = lowSteady ? null : p1 / steady * 100;
-  const over = !lowSteady && r1 > SD_COMMIT_MAX_SHARE;
+  const { r0, r1, lowSteady, over } = sdCommitShares(p0, p1, steady);
   return { her, weeks, down, fromSavings, toWall, added, monthly, weekly, p0, p1, steady, r0, r1,
            lowSteady, over, needsTick: lowSteady || over };
 }
@@ -1007,6 +1021,6 @@ if (typeof module !== 'undefined' && module.exports) {
     sdOweOwnForecast, sdOweOwnSeries, sdThinLabels, SD_CHART_LABELS,
     sdSegHitsBox, sdGapLabelSpot, SD_REQUEST_TAGS, sdRequestTag, sdOff$, sdFineFloorNote,
     sdLoanPlan, sdOweAfterPlan, sdHistGroups, sdSundayRecord, sdRescaleMonthly, SD_COMMIT_MIN_STEADY, SD_COMMIT_MAX_SHARE,
-    sdCommitPlan,
+    sdCommitPlan, sdSteadyShare, sdCommitShares,
   };
 }

@@ -5935,8 +5935,19 @@ function findChromium() {
   if (want('noLabelIsCutOnTheMoneyScreens')) {
     const fitFindings = [];
     const fitMeasure = (rootId) => {
-      const root = document.getElementById(rootId);
-      if (!root) return ['no element #' + rootId];
+      const host = document.getElementById(rootId);
+      if (!host) return ['no element #' + rootId];
+      /* The money roots are found by their attribute, not a list (PR 1 money
+         re-check): the row's element when it is one, else every outermost
+         [data-money-surface] on show inside it — My money and its head, Money
+         school, All my Sundays, By month, the meeting's head and Sunday step,
+         Grown-ups, Parent › Now and the money sheets. A screen with none fails.
+         The '?' explainer is not a money surface; it is measured as itself. */
+      const SURFACE = '[data-money-surface]';
+      const roots = host.matches(SURFACE) ? [host]
+        : [...host.querySelectorAll(SURFACE)].filter(el => el.getClientRects().length && !el.parentElement.closest(SURFACE));
+      if (!roots.length && rootId !== 'mnyConceptCard') return ['no money surface ([data-money-surface]) on show in #' + rootId];
+      if (!roots.length) roots.push(host);
       const vw = document.documentElement.clientWidth;
       const out = new Set();
       const css = new Map();
@@ -5946,103 +5957,105 @@ function findChromium() {
       const borders = (c) => ['Top', 'Right', 'Bottom', 'Left'].map(s => (c['border' + s + 'Style'] === 'none' ? 0 : parseFloat(c['border' + s + 'Width']) || 0));
       // A box has a border on all four sides; a single rule (a dashed line, a head's underline) is not one.
       const boxed = (c) => borders(c).every(v => v > 0);
-      const shown = (el) => {
-        for (let e = el; e; e = e.parentElement) {
-          const c = cs(e);
-          if (c.display === 'none' || c.visibility === 'hidden' || c.opacity === '0') return false;
-          if (e === root) break;
+      for (const root of roots) {
+        const shown = (el) => {
+          for (let e = el; e; e = e.parentElement) {
+            const c = cs(e);
+            if (c.display === 'none' || c.visibility === 'hidden' || c.opacity === '0') return false;
+            if (e === root) break;
+          }
+          return true;
+        };
+        const lines = [];
+        const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let n; (n = tw.nextNode());) {
+          const text = n.textContent.replace(/\s+/g, ' ').trim();
+          if (!text) continue;
+          const el = n.parentElement;
+          if (!el || el.closest('svg, script, style, noscript, template') || !shown(el)) continue;
+          if (cs(el).position === 'absolute' && el.getBoundingClientRect().width <= 1) continue;   // screen-reader only
+          const range = document.createRange(); range.selectNodeContents(n);
+          /* A text's box is its line, not the font's whole ascent and descent:
+             Pop's handwriting fonts reach well past a tight line-height, which
+             draws nothing over the line above. */
+          const ec = cs(el), lh = parseFloat(ec.lineHeight) || parseFloat(ec.fontSize) * 1.2;
+          let rects = [...range.getClientRects()].filter(r => r.width > 0.5 && r.height > 0.5).map(r => {
+            const trim = Math.max(0, (r.height - lh) / 2);
+            return { left: r.left, right: r.right, top: r.top + trim, bottom: r.bottom - trim };
+          });
+          if (!rects.length) continue;
+          let block = null, bordered = null, scroller = null;
+          const ruled = [];
+          for (let e = el; e; e = e.parentElement) {
+            const c = cs(e);
+            if (!bordered && !scroller && borders(c).some(v => v > 0)) ruled.push(e);
+            if (!block && c.display !== 'inline' && c.display !== 'contents') block = e;
+            if (!bordered && !scroller && boxed(c)) bordered = e;
+            if (!scroller && scrolls(e) && e !== document.documentElement && e !== document.body) scroller = e;
+            if (e === root || (bordered && scroller)) break;
+          }
+          /* Text a scroll container has scrolled out of view is still measured
+             against its own boxes; it is only not compared with text outside
+             that container, which it passes under as it scrolls. */
+          const view = scroller && scroller.getBoundingClientRect();
+          const inView = (r) => !view || (r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom);
+          const tag = `${name(el)} "${text.slice(0, 32)}"`;
+          // Cut: the box is narrower than its text, and it is this text that runs past it.
+          const bx = block && block.getBoundingClientRect();
+          if (block && !scrolls(block) && block.clientWidth > 0 && block.scrollWidth > block.clientWidth + 1
+              && rects.some(r => r.right > bx.left + block.clientLeft + block.clientWidth + 1 || r.left < bx.left + block.clientLeft - 1)) {
+            out.add(`clip · ${block === el ? tag : name(block) + ' › ' + tag} (${block.scrollWidth} > ${block.clientWidth})`);
+          }
+          if (bordered) {
+            const b = bordered.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(bordered));
+            const inner = { left: b.left + bl, right: b.right - br, top: b.top + bt, bottom: b.bottom - bb };
+            if (rects.some(r => r.left < inner.left - 1 || r.right > inner.right + 1 || r.top < inner.top - 1 || r.bottom > inner.bottom + 1)) {
+              out.add(`spill · ${tag} out of ${name(bordered)}`);
+            }
+          }
+          // Nor may it sit on a line drawn by a box or rule around it.
+          ruled.forEach(e => {
+            const b = e.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(e));
+            const strips = [bt && { left: b.left, right: b.right, top: b.top, bottom: b.top + bt }, br && { left: b.right - br, right: b.right, top: b.top, bottom: b.bottom },
+              bb && { left: b.left, right: b.right, top: b.bottom - bb, bottom: b.bottom }, bl && { left: b.left, right: b.left + bl, top: b.top, bottom: b.bottom }].filter(Boolean);
+            if (rects.some(r => strips.some(t => Math.min(r.right, t.right) - Math.max(r.left, t.left) > 1 && Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top) > 1))) {
+              out.add(`spill · ${tag} on the border of ${name(e)}`);
+            }
+          });
+          // Past the screen's side: only the part a scroll container shows counts.
+          const shownPart = (r) => (view ? { left: Math.max(r.left, view.left), right: Math.min(r.right, view.right) } : r);
+          if (rects.some(r => inView(r) && (shownPart(r).right > vw + 1 || shownPart(r).left < -1))) out.add(`spill · ${tag} past the screen edge`);
+          rects.forEach(r => lines.push({ r, tag, n, scroller, seen: inView(r) }));
         }
-        return true;
-      };
-      const lines = [];
-      const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      for (let n; (n = tw.nextNode());) {
-        const text = n.textContent.replace(/\s+/g, ' ').trim();
-        if (!text) continue;
-        const el = n.parentElement;
-        if (!el || el.closest('svg, script, style, noscript, template') || !shown(el)) continue;
-        if (cs(el).position === 'absolute' && el.getBoundingClientRect().width <= 1) continue;   // screen-reader only
-        const range = document.createRange(); range.selectNodeContents(n);
-        /* A text's box is its line, not the font's whole ascent and descent:
-           Pop's handwriting fonts reach well past a tight line-height, which
-           draws nothing over the line above. */
-        const ec = cs(el), lh = parseFloat(ec.lineHeight) || parseFloat(ec.fontSize) * 1.2;
-        let rects = [...range.getClientRects()].filter(r => r.width > 0.5 && r.height > 0.5).map(r => {
-          const trim = Math.max(0, (r.height - lh) / 2);
-          return { left: r.left, right: r.right, top: r.top + trim, bottom: r.bottom - trim };
+        for (let i = 0; i < lines.length; i++) {
+          for (let j = i + 1; j < lines.length; j++) {
+            const a = lines[i], b = lines[j];
+            if (a.n === b.n || (a.scroller !== b.scroller && !(a.seen && b.seen))) continue;
+            const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+            const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+            if (ix > 1 && iy > 1) out.add(`overlap · ${a.tag} × ${b.tag}`);
+          }
+        }
+        // A bordered box past the screen's side (a card edge peeking in or out).
+        root.querySelectorAll('*').forEach(el => {
+          if (!shown(el) || !boxed(cs(el))) return;
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          for (let e = el.parentElement; e && e !== root; e = e.parentElement) if (/auto|scroll|hidden|clip/.test(cs(e).overflowX)) return;
+          if (r.right > vw + 1 || r.left < -1) out.add(`spill · ${name(el)} box past the screen edge (${Math.round(r.left)} to ${Math.round(r.right)})`);
+          /* A box laid out in the flow stays inside the box around it (a sticker
+             placed on purpose is position:absolute and is not held to this). */
+          if (/absolute|fixed/.test(cs(el).position)) return;
+          for (let e = el.parentElement; e && root.contains(e); e = e.parentElement) {
+            if (boxed(cs(e))) {
+              const p = e.getBoundingClientRect(), [pt, pr, pb, pl] = borders(cs(e));
+              if (r.left < p.left + pl - 1 || r.right > p.right - pr + 1) out.add(`spill · ${name(el)} box in ${name(el.parentElement)} "${el.textContent.trim().slice(0, 20)}" out of ${name(e)} (${Math.round(r.left)} to ${Math.round(r.right)} past ${Math.round(p.right - pr)})`);
+              break;
+            }
+            if (scrolls(e)) break;
+          }
         });
-        if (!rects.length) continue;
-        let block = null, bordered = null, scroller = null;
-        const ruled = [];
-        for (let e = el; e; e = e.parentElement) {
-          const c = cs(e);
-          if (!bordered && !scroller && borders(c).some(v => v > 0)) ruled.push(e);
-          if (!block && c.display !== 'inline' && c.display !== 'contents') block = e;
-          if (!bordered && !scroller && boxed(c)) bordered = e;
-          if (!scroller && scrolls(e) && e !== document.documentElement && e !== document.body) scroller = e;
-          if (e === root || (bordered && scroller)) break;
-        }
-        /* Text a scroll container has scrolled out of view is still measured
-           against its own boxes; it is only not compared with text outside
-           that container, which it passes under as it scrolls. */
-        const view = scroller && scroller.getBoundingClientRect();
-        const inView = (r) => !view || (r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom);
-        const tag = `${name(el)} "${text.slice(0, 32)}"`;
-        // Cut: the box is narrower than its text, and it is this text that runs past it.
-        const bx = block && block.getBoundingClientRect();
-        if (block && !scrolls(block) && block.clientWidth > 0 && block.scrollWidth > block.clientWidth + 1
-            && rects.some(r => r.right > bx.left + block.clientLeft + block.clientWidth + 1 || r.left < bx.left + block.clientLeft - 1)) {
-          out.add(`clip · ${block === el ? tag : name(block) + ' › ' + tag} (${block.scrollWidth} > ${block.clientWidth})`);
-        }
-        if (bordered) {
-          const b = bordered.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(bordered));
-          const inner = { left: b.left + bl, right: b.right - br, top: b.top + bt, bottom: b.bottom - bb };
-          if (rects.some(r => r.left < inner.left - 1 || r.right > inner.right + 1 || r.top < inner.top - 1 || r.bottom > inner.bottom + 1)) {
-            out.add(`spill · ${tag} out of ${name(bordered)}`);
-          }
-        }
-        // Nor may it sit on a line drawn by a box or rule around it.
-        ruled.forEach(e => {
-          const b = e.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(e));
-          const strips = [bt && { left: b.left, right: b.right, top: b.top, bottom: b.top + bt }, br && { left: b.right - br, right: b.right, top: b.top, bottom: b.bottom },
-            bb && { left: b.left, right: b.right, top: b.bottom - bb, bottom: b.bottom }, bl && { left: b.left, right: b.left + bl, top: b.top, bottom: b.bottom }].filter(Boolean);
-          if (rects.some(r => strips.some(t => Math.min(r.right, t.right) - Math.max(r.left, t.left) > 1 && Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top) > 1))) {
-            out.add(`spill · ${tag} on the border of ${name(e)}`);
-          }
-        });
-        // Past the screen's side: only the part a scroll container shows counts.
-        const shownPart = (r) => (view ? { left: Math.max(r.left, view.left), right: Math.min(r.right, view.right) } : r);
-        if (rects.some(r => inView(r) && (shownPart(r).right > vw + 1 || shownPart(r).left < -1))) out.add(`spill · ${tag} past the screen edge`);
-        rects.forEach(r => lines.push({ r, tag, n, scroller, seen: inView(r) }));
       }
-      for (let i = 0; i < lines.length; i++) {
-        for (let j = i + 1; j < lines.length; j++) {
-          const a = lines[i], b = lines[j];
-          if (a.n === b.n || (a.scroller !== b.scroller && !(a.seen && b.seen))) continue;
-          const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
-          const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
-          if (ix > 1 && iy > 1) out.add(`overlap · ${a.tag} × ${b.tag}`);
-        }
-      }
-      // A bordered box past the screen's side (a card edge peeking in or out).
-      root.querySelectorAll('*').forEach(el => {
-        if (!shown(el) || !boxed(cs(el))) return;
-        const r = el.getBoundingClientRect();
-        if (!r.width || !r.height) return;
-        for (let e = el.parentElement; e && e !== root; e = e.parentElement) if (/auto|scroll|hidden|clip/.test(cs(e).overflowX)) return;
-        if (r.right > vw + 1 || r.left < -1) out.add(`spill · ${name(el)} box past the screen edge (${Math.round(r.left)} to ${Math.round(r.right)})`);
-        /* A box laid out in the flow stays inside the box around it (a sticker
-           placed on purpose is position:absolute and is not held to this). */
-        if (/absolute|fixed/.test(cs(el).position)) return;
-        for (let e = el.parentElement; e && root.contains(e); e = e.parentElement) {
-          if (boxed(cs(e))) {
-            const p = e.getBoundingClientRect(), [pt, pr, pb, pl] = borders(cs(e));
-            if (r.left < p.left + pl - 1 || r.right > p.right - pr + 1) out.add(`spill · ${name(el)} box in ${name(el.parentElement)} "${el.textContent.trim().slice(0, 20)}" out of ${name(e)} (${Math.round(r.left)} to ${Math.round(r.right)} past ${Math.round(p.right - pr)})`);
-            break;
-          }
-          if (scrolls(e)) break;
-        }
-      });
       return [...out];
     };
     const fitReset = () => page.evaluate(() => {
@@ -6122,6 +6135,13 @@ function findChromium() {
             const where = `Grown-ups › ${tab} · ${look} · ${w} · ${pass}`;
             (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`${where} · ${f}`));
           }
+          // Parent › Now over the same seeded week: its money cards are a money surface too.
+          await page.evaluate(() => {
+            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+            showScreen('parent'); renderParentHome(); setParentTab('now');
+          });
+          await page.waitForTimeout(200);
+          (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`Parent › Now · ${look} · ${w} · ${pass} · ${f}`));
           await page.evaluate(() => {
             const s = JSON.parse(window.__fitGuSnap); window.__fitGuSnap = null;
             Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s);

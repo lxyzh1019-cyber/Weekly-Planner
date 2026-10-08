@@ -128,12 +128,14 @@ function flMonthsFor(kid) {
   return out;
 }
 
-/* The month on screen: the one she picked, else the newest with a Sunday. */
+/* The month on screen: the one she picked, else the calendar month — "This
+   month" means this month, even before anything has landed in it (the page
+   then says so). `flMonthsFor` always runs to this month. */
 function flCurrentMonth(months) {
   if (!months.length) return null;
   if (flMonth && months.some(m => m.month === flMonth)) return flMonth;
-  const full = months.filter(m => !m.empty);
-  return (full.length ? full[full.length - 1] : months[months.length - 1]).month;
+  const now = todayKey().slice(0, 7);
+  return months.some(m => m.month === now) ? now : months[months.length - 1].month;
 }
 
 /* The flow being drawn. One function, so the sentence, the bars and the
@@ -260,7 +262,7 @@ function flRenderFlow(kid) {
   const months = flMonthsFor(kid);
   const head = `<div class="mv2-cardhead"><span class="mv2-title">📊 By month</span></div>`;
   if (!months.length) {
-    return `<div class="mv2-flow mv2-flow--empty"><div class="mv2-card mv2-flow-main">
+    return `<div class="mv2-flow mv2-flow--empty" data-money-surface><div class="mv2-card mv2-flow-main">
         ${head}
         <div class="fl-empty">My money story starts the first time a Sunday is signed. Nothing yet: that is just the beginning, not a problem.</div>
       </div></div>`;
@@ -277,11 +279,11 @@ function flRenderFlow(kid) {
     `<button type="button" class="mv2-btn${flPeriod === p.id ? ' on' : ''}"
        data-fl-action="period" data-fl-id="${p.id}" aria-pressed="${flPeriod === p.id}">${escapeHtml(p.label)}</button>`).join('');
   const outRows = flOutRows(flow), growRows = flGrowRows(flow);
-  return `<div class="mv2-flow">
-    <div class="mv2-card mv2-flow-main">
-      ${head}
-      <div class="fl-chiprow">${chips}</div>
-      <p class="fl-story">${flStory(flow, periodWords)}</p>
+  /* This month before any Sunday of it is signed: one line, not three
+     groups of $0 (PR 1 money re-check, fix 6). */
+  const nothingYet = flPeriod === 'month' && selected === todayKey().slice(0, 7)
+    && months.some(m => m.month === selected && m.empty);
+  const groups = nothingYet ? '<div class="fl-empty">Nothing has landed this month yet.</div>' : `<p class="fl-story">${flStory(flow, periodWords)}</p>
 
       <div class="fl-group">
         <div class="fl-cap">⬇️ What came in <b>${mnyMoney(flow.inTotal)}</b></div>
@@ -296,7 +298,12 @@ function flRenderFlow(kid) {
       <div class="fl-group">
         <div class="fl-cap">🌱 Put away to grow <b>${mnyMoney(flow.savedTotal)}</b></div>
         ${growRows || '<div class="fl-empty">Nothing was put away to grow.</div>'}
-      </div>
+      </div>`;
+  return `<div class="mv2-flow" data-money-surface>
+    <div class="mv2-card mv2-flow-main">
+      ${head}
+      <div class="fl-chiprow">${chips}</div>
+      ${groups}
       ${flHistoryStrip(months, selected)}
     </div>
   </div>`;

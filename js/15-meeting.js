@@ -1005,14 +1005,15 @@ function renderMeetingMode() {
    hides while the head shows. */
 function mmHead(wk, stepper, id) {
   const late = mrWeeksSince(wk);
-  // The money step names the money week (Sun–Sat from 11 Oct 2026); the
-  // other steps keep the planner's Mon–Sun week.
+  // The money step names the money week, Monday to Sunday like the
+  // planner's (decision 15); the Sun–Sat mapping behind mrMoneyWeekLabel
+  // stays only as tested code until it is deleted (PR 13).
   const label = id === 'money' ? mrMoneyWeekLabel(wk) : mmWeekLabel(wk);
   const week = `<span class="mm-head-wk"><span class="ph-word">Week of </span>${escapeHtml(label)}</span>`
     + (late ? `<span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
        <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button>` : '');
   const money = id === 'money' && typeof sdMeetingAvatars === 'function';
-  return `<div class="mm-head mm-head--two${late ? ' late' : ''}">
+  return `<div class="mm-head mm-head--two${late ? ' late' : ''}" data-money-surface>
       <div class="mm-head-r1">${money ? sdMeetingAvatars(wk) : ''}<h2 class="mm-head-title" aria-label="Family meeting">👨‍👧‍👧<span class="ph-word"> Family meeting</span></h2><div class="mm-stepper">${stepper}</div><span class="mm-head-right">${week}</span></div>
       <div class="mm-head-r2">${money ? sdMeetingStepRow(wk) : mmLastReviewedLine()}</div>
     </div>`;

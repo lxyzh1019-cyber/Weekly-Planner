@@ -287,7 +287,7 @@ function sdRenderMoneyStep(wk) {
   const main = [sdGuessMain, sdPaydayMain, sdChooseMain, sdSignedMain][d.step](c);
   const side = [sdGuessSide, sdPaydaySide, sdChooseSide, sdSignedSide][d.step](c);
   const newRow = d.step === 0 ? sdNewRowCard(c) : '';
-  return `<div class="sd" data-sd-step="${d.step}">
+  return `<div class="sd" data-money-surface data-sd-step="${d.step}">
       <div class="sd-grid">
         <div class="sd-card sd-main">${main}</div>
         <div class="sd-side">${side}</div>
@@ -1298,16 +1298,21 @@ function sdNewRowCard(c) {
   const steady = guSteady(c.kid);
   const p1 = money2(mnyOpenDebtsOldestFirst(c.kid).reduce((a, x) => a + mnyWeeklyDue(x), 0));
   const p0 = money2(p1 - mnyWeeklyDue(row));
-  const pct = v => steady > 0 ? Math.round(v / steady * 100) : 0;
+  /* Her share of steady money is the core's (`sdCommitShares`, js/43): the
+     $5 floor and the 50 % line the parent's "Can she afford it?" card uses.
+     Under the floor there is no figure, only the form's words. */
+  const S = sdCommitShares(p0, p1, steady);
+  const pct = r => Math.round(r) + '%';
+  const LOW = 'not enough steady money yet';
   const left = mnyTotalOwing(c.kid);
   const lines = isSur
     ? [['I had to borrow', sdM(row.principal), 'red'], ['Savings now', sdM(mnySavedTotal(c.kid)), '']]
     : [['10% down from my 🏦 Savings', sdM(row.paid), ''], ['My loan payment a week', `${sdM(p0)} → ${sdM(p1)}`, ''],
-       ['Part of my steady money', `${pct(p0)}% → ${pct(p1)}%`, pct(p1) > 50 ? 'red' : 'teal'],
-       ['Left for me to choose a week', `${sdM(steady - p0)} → ${sdM(steady - p1)}`, ''],
+       ['Part of my steady money', S.lowSteady ? LOW : `${pct(S.r0)} → ${pct(S.r1)}`, S.lowSteady ? '' : S.over ? 'red' : 'teal'],
+       ['Left for me to choose a week', S.lowSteady ? LOW : `${sdM(Math.max(0, steady - p0))} → ${sdM(Math.max(0, steady - p1))}`, ''],
        ['This row is paid off by', mnyWeeklyDue(row) > 0 ? sdMonthYear(c.wk, Math.ceil(loanBalance(c.kid, row.id) / mnyWeeklyDue(row))) : '—', ''],
        ['All my loans free by', p1 > 0 ? sdMonthYear(c.wk, Math.ceil(left / p1)) : '—', '']];
-  const over = !isSur && pct(p1) > 50;
+  const over = !isSur && S.over;
   /* 💡 Does it earn back? (owner's review S8-4, the prototype's line): her
      meets' average pay over her last Sundays, and how many meets pay the
      row back. */
@@ -1320,16 +1325,18 @@ function sdNewRowCard(c) {
   const rate = sdRule(c.rules, 'sessions.perSession');
   const choresAvg = c.f.hist.length ? c.f.hist.reduce((a, h) => a + money2((h.row || {}).chores), 0) / c.f.hist.length : 0;
   const choresMax = sdRule(c.rules, 'chores.dailyCap') * 5;
-  const ideas = [['club', `⛸️ One more club session → ${steady + rate > 0 ? Math.round(p1 / (steady + rate) * 100) : 0}%`, false],
+  const clubShare = sdSteadyShare(p1, steady + rate);
+  const ideas = [['club', `⛸️ One more club session → ${clubShare == null ? '—' : pct(clubShare)}`, false],
     ['chores', choresAvg >= choresMax ? `🧹 More chores · already at ${sdM(choresMax)}` : '🧹 More chores', choresAvg >= choresMax],
     ['dad', '👨 Ask parents: smaller share or longer time', false]];
   const verdict = isSur ? `My safety money wasn't enough, so ${sdM(row.principal)} went on my wall. 🏦 Savings fills first until it's back to $${sdRule(c.rules, 'pots.safety')}.`
-    : over ? `⚠️ My loan takes ${pct(p1)}% of my steady money, more than half. My parents' limit is 50%.` : '✅ Still under half of my steady money. My parents\' limit is 50%.';
+    : S.lowSteady ? '⚠️ Not enough steady money yet to judge it. My parents check it with me first.'
+    : over ? `⚠️ My loan takes ${pct(S.r1)} of my steady money, more than half. My parents' limit is 50%.` : '✅ Still under half of my steady money. My parents\' limit is 50%.';
   return `<div class="sd-scrim"><div class="sd-newrow" role="dialog" aria-modal="true" aria-label="${escapeAttr(isSur ? 'A surprise cost' : 'New row on my wall')}">
       <div class="sd-title">${isSur ? '🌧️ A surprise cost' : '🆕 New row on my wall'}</div>
       <div class="sd-newrow-what">${escapeHtml(row.name + ' · ' + sdM(row.principal) + ' added')}</div>
       ${lines.map(([k, v, cls]) => `<div class="sd-newrow-line"><span>${escapeHtml(k)}</span><b class="${cls ? 'sd-' + cls : ''}">${escapeHtml(v)}</b></div>`).join('')}
-      <div class="sd-newrow-verdict${over || isSur ? ' warn' : ''}">${escapeHtml(verdict)}</div>
+      <div class="sd-newrow-verdict${over || isSur || S.lowSteady ? ' warn' : ''}">${escapeHtml(verdict)}</div>
       ${payback}
       ${over ? `<div class="sd-q">How could I get back under half?</div>
         <div class="sd-ideas">${ideas.map(([id, label, dis]) => `<button type="button" class="sd-chip${c.d.newIdea === id ? ' on' : ''}${dis ? ' lock' : ''}" data-mny-action="sd-newidea" data-sd-id="${id}" aria-pressed="${c.d.newIdea === id}">${escapeHtml(label)}</button>`).join('')}</div>` : ''}
