@@ -27859,7 +27859,7 @@ function findChromium() {
               // ── Where things sit ──
               const hr = hdr.getBoundingClientRect(), sr = start.getBoundingClientRect(), er = end.getBoundingClientRect();
               if (row.scrollWidth > row.clientWidth + 1 || er.right > hr.right - want.bar.pad + 0.5 || (sr.width && sr.left < hr.left + want.bar.pad - 0.5)) out.push(`${tag}: something is pushed out of the bar (${row.scrollWidth}px in ${row.clientWidth}px)`);
-              if (isMoney || isMeeting) {
+              {
                 const vw = document.documentElement.clientWidth;
                 if (Math.abs(hr.left) > 0.5 || Math.abs(hr.width - vw) > 0.5) out.push(`${tag}: the header is ${Math.round(hr.width)}px from ${Math.round(hr.left)}, not the screen's ${vw}`);
               }

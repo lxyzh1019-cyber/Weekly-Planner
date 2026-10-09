@@ -7196,6 +7196,7 @@
 @media (min-width: 768px) {
   #mnyPage1Wrap > .hdr, #mnySchoolWrap > .hdr, #mnyStoryWrap > .hdr { margin: 0 -14px; }
 }
+#screen-print > .hdr { margin: -1rem -1rem 1rem; }
 #screen-day > .hdr { flex: none; }
 /* Narrower than an iPad held sideways (and on a phone) the back button keeps
    only its ◀, its "Back to <screen>" in the label: there is no room for the

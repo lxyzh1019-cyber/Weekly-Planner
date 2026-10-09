@@ -23,7 +23,7 @@ The context slot (date or ◀ week ▶) **must sit in the middle of the bar** (`
 | Full / Preview | **One joined switch**: 2px ink border, radius 14, overflow hidden; two cells 56×48, divider 2px ink; selected cell = --sel fill. Icons 📋 / 🖨, 20px, no words |
 | Print (Preview only) | 52px high, --main fill, word "Print" 18px 600 |
 | Day span 1·2·3 | joined switch, cells 52×48, selected = --sel (**Pop yellow #ffc83d**, Calm navy) |
-| Badge | 52×52 circle, **#ffe4ec (pink)**, 2px ink border, emoji 24px, no name. Parent 44×44 |
+| Badge | 52×52 circle, **#ffe4ec (pink)**, 2px ink border, emoji 24px, no name. Parent 44×44 (a parent on a kid screen keeps the kid header's 52px pink avatar (D25, parentDayTopBarStaysCompact); 44×44 is the parent header (`hdr--parent`, PR 5, D35)) |
 | Meeting chosen girl | 2.5px ink border + 3px #ff5c8a ring |
 | Kid buttons | 52px min · parent 44px · money 54px |
 
