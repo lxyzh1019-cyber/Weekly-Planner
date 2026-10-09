@@ -51,6 +51,11 @@
    not offer her the three that are a grown-up's judgement.
    ════════════════════════════════════════════════════════════════ */
 
+/* The hint beside both ✍️ Record doors (Grown-ups' bar and Parent › Now):
+   one sentence, one source, so the two doors cannot drift apart. */
+const RC_DOOR_HINT = 'Write down money that came in or went out.';
+function rcDoorHint() { return `<span class="rc-door-hint">${escapeHtml(RC_DOOR_HINT)}</span>`; }
+
 const RC_KINDS = [
   { id: 'chore', icon: '🧹', label: 'A chore graded',   kid: false },
   { id: 'meet',  icon: '🏆', label: 'A competition result',    kid: false },

@@ -5935,8 +5935,19 @@ function findChromium() {
   if (want('noLabelIsCutOnTheMoneyScreens')) {
     const fitFindings = [];
     const fitMeasure = (rootId) => {
-      const root = document.getElementById(rootId);
-      if (!root) return ['no element #' + rootId];
+      const host = document.getElementById(rootId);
+      if (!host) return ['no element #' + rootId];
+      /* The money roots are found by their attribute, not a list (PR 1 money
+         re-check): the row's element when it is one, else every outermost
+         [data-money-surface] on show inside it — My money and its head, Money
+         school, All my Sundays, By month, the meeting's head and Sunday step,
+         Grown-ups, Parent › Now and the money sheets. A screen with none fails.
+         The '?' explainer is not a money surface; it is measured as itself. */
+      const SURFACE = '[data-money-surface]';
+      const roots = host.matches(SURFACE) ? [host]
+        : [...host.querySelectorAll(SURFACE)].filter(el => el.getClientRects().length && !el.parentElement.closest(SURFACE));
+      if (!roots.length && rootId !== 'mnyConceptCard') return ['no money surface ([data-money-surface]) on show in #' + rootId];
+      if (!roots.length) roots.push(host);
       const vw = document.documentElement.clientWidth;
       const out = new Set();
       const css = new Map();
@@ -5946,74 +5957,98 @@ function findChromium() {
       const borders = (c) => ['Top', 'Right', 'Bottom', 'Left'].map(s => (c['border' + s + 'Style'] === 'none' ? 0 : parseFloat(c['border' + s + 'Width']) || 0));
       // A box has a border on all four sides; a single rule (a dashed line, a head's underline) is not one.
       const boxed = (c) => borders(c).every(v => v > 0);
-      const shown = (el) => {
-        for (let e = el; e; e = e.parentElement) {
-          const c = cs(e);
-          if (c.display === 'none' || c.visibility === 'hidden' || c.opacity === '0') return false;
-          if (e === root) break;
-        }
-        return true;
-      };
+      /* Lines from every root on show are compared with each other: a screen's
+         head and its body are separate money roots, and a head drawn over the
+         body is still an overlap. */
       const lines = [];
-      const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      for (let n; (n = tw.nextNode());) {
-        const text = n.textContent.replace(/\s+/g, ' ').trim();
-        if (!text) continue;
-        const el = n.parentElement;
-        if (!el || el.closest('svg, script, style, noscript, template') || !shown(el)) continue;
-        if (cs(el).position === 'absolute' && el.getBoundingClientRect().width <= 1) continue;   // screen-reader only
-        const range = document.createRange(); range.selectNodeContents(n);
-        /* A text's box is its line, not the font's whole ascent and descent:
-           Pop's handwriting fonts reach well past a tight line-height, which
-           draws nothing over the line above. */
-        const ec = cs(el), lh = parseFloat(ec.lineHeight) || parseFloat(ec.fontSize) * 1.2;
-        let rects = [...range.getClientRects()].filter(r => r.width > 0.5 && r.height > 0.5).map(r => {
-          const trim = Math.max(0, (r.height - lh) / 2);
-          return { left: r.left, right: r.right, top: r.top + trim, bottom: r.bottom - trim };
-        });
-        if (!rects.length) continue;
-        let block = null, bordered = null, scroller = null;
-        const ruled = [];
-        for (let e = el; e; e = e.parentElement) {
-          const c = cs(e);
-          if (!bordered && !scroller && borders(c).some(v => v > 0)) ruled.push(e);
-          if (!block && c.display !== 'inline' && c.display !== 'contents') block = e;
-          if (!bordered && !scroller && boxed(c)) bordered = e;
-          if (!scroller && scrolls(e) && e !== document.documentElement && e !== document.body) scroller = e;
-          if (e === root || (bordered && scroller)) break;
-        }
-        /* Text a scroll container has scrolled out of view is still measured
-           against its own boxes; it is only not compared with text outside
-           that container, which it passes under as it scrolls. */
-        const view = scroller && scroller.getBoundingClientRect();
-        const inView = (r) => !view || (r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom);
-        const tag = `${name(el)} "${text.slice(0, 32)}"`;
-        // Cut: the box is narrower than its text, and it is this text that runs past it.
-        const bx = block && block.getBoundingClientRect();
-        if (block && !scrolls(block) && block.clientWidth > 0 && block.scrollWidth > block.clientWidth + 1
-            && rects.some(r => r.right > bx.left + block.clientLeft + block.clientWidth + 1 || r.left < bx.left + block.clientLeft - 1)) {
-          out.add(`clip · ${block === el ? tag : name(block) + ' › ' + tag} (${block.scrollWidth} > ${block.clientWidth})`);
-        }
-        if (bordered) {
-          const b = bordered.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(bordered));
-          const inner = { left: b.left + bl, right: b.right - br, top: b.top + bt, bottom: b.bottom - bb };
-          if (rects.some(r => r.left < inner.left - 1 || r.right > inner.right + 1 || r.top < inner.top - 1 || r.bottom > inner.bottom + 1)) {
-            out.add(`spill · ${tag} out of ${name(bordered)}`);
+      for (const root of roots) {
+        const shown = (el) => {
+          for (let e = el; e; e = e.parentElement) {
+            const c = cs(e);
+            if (c.display === 'none' || c.visibility === 'hidden' || c.opacity === '0') return false;
+            if (e === root) break;
           }
+          return true;
+        };
+        const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let n; (n = tw.nextNode());) {
+          const text = n.textContent.replace(/\s+/g, ' ').trim();
+          if (!text) continue;
+          const el = n.parentElement;
+          if (!el || el.closest('svg, script, style, noscript, template') || !shown(el)) continue;
+          if (cs(el).position === 'absolute' && el.getBoundingClientRect().width <= 1) continue;   // screen-reader only
+          const range = document.createRange(); range.selectNodeContents(n);
+          /* A text's box is its line, not the font's whole ascent and descent:
+             Pop's handwriting fonts reach well past a tight line-height, which
+             draws nothing over the line above. */
+          const ec = cs(el), lh = parseFloat(ec.lineHeight) || parseFloat(ec.fontSize) * 1.2;
+          let rects = [...range.getClientRects()].filter(r => r.width > 0.5 && r.height > 0.5).map(r => {
+            const trim = Math.max(0, (r.height - lh) / 2);
+            return { left: r.left, right: r.right, top: r.top + trim, bottom: r.bottom - trim };
+          });
+          if (!rects.length) continue;
+          let block = null, bordered = null, scroller = null;
+          const ruled = [];
+          for (let e = el; e; e = e.parentElement) {
+            const c = cs(e);
+            if (!bordered && !scroller && borders(c).some(v => v > 0)) ruled.push(e);
+            if (!block && c.display !== 'inline' && c.display !== 'contents') block = e;
+            if (!bordered && !scroller && boxed(c)) bordered = e;
+            if (!scroller && scrolls(e) && e !== document.documentElement && e !== document.body) scroller = e;
+            if (e === root || (bordered && scroller)) break;
+          }
+          /* Text a scroll container has scrolled out of view is still measured
+             against its own boxes; it is only not compared with text outside
+             that container, which it passes under as it scrolls. */
+          const view = scroller && scroller.getBoundingClientRect();
+          const inView = (r) => !view || (r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom);
+          const tag = `${name(el)} "${text.slice(0, 32)}"`;
+          // Cut: the box is narrower than its text, and it is this text that runs past it.
+          const bx = block && block.getBoundingClientRect();
+          if (block && !scrolls(block) && block.clientWidth > 0 && block.scrollWidth > block.clientWidth + 1
+              && rects.some(r => r.right > bx.left + block.clientLeft + block.clientWidth + 1 || r.left < bx.left + block.clientLeft - 1)) {
+            out.add(`clip · ${block === el ? tag : name(block) + ' › ' + tag} (${block.scrollWidth} > ${block.clientWidth})`);
+          }
+          if (bordered) {
+            const b = bordered.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(bordered));
+            const inner = { left: b.left + bl, right: b.right - br, top: b.top + bt, bottom: b.bottom - bb };
+            if (rects.some(r => r.left < inner.left - 1 || r.right > inner.right + 1 || r.top < inner.top - 1 || r.bottom > inner.bottom + 1)) {
+              out.add(`spill · ${tag} out of ${name(bordered)}`);
+            }
+          }
+          // Nor may it sit on a line drawn by a box or rule around it.
+          ruled.forEach(e => {
+            const b = e.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(e));
+            const strips = [bt && { left: b.left, right: b.right, top: b.top, bottom: b.top + bt }, br && { left: b.right - br, right: b.right, top: b.top, bottom: b.bottom },
+              bb && { left: b.left, right: b.right, top: b.bottom - bb, bottom: b.bottom }, bl && { left: b.left, right: b.left + bl, top: b.top, bottom: b.bottom }].filter(Boolean);
+            if (rects.some(r => strips.some(t => Math.min(r.right, t.right) - Math.max(r.left, t.left) > 1 && Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top) > 1))) {
+              out.add(`spill · ${tag} on the border of ${name(e)}`);
+            }
+          });
+          // Past the screen's side: only the part a scroll container shows counts.
+          const shownPart = (r) => (view ? { left: Math.max(r.left, view.left), right: Math.min(r.right, view.right) } : r);
+          if (rects.some(r => inView(r) && (shownPart(r).right > vw + 1 || shownPart(r).left < -1))) out.add(`spill · ${tag} past the screen edge`);
+          rects.forEach(r => lines.push({ r, tag, n, scroller, seen: inView(r) }));
         }
-        // Nor may it sit on a line drawn by a box or rule around it.
-        ruled.forEach(e => {
-          const b = e.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(e));
-          const strips = [bt && { left: b.left, right: b.right, top: b.top, bottom: b.top + bt }, br && { left: b.right - br, right: b.right, top: b.top, bottom: b.bottom },
-            bb && { left: b.left, right: b.right, top: b.bottom - bb, bottom: b.bottom }, bl && { left: b.left, right: b.left + bl, top: b.top, bottom: b.bottom }].filter(Boolean);
-          if (rects.some(r => strips.some(t => Math.min(r.right, t.right) - Math.max(r.left, t.left) > 1 && Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top) > 1))) {
-            out.add(`spill · ${tag} on the border of ${name(e)}`);
+        // A bordered box past the screen's side (a card edge peeking in or out).
+        root.querySelectorAll('*').forEach(el => {
+          if (!shown(el) || !boxed(cs(el))) return;
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          for (let e = el.parentElement; e && e !== root; e = e.parentElement) if (/auto|scroll|hidden|clip/.test(cs(e).overflowX)) return;
+          if (r.right > vw + 1 || r.left < -1) out.add(`spill · ${name(el)} box past the screen edge (${Math.round(r.left)} to ${Math.round(r.right)})`);
+          /* A box laid out in the flow stays inside the box around it (a sticker
+             placed on purpose is position:absolute and is not held to this). */
+          if (/absolute|fixed/.test(cs(el).position)) return;
+          for (let e = el.parentElement; e && root.contains(e); e = e.parentElement) {
+            if (boxed(cs(e))) {
+              const p = e.getBoundingClientRect(), [pt, pr, pb, pl] = borders(cs(e));
+              if (r.left < p.left + pl - 1 || r.right > p.right - pr + 1) out.add(`spill · ${name(el)} box in ${name(el.parentElement)} "${el.textContent.trim().slice(0, 20)}" out of ${name(e)} (${Math.round(r.left)} to ${Math.round(r.right)} past ${Math.round(p.right - pr)})`);
+              break;
+            }
+            if (scrolls(e)) break;
           }
         });
-        // Past the screen's side: only the part a scroll container shows counts.
-        const shownPart = (r) => (view ? { left: Math.max(r.left, view.left), right: Math.min(r.right, view.right) } : r);
-        if (rects.some(r => inView(r) && (shownPart(r).right > vw + 1 || shownPart(r).left < -1))) out.add(`spill · ${tag} past the screen edge`);
-        rects.forEach(r => lines.push({ r, tag, n, scroller, seen: inView(r) }));
       }
       for (let i = 0; i < lines.length; i++) {
         for (let j = i + 1; j < lines.length; j++) {
@@ -6024,25 +6059,6 @@ function findChromium() {
           if (ix > 1 && iy > 1) out.add(`overlap · ${a.tag} × ${b.tag}`);
         }
       }
-      // A bordered box past the screen's side (a card edge peeking in or out).
-      root.querySelectorAll('*').forEach(el => {
-        if (!shown(el) || !boxed(cs(el))) return;
-        const r = el.getBoundingClientRect();
-        if (!r.width || !r.height) return;
-        for (let e = el.parentElement; e && e !== root; e = e.parentElement) if (/auto|scroll|hidden|clip/.test(cs(e).overflowX)) return;
-        if (r.right > vw + 1 || r.left < -1) out.add(`spill · ${name(el)} box past the screen edge (${Math.round(r.left)} to ${Math.round(r.right)})`);
-        /* A box laid out in the flow stays inside the box around it (a sticker
-           placed on purpose is position:absolute and is not held to this). */
-        if (/absolute|fixed/.test(cs(el).position)) return;
-        for (let e = el.parentElement; e && root.contains(e); e = e.parentElement) {
-          if (boxed(cs(e))) {
-            const p = e.getBoundingClientRect(), [pt, pr, pb, pl] = borders(cs(e));
-            if (r.left < p.left + pl - 1 || r.right > p.right - pr + 1) out.add(`spill · ${name(el)} box in ${name(el.parentElement)} "${el.textContent.trim().slice(0, 20)}" out of ${name(e)} (${Math.round(r.left)} to ${Math.round(r.right)} past ${Math.round(p.right - pr)})`);
-            break;
-          }
-          if (scrolls(e)) break;
-        }
-      });
       return [...out];
     };
     const fitReset = () => page.evaluate(() => {
@@ -6122,6 +6138,13 @@ function findChromium() {
             const where = `Grown-ups › ${tab} · ${look} · ${w} · ${pass}`;
             (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`${where} · ${f}`));
           }
+          // Parent › Now over the same seeded week: its money cards are a money surface too.
+          await page.evaluate(() => {
+            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+            showScreen('parent'); renderParentHome(); setParentTab('now');
+          });
+          await page.waitForTimeout(200);
+          (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`Parent › Now · ${look} · ${w} · ${pass} · ${f}`));
           await page.evaluate(() => {
             const s = JSON.parse(window.__fitGuSnap); window.__fitGuSnap = null;
             Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s);
@@ -6677,14 +6700,23 @@ function findChromium() {
           });
           mnySavePlan(prev, kid, { planId: 'sunday', presetId: 'saving', guess: 35 });
           mnyAddDeposit(kid, wk, { amount: 30, from: 'A gift', giver: 'Uncle Mike', dayKey: mrWeekDayKeys(wk)[0] });   // money to place
-          const row = mnyAddDebt(kid, { name: 'Winter entry', icon: '🆕', principal: 27, monthly: 5 });
+          const row = mnyAddDebt(kid, { name: 'Winter entry', icon: '🆕', principal: 27, monthly: 20 });
           row.createdAt = Date.now();
+          renderMeetingMode();
+          /* PR 1 money re-check: under the $5 steady floor (chores $2 a week
+             here) the card shows the "not enough steady money" wording and
+             no share, so no "get back under half" ideas. */
+          const low = sdBody().querySelector('.sd-newrow');
+          if (!low) bad.push('the new-row card did not show');
+          else if (!/Not enough steady money yet to judge it/.test(low.textContent) || /How could I get back under half\?/.test(low.textContent)) bad.push('steady under $5: the card does not show the not-enough-steady wording alone (steady ' + guSteady(kid) + ')');
+          // Then $6 of steady money a week (chores $2 + learning $4): the loan is over half.
+          [prev, prev2].forEach(w => { const r = c.moneyLedger[w][kid]; r.learning = 4; r.gross += 4; r.net += 4; c.finalizedWeeks[w][kid] += 4; });
           renderMeetingMode();
           const card = sdBody().querySelector('.sd-newrow');
           if (!card) bad.push('the new-row card did not show');
           else {
             if (!/💡 Does it earn back\? My competitions pay me about \$12\.00 each\. This row is paid back by about 3 competitions./.test(card.textContent)) bad.push('no "Does it earn back?" line: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 200));
-            if (!/How could I get back under half\?/.test(card.textContent) || card.querySelectorAll('[data-mny-action="sd-newidea"]').length !== 3) bad.push('over half, the card does not ask how to get back under half with three ideas');
+            if (!/How could I get back under half\?/.test(card.textContent) || card.querySelectorAll('[data-mny-action="sd-newidea"]').length !== 3) bad.push('over half, the card does not ask how to get back under half with three ideas (steady ' + guSteady(kid) + ')');
             sdClick('[data-mny-action="sd-newok"]');
           }
           // Through to I choose.
@@ -24486,6 +24518,50 @@ function findChromium() {
     await guTeardown();
   }
 
+  /* PR 1 money re-check, fix 5: the Rules index keeps its 300px at two-column
+     widths, so the search box's placeholder "Find a price or rule…" is not cut
+     in either look (at 240px Calm's Lexend cut it). Measured, not looked at:
+     the placeholder text, laid out as the input's value, must not overflow
+     the input (scrollWidth <= clientWidth). */
+  if (want('rulesSearchPlaceholderFitsTheIndex')) {
+    await guSetup();
+    const wasView = page.viewportSize();
+    const wasScale = await page.evaluate(() => paTextScale());
+    const bad = [];
+    try {
+      await page.setViewportSize({ width: 900, height: 834 });
+      for (const look of ['pop', 'calm']) {
+        await setLook(look);
+        // Standard and the parent's Largest Reading size (Calm's Lexend at
+        // Larger or Largest is what a 240px column cut).
+        for (const scale of ['1', '1.3']) {
+          await page.evaluate((v) => { try { localStorage.setItem(PA_SCALE_KEY, v); } catch (e) {} paApplyTextScale(); }, scale);
+          await page.waitForTimeout(150);
+          const r = await page.evaluate(() => {
+            guRuleSearch = '';
+            const box = guOpen('rules').querySelector('#guRuleSearch');
+            if (!box) return 'no #guRuleSearch on ⚙️ Rules';
+            // Real layout: put the placeholder text in as the value (no input
+            // event fires) and see whether it overflows; type="search" keeps
+            // space for its invisible clear button, which a canvas sum misses.
+            box.value = box.getAttribute('placeholder') || '';
+            const sw = box.scrollWidth, cw = box.clientWidth;
+            box.value = '';
+            return sw <= cw ? true : `placeholder text is ${sw}px wide but the box shows ${cw}px`;
+          });
+          if (r !== true) bad.push(`[${look}, Reading size ${scale}] ${r}`);
+        }
+      }
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally {
+      try { await page.evaluate((v) => { try { localStorage.setItem(PA_SCALE_KEY, v); } catch (e) {} paApplyTextScale(); }, wasScale); } catch (e) { bad.push('could not put the Reading size back: ' + e.message); }
+      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
+      if (wasView) await page.setViewportSize(wasView);
+    }
+    checks.rulesSearchPlaceholderFitsTheIndex = bad.length ? bad : true;
+    await guTeardown();
+  }
+
   if (want('grownupsExpectedMoneyMoves')) {
     await guSetup();
     checks.grownupsExpectedMoneyMoves = await page.evaluate(() => {
@@ -26152,6 +26228,7 @@ function findChromium() {
       const bad = [];
       const active = () => (document.querySelector('.screen.active') || {}).id;
       const kid = 'jenn';
+      const savedPeriod = flPeriod, savedMonth = flMonth;
       try {
         const seeded = mv2Seed(kid); if (seeded) bad.push(seeded);
         // One Sunday with a fine, so ➖ has something to say.
@@ -26222,14 +26299,25 @@ function findChromium() {
           wrap.querySelector('[data-mny-action="sundaysmode"][data-mny-mode="week"]').click();
           underMyMoney('📖 All my Sundays');
         }
+        flPeriod = 'month'; flMonth = null;
         if (!door('bymonth')) bad.push('the passbook has no 📊 By month door');
         else {
-          if (!wrap.querySelector('.fl-story')) bad.push('📊 By month did not draw the Flow');
+          const ledRows = mnyLedgerRows(kid);
+          const newest = ledRows[0];
+          /* PR 1 money re-check: "This month" is the calendar month. On a date
+             whose month has no settled Sunday yet (CI's 2026-10-01) the page
+             says so in one line; the newest month with a Sunday is then picked
+             on the strip, as she would. */
+          const nowMonth = todayKey().slice(0, 7);
+          if (!ledRows.some(r => flSundayMonth(r.weekKey) === nowMonth)) {
+            if (!/Nothing has landed this month yet\./.test(wrap.textContent)) bad.push('📊 By month on an empty calendar month does not say "Nothing has landed this month yet."');
+            const col = wrap.querySelector(`.fl-col[data-fl-month="${flSundayMonth(newest.weekKey)}"]`);
+            if (col) col.click(); else bad.push('the newest month with a Sunday is not on the strip');
+          }
+          if (!wrap.querySelector('.fl-story')) { bad.push('📊 By month did not draw the Flow'); return bad; }
           /* Build 2026-10-06c: the months come from the frozen Sundays, so the
              newest month says what its Sundays earned, split as drawn, and
              the month bars fill the one card (no empty band). */
-          const ledRows = mnyLedgerRows(kid);
-          const newest = ledRows[0];
           const g = mnySundayGroups(newest);
           const same = ledRows.filter(r => flSundayMonth(r.weekKey) === flSundayMonth(newest.weekKey)).map(mnySundayGroups);
           const earned = money2(same.reduce((a, x) => a + x.earned, 0));
@@ -26245,9 +26333,157 @@ function findChromium() {
           underMyMoney('📊 By month');
         }
       } catch (e) { bad.push('threw: ' + e.message); }
-      finally { goToday(); }
+      finally { flPeriod = savedPeriod; flMonth = savedMonth; goToday(); }
       return bad.length ? bad : true;
     });
+    await guTeardown();
+  }
+
+  /* ── 📊 This month is the calendar month (PR 1 money re-check, fix 6) ──
+     Before: "This month" quietly showed the newest month with a Sunday, so in
+     the first days of a month the page headed "This month" read last month.
+     Asserted on a ledger with Sundays two and one months back and none this
+     month: the page picks this month, says "Nothing has landed this month
+     yet." in one line with no story and no $0 groups, and keeps the strip; a
+     month she picks stays picked; All of it has no such line; and once a
+     Sunday of this month is signed the story is back. */
+  if (want('thisMonthSaysNothingHasLandedYet')) {
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await guSetup();
+    checks.thisMonthSaysNothingHasLandedYet = await page.evaluate(() => {
+      const bad = [];
+      const kid = 'jenn';
+      const savedPeriod = flPeriod, savedMonth = flMonth;
+      const EMPTY = 'Nothing has landed this month yet.';
+      try {
+        profile = kid; parentViewing = kid;
+        ctEnsureShared();
+        const c = state.shared.chore;
+        const now = todayKey().slice(0, 7);
+        const [yy, mm] = now.split('-').map(Number);
+        const back = (n) => { let y = yy, m = mm - n; while (m < 1) { m += 12; y -= 1; } return y + '-' + String(m).padStart(2, '0'); };
+        const put = (day, row) => {
+          const wk = ctWeekKeyForDate(day);
+          c.moneyLedger[wk] = { [kid]: Object.assign({ at: 1, chores: 0, learning: 0, streak: 0, competition: 0, sessionsPaid: 0, fines: 0,
+            groups: { given: 0, made: 0, bank: 0, takenOff: 0 }, loan: { paid: 0 }, ready: 0, gic: 0, stock: 0, spend: 0 }, row) };
+          return wk;
+        };
+        c.moneyLedger = {};
+        put(back(2) + '-15', { chores: 40 });
+        put(back(1) + '-15', { chores: 25 });
+        const host = document.getElementById('mnyStoryWrap');
+        const empties = () => [...host.querySelectorAll('.fl-empty')].filter(e => e.textContent.trim() === EMPTY).length;
+
+        flPeriod = 'month'; flMonth = null; mnyOpenByMonth();
+        if (flCurrentMonth(flMonthsFor(kid)) !== now) bad.push('This month picks ' + flCurrentMonth(flMonthsFor(kid)) + ', not the calendar month ' + now);
+        if (empties() !== 1) bad.push(`an empty calendar month shows "${EMPTY}" ${empties()} times`);
+        if (host.querySelector('.fl-story')) bad.push('an empty calendar month still tells a story: ' + host.querySelector('.fl-story').textContent);
+        if (host.querySelector('.fl-group')) bad.push('an empty calendar month still draws the $0 groups');
+        const chip = host.querySelector('[data-fl-action="period"][data-fl-id="month"]');
+        if (!chip || chip.getAttribute('aria-pressed') !== 'true' || chip.textContent.trim() !== 'This month') bad.push('the "This month" chip is not the pressed one');
+        const onCol = host.querySelector('.fl-col.on');
+        if (!onCol || onCol.getAttribute('data-fl-month') !== now) bad.push('the strip does not mark ' + now + ' as the month on show');
+        if (host.querySelectorAll('.fl-col').length < 3) bad.push('the strip lost months: ' + host.querySelectorAll('.fl-col').length);
+
+        // A month she picks stays picked, and it is not "nothing yet".
+        const picked = host.querySelector(`.fl-col[data-fl-month="${back(1)}"]`);
+        if (!picked) bad.push('last month is not on the strip');
+        else {
+          picked.click();
+          if (flMonth !== back(1)) bad.push('tapping last month did not pick it');
+          if (empties()) bad.push(`a picked month with a Sunday says "${EMPTY}"`);
+          const story = host.querySelector('.fl-story');
+          if (!story || !/I earned \$25\.00/.test(story.textContent)) bad.push('the picked month does not say I earned $25.00: ' + (story ? story.textContent : 'no story'));
+          mnyRenderHistory();
+          if (flMonth !== back(1) || flCurrentMonth(flMonthsFor(kid)) !== back(1)) bad.push('the picked month did not stay picked on a redraw');
+        }
+
+        // All of it is never "nothing yet".
+        flPeriod = 'all'; flMonth = null; mnyRenderHistory();
+        if (empties()) bad.push(`All of it says "${EMPTY}"`);
+        if (!host.querySelector('.fl-story')) bad.push('All of it tells no story');
+
+        // A Sunday of this month signed: the story is back.
+        let sunday = null;
+        for (let d = 1; d <= 7 && !sunday; d++) {
+          const day = now + '-0' + d;
+          if (sdSundayOf(ctWeekKeyForDate(day)) === day) sunday = day;
+        }
+        if (!sunday) bad.push('precondition: no Sunday found in the first week of ' + now);
+        else {
+          put(sunday, { chores: 12 });
+          flPeriod = 'month'; flMonth = null; mnyRenderHistory();
+          if (empties()) bad.push(`this month with a signed Sunday still says "${EMPTY}"`);
+          const story = host.querySelector('.fl-story');
+          if (!story || !/I earned \$12\.00/.test(story.textContent)) bad.push('this month with a signed Sunday does not say I earned $12.00: ' + (story ? story.textContent : 'no story'));
+        }
+      } catch (e) { bad.push('threw: ' + e.message); }
+      finally { flPeriod = savedPeriod; flMonth = savedMonth; goToday(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* ── ✍️ Both Record doors carry one hint (PR 1 money re-check) ──
+     The Grown-ups bar and Parent › Now each have a ✍️ Record door. Asserted:
+     beside each, on show, the same sentence (rcDoorHint's), so the two doors
+     cannot drift apart. */
+  if (want('bothRecordDoorsCarryTheHint')) {
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await guSetup();
+    checks.bothRecordDoorsCarryTheHint = await page.evaluate(() => {
+      const bad = [];
+      const WANT = 'Write down money that came in or went out.';
+      try {
+        if (RC_DOOR_HINT !== WANT) bad.push('rcDoorHint reads "' + RC_DOOR_HINT + '"');
+        const look = (where, root, doorSel) => {
+          if (!root) { bad.push(where + ': not drawn'); return; }
+          const door = root.querySelector(doorSel);
+          if (!door || !door.getClientRects().length) { bad.push(where + ': no ✍️ Record door on show'); return; }
+          const hints = [...root.querySelectorAll('.rc-door-hint')];
+          if (hints.length !== 1) { bad.push(where + ': ' + hints.length + ' Record hints'); return; }
+          const h = hints[0];
+          if (h.textContent.trim() !== WANT) bad.push(where + ': the hint reads "' + h.textContent.trim() + '"');
+          if (!h.getClientRects().length || getComputedStyle(h).visibility === 'hidden') bad.push(where + ': the hint is not on show');
+          if (h.parentElement !== door.parentElement) bad.push(where + ': the hint does not sit beside the ✍️ Record door');
+        };
+        GU_TABS.forEach(t => {
+          const wrap = guOpen(t.id);
+          look('Grown-ups › ' + t.id, wrap && wrap.querySelector('.gu-tabs'), '[data-mny-action="record-any"]');
+        });
+        look('Parent › Now', guOpen('approve'), '.pn-sidebtns [data-pn-action="record"]');
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    // Phones (owner decision 3): the Grown-ups hint sits UNDER the button, and ✍️ Record stays on one line.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(100);
+    const phoneBad = [];
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      const r = await page.evaluate(() => {
+        const bad = [];
+        try {
+          GU_TABS.forEach(t => {
+            const wrap = guOpen(t.id);
+            const bar = wrap && wrap.querySelector('.gu-tabs');
+            const btn = bar && bar.querySelector('[data-mny-action="record-any"]');
+            const hint = bar && bar.querySelector('.rc-door-hint');
+            if (!btn || !hint) { bad.push(t.id + ': Record button or hint missing'); return; }
+            const rect = btn.getBoundingClientRect();
+            const range = document.createRange(); range.selectNodeContents(btn);
+            const lines = new Set([...range.getClientRects()].map(q => Math.round(q.top))).size;
+            if (lines > 1) bad.push(t.id + ': Record text is on ' + lines + ' lines');
+            if (hint.getBoundingClientRect().top < rect.bottom - 1) bad.push(t.id + ': hint is not below the Record button');
+          });
+        } catch (e) { bad.push('threw: ' + e.message); }
+        return bad;
+      });
+      r.forEach(m => phoneBad.push('390 ' + look + ' ' + m));
+    }
+    if (phoneBad.length) {
+      checks.bothRecordDoorsCarryTheHint = checks.bothRecordDoorsCarryTheHint === true ? phoneBad : [].concat(checks.bothRecordDoorsCarryTheHint, phoneBad);
+    }
     await guTeardown();
   }
 

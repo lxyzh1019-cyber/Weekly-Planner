@@ -528,7 +528,7 @@ function pnRenderNow() {
      (the catch-up screen is where that work happens; the meeting hub still
      lists the weeks). */
   const open = pnOpenCount(pnScopeKids());
-  wrap.innerHTML = `<div class="pn-grid">
+  wrap.innerHTML = `<div class="pn-grid" data-money-surface>
       <div class="pn-main">
         <div class="pn-wait-head">
           <h2 class="pn-wait-title">✅ Waiting for you</h2>
@@ -549,6 +549,7 @@ function pnRenderNow() {
         <div class="pn-sidebtns">
           <button type="button" class="pn-sidebtn" data-pn-action="record">✍️ Record</button>
           <button type="button" class="pn-sidebtn" data-pn-action="told">🚪 She told me…</button>
+          ${rcDoorHint()}
         </div>
         ${pnTidyCard()}
       </div>

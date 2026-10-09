@@ -446,7 +446,7 @@
 <!-- Her request sheets — Tell Dad a result, club sessions, move / cash out /
      put in, draw in advance, a new goal, everything she asked (js/45-requests.js).
      Chrome here, body filled by JS, the recordOverlay pattern. -->
-<div class="overlay" id="requestOverlay" onclick="overlayClick(event,'requestOverlay')">
+<div class="overlay" id="requestOverlay" data-money-surface onclick="overlayClick(event,'requestOverlay')">
   <div class="sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
     <h3 id="rqSheetTitle">✋ Ask parents</h3>
     <div id="requestBody"></div>
@@ -455,7 +455,7 @@
 
 <!-- 🗣️ Dad's card on Sunday — ASK / SAY / WAIT for the step (js/44-sunday.js).
      Chrome here, body filled by JS, the recordOverlay pattern. -->
-<div class="overlay" id="sundayOverlay" onclick="overlayClick(event,'sundayOverlay')">
+<div class="overlay" id="sundayOverlay" data-money-surface onclick="overlayClick(event,'sundayOverlay')">
   <div class="sheet sd-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
     <h3 id="sdSheetTitle">🗣️ Parent's card</h3>
     <div id="sundayBody"></div>
@@ -468,14 +468,14 @@
 <!-- 🚪 "She told me…" (Parent › Now, Plan v9 §N): the On-her-behalf card in a
      sheet. Body filled by pnRenderToldSheet (js/32-parent-now.js); its
      data-pn-action controls go to pnHandleClick (js/99-main.js). -->
-<div class="overlay" id="pnToldOverlay" onclick="overlayClick(event,'pnToldOverlay')">
+<div class="overlay" id="pnToldOverlay" data-money-surface onclick="overlayClick(event,'pnToldOverlay')">
   <div class="sheet pn-told-sheet" role="dialog" aria-modal="true" aria-labelledby="pnToldTitle">
     <h3 id="pnToldTitle">🚪 She told me… — on her behalf</h3>
     <div id="pnToldBody"></div>
   </div>
 </div>
 
-<div class="overlay" id="grownupsOverlay" onclick="overlayClick(event,'grownupsOverlay')">
+<div class="overlay" id="grownupsOverlay" data-money-surface onclick="overlayClick(event,'grownupsOverlay')">
   <div class="sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
     <h3 id="guSheetTitle">✏️ Fix</h3>
     <div id="grownupsBody"></div>

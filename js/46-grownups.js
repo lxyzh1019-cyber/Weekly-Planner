@@ -219,7 +219,7 @@ function guTabBar() {
   return `<div class="gu-tabs" role="group" aria-label="Money">
       ${GU_TABS.map(t =>
     `<button type="button" class="gu-tab${cur === t.id ? ' on' : ''}" aria-pressed="${cur === t.id}" data-mnyp-action="gutab" data-mnyp-id="${t.id}">${escapeHtml(t.label)}</button>`).join('')}
-      <span class="gu-tools"><button type="button" class="gu-btn gu-record" data-mny-action="record-any">✍️ Record</button><button type="button" class="gu-btn" data-mny-action="tourpar" aria-label="How this page works">?</button></span></div>`;
+      <span class="gu-tools">${rcDoorHint()}<button type="button" class="gu-btn gu-record" data-mny-action="record-any">✍️ Record</button><button type="button" class="gu-btn" data-mny-action="tourpar" aria-label="How this page works">?</button></span></div>`;
 }
 
 /* The whole tab: the prototype's two columns, the main one and its pane. */
@@ -534,7 +534,7 @@ function guCommitKidCard(kid) {
   }).join('');
   return `<div class="gu-card ${'gu-tint--' + kid}">
       <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))}</span><b class="gu-fig">${mnyMoney(left)} left</b></div>
-      <div class="gu-line">${mnyMoney(weekly)} a week · ${steady > 0 ? Math.round(weekly / steady * 100) + '%' : '—'} of steady ${mnyMoney(steady)}</div>
+      <div class="gu-line">${mnyMoney(weekly)} a week · ${guPct(sdSteadyShare(weekly, steady))} of steady ${mnyMoney(steady)}</div>
       ${rows || '<div class="gu-line">Nothing on her wall.</div>'}
     </div>`;
 }
@@ -554,7 +554,7 @@ function guCommitMath() {
   const fromSafe = money2(Math.min(c.cost, sav)), borrow = money2(c.cost - fromSafe);
   return { c, kid, sur, safety, plan, leftNow, sav, fromSafe, borrow, ticked: c.tickFor === guCommitTickKey(c) };
 }
-function guPct(v) { return isFinite(v) ? Math.round(v) + '%' : '—'; }
+function guPct(v) { return v != null && isFinite(v) ? Math.round(v) + '%' : '—'; }   // null: under the $5 floor (sdSteadyShare)
 function guCommitMain() {
   const c = guCommit(), sur = c.type === 'surprise';
   const rows = [

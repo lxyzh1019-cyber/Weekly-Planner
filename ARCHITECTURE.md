@@ -119,7 +119,10 @@ SMOKE_ONLY=checkA,checkB npm run test:smoke   # a few checks, locally
 `tests/check-shared-merge.js`, `tests/check-escaping.js`,
 `tests/check-look-tokens.js` (every colour and font reads a `:root` token and
 every absolute font size multiplies `--text-scale`, so a look reaches every
-spot), `tests/check-dead-css.js`,
+spot), `tests/check-money-words.js`, `tests/check-steady-share.js` (no division
+by steady money outside `js/43-sunday-core.js`), `tests/check-money-surface.js`
+(the money text size and font are set through `[data-money-surface]` only),
+`tests/check-dead-css.js`,
 `tests/check-dead-ids.js`, `tests/check-dead-actions.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
@@ -3997,15 +4000,28 @@ The exact withdrawn pair (`startsOn: 'sunday'`, `from: '2026-10-11'`), copied in
 
 ## The money screens use the prototype's text size — Plan v6 Deviation 35
 
-On My money (`.mv2`), the Sunday money step (`.sd`), Grown-ups (`.gu`) and
-their sheets (`#requestOverlay`, `#sundayOverlay`, `#grownupsOverlay`), at
+On every money root — each carries `data-money-surface` (My money and its
+head, Money school, All my Sundays, By month, the Sunday money step and the
+meeting's head, Grown-ups, Parent › Now, and the `#requestOverlay`,
+`#sundayOverlay`, `#pnToldOverlay` and `#grownupsOverlay` sheets) — at
 768px and wider, `--text-scale` is set to 1 — a scoped value of the same
 token, so every size there still multiplies it and check-look-tokens passes;
 Calm was already 1; the phone keeps the house 1.1 in Pop; the 13px floor
-still measures the result. A name on those screens is never cut with "…":
+still measures the result. The same roots read `--font-round` as the look's
+body font (one font for words and figures). Both rules select
+`[data-money-surface]`; a hand-kept list of roots is not allowed back — the
+lists disagreed (PR 1 money re-check). (checked by tests/check-money-surface.js)
+A name on those screens is never cut with "…":
 the old ellipsis rules wrap instead, and smoke `noLabelIsCutOnTheMoneyScreens`
-fails on any ellipsis-truncated element there at 1194 (seeded My money, her
-sheets, Sunday's four steps, Grown-ups' six tabs, both looks). (checked by smoke: noLabelIsCutOnTheMoneyScreens)
+finds its roots by `[data-money-surface]` and fails on any cut, spilled or
+overlapping label there (seeded My money, her sheets, Sunday's four steps,
+Grown-ups' six tabs, Parent › Now, both looks, 390 and 1194). (checked by smoke: noLabelIsCutOnTheMoneyScreens)
+
+Her share of steady money (Grown-ups' loan card and "Can she afford it?",
+her "New row on my wall" pop-up and its club-session idea) is divided in one
+place, `sdSteadyShare` / `sdCommitShares` in `js/43-sunday-core.js`, with the
+$5 floor and the 50 % line `sdCommitPlan` uses; under the floor a screen
+shows "not enough steady money yet", never a figure. (checked by tests/check-steady-share.js)
 
 ## Stage 6d — the approved redesigns (Plan v9 §N, build 2026-10-04b)
 

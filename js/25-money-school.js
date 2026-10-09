@@ -77,7 +77,7 @@ function mnyRenderSchool() {
       `${mnyPageHead('🎓 Money school', '', [
           { action: 'tourkid', icon: '?', word: 'How this page works' },
         ], { kidSwitch: true, tabs: 'school', date: true, back: 'backschool', big: true })}
-       <div class="mv2-school">
+       <div class="mv2-school" data-money-surface>
          <div class="mv2-col">${mnyLadderCard(kid, pct, idx)}${mnyStockChart()}</div>
          <div class="mv2-col">${mnyIdeasCard(kid)}</div>
          <div class="mv2-col">${mnyWorkListsCard()}${mnyBuysCard()}</div>

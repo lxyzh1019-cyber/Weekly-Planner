@@ -8133,7 +8133,10 @@
 .gu-grid--rules > .gu-main { grid-area: main; }
 .gu-grid--rules > .gu-side { grid-area: side; }
 .gu-grid--rules > .gu-savestrip { grid-area: save; }
-@media (max-width: 1099px) { .gu-grid--rules { grid-template-columns: 240px minmax(0, 1fr); grid-template-areas: "index main" "index side" "save save"; } }
+/* The index keeps its 300px at every two-column width, so the search box
+   takes that column's width and its placeholder "Find a price or rule…" is
+   not cut (PR 1 money re-check, fix 5: at 240px Calm's Lexend cut it). */
+@media (max-width: 1099px) { .gu-grid--rules { grid-template-columns: 300px minmax(0, 1fr); grid-template-areas: "index main" "index side" "save save"; } }
 .gu-ruleindex {
   display: flex; flex-direction: column; gap: 4px; padding: 8px; min-width: 0;
   background: var(--mny-v15-paper); border: var(--bw-card) solid var(--mny-v15-ink); border-radius: var(--radius-md); box-shadow: var(--mny-shadow-card);
@@ -8165,6 +8168,11 @@
 /* Stage 4b — the old sections' new homes (📖 More is retired) */
 .gu-tools { display: flex; gap: 6px; margin-left: auto; }
 .gu-tools .gu-btn { min-width: 44px; }
+/* The ✍️ Record doors' hint (rcDoorHint, js/41): beside the door in the
+   Grown-ups bar, under it on Parent › Now. */
+.rc-door-hint { font-size: max(13px, calc(0.8125rem * var(--fs-scale, 1) * var(--text-scale, 1))); line-height: 1.3; color: var(--mny-v15-sub); }
+.gu-tools .rc-door-hint { align-self: center; max-width: 15em; text-align: right; }
+.pn-sidebtns .rc-door-hint { grid-column: 1; }
 .gu-record { font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-ovtoggle { align-self: flex-start; }
 .gu-ovrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; border-top: var(--bw-hair) dashed var(--mny-v15-dash); font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
@@ -8229,6 +8237,10 @@ button.gu-loanrow {
   .gu-grid--rules { grid-template-areas: "index" "main" "side" "save"; }
   .gu-head { flex-wrap: wrap; }
   .gu-tabs { justify-content: flex-start; }
+  /* Owner decision 3: on phones the Record hint sits under the button row, so ✍️ Record stays on one line. */
+  .gu-tools { flex-wrap: wrap; justify-content: flex-end; }
+  .gu-tools .gu-record { white-space: nowrap; }
+  .gu-tools .rc-door-hint { order: 3; flex: 1 0 100%; max-width: none; }
   .gu-formrow { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .gu-exrow { grid-template-columns: minmax(0, 1fr) 44px; }
   .gu-exrow .gu-pair { grid-column: 1 / -1; }
@@ -8377,16 +8389,19 @@ button.gu-loanrow {
 }
 /* ── Deviation 35 (Plan v6 Rev 5): the prototype's text size on the money
    screens at iPad width ──
-   Pop's --text-scale (1.1) is the house rule everywhere else; on My money
-   (.mv2), the Sunday money step (.sd), Grown-ups (.gu) and the sheets they
-   open (request, Dad's card, the Grown-ups fix sheets) the owner wants the
-   prototype's own sizes, so labels are not cut or wrapped. A SCOPED value of
-   the same token, not a second token: every size there still multiplies
-   --text-scale (check-look-tokens), Calm is already 1, the phone keeps the
-   house rule, and the 13px floor (kid/parent house-rules sweeps) still
-   measures the result. */
+   Pop's --text-scale (1.1) is the house rule everywhere else; on every
+   money root (`data-money-surface`: My money and its head, Money school,
+   All my Sundays, By month, the Sunday money step and the meeting's head,
+   Grown-ups, Parent › Now, and the request, Parent's card, She told me and
+   Grown-ups fix sheets) the owner wants the prototype's own sizes, so labels
+   are not cut or wrapped. A SCOPED value of the same token, not a second
+   token: every size there still multiplies --text-scale (check-look-tokens),
+   Calm is already 1, the phone keeps the house rule, and the 13px floor
+   (kid/parent house-rules sweeps) still measures the result. One attribute,
+   not a list of roots (PR 1 money re-check): the lists disagreed, and
+   tests/check-money-surface.js fails if one comes back. */
 @media (min-width: 768px) {
-  .mv2, .sd, .gu, .pn-grid, #requestOverlay, #sundayOverlay, #grownupsOverlay, #pnToldOverlay { --text-scale: 1; }
+  [data-money-surface] { --text-scale: 1; }
 }
 /* Plan v17 §1 (the final reference, Stage 6h): on the iPad a 800px left
    column and a 352px right column under a one-row 72px head; under 768px
@@ -8395,7 +8410,7 @@ button.gu-loanrow {
    every figure is Patrick Hand like the words around it, and Calm keeps its
    own Lexend (the Calm look's rule). Money columns are right-aligned —
    Patrick Hand has no equal-width digits. */
-.mv2, .sd, .mm-head--two, #requestOverlay, #sundayOverlay, .mny-head--big, .gu, #grownupsOverlay { --font-round: var(--font-body); }
+[data-money-surface] { --font-round: var(--font-body); }
 .mv2 {
   display: grid; grid-template-columns: minmax(0, 1fr) 352px; gap: 14px; align-items: stretch;
   font-family: var(--font-body); color: var(--mny-v15-ink); font-size: calc(1rem * var(--text-scale, 1));
@@ -9554,7 +9569,7 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 /* The last card in a column takes what is left, so no empty band sits under it. */
 .mv2-col > .mv2-card:last-child, .mv2-hist > .mv2-card, .mv2-flow > .mv2-card { flex: 1 1 auto; }
 @media (min-width: 768px) {
-  .mv2-school, .mv2-hist, .mv2-flow { --text-scale: 1; min-height: calc(100vh - 90px); min-height: calc(100dvh - 90px); }
+  .mv2-school, .mv2-hist, .mv2-flow { min-height: calc(100vh - 90px); min-height: calc(100dvh - 90px); }   /* their text size: [data-money-surface] */
 }
 @media (max-width: 1099px) { .mv2-school { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .mv2-school > .mv2-col:last-child { grid-column: 1 / -1; } }
 @media (max-width: 767px) { .mv2-school, .mv2-hist, .mv2-flow { grid-template-columns: minmax(0, 1fr); } }

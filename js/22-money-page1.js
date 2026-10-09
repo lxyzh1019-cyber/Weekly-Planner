@@ -144,7 +144,7 @@ function mnyRenderMyMoney() {
 
   wrap.innerHTML =
       `${mnyMoneyHead('backtoday')}
-       <div class="mv2">
+       <div class="mv2" data-money-surface>
          <div class="mv2-main">
            ${mnyCountdownCard(kid)}
            ${mnyAskedStrip(kid)}
@@ -193,7 +193,7 @@ function mnyPageHead(title, strap, buttons, opts) {
     ? `<span class="mny-head-kids">${['jenn', 'jess'].map(k =>
         `<button type="button" class="mny-chip ${k === mnyViewKid() ? 'on' : ''}" data-mny-action="kid" data-mny-kid="${k}">${CT_PROFILE_ICON[k]} ${mnyKidName(k)}</button>`).join('')}</span>`
     : '';
-  return `<div class="mny-head${o.tabs ? ' mny-head--one' : ''}${o.big ? ' mny-head--big' : ''}">
+  return `<div class="mny-head${o.tabs ? ' mny-head--one' : ''}${o.big ? ' mny-head--big' : ''}"${o.big ? ' data-money-surface' : ''}>
       ${o.back === false ? '' : `<button type="button" class="mny-back" data-mny-action="${escapeAttr(o.back || 'backplanner')}" aria-label="Back">◀</button>`}
       <h2 class="mny-head-title">${escapeHtml(title)}</h2>
       ${strap ? `<span class="mny-head-strap">${escapeHtml(strap)}</span>` : ''}
@@ -1024,7 +1024,7 @@ function mnySundayGroups(row) {
 function mnySundaysPage(kid) {
   const all = mnyLedgerRows(kid);
   if (!all.length) {
-    return `<div class="mv2-hist mv2-hist--empty"><div class="mv2-card mv2-hist-list">
+    return `<div class="mv2-hist mv2-hist--empty" data-money-surface><div class="mv2-card mv2-hist-list">
         <div class="mv2-cardhead"><span class="mv2-title">📖 All my Sundays</span></div>
         <div class="mv2-line">Every Sunday I sign gets written here: what came in, what was taken off, and where it went. Nothing signed yet.</div>
       </div></div>`;
@@ -1082,7 +1082,7 @@ function mnySundaysPage(kid) {
   const period = mnySundaysMode === 'month' ? mnySundaysMonthLabel(mnySundaysMonth)
     : `${groups.length} Sunday${groups.length === 1 ? '' : 's'}`;
   const li = (l, v, cls) => `<div class="mv2-li ${cls}"><span>${escapeHtml(l)}</span><b>${escapeHtml(v)}</b></div>`;
-  return `<div class="mv2-hist">
+  return `<div class="mv2-hist" data-money-surface>
       <div class="mv2-card mv2-hist-list">
         <div class="mv2-cardhead"><span class="mv2-title">📖 All my Sundays</span><span class="mv2-hist-modes">${modeBtns}</span></div>
         ${monthNav}
