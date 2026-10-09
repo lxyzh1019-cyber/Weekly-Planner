@@ -18,6 +18,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Own things · helping out card cycles none, done, nobody asked (XP) — Proof: ownThingsFromToday
 - Training card after training ends: her 1 to 5 rating, tap again to take back, XP only, no money — Proof: attitudeAfterTraining
 - A ✨ chip opens the Mum answered card and clears itself; a parent's look consumes nothing — Proof: answeredGradesClearFromToday
+- A ⏳ N with Mum chip counts this week's answers Mum has not checked and goes to the first day with one: today → Jobs I can do; an earlier day → the Week tab's 🧹 Chores this week report, opened, with that chore's row in view — Proof: newAffordancesActuallyNavigate, kidSeesWaitingAndAnswered
 - 🕓 Catch up card lists earlier days of this week with an unanswered chore, routine or training, one day open at a time — Proof: catchUpListsOnlyUnansweredDaysOfOpenWeeks, catchUpReachesThisWeekOnly
 - Every Today control is at least 44px, words she acts on 15px, nothing under 13px, no sideways scroll at 390px — Proof: kidScreensMeetTheHouseRules
 - ＋ Add to an earlier day lists earlier days of this week for a claim; claim only, no grade — Proof: somethingElseOnAFullyAnsweredEarlierDay

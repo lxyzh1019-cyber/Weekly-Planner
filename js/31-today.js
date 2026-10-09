@@ -1272,6 +1272,26 @@ function tdShowJobs() {
   window.scrollTo(0, Math.max(0, top));
 }
 
+/* ⏳ "with Mum" counts the whole week, but the jobs card lists today only, so the
+   chip goes to the first day with something waiting (what ckGoWaiting did on the
+   Chores screen until PR 2b): today → the jobs card; an earlier day → the Week
+   tab's 🧹 Chores this week report (row 14), opened, with the row of a chore
+   still waiting in view. */
+function tdGoWaiting(kid) {
+  const d = mrFirstWaitingDay(kid, ctThisWeekKey());
+  if (d == null || d === tdTodayIndex()) { tdShowJobs(); return; }
+  try { localStorage.setItem(WK_CHORES_LS_KEY, '1'); } catch (e) {}
+  weekOffset = 0;
+  goWeek();
+  const host = document.getElementById('weekChores');
+  if (!host || host.hidden) return;
+  const cell = host.querySelector('.wcr-cell--claimed');
+  const target = (cell && cell.closest('.wcr-row')) || host;
+  const bar = document.querySelector('#screen-week .topbar');
+  const top = target.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
+  window.scrollTo(0, Math.max(0, top));
+}
+
 function tdOpenInvites() {
   openSisterSync();
   const sync = document.getElementById('screen-sync');
@@ -1900,8 +1920,8 @@ function tdHandleClick(e) {
     if (di >= 0 && ckRateSelfFor(kid, wk, di, Number(el.getAttribute('data-td-n')) || 0)) tdRenderToday();
     return;
   }
-  // ⏳ — what is with Mum is on the jobs card, 'with Mum' (row 6).
-  if (a === 'waiting') { tdShowJobs(); return; }
+  // ⏳ — the first day with something with Mum: today's jobs card, or the Week report (rows 6, 14).
+  if (a === 'waiting') { tdGoWaiting(kid); return; }
   // ✨ — what Mum answered, shown here; opening it is the look (row 6).
   if (a === 'fresh') {
     tdShowAnswered(kid);

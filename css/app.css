@@ -1791,11 +1791,6 @@
   .placed-block .block-train-chip.complete { background: var(--surface-chip-done); }
   .block-train-chip-go { font-weight: 700; opacity: 0.8; white-space: nowrap; }
 
-  /* Her half of the loop: what is with Mom, and what came back. Both tappable. */
-  .ck-chore-fresh { box-shadow: 0 0 0 2px var(--shadow-fresh); border-radius: 10px; }
-
-  /* "I did something else today" — the kid-side door for unplanned work. */
-  .ck-else { margin-top: 6px; border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--bg2); }
   /* Marks a chore that reached the day without being planned. */
   .ck-added {
     font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
@@ -5741,7 +5736,6 @@
     --mny-flow-locked: #8ad8d0;
     --mny-flow-fine: #e08e8e;
     --mny-flow-other: #bdbdbd;
-    /* Today's chore pay bar and its key (ckCapBarFor, js/26-chore-kid.js) */
     --mny-earn-fined: #e05a3c;
     --mny-earn-fined-ink: #fffdf5;
     --mny-earn-kept: #6fc292;
@@ -6000,58 +5994,26 @@
   .mny-head-kids { display: flex; gap: 0.3rem; }
 
   /* ═══════════════════════════════════════════════════════════════
-     KID CHORE TAB (redesign 2a — "Kid" frame, js/26-chore-kid.js)
+     CHORE CONTROLS (redesign 2a — "Kid" frame)
 
-     Sizes are the mock's own pixel values, not rem: the handoff is drawn at
-     iPad Pro 11" landscape (1194 × 834) and the brief was pixel fidelity at
-     that width. Below 700px a single block of overrides takes over — it
-     scales the type down and grows every tap target to 44px+, because the
-     same screen has to work in a hand as well as on a desk.
+     Born on the kid chore tab, which PR 2b retired; what is left here is what
+     the parent portal and Today still draw. Sizes are the mock's own pixel
+     values, not rem: the handoff is drawn at iPad Pro 11" landscape
+     (1194 × 834). Below 700px a single block of overrides grows every tap
+     target to 44px+.
   ═══════════════════════════════════════════════════════════════ */
-  .ck-tab {
-    --ck-green: var(--status-done); --ck-green-ink: var(--status-done-strong); --ck-red: var(--status-miss);
-    --ck-amber: var(--status-amber); --ck-line: var(--border-warm); --ck-dash: var(--border-soft);
-    --ck-ink: var(--ink); --ck-paper: var(--paper); --ck-cream: var(--bg2);
-    display: flex; flex-direction: column; min-width: 0;
-    background: var(--bg); border: 2px solid var(--ck-ink); border-radius: 20px;
-    box-shadow: 4px 4px 0 var(--ck-ink); overflow: clip;
-    font-family: var(--font-round); color: var(--ck-ink);
-  }
   .ck-green { color: var(--ck-green-ink); }
   .ck-amber { color: var(--ck-amber); }
   .ck-red   { color: var(--mny-figure); }
-  .ck-blue  { color: var(--ink-accent-blue); }
   .ck-spacer { flex: 1; }
 
-  /* ── header: 12/16 padding, 14px gaps ── */
-  .ck-head {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    padding: 12px 16px; background: var(--ck-cream); border-bottom: 2px solid var(--ck-ink);
-  }
-  .ck-weeknav { display: flex; align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
-  .ck-weeklabel { font-size: calc(11.5px * var(--text-scale, 1)); font-weight: 800; }
-  .ck-weeksub { font-size: calc(10.5px * var(--text-scale, 1)); font-weight: 700; color: var(--accent-strong); }
   .ck-navbtn {
     width: 21px; height: 21px; padding: 0; line-height: 1;
     border: 2px solid var(--ck-ink); border-radius: 7px; background: var(--ck-paper);
     color: var(--ck-ink); font-family: inherit; font-size: max(13px, calc(12px * var(--text-scale, 1))); font-weight: 900; cursor: pointer;
   }
   .ck-navbtn:hover { background: var(--accent-yellow); }
-  .ck-chip {
-    display: flex; align-items: center; gap: 8px; min-width: 0;
-    background: var(--ck-paper); border: 2px solid var(--ck-ink); border-radius: 12px; padding: 6px 12px;
-  }
-  .ck-of { font-size: calc(12px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); }
-  .ck-xpwrap { width: 62px; }
-  .ck-xpbar { height: 7px; background: var(--surface-track); border-radius: 99px; overflow: hidden; }
-  .ck-xpfill { height: 100%; background: var(--accent-blue); }
 
-  /* ── control strip: 9/16/11 padding on #f6f0e1 ── */
-  .ck-controls {
-    display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
-    padding: 9px 16px 11px; background: var(--surface-future); border-bottom: 2px solid var(--ck-ink);
-  }
-  .ck-legend { display: flex; align-items: center; gap: 4px; font-size: calc(9.5px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-caption); }
   .ck-seg { display: flex; }
   .ck-segbtn {
     border: 2px solid var(--ck-ink); background: var(--ck-paper); color: var(--ck-ink);
@@ -6065,37 +6027,8 @@
     font-family: inherit; font-size: max(13px, calc(12.5px * var(--text-scale, 1))); font-weight: 800; padding: 8px 15px; cursor: pointer;
   }
   .ck-btn.on, .ck-btn:hover { background: var(--accent-yellow); }
-  .ck-daystrip { display: flex; gap: 6px; }
-  .ck-day {
-    flex: 1; min-width: 0; padding: 4px 0 7px; cursor: pointer;
-    border: 2px solid var(--ck-ink); border-radius: 11px; background: var(--ck-paper);
-    color: var(--ck-ink); font-family: inherit; display: block;
-  }
-  .ck-day.sel { background: var(--accent-yellow); box-shadow: inset 0 0 0 3px var(--shadow-accent-strong); }
-  .ck-day.today:not(.sel) { box-shadow: inset 0 0 0 2px var(--today-mark); }
-  .ck-dots { display: flex; gap: 5px; justify-content: center; margin-top: 5px; }
-  .ck-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    border: 2px solid var(--ck-dash); background: transparent; display: inline-block;
-  }
-  .ck-dot.on { border-color: var(--ck-ink); background: var(--ck-green-ink); }
-  .ck-dot.chore { border-color: var(--ck-ink); background: var(--ck-amber); }
 
-  /* ── body: 268px rail beside a fluid main column ── */
-  .ck-body { display: flex; align-items: stretch; }
-  .ck-main { flex: 1; min-width: 0; padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
-  .ck-rail {
-    width: 268px; flex: none; align-self: flex-start; position: sticky; top: 0;
-    border-left: 2px solid var(--ck-ink); background: var(--ck-cream);
-    padding: 14px 14px 18px; display: flex; flex-direction: column; gap: 12px;
-  }
-
-  .ck-sect { display: flex; flex-direction: column; gap: 6px; }
-  .ck-h2 { font-family: var(--font-display); font-size: calc(21px * var(--text-scale, 1)); line-height: 1.1; }
-  .ck-h2row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .ck-sub { font-size: max(13px, calc(12px * var(--text-scale, 1))); font-weight: 700; color: var(--ink-light); line-height: 1.5; }
-  .ck-note { font-size: calc(12px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); margin-top: 2px; }
-  .ck-card { background: var(--ck-paper); border: 2px solid var(--ck-ink); border-radius: 12px; padding: 9px 11px 10px; }
   .ck-empty {
     border: 2px dashed var(--ck-dash); border-radius: 13px; background: var(--ck-paper);
     padding: 14px 15px; font-size: calc(13px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-caption); line-height: 1.5;
@@ -6111,77 +6044,10 @@
   }
   .ck-pill-red { background: var(--ck-red); color: var(--ck-paper); }
 
-  .ck-check {
-    width: 28px; height: 28px; flex: none; border: 2px solid var(--ck-ink); border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: calc(14px * var(--text-scale, 1)); font-weight: 900; background: var(--ck-paper); color: var(--ink-faint);
-  }
-  .ck-check.on { background: var(--ck-green); color: var(--status-done-ink); }
-  .ck-check.ring { background: var(--ck-paper); color: var(--ck-amber); box-shadow: inset 0 0 0 3px var(--shadow-highlight); }
-
-  /* ── routines & lanes ── */
-  .ck-block, .ck-lane { border: 2px solid var(--ck-ink); border-radius: 14px; overflow: hidden; background: var(--ck-paper); }
-  .ck-block + .ck-block { margin-top: 9px; }
-  .ck-count { font-size: calc(12px * var(--text-scale, 1)); font-weight: 800; }
-  .ck-allbtn {
-    display: flex; align-items: center; gap: 6px; border: 2px solid var(--ck-ink); border-radius: 99px;
-    padding: 3px 10px 3px 4px; background: var(--ck-paper); color: var(--ck-ink);
-    font-family: inherit; font-size: calc(11.5px * var(--text-scale, 1)); font-weight: 800; cursor: pointer;
-  }
-  .ck-allbtn .ck-check { width: 22px; height: 22px; border-radius: 7px; font-size: calc(12px * var(--text-scale, 1)); }
-  /* The day-level copy: same control, but it closes the whole day, so it reads
-     as the primary one rather than a fourth peer of the three per-block ones. */
-  .ck-allday { background: var(--bg2); border-width: 2.5px; }
-  .ck-item {
-    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-    padding: 8px 11px; border: 0; border-top: 1px solid var(--border-item);
-    background: var(--ck-paper); color: var(--ck-ink); font-family: inherit; cursor: pointer;
-  }
-  .ck-item:first-child { border-top: 0; }
-  .ck-item.on { background: var(--status-done-wash); }
-  .ck-item-icon { font-size: calc(19px * var(--text-scale, 1)); flex: none; }
-  .ck-item-name { flex: 1; min-width: 0; font-size: calc(15px * var(--text-scale, 1)); font-weight: 800; }
   .ck-item-due { display: block; font-size: calc(11px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); }
-  .ck-item-note { font-size: calc(10.5px * var(--text-scale, 1)); font-weight: 700; color: var(--ck-green-ink); }
-  .ck-lanes { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
-  .ck-lanes > .ck-lane { flex: 1; min-width: 240px; }
-
-  /* ── chores: layout C ── */
-  .ck-chore { border: 2px solid var(--ck-ink); border-radius: 13px; background: var(--ck-paper); }
-  .ck-chore + .ck-chore { margin-top: 8px; }
-  .ck-chore-graded { background: var(--status-done-wash); }
-  .ck-chore-claimed { background: var(--surface-warm); }
-  .ck-chore.open { background: var(--ck-cream); box-shadow: 0 0 0 3px var(--shadow-highlight); }
-  .ck-chore-row {
-    display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
-    padding: 11px 13px; border: 0; background: transparent; color: var(--ck-ink);
-    font-family: inherit; cursor: pointer;
-  }
-  .ck-chore-row .ck-check { width: 30px; height: 30px; border-radius: 9px; font-size: calc(16px * var(--text-scale, 1)); }
-  .ck-chore-icon { font-size: calc(22px * var(--text-scale, 1)); flex: none; }
-  .ck-chore-name { flex: 1; min-width: 0; font-size: calc(16px * var(--text-scale, 1)); font-weight: 800; }
-  .ck-chore-status { display: block; font-size: calc(11.5px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); }
   .ck-chore-pay { font-size: calc(14px * var(--text-scale, 1)); font-weight: 800; }
-  .ck-quality { padding: 0 13px 12px; }
-  .ck-qbtn {
-    flex: 1; height: 46px; border: 2px solid var(--ck-ink); border-radius: 10px;
-    background: var(--ck-paper); color: var(--ck-ink); font-family: inherit; cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  }
-  .ck-qbtn:hover { background: var(--ck-cream); }
-  .ck-qbtn.on { background: var(--ck-green); color: var(--status-done-ink); }
-  .ck-qword { font-size: calc(13px * var(--text-scale, 1)); font-weight: 800; text-align: center; line-height: 1.15; }
-  .ck-qpay { font-size: calc(10.5px * var(--text-scale, 1)); font-weight: 700; opacity: 0.75; }
 
-  /* ── learning, training, loops ── */
-  .ck-learn, .ck-loop {
-    display: flex; align-items: center; gap: 11px;
-    border: 2px solid var(--ck-ink); border-radius: 13px; background: var(--ck-paper); padding: 8px 12px;
-  }
-  .ck-learn + .ck-learn, .ck-loop + .ck-loop { margin-top: 7px; }
-  .ck-learn.on { background: var(--status-done-wash); }
-  .ck-training { border: 2px solid var(--ck-ink); border-radius: 14px; background: var(--surface-training); padding: 11px 13px; }
-  .ck-rates { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+  /* ── ratings ── */
   .ck-raterow { display: flex; gap: 4px; margin-top: 5px; }
   .ck-rate {
     width: 34px; height: 34px; border: 2px solid var(--ck-ink); border-radius: 9px;
@@ -6190,141 +6056,35 @@
   }
   button.ck-rate:hover { background: var(--ck-cream); }
   .ck-rate.on { background: var(--accent-blue); color: var(--ink-on-blue); }
-  .ck-ratebox { background: var(--ck-paper); border: 2px solid var(--ck-ink); border-radius: 12px; padding: 6px 13px; }
 
-  /* ── week grid: 176px label column, 56px week column ── */
+  /* ── week grid ── */
   .ck-gridwrap { overflow-x: auto; }
-  .ck-grid { min-width: 640px; display: flex; flex-direction: column; gap: 3px; }
-  .ck-grid-row { display: grid; grid-template-columns: 176px repeat(7, minmax(38px, 1fr)) 56px; gap: 3px; align-items: center; }
-  .ck-grid-head { margin-bottom: 3px; }
   .ck-grid-dh { text-align: center; font-size: calc(10.5px * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); }
   .ck-grid-dh small { display: block; font-size: calc(9.5px * var(--text-scale, 1)); font-weight: 700; }
-  .ck-grid-lane { display: flex; flex-direction: column; gap: 3px; margin-top: 7px; }
-  .ck-grid-lanehead {
-    font-size: calc(10px * var(--text-scale, 1)); font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase;
-    color: var(--ck-ink); background: var(--accent-yellow); border: 1.5px solid var(--ck-ink);
-    border-radius: 99px; padding: 1px 9px; align-self: flex-start;
-  }
   .ck-grid-label {
     display: flex; align-items: center; gap: 7px; font-size: calc(13.5px * var(--text-scale, 1)); font-weight: 800;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
   .ck-grid-icon { font-size: calc(15px * var(--text-scale, 1)); flex: none; }
-  .ck-grid-total { text-align: right; font-size: calc(12.5px * var(--text-scale, 1)); font-weight: 800; }
-  .ck-cell {
-    height: 30px; display: flex; align-items: center; justify-content: center;
-    border: 2px solid var(--ck-ink); border-radius: 8px; background: var(--ck-paper);
-    color: var(--ink-faint); font-family: inherit; font-size: calc(11px * var(--text-scale, 1)); font-weight: 800; cursor: pointer; padding: 0;
-  }
-  button.ck-cell:hover { background: var(--ck-cream); }
-  .ck-cell.done { background: var(--ck-green); color: var(--status-done-ink); }
-  .ck-cell.claimed { background: var(--ck-cream); color: var(--accent-strong); box-shadow: inset 0 0 0 3px var(--shadow-highlight); }
-  .ck-legend2 {
-    display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px;
-    font-size: calc(11px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light);
-  }
-
-  /* ── history drawer ── */
-  .ck-history { margin: 0 16px; background: var(--ck-cream); border-radius: 15px; padding: 12px 14px; }
-  .ck-hist-row {
-    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-    border: 2px solid var(--ck-ink); border-radius: 11px; background: var(--ck-paper);
-    color: var(--ck-ink); font-family: inherit; padding: 7px 11px; cursor: pointer; margin-top: 5px;
-  }
-  .ck-hist-row:hover { background: var(--accent-yellow); }
-  .ck-hist-label { font-size: calc(12.5px * var(--text-scale, 1)); font-weight: 800; min-width: 56px; }
-  .ck-hist-detail { flex: 1; font-size: calc(10.5px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); }
   .ck-hist-total { font-family: var(--font-display); font-size: calc(20px * var(--text-scale, 1)); line-height: 1; }
-
-  /* ── the earn board ── */
-  .ck-rail-cap { font-size: calc(10px * var(--text-scale, 1)); font-weight: 800; letter-spacing: 0.9px; text-transform: uppercase; color: var(--accent-strong); }
   .ck-rail-total { font-family: var(--font-display); font-size: calc(40px * var(--text-scale, 1)); line-height: 1.05; }
-  .ck-barwrap { position: relative; margin-top: 7px; }
-  .ck-bar {
-    display: flex; height: 20px; border: 2px solid var(--ck-ink); border-radius: 99px;
-    overflow: hidden; background: var(--surface-track);
-  }
-  .ck-barseg { height: 100%; }
-  .ck-ceil {
-    position: absolute; top: -3px; bottom: -3px; width: 3px; background: var(--ck-ink);
-    border-radius: 2px; transform: translateX(-50%);
-  }
-  .ck-keys { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-  .ck-key { font-size: calc(9.5px * var(--text-scale, 1)); font-weight: 800; border: 1.5px solid var(--ck-ink); border-radius: 99px; padding: 2px 8px; }
   .ck-risk {
     margin-top: 8px; padding-top: 7px; border-top: 2px dashed var(--ck-line);
     font-size: calc(12px * var(--text-scale, 1)); font-weight: 800; color: var(--status-warn-strong); line-height: 1.45;
   }
-  .ck-ledger { display: flex; flex-direction: column; gap: 5px; }
-  .ck-sparkrow { display: flex; align-items: flex-end; gap: 4px; height: 42px; margin-top: 5px; }
-  .ck-spark { flex: 1; background: var(--accent-yellow); border: 1.5px solid var(--ck-ink); border-radius: 3px 3px 0 0; }
-  .ck-spark.now { background: var(--ck-green); }
-  .ck-xpcard { border-top: 2px solid var(--ck-ink); border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; padding: 11px 0 0; }
-  .ck-xprow { display: flex; align-items: baseline; gap: 7px; margin: 2px 0 4px; }
-  .ck-xprow .ck-rail-total { font-size: calc(30px * var(--text-scale, 1)); }
-  .ck-privcap { margin-top: 9px; padding-top: 8px; border-top: 2px dashed var(--ck-dash); }
-  .ck-priv {
-    display: flex; align-items: center; gap: 7px; border: 2px solid var(--ck-ink);
-    border-radius: 10px; padding: 5px 9px; background: var(--surface-track); margin-top: 4px;
-  }
-  .ck-priv.on { background: var(--ck-paper); }
 
   /* ═══ In a hand ═══
-     Below 700px the rail moves under the work and every control grows to a
-     44px tap target. The mock's proportions survive; its exact pixel sizes
-     do not, because a 21px arrow is not something a thumb can hit. */
+     Below 700px every control grows to a 44px tap target. The mock's
+     proportions survive; its exact pixel sizes do not, because a 21px arrow
+     is not something a thumb can hit. */
   @media (max-width: 700px) {
-    .ck-tab { border-radius: 16px; box-shadow: 3px 3px 0 var(--ck-ink); }
-    .ck-head { padding: 10px 12px; gap: 10px; }
-    .ck-chip { flex: 1; justify-content: center; padding: 8px 10px; }
     .ck-navbtn { width: 36px; height: 36px; border-radius: 9px; font-size: calc(16px * var(--text-scale, 1)); }
-    .ck-weeklabel { font-size: calc(13px * var(--text-scale, 1)); }
-    .ck-weeksub { font-size: calc(11.5px * var(--text-scale, 1)); }
-
-    .ck-controls { padding: 10px 12px 12px; gap: 10px; }
     .ck-segbtn { flex: 1; min-height: 44px; padding: 12px 0; font-size: calc(15px * var(--text-scale, 1)); }
     .ck-seg { width: 100%; }
     .ck-btn { min-height: 44px; padding: 12px 16px; font-size: calc(14px * var(--text-scale, 1)); }
-    .ck-daystrip { gap: 4px; }
-    .ck-day { min-height: 56px; padding: 6px 0 8px; }
-    .ck-legend { display: none; }          /* the dots are labelled in the week view */
-
-    .ck-body { flex-direction: column; }
-    .ck-main { padding: 12px 12px 16px; }
-    .ck-rail {
-      width: auto; position: static; border-left: 0;
-      border-top: 2px solid var(--ck-ink); padding: 14px 12px 18px;
-    }
-
-    .ck-h2 { font-size: calc(24px * var(--text-scale, 1)); }
     .ck-sub { font-size: calc(13px * var(--text-scale, 1)); }
-    .ck-lanes { flex-direction: column; }
-    .ck-lanes > .ck-lane { width: 100%; min-width: 0; }
-
-    /* Tap targets. Everything a thumb aims at clears 44px. */
-    .ck-item { min-height: 52px; padding: 10px 12px; }
-    .ck-item-name { font-size: calc(16px * var(--text-scale, 1)); }
-    .ck-check { width: 32px; height: 32px; font-size: calc(16px * var(--text-scale, 1)); }
-    .ck-chore-row { min-height: 60px; padding: 12px 13px; }
-    .ck-chore-row .ck-check { width: 34px; height: 34px; }
-    .ck-chore-name { font-size: calc(17px * var(--text-scale, 1)); }
-    .ck-chore-status { font-size: calc(12.5px * var(--text-scale, 1)); }
-    .ck-qbtn { height: 56px; }
-    .ck-qword { font-size: calc(13.5px * var(--text-scale, 1)); }
-    .ck-allbtn { min-height: 36px; }
     .ck-rate { width: 44px; height: 44px; font-size: calc(15px * var(--text-scale, 1)); }
-    .ck-hist-row { min-height: 48px; }
-
-    /* The three quality words stack rather than squeezing to two characters. */
-    .ck-qbtn { flex-direction: row; gap: 8px; height: 50px; }
-
     .ck-rail-total { font-size: calc(46px * var(--text-scale, 1)); }
-    .ck-history { margin: 0 12px; }
-  }
-  /* The narrowest phones still in use — an iPhone SE is 375px. */
-  @media (max-width: 380px) {
-    .ck-dots { gap: 3px; }
-    .ck-dot { width: 7px; height: 7px; }
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -6623,7 +6383,6 @@
     --fs-scale: 1.2;
   }
   /* A few fixed-size chips would clip their label at 1.2x — let them grow. */
-  #screen-parent .ck-key,
   #screen-meeting .mny-tab-tag, #screen-mymoney .mny-tab-tag,
   #screen-moneyschool .mny-tab-tag,
   #screen-meeting .cp-gbtn {
@@ -6711,10 +6470,8 @@
      chore tab and the parent portal. Scoping the rule to the chore tab left the
      portal copy at 36x36 — the reason the assertion checks the portal too. */
   .ck-navbtn,                        /* the 36x36 week arrows — the worst offender */
-  .ck-allbtn,
   .ck-segbtn,
   .ck-btn,
-  .ck-day,
   .cp-gbtn,
   .mny-back,
   .mny-tab,

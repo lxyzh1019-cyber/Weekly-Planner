@@ -5120,7 +5120,7 @@ function findChromium() {
       // measure height only, which is how a 36x36 week arrow passed for months:
       // tall enough was never the problem, wide enough was.
       document.querySelectorAll(
-        '.ck-chore-row, .ck-qbtn, .ck-day, .ck-segbtn, .ck-item, .ck-rate, .ck-navbtn,' +
+        '.ck-segbtn, .ck-rate, .ck-navbtn,' +
         '.cp-gbtn, .cp-kid, .co-lane, .co-who, .ck-else-btn'
       ).forEach(el => {
         const r = el.getBoundingClientRect();
@@ -11339,8 +11339,14 @@ function findChromium() {
       const chip = document.querySelector('#tdWrap [data-td-action="waiting"]');
       if (!chip || !/2\D*with Mum/.test(chip.textContent)) bad.push(`Today's ⏳ chip reads "${chip ? chip.textContent.trim() : 'nothing'}", want 2 with Mum`);
       else {
+        // Tuesday's dishes are the first thing waiting, so the tap opens the
+        // Week tab's chores report, not Today's jobs card (newAffordancesActuallyNavigate
+        // checks where each case lands).
+        const wasChoresOpen = localStorage.getItem(WK_CHORES_LS_KEY);
         chip.click();
-        if (!document.getElementById('screen-today').classList.contains('active')) bad.push('the ⏳ chip left Today');
+        if (!document.getElementById('screen-week').classList.contains('active')) bad.push('the ⏳ chip, Tuesday waiting, did not open the Week tab');
+        if (wasChoresOpen == null) localStorage.removeItem(WK_CHORES_LS_KEY);
+        else localStorage.setItem(WK_CHORES_LS_KEY, wasChoresOpen);
       }
 
       /* Say when she last looked, rather than inheriting it from a render.
@@ -11812,28 +11818,61 @@ function findChromium() {
     mmHide();
     e.overrides = {};
 
-    // Her ⏳ "with Mum" chip stays on Today and brings the jobs card into view
-    // (it jumped to a day on the Chores screen until PR 2b retired it).
+    /* Her ⏳ "with Mum" chip counts the whole week, so it goes to the first day
+       with something waiting: today's → the jobs card on Today; an earlier
+       day's → the Week tab's 🧹 Chores this week report (it jumped to that day
+       on the Chores screen until PR 2b). Either way the waiting chore's label
+       must be on screen where the tap lands. The clock is pinned to Thursday so
+       "today" and "an earlier day" exist whatever date the suite runs on. */
     profile = 'jess';
-    e.chores = {}; e.claims = {};
-    mrSetClaim(kid, wk, 4, 'mop', 3);
-    goToday(); window.scrollTo(0, 0);
-    const waitChip = document.querySelector('#tdWrap [data-td-action="waiting"]');
-    const jobsCard = document.querySelector('#tdWrap .td-jobs');
-    let waitingLanded = 'no ⏳ chip on Today';
-    if (waitChip && !jobsCard) waitingLanded = 'no jobs card on Today';
-    else if (waitChip) {
-      const bar = document.querySelector('#screen-today .topbar');
-      const want = Math.max(0, Math.min(
-        jobsCard.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0),
-        document.documentElement.scrollHeight - window.innerHeight));
-      waitChip.click();
-      waitingLanded = !document.getElementById('screen-today').classList.contains('active') ? 'it left Today'
-        : Math.abs(window.scrollY - want) > 2 ? `scrolled to ${Math.round(window.scrollY)}, the jobs card is at ${Math.round(want)}`
-        : '';
+    const RealDate = Date;
+    const [py, pm, pdd] = getDayKeys(0)[3].split('-').map(Number);
+    const when = new RealDate(RealDate.UTC(py, pm - 1, pdd, 19, 0, 0));   // Thursday, midday in Edmonton
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    const wasChoresOpen = localStorage.getItem(WK_CHORES_LS_KEY);
+    const labelInView = (rootSel, label, barSel) => {
+      const root = document.querySelector(rootSel);
+      if (!root) return `${rootSel} is not there`;
+      const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walk.nextNode()) && !node.textContent.includes(label)) {}
+      if (!node) return `"${label}" is not in ${rootSel}`;
+      const range = document.createRange(); range.selectNodeContents(node);
+      const r = range.getBoundingClientRect();
+      const bar = document.querySelector(barSel);
+      const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+      return (r.width > 0 && r.top >= top - 1 && r.bottom <= window.innerHeight + 1) ? ''
+        : `"${label}" is at ${Math.round(r.top)}–${Math.round(r.bottom)}, the screen shows ${Math.round(top)}–${window.innerHeight}`;
+    };
+    const tapWaiting = (dayIdx, choreId) => {
+      e.chores = {}; e.claims = {};
+      mrSetClaim(kid, wk, dayIdx, choreId, 3);
+      const label = (mrPoolRow(choreId, wk) || {}).label || choreId;
+      goToday(); window.scrollTo(0, 0);
+      const chip = document.querySelector('#tdWrap [data-td-action="waiting"]');
+      if (!chip) return 'no ⏳ chip on Today';
+      chip.click();
+      if (dayIdx === 3) {
+        return !document.getElementById('screen-today').classList.contains('active') ? 'it left Today'
+          : labelInView('#tdWrap .td-jobs', label, '#screen-today .topbar');
+      }
+      return !document.getElementById('screen-week').classList.contains('active') ? 'it did not open the Week tab'
+        : document.getElementById('weekChoresBody')?.hidden !== false ? 'the 🧹 Chores this week report is not open'
+        : labelInView('#weekChoresBody', label, '#screen-week .topbar');
+    };
+    let waitToday, waitEarlier;
+    try {
+      waitToday = tapWaiting(3, 'mop');
+      waitEarlier = tapWaiting(1, 'dishes');
+    } finally {
+      Date = RealDate;
+      if (wasChoresOpen == null) localStorage.removeItem(WK_CHORES_LS_KEY);
+      else localStorage.setItem(WK_CHORES_LS_KEY, wasChoresOpen);
+      e.chores = {}; e.claims = {};
+      goToday(); window.scrollTo(0, 0);
     }
-    const toWaiting = waitingLanded === '';
-    window.scrollTo(0, 0);
     // The short-block training chip → the sheet with all four checks on it.
     profile = 'jenn'; parentViewing = 'jenn';
     const dk = getDayKeys(0)[1];
@@ -11851,7 +11890,8 @@ function findChromium() {
     const problems = [];
     if (!toTheChange) problems.push('"See the change" on an override notice does not reach the money screen with that row open — landed on '
       + mmStepId() + ', row ' + String(mnyExpandRow));
-    if (!toWaiting) problems.push('her ⏳ "with Mum" chip does not bring the jobs card on Today into view: ' + waitingLanded);
+    if (waitToday) problems.push(`her ⏳ "with Mum" chip, today's chore waiting, does not show it on the jobs card: ${waitToday}`);
+    if (waitEarlier) problems.push(`her ⏳ "with Mum" chip, an earlier day's chore waiting, does not show it in the Week tab's chores report: ${waitEarlier}`);
     if (!toSheet) problems.push('the training chip on a short block does not open the sheet with all four checks on it');
     return problems.length ? problems : true;
   });
