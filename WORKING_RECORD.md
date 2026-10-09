@@ -18,6 +18,11 @@ Single working record for this repository. Updated by the main session at the en
 - [superseded by v6] The part runner sets the screen size and print view back to normal before every test, so a test that only changes those counts as look-only; the seam capture decides the rest (owner choice c, 2026-10-08) — search: view back to normal
 - [superseded by v6] One measuring run on GitHub; if start-up plus repeated tests is still over 200 s, allow those jobs over 5 minutes for now and add a later stage where the slowest tests set up their own data — search: still over 200
 
+- [agreed] Night check 2026-10-08 ("all as recommended"): girls lose the old Chores view of past weeks (past weeks stay in Money story; parents see History) — search: old Chores view of past weeks
+- [agreed] Night check 2026-10-08: parent money-board controls (remove competition, remove fine, goal and bonus) keep working from the parent screens; only branches the dead-actions check proves unused are removed — search: parent money-board controls
+- [agreed] Night check 2026-10-08: anything reachable only on Chores and not in the relocation map is kept and asked about in the morning — search: not in the relocation map
+- [agreed] Night check 2026-10-08: Plan v7 is shown in the morning (build-number hiding in Stage 36; Stage 38 wording "in parts" fixed) — search: Plan v7 in the morning
+- [agreed] Night check 2026-10-08: the header pictures page for Stage 17 is made overnight — search: header pictures page overnight
 - [agreed] Owner yes 2026-10-08: the picture test hides the build number, so a new build number needs no new reference pictures; goes into Stage 36 (clean-up and guards) at the next Plan version — search: hides the build number
 - [agreed] [in v6] Owner choice B (2026-10-08): stop splitting the smoke test by repeats; remove the repeat-and-compare system; one smoke job per date again, about 8 minutes accepted — search: one smoke job per date
 - [agreed] [in v6] Keep the short test loop, the test map and the time tool; a read-only check finds why the 2026-10-07 job took 20 minutes, and that is fixed — search: took 20 minutes
