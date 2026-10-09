@@ -113,6 +113,23 @@
     --z-overlay:  400;
     --z-toast:    999;
 
+    /* Consistency PR 3 — the component kit's names (.ui-*, .ph-*; nothing
+       reads them yet). Shared by both looks: a size or a layer is not a
+       look's. Each layer equals the z-index that layer uses today, so moving
+       a surface onto its name changes no stacking: the header is the sticky
+       .topbar (100), the nav the kid's bottom bar .kid-nav (60), a sheet the
+       .overlay (300), a dialog #appDialogOverlay (500). */
+    --radius-pill: var(--radius-full);
+    --z-header: 100;
+    --z-nav:    60;
+    --z-sheet:  300;
+    --z-dialog: 500;
+    /* The page header: 64px on the iPad and at 700–1099px, 56px on a phone
+       (≤699px, set beside the kit's classes); the sub-bar is 48px everywhere. */
+    --hdr-h: 64px;
+    --hdr-sub-h: 48px;
+    --hdr-title-rem: 1.75rem;
+
     /* ════ Look tokens (Stage 1, looks-calm-pop) ════
        Every colour and font in this file reads one of these; each holds
        today's value. They are named by ROLE, so a look can give each role
@@ -7446,6 +7463,125 @@
 .td-else-earlier-list {
   margin: 0.1rem 0 0.4rem 0.3rem; padding-left: 0.5rem;
   border-left: 3px dashed var(--ink-light);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE COMPONENT KIT — Consistency PR 3 (no visible change)
+   One button, chip, tab row, card, section head, sheet, kid switch and
+   stepper (.ui-*), and the page header pageHeader draws (.ph-*, js/47-header.js).
+   Nothing uses them yet: PRs 4–12 move one surface at a time onto them and
+   delete that surface's own classes. Token-driven only — colours, fonts,
+   radii, borders, layers and header sizes all read a :root or look token, so
+   both looks reach every piece. Every target is at least 44px. The header is
+   kept minimal until its picture is approved (Stage 17).
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 699px) {
+  :root { --hdr-h: 56px; --hdr-title-rem: 1.45rem; }
+}
+
+.ui-btn {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 44px; min-width: 44px; padding: 0 var(--space-4);
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-btn) solid var(--ink); border-radius: var(--radius-btn);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
+  cursor: pointer;
+}
+.ui-btn--primary { background: var(--btn-main); color: var(--btn-main-ink); }
+.ui-btn--secondary { background: var(--paper); color: var(--ink); }
+.ui-btn--danger { background: var(--status-danger-wash); color: var(--status-danger-ink); border-color: var(--status-danger-ink); }
+.ui-btn--icon { width: 44px; padding: 0; }
+/* The money size: 54px in a money row, 66px for a two-line action button. */
+.ui-btn--lg { min-height: 54px; min-width: 54px; }
+.ui-btn--lg.ui-btn--two-line { min-height: 66px; flex-direction: column; gap: 0; }
+.ui-btn--icon.ui-btn--lg { width: 54px; }
+
+.ui-chip {
+  box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-1);
+  min-height: 44px; padding: 0 var(--space-3);
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(0.95rem * var(--text-scale, 1));
+  white-space: nowrap;
+}
+.ui-chip[aria-pressed="true"] { background: var(--pill-on); color: var(--pill-on-ink); }
+
+.ui-tabs { display: flex; gap: var(--space-2); }
+.ui-tabs > button {
+  box-sizing: border-box; flex: 1 1 0; min-height: 44px; padding: 0 var(--space-3);
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
+}
+.ui-tabs > button[aria-selected="true"] { background: var(--tab-on); color: var(--tab-on-ink); }
+
+.ui-card {
+  box-sizing: border-box; background: var(--paper); color: var(--ink);
+  border: var(--bw-card) solid var(--ink); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card); padding: var(--space-4);
+}
+.ui-sect-head {
+  margin: 0 0 var(--space-2); color: var(--ink);
+  font-family: var(--font-head); font-weight: var(--head-weight, 400); font-size: calc(1.25rem * var(--text-scale, 1));
+}
+
+.ui-sheet {
+  box-sizing: border-box; position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sheet);
+  max-height: 85vh; overflow-y: auto; padding: var(--space-4);
+  background: var(--paper); color: var(--ink);
+  border-top: var(--bw-card) solid var(--ink); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.ui-kids { display: inline-flex; gap: var(--space-2); }
+.ui-kids > button {
+  box-sizing: border-box; min-height: 44px; padding: 0 var(--space-3);
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
+}
+.ui-kids > button[aria-pressed="true"] { background: var(--pill-on); color: var(--pill-on-ink); }
+
+.ui-stepper { display: inline-flex; align-items: center; gap: var(--space-2); }
+.ui-stepper > button {
+  box-sizing: border-box; width: 44px; height: 44px; padding: 0;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
+}
+
+/* The page header. Its one 2.5px solid rule sits inside its own height. */
+.ph {
+  box-sizing: border-box; position: sticky; top: 0; z-index: var(--z-header);
+  background: var(--paper); color: var(--ink);
+}
+.ph::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: var(--bw-card); background: var(--ink); }
+.ph-row { box-sizing: border-box; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4); }
+.ph-main { height: var(--hdr-h); }
+.ph-sub { height: var(--hdr-sub-h); border-top: var(--bw-info) solid var(--ink); }
+.ph-title {
+  flex: 1 1 auto; min-width: 0; margin: 0; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--font-head); font-weight: var(--head-weight, 400); font-size: calc(var(--hdr-title-rem) * var(--text-scale, 1));
+}
+.ph-context { flex: 0 1 auto; white-space: nowrap; color: var(--ink-light); font-family: var(--font-text); font-size: calc(1rem * var(--text-scale, 1)); }
+.ph-actions { display: flex; gap: var(--space-2); flex: none; }
+.ph-btn, .ph-badge {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  height: 44px; min-width: 44px; padding: 0;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
+}
+.ph-badge { gap: var(--space-1); padding: 0 var(--space-3) 0 var(--space-1); border-radius: var(--radius-pill); background: var(--bg); }
+.ph-badge--avatar { width: 44px; padding: 0; }
+.ph-av { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-pill); }
+.ph--money .ph-main { height: 72px; }
+.ph--money .ph-btn { height: 54px; min-width: 54px; }
+.ph--meeting .ph-main { height: 54px; }
+.ph-r2 { height: 52px; justify-content: center; border-top: var(--bw-info) solid var(--ink); }
+.ph--parent { background: var(--accent-purple); }
+@media (max-width: 699px) {
+  .ph-row { padding: 0 var(--space-2); }
+  .ph-context { display: none; }
 }
 
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */

@@ -27375,6 +27375,76 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  // The component kit (Consistency PR 3) holds its sizes. pageHeader
+  // (js/47-header.js) draws each variant into a node of its own — appended for
+  // the measure and removed after, since a detached node has no layout — at
+  // the iPad and the phone size: standard and parent 64px / 56px (--hdr-h),
+  // money 72px, the meeting's two rows 106px, a sub-bar 48px more; every
+  // header button 44px, the money row's 54px. The kit's buttons hold 44px,
+  // `lg` 54px and `lg two-line` 66px. And nothing on the page uses the kit
+  // yet: PRs 4–12 move the screens onto it, one surface at a time.
+  if (want('theComponentKitHoldsItsSizes')) {
+    const before = page.viewportSize();
+    const problems = [];
+    for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+      await page.setViewportSize({ width: w, height: h });
+      problems.push(...await page.evaluate(([size]) => {
+        const out = [];
+        const used = document.querySelectorAll('.ph, [class*="ui-"]');
+        const kitUsers = [...used].filter(el => el.classList.contains('ph') || [...el.classList].some(c => c.startsWith('ui-')));
+        if (kitUsers.length) out.push(`${size}: ${kitUsers.length} element(s) already use the kit, e.g. ${kitUsers[0].className}`);
+        const host = document.createElement('div');
+        host.style.cssText = 'position:absolute;left:0;top:0;width:100%;visibility:hidden';
+        document.body.appendChild(host);
+        const sub = '<div class="ui-tabs"><button type="button" aria-selected="true">Week</button><button type="button">Day</button></div>';
+        const full = { back: { to: 'Week' }, title: 'My money', context: 'Wed 7 Oct', actions: [{ label: '?', aria: 'Help' }], badge: { text: 'Jenn', icon: '🐥', aria: 'Switch profile' } };
+        const phone = size === 'phone';
+        const cases = [
+          ['standard', {}, phone ? 56 : 64, 44],
+          ['standard', { sub }, (phone ? 56 : 64) + 48, 44],
+          ['parent', {}, phone ? 56 : 64, 44],
+          ['money', {}, 72, 54],
+          ['meeting', { sub }, 106, 44],
+        ];
+        for (const [variant, extra, wantH, wantBtn] of cases) {
+          host.innerHTML = pageHeader(Object.assign({ variant }, full, extra));
+          const hdr = host.querySelector('header.ph');
+          const got = hdr ? hdr.getBoundingClientRect().height : 0;
+          const label = `${size} ${variant}${extra.sub ? ' with sub-bar' : ''}`;
+          if (Math.abs(got - wantH) > 0.5) out.push(`${label}: the header is ${got}px, expected ${wantH}px`);
+          for (const b of host.querySelectorAll('.ph-btn')) {
+            const bh = b.getBoundingClientRect().height;
+            if (Math.abs(bh - wantBtn) > 0.5) out.push(`${label}: a header button is ${bh}px, expected ${wantBtn}px`);
+          }
+          const badge = host.querySelector('.ph-badge');
+          if (!badge || badge.getBoundingClientRect().height < 44) out.push(`${label}: the badge is under 44px`);
+          const row = host.querySelector('.ph-main');
+          if (row && row.lastElementChild !== badge) out.push(`${label}: the badge is not far right`);
+          const ctx = host.querySelector('.ph-context');
+          if (ctx && (getComputedStyle(ctx).display === 'none') !== phone) out.push(`${label}: the context is ${phone ? 'shown' : 'hidden'}`);
+        }
+        host.innerHTML = '<button class="ui-btn">A</button><button class="ui-btn ui-btn--lg">B</button><button class="ui-btn ui-btn--lg ui-btn--two-line">C<br>D</button>';
+        [44, 54, 66].forEach((want, i) => {
+          const bh = host.children[i].getBoundingClientRect().height;
+          if (Math.abs(bh - want) > 0.5) out.push(`${size}: kit button ${i + 1} is ${bh}px, expected ${want}px`);
+        });
+        if (!phone) {
+          const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
+          const pageScale = parseFloat(getComputedStyle(document.body).getPropertyValue('--text-scale')) || 1;
+          const titleHtml = pageHeader({ variant: 'standard', title: 'My money' });
+          host.innerHTML = titleHtml + '<div data-money-surface>' + titleHtml + '</div>';
+          const [outside, inside] = [...host.querySelectorAll('.ph-title')].map(t => parseFloat(getComputedStyle(t).fontSize));
+          if (Math.abs(inside - 1.75 * rootPx) > 0.5) out.push(`${size}: .ph-title inside a money surface is ${inside}px, expected ${1.75 * rootPx}px (1.75rem x 1)`);
+          if (Math.abs(outside - 1.75 * rootPx * pageScale) > 0.5) out.push(`${size}: .ph-title outside is ${outside}px, expected ${1.75 * rootPx * pageScale}px (1.75rem x --text-scale ${pageScale})`);
+        }
+        host.remove();
+        return out;
+      }, [size]));
+    }
+    await page.setViewportSize(before);
+    checks.theComponentKitHoldsItsSizes = problems.length ? problems : true;
+  }
+
   // The build number is on the page. The service worker answers offline from a
   // cached shell, so a device can run an old build for a long time, and "which
   // one is this?" had no answer anywhere a parent could read it. APP_BUILD

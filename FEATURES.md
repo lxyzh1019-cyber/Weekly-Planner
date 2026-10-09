@@ -323,7 +323,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 ## Data and rules
 
 - Smoke subset: SMOKE_ONLY=a,b runs only the named smoke checks, refuses an unknown name, prints PARTIAL RUN and never counts as a pass of the suite — Proof: tests/check-ci-scripts.js
-- Short loop: npm run test:fast runs the static checks (steady-share and money-surface included) and the six unit suites; npm test adds cleanup and smoke; CI runs checks, browser and one smoke job per date — Proof: tests/check-ci-scripts.js
+- Short loop: npm run test:fast runs the static checks (steady-share and money-surface included) and the seven unit suites; npm test adds cleanup and smoke; CI runs checks, browser and one smoke job per date — Proof: tests/check-ci-scripts.js
 - Dead-action guard: an onclick or data-action in the markup must name a function or handler that exists — Proof: tests/check-dead-actions.js
 - Gate runs on Windows: npm test passes in a Windows checkout with no environment variables (LF files, Node suites set UTC themselves) — Proof: none found
 - Picture test: every screen and state is shot at iPad 1194x834 and phone 390x844 in Pop and Calm and compared with tests/reference, on CI only — Proof: picture tests/reference/today-jenn-ipad-pop.png
@@ -393,6 +393,15 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Weekly pay: a chore on time and to standard pays $3, the daily cap is $3 and the streak pays the highest tier only — Proof: money.test.js "a chore on time and to standard pays $3", "the daily chore cap is $3", "the streak pays the highest tier only, never the sum"
 - Fines: twice costs nothing, the third time costs $1 and a fine can never create debt — Proof: money.test.js "twice costs nothing", "the third time costs $1", "a fine can never create debt"
 
+## Component kit (not on any screen yet)
+
+- One money format: fmtMoney (js/05-helpers.js) writes $3 for whole dollars, $2.50 otherwise, −$3 for a negative (U+2212), +$3 when signed; rounded to the cent like money2 and the same as mnyShort$ and sdD. Nothing calls it yet (PR 6) — Proof: helpers.test.js "agrees with mnyShort$ and sdD from −$500 to $500", "a negative is the minus sign U+2212, never "$-3.00""
+- One day format: fmtDay(key, 'short' | 'long' | 'weekday') writes 27 Sep, Sat 3 Oct, Sat from the key alone, the same in every time zone. Nothing calls it yet (PR 6) — Proof: helpers.test.js "long is "Sat 3 Oct" (mnyDayName)", "the same key reads the same day in every time zone"
+- kidLabel (js/01-config.js) stays the one kid-name source; mnyKidName, pcwKidName and cfKidName move onto it in PR 6 — Proof: tests/check-globals.js
+- One page header: pageHeader({variant, back, title, context, actions, badge, sub}) in js/47-header.js draws back, title, context, at most two actions and the badge far right, every text escaped, and a 48px sub-bar; variants standard (64px iPad, 56px phone), money (72px, 54px buttons), meeting (two rows, 106px) and parent (purple). Nothing calls it yet (PR 4, PR 5) — Proof: helpers.test.js "every slot combination renders in every variant (256 headers)", theComponentKitHoldsItsSizes
+- Kit classes .ui-btn (primary, secondary, icon, danger; lg 54px, lg two-line 66px), .ui-chip, .ui-tabs, .ui-card, .ui-sect-head, .ui-sheet, .ui-kids, .ui-stepper read only tokens and keep 44px targets; no screen uses them yet (PRs 7–12) — Proof: helpers.test.js "every listed kit class has a rule and every .ui-* rule is listed", theComponentKitHoldsItsSizes
+- Kit tokens in :root, shared by both looks: --radius-pill, --z-header 100, --z-nav 60, --z-sheet 300, --z-dialog 500 (each the layer's z-index today), --hdr-h 64px / 56px at ≤699px, --hdr-sub-h 48px, --hdr-title-rem (1.75rem / 1.45rem at ≤699px) times --text-scale, applied in .ph-title so a money surface's --text-scale 1 reaches it — Proof: tests/check-look-tokens.js, theComponentKitHoldsItsSizes
+
 ## Shell and build number
 
 - Build number is on the page: APP_BUILD equals SW_VERSION and prints as Build <number> on the Today More sheet and the parent App landing — Proof: theBuildNumberIsOnThePage, tests/check-sw-shell.js
@@ -420,6 +429,7 @@ The test map: for a change in the area or files named, the tests it needs before
 - Tests: `js/03-sync.js`, `js/04-merge.js`, `js/02-state.js`, `js/38-conflicts.js` → `npm run test:merge`; `SMOKE_ONLY=rapidEditsCoalesceIntoOneWrite,aDraggedBlockIsStampedSoAMergeCannotLoseIt,stampsUseServerCorrectedTime,aConflictIsAParentsToDecideNotTheClocks,cloudSizeWarnsBeforeTheCeiling`
 - Tests: money rules and data (`js/18-rules.js`, `js/19-pocket.js`, `js/20-loan.js`, `js/21-money-data.js`, `js/40-stream.js`, `js/41-record.js`, `js/42-flow.js`, `js/43-sunday-core.js`) → `npm run test:money`, `test:stream`, `test:sunday`, `test:xp`; `SMOKE_ONLY=meetingMoneyFlowEndToEnd,sundayInEqualsOut,sundayPaydayAddsUp,onePileFigureOnEveryStep,fromMyBankAddsUp,takenOffIsAlwaysNegative,theMoneyStreamAgreesWithTheWallet`
 - Tests: money screens (`js/14-money.js`, `js/15-meeting.js`, `js/22-…25-money-*.js`, `js/44-sunday.js`, `js/45-requests.js`, `js/46-grownups.js`) → the money line above plus `SMOKE_ONLY=everyMoneyControlClicksClean,noLabelIsCutOnTheMoneyScreens` (about 2 minutes on CI on their own)
+- Tests: the component kit (`fmtMoney`, `fmtDay` in `js/05-helpers.js`, `js/47-header.js`, the `.ui-*` / `.ph-*` rules and `--hdr-*` / `--z-*` tokens in `css/app.css`) → `npm run test:helpers`; `SMOKE_ONLY=theComponentKitHoldsItsSizes`
 - Tests: buffers (travel and get-ready, `js/07-week-view.js`, `js/08-day-view.js`) → `npm run test:buffers`; `SMOKE_ONLY=aBufferStripNeverCoversACard,theStripStillSaysWhenToLeave,theDayViewClipsItsBuffersTheSameWay,printBuffers`
 - Tests: Week and Day (`js/07-week-view.js`, `js/08-day-view.js`, `js/09-sheets.js`, `js/39-block-drag.js`) → `SMOKE_ONLY=weekOpensOnTheLayoutYouCanPlanIn,weekScrollsAsOneSurface,theWeekGridKeepsItsColumnFloor,draggingABlockMovesItToTheTimeItWasDroppedAt,resizingABlockChangesOnlyItsDuration,theHourLadderLinesUpWithTheSchedule,onlyTheScheduleScrollsOnTheDayScreen,narrowScreensGetOneDay,copyDayReplacesCleanly`
 - Tests: Today and the reflection (`js/31-today.js`, `js/37-reflection.js`) → `SMOKE_ONLY=todayIsTheFrontDoor,todayAnswersWhatNow,todayLeadsWithWhatIsNext,todayNamesFreeTime,todayAgreesWithTheChoreScreen,todayMoneyRowMatchesMyMoney,theReflectionIsHerAnswer,catchUpReachesThisWeekOnly`
