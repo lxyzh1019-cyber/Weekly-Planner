@@ -27428,6 +27428,15 @@ function findChromium() {
           const bh = host.children[i].getBoundingClientRect().height;
           if (Math.abs(bh - want) > 0.5) out.push(`${size}: kit button ${i + 1} is ${bh}px, expected ${want}px`);
         });
+        if (!phone) {
+          const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
+          const pageScale = parseFloat(getComputedStyle(document.body).getPropertyValue('--text-scale')) || 1;
+          const titleHtml = pageHeader({ variant: 'standard', title: 'My money' });
+          host.innerHTML = titleHtml + '<div data-money-surface>' + titleHtml + '</div>';
+          const [outside, inside] = [...host.querySelectorAll('.ph-title')].map(t => parseFloat(getComputedStyle(t).fontSize));
+          if (Math.abs(inside - 1.75 * rootPx) > 0.5) out.push(`${size}: .ph-title inside a money surface is ${inside}px, expected ${1.75 * rootPx}px (1.75rem x 1)`);
+          if (Math.abs(outside - 1.75 * rootPx * pageScale) > 0.5) out.push(`${size}: .ph-title outside is ${outside}px, expected ${1.75 * rootPx * pageScale}px (1.75rem x --text-scale ${pageScale})`);
+        }
         host.remove();
         return out;
       }, [size]));

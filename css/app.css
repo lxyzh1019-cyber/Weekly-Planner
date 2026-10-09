@@ -128,7 +128,7 @@
        (≤699px, set beside the kit's classes); the sub-bar is 48px everywhere. */
     --hdr-h: 64px;
     --hdr-sub-h: 48px;
-    --hdr-title-size: calc(1.75rem * var(--text-scale, 1));
+    --hdr-title-rem: 1.75rem;
 
     /* ════ Look tokens (Stage 1, looks-calm-pop) ════
        Every colour and font in this file reads one of these; each holds
@@ -7476,7 +7476,7 @@
    kept minimal until its picture is approved (Stage 17).
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 699px) {
-  :root { --hdr-h: 56px; --hdr-title-size: calc(1.45rem * var(--text-scale, 1)); }
+  :root { --hdr-h: 56px; --hdr-title-rem: 1.45rem; }
 }
 
 .ui-btn {
@@ -7560,7 +7560,7 @@
 .ph-sub { height: var(--hdr-sub-h); border-top: var(--bw-info) solid var(--ink); }
 .ph-title {
   flex: 1 1 auto; min-width: 0; margin: 0; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-family: var(--font-head); font-weight: var(--head-weight, 400); font-size: var(--hdr-title-size);
+  font-family: var(--font-head); font-weight: var(--head-weight, 400); font-size: calc(var(--hdr-title-rem) * var(--text-scale, 1));
 }
 .ph-context { flex: 0 1 auto; white-space: nowrap; color: var(--ink-light); font-family: var(--font-text); font-size: calc(1rem * var(--text-scale, 1)); }
 .ph-actions { display: flex; gap: var(--space-2); flex: none; }
