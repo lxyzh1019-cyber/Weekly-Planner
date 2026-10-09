@@ -27255,8 +27255,8 @@ function findChromium() {
     const bad = [];
     const count = (re) => (html.match(re) || []).length;
     if (count(/<main\b/g) !== 1) bad.push(`${count(/<main\b/g)} <main> elements, want 1`);
-    // 7 topbars, plus the parent portal's one-row <header class="parent-bar"> (Plan v9 §N).
-    if (count(/<header class="topbar/g) !== 7) bad.push(`${count(/<header class="topbar/g)} topbars are <header>, want 7`);
+    // 6 topbars (the Chores screen and its header retired in PR 2b), plus the parent portal's one-row <header class="parent-bar"> (Plan v9 §N).
+    if (count(/<header class="topbar/g) !== 6) bad.push(`${count(/<header class="topbar/g)} topbars are <header>, want 6`);
     if (count(/<header class="parent-bar"/g) !== 1) bad.push('the parent portal one-row bar is not a <header>');
     if (count(/<div class="topbar(?:\s|")/g)) bad.push('a topbar is still a <div>');
     const toggles = html.match(/<div class="(?:buffer|repeat)-toggle[^>]*>/g) || [];
@@ -27279,8 +27279,10 @@ function findChromium() {
        23: up one for Grown-ups' ✏️ fix sheets (#grownupsOverlay, Sunday v15
        Stage 4b, js/46-grownups.js), through openSheet / closeSheet too.
        24: up one for Parent › Now's 🚪 "She told me…" (#pnToldOverlay, Plan v9
-       §N, js/32-parent-now.js), through openSheet / closeSheet too. */
-    if (overlays.length !== 24) bad.push(`${overlays.length} static overlays, expected 24`);
+       §N, js/32-parent-now.js), through openSheet / closeSheet too.
+       23 again: down one when the Chores screen and its group sheet
+       (#choreGroupOverlay) retired in PR 2b. */
+    if (overlays.length !== 23) bad.push(`${overlays.length} static overlays, expected 23`);
     // Six destinations since 💰 Money became its own (Plan v9 §N).
     if (count(/role="tabpanel"/g) !== 6) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 6 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
