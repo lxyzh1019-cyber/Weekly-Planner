@@ -52,6 +52,8 @@
      noPrint  true: the header is not printed (Print's own header)
      moneySurface  true: the header is a money root (data-money-surface,
               ARCHITECTURE.md) — the money pages' and the meeting's
+     hdr      true: draw the rebuilt .hdr-* header (Stage 20, below
+              hdrPageHeader) instead of .ph-*; Today first
    `data` is { 'mny-action': 'x', … } and becomes data-mny-action="x": the
    header wires no handler of its own; the screen's delegated listener reads
    the button the way it reads its own (ARCHITECTURE.md prefers data
@@ -99,6 +101,7 @@ function phStepButton(s, glyph) {
 function pageHeader(o) {
   o = o || {};
   const variant = PH_VARIANTS.indexOf(o.variant) >= 0 ? o.variant : 'standard';
+  if (o.hdr) return hdrPageHeader(o, variant);
   const backNameHtml = o.back && o.back.named && o.back.to ? ` <span class="ph-back-to">${escapeHtml(o.back.to)}</span>` : '';
   const backHtml = o.back
     ? phButton('ph-btn ph-back', 'Back to ' + (o.back.to || ''), o.back.data, '<span aria-hidden="true">◀</span>' + backNameHtml)
@@ -129,8 +132,62 @@ function pageHeader(o) {
   return `<header class="ph ${PH_VARIANT_CLASS[variant]}${printCls}"${surfaceAttr}>${mainRowHtml}${lowerHtml}</header>`;
 }
 
+/* ── The rebuilt header (Stage 20): pageHeader({hdr: true, …}) ──
+   The same options, drawn as the owner's turn-2 picture draws them
+   (docs/handoff/header-exact-values.md, per-screen table) in new .hdr-*
+   markup, three groups on one grid row (css/app.css, THE REBUILT PAGE
+   HEADER): .hdr-start [back][lead][title] · .hdr-context in the middle of
+   the bar (the context text, or ◀ title ▶ when `step` is given — the Day's
+   date is its title) · .hdr-end [tools][actions][badge]. Both groups are
+   always drawn, so the badge is always the last thing in .hdr-end. The pilot
+   is Today; part B moves the other screens and retires the .ph form. */
+const HDR_VARIANT_CLASS = { standard: 'hdr--standard', money: 'hdr--money', meeting: 'hdr--meeting', parent: 'hdr--parent' };
+
+function hdrBadgeHtml(b) {
+  const iconHtml = b.icon ? `<span aria-hidden="true">${escapeHtml(b.icon)}</span>` : '';
+  if (b.avatar) return phButton('hdr-badge', b.aria || b.text, b.data, iconHtml, b.id);
+  const textHtml = b.text ? `${iconHtml ? ' ' : ''}<span class="hdr-badge-text">${escapeHtml(b.text)}</span>` : '';
+  return phButton('hdr-badge', b.aria, b.data, iconHtml + textHtml, b.id);
+}
+
+function hdrStepButton(s, glyph) {
+  return phButton('hdr-btn hdr-step', s && s.aria, s && s.data, `<span aria-hidden="true">${glyph}</span>`);
+}
+
+function hdrPageHeader(o, variant) {
+  const backNameHtml = o.back && o.back.named && o.back.to ? ` <span class="hdr-back-to">${escapeHtml(o.back.to)}</span>` : '';
+  const backHtml = o.back
+    ? phButton('hdr-btn hdr-back', 'Back to ' + (o.back.to || ''), o.back.data, '<span aria-hidden="true">◀</span>' + backNameHtml)
+    : '';
+  const titleAction = o.step && o.step.titleAction;
+  const titleInnerHtml = titleAction
+    ? `<button type="button" class="hdr-title-btn"${phDataAttrs(titleAction.data)} aria-label="${escapeAttr(titleAction.aria || '')}">${escapeHtml(o.title || '')}</button>`
+    : escapeHtml(o.title || '');
+  const titleHtml = o.title ? `<h2 class="hdr-title">${titleInnerHtml}</h2>` : '';
+  const leadHtml = o.lead ? `<div class="hdr-lead">${o.lead}</div>` : '';
+  const centreHtml = o.step
+    ? `<div class="hdr-context">${hdrStepButton(o.step.prev, '◀')}${titleHtml}${hdrStepButton(o.step.next, '▶')}</div>`
+    : o.context ? `<div class="hdr-context">${escapeHtml(o.context)}</div>` : '';
+  const startHtml = `<div class="hdr-start">${backHtml}${leadHtml}${o.step ? '' : titleHtml}</div>`;
+  const toolsHtml = o.tools ? `<div class="hdr-tools">${o.tools}</div>` : '';
+  const actionsHtml = (o.actions || []).slice(0, PH_MAX_ACTIONS)
+    .map(a => phButton('hdr-btn', a.aria, a.data, escapeHtml(a.label || ''), null, a.pressed))
+    .join('');
+  const actionsWrapHtml = actionsHtml ? `<div class="hdr-actions">${actionsHtml}</div>` : '';
+  const badgeHtml = o.badge ? hdrBadgeHtml(o.badge) : '';
+  const endHtml = `<div class="hdr-end">${toolsHtml}${actionsWrapHtml}${badgeHtml}</div>`;
+  const subHtml = o.sub || '';
+  const lowerHtml = !subHtml ? ''
+    : variant === 'meeting' ? `<div class="hdr-r2">${subHtml}</div>`
+    : `<div class="hdr-sub">${subHtml}</div>`;
+  const printCls = o.noPrint ? ' no-print' : '';
+  const surfaceAttr = o.moneySurface ? ' data-money-surface' : '';
+  return `<header class="hdr ${HDR_VARIANT_CLASS[variant]}${printCls}"${surfaceAttr}><div class="hdr-row">${startHtml}${centreHtml}${endHtml}</div>${lowerHtml}</header>`;
+}
+
 /* ── The kid screens' headers (PR 4) ──
    Today, Week, Day, Sister Sync and Print each keep one <header class="ph …">
+   (Today: <header class="hdr …">, the Stage 20 pilot)
    as a direct child of their screen; phMount swaps it for a fresh pageHeader
    on every render of that screen, so the header always says what the screen
    under it says. The money pages draw theirs at the top of their wrap
@@ -141,7 +198,7 @@ const KID_HEAD_SCREENS = ['screen-today', 'screen-week', 'screen-day', 'screen-s
   'screen-mymoney', 'screen-moneyschool', 'screen-moneystory'];
 
 function phMount(screenId, o) {
-  const old = document.querySelector('#' + screenId + ' > header.ph');
+  const old = document.querySelector('#' + screenId + ' > header.ph, #' + screenId + ' > header.hdr');
   if (old) old.outerHTML = pageHeader(o);
 }
 

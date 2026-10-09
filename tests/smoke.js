@@ -133,6 +133,7 @@ function findChromium() {
     weekOpensOnTheLayoutYouCanPlanIn: [],
     theComponentKitHoldsItsSizes: [],
     kidScreensHaveOneStandardHeader: [],
+    everyHeaderMeasuresToTheExactValues: [],
     moneyAndMeetingHeadersHoldTheirSizes: [],
     oneBackStackGoesWhereYouCameFrom: [],
   };
@@ -11642,7 +11643,8 @@ function findChromium() {
         const br = badge.getBoundingClientRect();
         if (br.width < 52 || br.height < 52) problems.push(`${label}: the profile badge is ${Math.round(br.width)}×${Math.round(br.height)}, under the kids' 52px`);
         const row = badge.parentElement;
-        if (!row || !row.classList.contains('ph-main') || row.lastElementChild !== badge) problems.push(`${label}: the profile badge is not far right in the header's row`);
+        // .ph-main in the .ph header; .hdr-end, the right group, in the rebuilt one (Stage 20).
+        if (!row || !(row.classList.contains('ph-main') || row.classList.contains('hdr-end')) || row.lastElementChild !== badge) problems.push(`${label}: the profile badge is not far right in the header's row`);
         const tag = (badge.tagName || '').toLowerCase();
         const hasClickPath = tag === 'button' || badge.hasAttribute('onclick')
           || (badge.getAttribute('role') === 'button' && badge.hasAttribute('tabindex'));
@@ -11661,7 +11663,7 @@ function findChromium() {
          js/99-main.js used to label every .profile-badge with no [onclick]
          filter, so a screen reader was told three <div>s opened the profile
          selector. That is the half of this defect a sighted test cannot see. */
-      const lying = [...document.querySelectorAll('.ph-badge')].filter(b => {
+      const lying = [...document.querySelectorAll('.ph-badge, .hdr-badge')].filter(b => {
         const tag = (b.tagName || '').toLowerCase();
         const isControl = tag === 'button' || tag === 'a'
           || b.hasAttribute('onclick') || b.getAttribute('role') === 'button';
@@ -11697,7 +11699,7 @@ function findChromium() {
       if (!mmHasReturn()) {
         problems.push('the meeting-return state could not be set, so the lock on the profile badges cannot be tested');
       } else {
-        const hiddenNow = () => [...document.querySelectorAll('.ph-badge')]
+        const hiddenNow = () => [...document.querySelectorAll('.ph-badge, .hdr-badge')]
           .filter(b => b.hidden).map(b => '#' + (b.id || '(unnamed)'));
 
         // It has to engage, or there is nothing to release.
@@ -11739,7 +11741,7 @@ function findChromium() {
       profile = wasProfile; parentViewing = wasViewing; ctParentKid = wasParentKid;
       weekOffset = wasOffset; syncDayIdx = wasSyncDay; currentDayKey = wasDayKey;
       closeSheet('profileSwitchOverlay');
-      document.querySelectorAll('.ph-badge').forEach(b => { b.hidden = false; });
+      document.querySelectorAll('.ph-badge, .hdr-badge').forEach(b => { b.hidden = false; });
       document.body.classList.remove('meeting-return-pending');
       goToday();
     }
@@ -11940,7 +11942,7 @@ function findChromium() {
       chip.click();
       if (dayIdx === 3) {
         return !document.getElementById('screen-today').classList.contains('active') ? 'it left Today'
-          : labelInView('#tdWrap .td-jobs', label, '#screen-today > .ph');
+          : labelInView('#tdWrap .td-jobs', label, '#screen-today > .hdr');
       }
       return !document.getElementById('screen-week').classList.contains('active') ? 'it did not open the Week tab'
         : document.getElementById('weekChoresBody')?.hidden !== false ? 'the 🧹 Chores this week report is not open'
@@ -19909,7 +19911,7 @@ function findChromium() {
            read from new Date() would name tomorrow to a child looking at today. */
         profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
         goToday();
-        const shown = (document.querySelector('#screen-today > .ph .ph-context') || {}).textContent || '';
+        const shown = (document.querySelector('#screen-today > .hdr .hdr-context') || {}).textContent || '';
         const wantWeekday = new Intl.DateTimeFormat('en-US', {
           timeZone: 'America/Edmonton', weekday: 'short',
         }).format(new Date());
@@ -27610,8 +27612,9 @@ function findChromium() {
           const heights = {};
           try {
             profile = 'jenn'; parentViewing = 'jenn';
+            /* Today moved to the rebuilt header (Stage 20 pilot); its sizes,
+               date and badge are everyHeaderMeasuresToTheExactValues'. */
             const screens = [
-              ['Today', 'screen-today', () => goToday(), false, true],
               ['Week', 'screen-week', () => { goWeek(); setWeekView('full'); }, false, true],
               ['Week preview', 'screen-week', () => { goWeek(); setWeekView('preview'); }, false, true],
               ['Day', 'screen-day', () => { goWeek(); openDay(getDayKeys(weekOffset)[0], 0); }, true, true],
@@ -27682,15 +27685,9 @@ function findChromium() {
                   closeSheet('templateOverlay');
                 }
               }
-              /* The pictures' dates: Today "Tuesday 6 October" on the iPad and
-                 "Tue 6 Oct" on a phone; the week "Oct 5 – Oct 11" on the iPad
-                 and "Oct 5 – 11" / "Sep 28 – Oct 4" on a phone. */
-              if (label === 'Today') {
-                const tk = todayKey(), td = formatDayKey(tk);
-                const wantCtx = phone ? fmtDay(tk, 'long') : `${DAY_LONG[dayIdxOfKey(tk)]} ${td.getDate()} ${MONTH_LONG[td.getMonth()]}`;
-                const known = { '2026-10-07': phone ? 'Wed 7 Oct' : 'Wednesday 7 October', '2026-10-01': phone ? 'Thu 1 Oct' : 'Thursday 1 October' }[tk];
-                if (!ctx || ctx.textContent !== wantCtx || (known && ctx.textContent !== known)) out.push(`${size} Today: the date reads ${ctx ? JSON.stringify(ctx.textContent) : 'nothing'}, expected ${JSON.stringify(known || wantCtx)}`);
-              }
+              /* The pictures' week: "Oct 5 – Oct 11" on the iPad and
+                 "Oct 5 – 11" / "Sep 28 – Oct 4" on a phone. (Today's date is
+                 everyHeaderMeasuresToTheExactValues'.) */
               if (label === 'Week' && weekOffset === 0) {
                 const wl = document.getElementById('weekRangeLabel');
                 const ks = getDayKeys(0), a = formatDayKey(ks[0]), z = formatDayKey(ks[6]), M = (d) => MONTH_SHORT[d.getMonth()];
@@ -27714,6 +27711,156 @@ function findChromium() {
     await clearLooks();
     await page.setViewportSize(before);
     checks.kidScreensHaveOneStandardHeader = problems.length ? problems : true;
+  }
+
+  /* EVERY HEADER MEASURES TO THE EXACT VALUES (Stage 20, D36: the owner's
+     picture is the specification, value for value). The values are not typed
+     here: they are read from the per-screen table in
+     docs/handoff/header-exact-values.md (from the owner's turn-2 source,
+     each value with its SRC line), row by Screen, Size and Look. Per header,
+     at 1194×834 and 390×844, in Pop and Calm: exactly one rebuilt header
+     (header.hdr, no .ph); the bar row's height, side padding and gap and the
+     solid ink rule under it (2.5px, which Chrome draws as 2px); the centre
+     (.hdr-context) within ±8px of the bar's centre, not overlapping either
+     side group, nothing pushed out of the row; the title's head font, size
+     (30px × the look's scale, 26px × on a phone) and weight; the date's body
+     font, 22px / 20px, 600, #1c2240, reading the day the family clock says;
+     the badge 52×52, #ffe4ec, 2px ink, round, emoji 24px, far right, its
+     words in the aria-label. Part A (the pilot) runs Today; part B adds every
+     screen in the table. */
+  if (want('everyHeaderMeasuresToTheExactValues')) {
+    const before = page.viewportSize();
+    const problems = [];
+    const tableFile = path.join(__dirname, '..', 'docs', 'handoff', 'header-exact-values.md');
+    const tableText = fs.readFileSync(tableFile, 'utf8');
+    const screensAt = tableText.indexOf('### Screens');
+    const rows = screensAt < 0 ? [] : tableText.slice(screensAt).split('\n')
+      .filter(l => /^\| [A-Z]/.test(l) && !/^\| Screen \|/.test(l))
+      .map(l => l.split(' | ').map(c => c.replace(/^\| ?| ?\|$/g, '').trim()))
+      .map(c => ({ screen: c[0], size: c[1], look: c[2], bar: c[4], title: c[5], centre: c[6], badge: c[9] }));
+    const num = (re, text, what) => {
+      const m = re.exec(text || '');
+      if (!m) { problems.push(`the table's ${what} cell reads ${JSON.stringify(text)}, which the check cannot read`); return null; }
+      return m.slice(1);
+    };
+    // [screen in the table, element id, how to open it]; part B adds the rest.
+    const screens = [['Today', 'screen-today', 'today']];
+    if (!rows.length) problems.push(`no per-screen table in ${tableFile}`);
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+        await page.setViewportSize({ width: w, height: h });
+        for (const [screen, id, open] of screens) {
+          const lookName = look === 'pop' ? 'Pop' : 'Calm';
+          const row = rows.find(r => r.screen === screen && r.size === size && r.look === lookName);
+          const tag = `[${look}] ${size} ${screen}`;
+          if (!row) { problems.push(`${tag}: no row in the per-screen table`); continue; }
+          const bar = num(/^([\d.]+) \+ ([\d.]+) solid (#[0-9a-f]{6}); pad 0 ([\d.]+); gap ([\d.]+)/, row.bar, `${tag} Bar`);
+          const title = num(/= ([\d.]+)px (\d{3}) (#[0-9a-f]{6})/, row.title, `${tag} Title`);
+          const centre = num(/([\d.]+)px (\d{3}) (#[0-9a-f]{6})/, row.centre, `${tag} Centre`);
+          const badge = num(/^(\d+)×(\d+) (#[0-9a-f]{6}), ([\d.]+)px (#[0-9a-f]{6}),.*emoji ([\d.]+)px/, row.badge, `${tag} Badge`);
+          if (!bar || !title || !centre || !badge) continue;
+          const want = {
+            rowH: +bar[0], rule: +bar[1], ruleInk: bar[2], pad: +bar[3], gap: +bar[4],
+            titlePx: +title[0], titleWeight: title[1], titleInk: title[2],
+            datePx: +centre[0], dateWeight: centre[1], dateInk: centre[2],
+            badgeW: +badge[0], badgeH: +badge[1], badgeBg: badge[2], badgeBorder: +badge[3], badgeInk: badge[4], emojiPx: +badge[5],
+          };
+          problems.push(...await page.evaluate(([tag, id, open, want, phone]) => {
+            const out = [];
+            const wasProfile = profile, wasViewing = parentViewing;
+            const rgb = (hex) => `rgb(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)})`;
+            const firstFamily = (f) => (f || '').split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+            const rootCs = getComputedStyle(document.documentElement);
+            const px = (v) => parseFloat(v) || 0;
+            const near = (got, exp, tol, what) => { if (Math.abs(got - exp) > tol) out.push(`${tag}: ${what} is ${Math.round(got * 100) / 100}px, the picture's ${exp}px`); };
+            try {
+              profile = 'jenn'; parentViewing = 'jenn';
+              if (open === 'today') goToday();
+              const screen = document.getElementById(id);
+              if (!screen || !screen.classList.contains('active')) { out.push(`${tag}: the screen did not open`); return out; }
+              const heads = screen.querySelectorAll('header');
+              const hdrs = screen.querySelectorAll(':scope > header.hdr.hdr--standard');
+              if (heads.length !== 1 || hdrs.length !== 1) { out.push(`${tag}: ${heads.length} headers, ${hdrs.length} rebuilt .hdr headers — want exactly one`); return out; }
+              const hdr = hdrs[0];
+              if (hdr.querySelector('[class*="ph-"]') || hdr.classList.contains('ph')) out.push(`${tag}: the header still carries old .ph classes`);
+              const row = hdr.querySelector(':scope > .hdr-row');
+              const start = row && row.querySelector(':scope > .hdr-start');
+              const ctx = row && row.querySelector(':scope > .hdr-context');
+              const end = row && row.querySelector(':scope > .hdr-end');
+              if (!row || !start || !ctx || !end) { out.push(`${tag}: the row, its left group, centre or right group is missing`); return out; }
+              // Bar: row height, padding, gap, the rule and the background.
+              const hs = getComputedStyle(hdr), rs = getComputedStyle(row);
+              const rowH = row.getBoundingClientRect().height;
+              near(rowH, want.rowH, 0.5, 'the bar row');
+              // Chrome draws a 2.5px border as 2px (it does in the owner's picture too).
+              const rule = px(hs.borderBottomWidth);
+              if (rule > want.rule + 0.01 || rule < Math.floor(want.rule) - 0.01) out.push(`${tag}: the rule under the bar is ${rule}px, the picture's ${want.rule}px (Chrome draws ${Math.floor(want.rule)}px)`);
+              if (hs.borderBottomStyle !== 'solid' || hs.borderBottomColor !== rgb(want.ruleInk)) out.push(`${tag}: the rule is ${hs.borderBottomStyle} ${hs.borderBottomColor}, the picture's solid ${want.ruleInk}`);
+              near(hdr.getBoundingClientRect().height, rowH + rule, 0.5, 'the header (row and rule)');
+              if (hs.backgroundColor !== 'rgb(255, 255, 255)') out.push(`${tag}: the bar is ${hs.backgroundColor}, the picture's #fff`);
+              near(px(rs.paddingLeft), want.pad, 0.01, 'the bar left padding');
+              near(px(rs.paddingRight), want.pad, 0.01, 'the bar right padding');
+              near(px(rs.columnGap), want.gap, 0.01, 'the bar gap');
+              // The centre sits in the middle of the BAR, between the two groups.
+              const hr = hdr.getBoundingClientRect(), cr = ctx.getBoundingClientRect();
+              const sr = start.getBoundingClientRect(), er = end.getBoundingClientRect();
+              const off = (cr.left + cr.width / 2) - (hr.left + hr.width / 2);
+              if (Math.abs(off) > 8) out.push(`${tag}: the centre is ${Math.round(off * 10) / 10}px off the bar's centre (±8px allowed)`);
+              if (sr.right > cr.left + 0.5 || cr.right > er.left + 0.5) out.push(`${tag}: the centre overlaps a side group (left ends ${Math.round(sr.right)}, centre ${Math.round(cr.left)}–${Math.round(cr.right)}, right starts ${Math.round(er.left)})`);
+              if (row.scrollWidth > row.clientWidth + 1 || er.right > hr.right - want.pad + 0.5 || sr.left < hr.left + want.pad - 0.5) out.push(`${tag}: something is pushed out of the bar`);
+              // Title.
+              const t = start.querySelector('.hdr-title');
+              if (!t) out.push(`${tag}: no title in the left group`);
+              else {
+                const tc = getComputedStyle(t);
+                near(px(tc.fontSize), want.titlePx, 0.05, 'the title size');
+                if (tc.fontWeight !== want.titleWeight) out.push(`${tag}: the title weight is ${tc.fontWeight}, the picture's ${want.titleWeight}`);
+                if (tc.color !== rgb(want.titleInk)) out.push(`${tag}: the title colour is ${tc.color}, the picture's ${want.titleInk}`);
+                if (firstFamily(tc.fontFamily) !== firstFamily(rootCs.getPropertyValue('--font-head'))) out.push(`${tag}: the title font is ${tc.fontFamily}, not the look's head font`);
+                if (t.scrollWidth > t.clientWidth + 1) out.push(`${tag}: the title "${t.textContent}" is cut`);
+              }
+              // Date.
+              const cc = getComputedStyle(ctx);
+              near(px(cc.fontSize), want.datePx, 0.05, 'the date size');
+              if (cc.fontWeight !== want.dateWeight) out.push(`${tag}: the date weight is ${cc.fontWeight}, the picture's ${want.dateWeight}`);
+              if (cc.color !== rgb(want.dateInk)) out.push(`${tag}: the date colour is ${cc.color}, the picture's ${want.dateInk}`);
+              if (firstFamily(cc.fontFamily) !== firstFamily(rootCs.getPropertyValue('--font-text'))) out.push(`${tag}: the date font is ${cc.fontFamily}, not the look's body font`);
+              if (open === 'today') {
+                /* The pictures' dates: "Tuesday 6 October" on the iPad and
+                   "Tue 6 Oct" on a phone, read from the family clock. */
+                const tk = todayKey(), td = formatDayKey(tk);
+                const wantCtx = phone ? fmtDay(tk, 'long') : `${DAY_LONG[dayIdxOfKey(tk)]} ${td.getDate()} ${MONTH_LONG[td.getMonth()]}`;
+                const known = { '2026-10-07': phone ? 'Wed 7 Oct' : 'Wednesday 7 October', '2026-10-01': phone ? 'Thu 1 Oct' : 'Thursday 1 October' }[tk];
+                if (ctx.textContent !== wantCtx || (known && ctx.textContent !== known)) out.push(`${tag}: the date reads ${JSON.stringify(ctx.textContent)}, expected ${JSON.stringify(known || wantCtx)}`);
+              }
+              // Badge.
+              const b = end.querySelector('.hdr-badge');
+              if (!b) out.push(`${tag}: no profile badge`);
+              else {
+                const bc = getComputedStyle(b), br = b.getBoundingClientRect();
+                near(br.width, want.badgeW, 0.5, 'the badge width');
+                near(br.height, want.badgeH, 0.5, 'the badge height');
+                if (bc.backgroundColor !== rgb(want.badgeBg)) out.push(`${tag}: the badge is ${bc.backgroundColor}, the picture's ${want.badgeBg}`);
+                near(px(bc.borderTopWidth), want.badgeBorder, 0.01, 'the badge border');
+                if (bc.borderTopColor !== rgb(want.badgeInk) || bc.borderTopStyle !== 'solid') out.push(`${tag}: the badge border is ${bc.borderTopStyle} ${bc.borderTopColor}, the picture's solid ${want.badgeInk}`);
+                if (bc.borderTopLeftRadius !== '50%') out.push(`${tag}: the badge corner is ${bc.borderTopLeftRadius}, not round`);
+                near(px(bc.fontSize), want.emojiPx, 0.05, 'the badge emoji');
+                if (end.lastElementChild !== b) out.push(`${tag}: the badge is not far right`);
+                if (b.tagName !== 'BUTTON' || !/, switch profile$/.test(b.getAttribute('aria-label') || '')) out.push(`${tag}: the badge is not a button named "…, switch profile"`);
+              }
+            } finally {
+              profile = wasProfile; parentViewing = wasViewing;
+              goToday();
+            }
+            return out;
+          }, [tag, id, open, want, size === 'phone']));
+        }
+      }
+    }
+    await clearLooks();
+    await page.setViewportSize(before);
+    checks.everyHeaderMeasuresToTheExactValues = problems.length ? problems : true;
   }
 
   /* THE MONEY AND MEETING HEADERS (PR 4 part 3, the owner's money and meeting

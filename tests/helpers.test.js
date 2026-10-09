@@ -210,5 +210,28 @@ const UI_KIT_CLASSES = ['ui-btn', 'ui-btn--primary', 'ui-btn--secondary', 'ui-bt
   check('every listed kit class has a rule and every .ui-* rule is listed', missing.length || unlisted.length ? { missing, unlisted } : true);
 }
 
+/* The rebuilt header (Stage 20, `hdr: true`): .hdr-* markup only, three
+   groups on one row — left (back, title), centre (context, or ◀ title ▶),
+   right (tools, actions, badge last) — every text still escaped. */
+{
+  const badge = { icon: '🐥', avatar: true, aria: 'Jenn, switch profile', id: 'todayProfileBadge', data: { 'ph-action': 'profile' } };
+  const html = pageHeader({ hdr: true, title: 'Today', context: 'Tuesday 6 October', badge });
+  check('hdr: Today draws .hdr-start title · .hdr-context date · .hdr-end badge, no .ph class',
+    html === '<header class="hdr hdr--standard"><div class="hdr-row"><div class="hdr-start"><h2 class="hdr-title">Today</h2></div>'
+      + '<div class="hdr-context">Tuesday 6 October</div><div class="hdr-end">'
+      + '<button type="button" class="hdr-badge" aria-label="Jenn, switch profile" title="Jenn, switch profile" data-ph-action="profile" id="todayProfileBadge"><span aria-hidden="true">🐥</span></button>'
+      + '</div></div></header>' || html);
+  const step = pageHeader({ hdr: true, title: 'Tue 6 Oct', back: { to: 'Week', named: true }, step: { prev: { aria: 'Previous day' }, next: { aria: 'Next day' } },
+    actions: [{ label: '📑', aria: 'Copy a day' }], badge, sub: '<i>s</i>', variant: 'meeting', noPrint: true });
+  check('hdr: step puts ◀ title ▶ in the centre, back in the left group, badge last in the right group, sub as .hdr-r2',
+    /<div class="hdr-start"><button type="button" class="hdr-btn hdr-back"[^>]*>.*<\/button><\/div><div class="hdr-context"><button type="button" class="hdr-btn hdr-step" aria-label="Previous day"/.test(step)
+      && step.includes('<h2 class="hdr-title">Tue 6 Oct</h2><button type="button" class="hdr-btn hdr-step" aria-label="Next day"')
+      && /<\/button><\/div><\/div><div class="hdr-r2"><i>s<\/i><\/div><\/header>$/.test(step)
+      && step.startsWith('<header class="hdr hdr--meeting no-print">') && !/\bph-/.test(step.replace(/data-ph-action/g, '')) || step);
+  const evil = '<img src=x onerror=alert(1)>"\'';
+  const bad = pageHeader({ hdr: true, back: { to: evil }, title: evil, context: evil, actions: [{ label: evil, aria: evil }], badge: { text: evil, icon: evil, aria: evil } });
+  check('hdr: every text is escaped', !/<img/i.test(bad) && bad.includes('&quot;&#39;') || bad);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

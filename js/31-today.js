@@ -1267,7 +1267,7 @@ function tdAnsweredCard(kid) {
 function tdShowJobs() {
   const card = document.querySelector('#tdWrap .td-jobs');
   if (!card) return;
-  const bar = document.querySelector('#screen-today > .ph');
+  const bar = document.querySelector('#screen-today > .hdr');
   const top = card.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
   window.scrollTo(0, Math.max(0, top));
 }
@@ -1323,7 +1323,10 @@ function tdRenderToday() {
      activeProfile(), so for a parent it is already whoever is being viewed; an
      unset profile gives an empty badge. The date shows on a phone too, as the
      header picture draws it (D26): "Fri 9 Oct". */
+  /* The rebuilt header (Stage 20 pilot, `hdr: true`): the owner's turn-2
+     picture value for value, the date in the middle of the bar. */
   phMount('screen-today', {
+    hdr: true,
     title: 'Today',
     context: tdHeadDate(todayKey()),
     badge: kidHeadBadge('todayProfileBadge', kid, isParent()),

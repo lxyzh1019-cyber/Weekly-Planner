@@ -135,6 +135,19 @@
     --hdr-meeting-h: 62px;
     --hdr-sub-h: 44px;
     --hdr-title-rem: 1.75rem;
+    /* The rebuilt header (.hdr-*, Stage 20), values from the per-screen table
+       in docs/handoff/header-exact-values.md (the owner's turn-2 picture):
+       the bar's side padding and gap, and the sizes the picture types in px in
+       BOTH looks — the date / week label and the badge's emoji are not
+       multiplied by the look's scale there (SRC 51, 52), only the title is.
+       They are tokens so the one size reaches both looks as drawn; phone
+       values beside the kit's ≤699px block. */
+    --hdr-pad: 18px;
+    --hdr-gap: 16px;
+    --hdr-label-size: 22px;
+    --hdr-emoji-size: 24px;
+    --hdr-glyph-size: 17px;
+    --hdr-word-size: 18px;
 
     /* ════ Look tokens (Stage 1, looks-calm-pop) ════
        Every colour and font in this file reads one of these; each holds
@@ -487,6 +500,16 @@
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--accent-yellow);
     --series-jess: var(--accent);
+    /* The rebuilt header (Stage 20; header-exact-values.md, Look values):
+       the selected cell, the badge, the meeting's ring, the date's ink and the
+       buttons' hard shadow. Badge, ring and ink are the same literals in both
+       looks in the owner's source (SRC 52, 209, 51). */
+    --sel: #ffc83d;
+    --sel-ink: #1c2240;
+    --hdr-badge-bg: #ffe4ec;
+    --hdr-ring: #ff5c8a;
+    --hdr-label-ink: #1c2240;
+    --hdr-sh: 3px 3px 0 var(--ink);
   }
 
   /* Calm: new fonts at today's size, cool graph paper, white cards and rows,
@@ -639,6 +662,14 @@
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--jenn);
     --series-jess: var(--jess);
+    /* The rebuilt header (Stage 20): navy selected with white text, the
+       2px shadow; badge, ring and ink as Pop (SRC 612, 615). */
+    --sel: #1c2240;
+    --sel-ink: #fff;
+    --hdr-badge-bg: #ffe4ec;
+    --hdr-ring: #ff5c8a;
+    --hdr-label-ink: #1c2240;
+    --hdr-sh: 2px 2px 0 var(--ink);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -6940,6 +6971,8 @@
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 699px) {
   :root { --hdr-h: 60px; --hdr-money-h: 64px; --hdr-meeting-h: 60px; --hdr-title-rem: 1.45rem; }
+  /* The rebuilt header on a phone (Today, SRC 122-125). */
+  :root { --hdr-pad: 12px; --hdr-gap: 10px; --hdr-label-size: 20px; --hdr-glyph-size: 16px; }
 }
 
 .ui-btn {
@@ -7176,6 +7209,86 @@
   #screen-week > .ph .ph-title { display: none; }
   #screen-day > .ph .ph-actions, #screen-day > .ph .ph-tools { display: none; }
   #screen-week > .ph .ph-tools { flex: 1 1 auto; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE REBUILT PAGE HEADER (.hdr-*, Stage 20) — pageHeader({hdr: true}).
+   Built new from the owner's turn-2 picture, value for value: the
+   per-screen table in docs/handoff/header-exact-values.md (SRC = the copied
+   source, docs/handoff/consistency/headers/source/header-system-turn2.dc.html).
+   The row is a 1fr auto 1fr grid: the left group (back, title) starts
+   column 1, the centre (.hdr-context: the date, a stepper, the Day's date)
+   is column 2, so it sits in the middle of the BAR rather than of the space
+   the sides leave, and the right group (tools, actions, badge) ends column
+   3. Measured by everyHeaderMeasuresToTheExactValues. The pilot is Today;
+   the other screens keep .ph until part B moves them.
+   ══════════════════════════════════════════════════════════════ */
+/* Bar: 64px (60 on a phone), #fff, a 2.5px ink rule under it (SRC 49, 122). */
+.hdr {
+  box-sizing: border-box; position: sticky; top: 0; z-index: var(--z-header);
+  background: var(--paper); color: var(--ink);
+  border-bottom: var(--bw-card) solid var(--ink);
+}
+.hdr-row {
+  box-sizing: border-box; height: var(--hdr-h); padding: 0 var(--hdr-pad);
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: var(--hdr-gap);
+}
+.hdr-start { grid-column: 1; justify-self: start; display: flex; align-items: center; gap: var(--hdr-gap); min-width: 0; }
+.hdr-context {
+  grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 10px;
+  white-space: nowrap; text-align: center;
+  font-family: var(--font-text); font-size: var(--hdr-label-size); font-weight: 600; color: var(--hdr-label-ink);
+}
+.hdr-end { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: var(--hdr-gap); }
+.hdr-lead, .hdr-actions, .hdr-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+/* Title: head font 30px × the look's scale, 700, line-height 1 (SRC 50). */
+.hdr-title {
+  margin: 0; white-space: nowrap; line-height: 1; color: var(--ink);
+  font-family: var(--font-head); font-weight: 700; font-size: calc(30px * var(--text-scale, 1));
+}
+/* The Day's date as the title, in the centre: 28px × scale (SRC 103). */
+.hdr-context > .hdr-title { min-width: 220px; text-align: center; font-size: calc(28px * var(--text-scale, 1)); }
+.hdr-title-btn {
+  display: inline-block; min-height: 52px; margin: 0; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; line-height: 52px; white-space: nowrap; cursor: pointer;
+}
+/* Buttons: 52px, white, 2px ink, radius 14, the look's hard shadow; ◀ ▶ glyph
+   17px, a word 18px (SRC 63, 100). */
+.hdr-btn {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 52px; height: 52px; padding: 0;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: 14px; box-shadow: var(--hdr-sh);
+  font-family: var(--font-text); font-size: var(--hdr-word-size); cursor: pointer;
+}
+.hdr-step { width: 52px; font-size: var(--hdr-glyph-size); }
+.hdr-back { padding: 0 16px; }
+/* Badge: 52×52 circle, pink, 2px ink, emoji 24px, no name (SRC 52). */
+.hdr-badge {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; padding: 0;
+  background: var(--hdr-badge-bg); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: 50%;
+  font-family: var(--font-text); font-size: var(--hdr-emoji-size); line-height: 1; cursor: pointer;
+}
+/* display:inline-flex outranks the browser's [hidden]; the meeting lock hides
+   a badge with `hidden` (applyMeetingLock). */
+.hdr-badge[hidden] { display: none; }
+/* Second rows: 44px; the meeting's under a 1.5px dashed rule in the page's
+   grid colour (SRC 207, 222). */
+.hdr-sub, .hdr-r2 {
+  box-sizing: content-box; height: var(--hdr-sub-h); padding: 0 var(--hdr-pad);
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-text); font-size: var(--hdr-word-size); color: var(--ink);
+}
+.hdr-sub { border-top: var(--bw-info) solid var(--ink); }
+.hdr-r2 { border-top: var(--bw-info) dashed var(--page-grid); }
+.hdr--money .hdr-row { height: var(--hdr-money-h); }
+.hdr--meeting .hdr-row { height: var(--hdr-meeting-h); }
+.hdr--parent { background: var(--accent-purple); }
+@media (max-width: 699px) {
+  /* Phone title: head font 26px × the look's scale (SRC 123). */
+  .hdr-title { font-size: calc(26px * var(--text-scale, 1)); }
 }
 
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */
