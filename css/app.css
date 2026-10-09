@@ -752,37 +752,8 @@
   }
   .topbar-left { display: flex; align-items: center; gap: 0.6rem; }
   .topbar h2 { font-size: calc(1.84rem * var(--text-scale, 1)); }
-  /* Which day it is, centred between the screen's name and whose screen it is.
-     flex:1 rather than relying on space-between, so it sits in the middle of the
-     BAR and not in the middle of whatever is left over — "Today" and the profile
-     badge are not the same width, and the date drifted with the name's length.
 
-     15px, the floor for anything a child has to read to act, and it wraps rather
-     than truncating: a date cut to "Thursday 20 Aug…" is worse than one on two
-     lines. At 390px it measures ~130px against ~178px of room, so the wrap is a
-     safety net rather than the normal case. */
-  .topbar-date {
-    flex: 1 1 auto; min-width: 0; text-align: center;
-    font-size: calc(max(15px, calc(1rem * var(--fs-scale, 1))) * var(--text-scale, 1));
-    font-weight: 700; color: var(--ink-light);
-  }
-
-  /* Day view: one sticky bar, one row inside it. */
-  #screen-day .topbar.day-topbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding-bottom: 0.45rem;
-  }
-  #screen-day .day-topbar__row1 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  /* Text that only a screen reader needs. #dayTitle is written by openDay and
-     read by the print heading, but says nothing the date line does not. */
+  /* Text that only a screen reader needs (Sister Sync's "moved" note). */
   .visually-hidden {
     position: absolute;
     width: 1px; height: 1px;
@@ -820,10 +791,6 @@
   /* Muted and struck through rather than faded: at 40% opacity the digit read
      2.4:1 (thePopLookReadsEverywhere). */
   .day-span-tab.unavailable { color: var(--ink-light); text-decoration: line-through; }
-  /* The day topbar's second row lived here, along with the "Schedule" /
-     "Activities" panel labels and the tray's bridge hint. The topbar is one row
-     now and the panels it labelled are down to one, so a label naming it would
-     be naming the only thing on screen. */
 
   /* Must chain .screen.active so #screen-day does not override .screen { display:none }. */
   /* BOUNDED, not min-height. With min-height the flex column grew to its own
@@ -967,47 +934,6 @@
       padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
     }
-    #screen-day .topbar.day-topbar {
-      padding-left: max(1rem, env(safe-area-inset-left, 0px));
-      padding-right: max(1rem, env(safe-area-inset-right, 0px));
-      padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
-    }
-    #screen-day .day-nav-center h3 {
-      min-width: 0;
-      font-size: calc(1.42rem * var(--text-scale, 1));
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact {
-      gap: 0.16rem;
-      padding-top: max(0.28rem, env(safe-area-inset-top, 0px));
-      padding-bottom: 0.22rem;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar__row1 {
-      gap: 0.38rem;
-    }
-    /* Compact tightens the bar's padding and type, never its targets: the
-       house 44px floor holds on a scrolled Day view too (Plan v7 — found when
-       the Day view joined kidScreensMeetTheHouseRules; these were 34px). */
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .btn-icon,
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .profile-badge {
-      min-height: 44px;
-      min-width: 44px;
-      font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center {
-      gap: 0.3rem;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center h3 {
-      font-size: calc(1.12rem * var(--text-scale, 1));
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-arrow {
-      min-height: 44px;
-      min-width: 44px;
-      padding: 0.16rem 0.44rem;
-      font-size: calc(0.94rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    }
     /* Landscape: the day still scrolls as ONE surface. It used to be a
        two-column grid whose lanes each had their own max-height and overflow,
        so the schedule scrolled inside a box that scrolled inside the page and a
@@ -1030,54 +956,8 @@
       padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
     }
-    #screen-week .topbar.week-topbar {
-      padding-left: max(1rem, env(safe-area-inset-left, 0px));
-      padding-right: max(1rem, env(safe-area-inset-right, 0px));
-      padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
-    }
-    #screen-week .week-topbar__row1 {
-      gap: 0.45rem;
-      flex-wrap: nowrap;
-    }
-    #screen-week .week-topbar__row1 .topbar-left {
-      flex: 0 1 auto;
-      min-width: 0;
-    }
-    /* Landscape has the width for the whole row on one line, so the tools stop
-       wrapping and the date label takes whatever is left over. */
-    #screen-week .week-topbar__tools {
-      flex-wrap: nowrap;
-      gap: 0.45rem;
-      min-width: 0;
-    }
-    #screen-week .week-nav--inline {
-      flex: 1 1 auto;
-      justify-content: center;
-      min-width: 0;
-    }
-    #screen-week .week-nav--inline h3 {
-      min-width: 0;
-      font-size: calc(1.52rem * var(--text-scale, 1));
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #screen-week .view-tab {
-      min-height: 40px;
-      padding: 0.36rem 0.88rem;
-      font-size: calc(0.96rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    }
   }
 
-  .profile-badge {
-    display: flex; align-items: center; gap: 0.4rem;
-    background: var(--bg); border-radius: 20px;
-    padding: 0.26rem 0.8rem;
-    font-weight: 600; font-size: calc(1.15rem * var(--text-scale, 1));
-    cursor: pointer;
-    border: 2px solid var(--ink);
-    transform: rotate(-1deg);
-  }
   .btn-icon {
     background: var(--paper); border: 2px solid var(--ink);
     border-radius: 12px; padding: 0.42rem 0.78rem;
@@ -1096,7 +976,6 @@
      so a child is not guessing at an emoji. */
   button:focus-visible,
   [role="button"]:focus-visible,
-  .view-tab:focus-visible,
   .filter-chip:focus-visible,
   .pill-btn:focus-visible,
   .profile-card:focus-visible {
@@ -1104,10 +983,8 @@
     outline-offset: 2px;
   }
   .btn-icon:focus-visible,
-  .view-tab:focus-visible,
   .filter-chip:focus-visible,
   .pill-btn:focus-visible,
-  .profile-badge:focus-visible,
   .btn-template:focus-visible {
     outline: 3px solid var(--accent-blue);
     outline-offset: 2px;
@@ -1158,91 +1035,11 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══════════ WEEK VIEW ═══════════ */
-  /* One row. It was two — the selector above a dashed rule, the view tabs and
-     Print below it — which cost about a third of an iPad's first screen before
-     the plan started. The tools that act on a week now sit beside the week they
-     name, and wrap together rather than as three loose items. */
-  .week-topbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.35rem;
-    padding-bottom: 0.45rem;
-  }
-  .week-topbar__row1 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .week-topbar__tools {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    flex: 1 1 auto;
-  }
-  /* Scoped to the component, not the screen: the day screen has a .btn-template
-     too, and screen-scoping a size rule is how the parent portal's copy of
-     .ck-navbtn was left at 36×36. */
-  .week-print-btn {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0.35rem 0.9rem;
-    flex: 0 0 auto;
-  }
-  .week-nav--inline {
-    padding: 0;
-    gap: 0.45rem;
-    flex-wrap: nowrap;
-  }
-  .week-nav--inline h3 {
-    font-size: calc(1.66rem * var(--text-scale, 1));
-    min-width: 9.5rem;
-    text-align: center;
-    margin: 0;
-  }
-  #screen-week .view-tabs {
-    padding: 0;
-    justify-content: center;
-    flex: 0 0 auto;
-  }
   .week-nav {
     display: flex; align-items: center; justify-content: center;
     gap: 1rem; padding: 0.8rem;
   }
   .week-nav h3 { font-size: calc(1.4rem * var(--text-scale, 1)); transform: rotate(-1deg); }
-  .day-topbar-actions {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  /* 44px, the house floor (Plan v7 — this rule's 38px beat the kid floor's
-     bare .btn-icon on the Day view's 📋 until the Day view joined the sweep). */
-  .day-topbar-actions .btn-icon {
-    padding: 0.34rem 0.62rem;
-    font-size: calc(1.16rem * var(--text-scale, 1));
-    min-height: 44px;
-    min-width: 44px;
-  }
-  /* A parent's Day badge reads `👨‍👩‍👧‍👦 Parent (Jenn)` (profileBadgeText), not
-     the old `🐥 (P)`. On one line it no longer fit beside 📋, and the pair
-     dropped to a row of their own — ~52px more bar on every phone and iPad
-     portrait. So it wraps inside the badge to `👨‍👩‍👧‍👦 Parent` / `(Jenn)` in
-     smaller type, about the width the old text took. Two ids so it also
-     beats the scrolled (compact) rule's font-size. A child's badge is short,
-     carries no class, and is untouched. Held by parentDayTopBarStaysCompact. */
-  #screen-day .day-topbar-actions #dayProfileBadge.profile-badge--parent {
-    max-width: 7.2em;
-    justify-content: center;
-    text-align: center;
-    white-space: normal;
-    line-height: 1.1;
-    padding: 0.14rem 0.55rem;
-    font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1));
-  }
   /* Rest-day toggle now lives inside the Template sheet */
   #restDayBtn.on {
     background: var(--cat-sleep);
@@ -1250,20 +1047,6 @@
     font-weight: 700;
   }
 
-  /* Weekly view toggle */
-  .view-tabs {
-    display: flex; gap: 0.3rem; padding: 0 0.8rem 0.5rem;
-    justify-content: center;
-  }
-  .view-tab {
-    background: var(--paper); border: 2px solid var(--ink);
-    border-radius: 18px; padding: 0.3rem 0.8rem;
-    cursor: pointer; font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 600;
-    font-family: var(--font-text);
-    box-shadow: 2px 2px 0 var(--ink);
-    min-height: 38px;
-  }
-  .view-tab.active { background: var(--pill-on); color: var(--pill-on-ink); }
 
   /* Time-Grid weekly view: 7-column × hour-row grid that visualizes free time */
   .tg-wrap { padding: 0 0.5rem 0.5rem; overflow-x: auto; }
@@ -2615,14 +2398,6 @@
   .wk-sig-btn--clear { background: transparent; box-shadow: none; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); border-style: dashed; }
 
   /* ═══════════ DAY EDITOR ═══════════ */
-  /* Labeled "back to week" button in the day topbar */
-  .btn-back-week {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: auto; padding: 0 0.7rem; gap: 0.25rem;
-    font-family: var(--font-text);
-    font-size: calc(0.95rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
-    white-space: nowrap;
-  }
   /* Event-zone chips — secondary jump-to filter, kept small so the schedule
      stays the focus (All Day is the default). */
 
@@ -2648,17 +2423,6 @@
   #reflectOverlay .vibe-mood { width: 44px; height: 44px; flex: 0 0 44px; }
   .obj-item.refl-block-row { flex-wrap: wrap; justify-content: space-between; font-size: calc(max(15px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
 
-  .day-nav-center {
-    display: flex; align-items: center; gap: 0.75rem;
-    flex: 1 1 auto; justify-content: center;
-  }
-  .day-nav-center h3 {
-    font-size: calc(1.6rem * var(--text-scale, 1)); margin: 0;
-    text-align: center; min-width: 9rem;
-  }
-  .day-nav-arrow {
-    font-size: calc(1.27rem * var(--text-scale, 1)); padding: 0.35rem 0.78rem;
-  }
   .btn-template {
     background: var(--accent-strong); color: var(--ink-on-strong);
     border: 2px solid var(--ink);
@@ -6290,9 +6054,7 @@
   .mny-btn,
   .mny-chip,
   .wk-sig-btn,
-  .view-tab,
-  .btn-icon,
-  .profile-badge {
+  .btn-icon {
     min-height: 44px;
     min-width: 44px;
   }
@@ -6300,14 +6062,6 @@
      a bare class can reach. Matching the selector rather than reaching for
      !important keeps the cascade readable. */
   .mny-head-btns .mny-btn { min-height: 44px; }
-  /* Same problem, found only once the sweep ran at tablet-landscape and desktop:
-     `#screen-week .view-tab` inside the >=980px landscape query is an id plus a
-     class, so a bare `.view-tab` never reached it and the view switcher stayed
-     40px on exactly the screens this app is used on. The 44px floor is not a
-     small-screen rule. */
-  @media (min-width: 980px) and (orientation: landscape) {
-    #screen-week .view-tab { min-height: 44px; }
-  }
   /* An input needs the height but must keep its own width — a number field
      sized for two digits should not stretch to 44px wide. */
   #screen-mymoney input:not([type=hidden]),
@@ -7358,10 +7112,46 @@
 .ph--meeting .ph-main { height: var(--hdr-meeting-h); }
 .ph-r2 { height: var(--hdr-sub-h); justify-content: center; border-top: var(--bw-info) solid var(--ink); }
 .ph--parent { background: var(--accent-purple); }
+/* The standard header is the kid screens' (Today, Week, Day, Sister Sync,
+   Print): its buttons and badge are 52px, the kids' tap rule. */
+.ph--standard .ph-btn, .ph--standard .ph-badge { height: 52px; min-width: 52px; }
+.ph-back, .ph-actions .ph-btn { gap: var(--space-1); padding: 0 var(--space-3); }
+.ph-badge-text { white-space: nowrap; }
+/* ◀ title ▶ (Day: the date is the title) and Week's ◀ week ▶. */
+.ph-step { display: flex; align-items: center; justify-content: center; gap: var(--space-2); flex: 1 1 auto; min-width: 0; }
+.ph-step > .ph-title { flex: 0 1 auto; text-align: center; }
+.ph-step-label {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
+}
+.ph-tools { display: flex; align-items: center; gap: var(--space-2); flex: 0 1 auto; min-width: 0; }
+.ph .ui-tabs > button { flex: none; width: 52px; height: 52px; padding: 0; font-size: calc(1.2rem * var(--text-scale, 1)); }
+.ph--standard .day-span-tab { min-height: 48px; }
+.ph-actions [data-ph-action="print-open"] { background: var(--btn-main); color: var(--btn-main-ink); }
+#screen-day > .ph { flex: none; }
+/* Below the iPad's landscape width the badge is the avatar alone, as the
+   header pictures draw it: a parent's "Parent (Jenn)" beside the Day's
+   date, 1 2 3 and 📑 left the date no room at 768px. The words stay in the
+   badge's text, and its aria-label says what it does. */
+@media (max-width: 1099px) {
+  .ph-badge { padding: 0; }
+  .ph-badge-text { display: none; }
+}
 @media (max-width: 699px) {
-  .ph-row { padding: 0 var(--space-2); }
+  .ph-row { padding: 0 var(--space-2); gap: var(--space-1); }
   .ph-context { display: none; }
   .ph--money .ph-btn { height: 52px; min-width: 52px; }
+  /* A phone drops more words (the header pictures): the back button's,
+     Week's title, the Day's 1 2 3 (one column is all a phone carries) and
+     the tab already selected — the other one is the switch. Its ◀ ▶ and ◀
+     back are 44px wide (52px tall), so the date between them has room. */
+  .ph-back-to { display: none; }
+  .ph-step { gap: 0; }
+  .ph-step-btn, .ph-back { width: 44px; min-width: 44px; padding: 0; }
+  .ph-step > .ph-title { font-size: calc(1rem * var(--text-scale, 1)); }
+  .ph .ui-tabs > [aria-selected="true"] { display: none; }
+  #screen-week > .ph .ph-title, #screen-day > .ph .day-span-tabs { display: none; }
+  #screen-week > .ph .ph-tools { flex: 1 1 auto; }
 }
 
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */

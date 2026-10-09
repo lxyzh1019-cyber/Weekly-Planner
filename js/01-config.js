@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-10-09a';
+const APP_BUILD = '2026-10-09b';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
@@ -1072,9 +1072,15 @@ function kidLabel(p) { return KID_LABEL[p] || { icon: '👤', name: String(p || 
    but 'jenn' or 'jess' gives '' — a profile not picked yet, which is what
    Today already showed; a parent's viewed child is always one of the two. */
 function profileBadgeText(kid, asParent) {
+  const parts = profileBadgeParts(kid, asParent);
+  return parts.icon ? `${parts.icon} ${parts.name}` : '';
+}
+/* The same wording in its two parts, for a header badge that draws the icon
+   as the avatar and the name beside it (pageHeader, js/47-header.js). */
+function profileBadgeParts(kid, asParent) {
   const k = KID_LABEL[kid];
-  if (!k) return '';
-  return asParent ? `👨‍👩‍👧‍👦 Parent (${k.name})` : `${k.icon} ${k.name}`;
+  if (!k) return { icon: '', name: '' };
+  return asParent ? { icon: '👨‍👩‍👧‍👦', name: `Parent (${k.name})` } : { icon: k.icon, name: k.name };
 }
 
 /* ── The school year ──────────────────────────────────────────────────────────

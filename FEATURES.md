@@ -46,7 +46,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 ## Day
 
-- The parent's Day badge is two short lines so the Day top bar keeps its height — Proof: parentDayTopBarStaysCompact
+- The Day header is the standard page header in one row: ◀ back to where the day was opened from, the date as the title between ◀ ▶, 1 2 3 days, 📑 Copy a day and the badge; a parent's badge keeps it one row at 360, 390, 768 and 1024px, and it no longer shrinks on scroll — Proof: parentDayTopBarStaysCompact, kidScreensHaveOneStandardHeader, oneBackStackGoesWhereYouCameFrom
 - A sister can be invited to watch: a watch block earns nothing, is never chased for a result and keeps the meet's own travel — Proof: aWatchedMeetIsNeverChasedForAResult, aWatchInviteNamesTheMeet
 - A watch block reads 👀 Watching — <meet>, or what the block is when no meet name was typed — Proof: aWatchInviteNamesTheMeet
 - A watch block gives no training checks and no packing list — Proof: aWatchInviteNamesTheMeet
@@ -255,7 +255,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 ## Print
 
-- Print is on the week sheet, with its travel and get-ready bands and side band — Proof: printIsOnTheWeek, printBuffers, printSideband
+- Print is on the week sheet, with its travel and get-ready bands and side band; the week's Print button shows on Print preview, the view it prints, and Print's own header (◀ back to the week, Print Week, 🖨 Print) is never printed — Proof: printIsOnTheWeek, printBuffers, printSideband
 - The parent portal prints no broken numbers — Proof: portalPrintsNoBrokenNumbers
 - Print preview looks as in the reference picture, parent iPad Pop — Proof: picture tests/reference/week-print-preview-jenn-ipad-pop.png
 
@@ -285,10 +285,12 @@ Each line says what you see or what the app does, then the test that proves it. 
 - More holds exactly Switch (and the look tile), then the build number; Chores (retired 2026-10-08), Sisters, Money story and Money school tiles are gone — Proof: moreHasNoMoneySchool
 - Money school is reached from the money head's tab and every ? explainer's Take me to Money school; All my Sundays and By month open from the passbook — Proof: explainerGoesToMoneySchoolAndBack
 - The sync tab lands on the Sister Sync screen and old routes still work — Proof: navReachesEverythingAndOldRoutesStillWork
-- Every profile badge (Today, Week, Day, Sister Sync) is a button that opens the one profile switcher and reads who is on screen, e.g. Parent (Jenn) or Jenn — Proof: everyProfileBadgeSaysTheSameThing, everyProfileBadgeSwitchesProfile
+- Every profile badge (Today, Week, Day, Sister Sync) is a 52px button far right in the header that opens the one profile switcher and reads who is on screen, e.g. Parent (Jenn) or Jenn (the avatar alone below 1100px) — Proof: everyProfileBadgeSaysTheSameThing, everyProfileBadgeSwitchesProfile
 - One writer makes every badge's text; no badge spells it out — Proof: everyProfileBadgeSaysTheSameThing
 - Nothing is announced as a control that is not one, and the meeting lock hides only the two badges and lifts for a child — Proof: everyProfileBadgeSwitchesProfile
 - Sister Sync fits in the fallback font at 375px — Proof: sisterSyncTabFitsInTheFallbackFont
+- Today, Week, Day, Sister Sync and Print each have one standard page header, one height at each size in both looks (64px iPad, 60px phone, plus its rule); no ◀ on Today, Week and Sister Sync; titles without emoji; the date hides on a phone; "Sister Sync" fits on one line at 375px — Proof: kidScreensHaveOneStandardHeader
+- One back stack: every header ◀ goes back to the screen it was opened from and says so ("Back to Week"), device-local, never in state — Proof: oneBackStackGoesWhereYouCameFrom
 - The profile picker looks as in the reference picture, iPad Pop — Proof: picture tests/reference/profile-any-ipad-pop.png
 
 ## Looks
@@ -398,7 +400,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - One money format: fmtMoney (js/05-helpers.js) writes $3 for whole dollars, $2.50 otherwise, −$3 for a negative (U+2212), +$3 when signed; rounded to the cent like money2 and the same as mnyShort$ and sdD. Nothing calls it yet (PR 6) — Proof: helpers.test.js "agrees with mnyShort$ and sdD from −$500 to $500", "a negative is the minus sign U+2212, never "$-3.00""
 - One day format: fmtDay(key, 'short' | 'long' | 'weekday') writes 27 Sep, Sat 3 Oct, Sat from the key alone, the same in every time zone. Nothing calls it yet (PR 6) — Proof: helpers.test.js "long is "Sat 3 Oct" (mnyDayName)", "the same key reads the same day in every time zone"
 - kidLabel (js/01-config.js) stays the one kid-name source; mnyKidName, pcwKidName and cfKidName move onto it in PR 6 — Proof: tests/check-globals.js
-- One page header: pageHeader({variant, back, title, context, actions, badge, sub}) in js/47-header.js draws back, title, context, at most two actions and the badge far right, every text escaped, and a 44px sub-bar under a 1.5px rule; the header ends in a 2.5px rule under its rows (2px and 1px on a 1x screen); row heights as the owner's header pictures (docs/handoff/consistency/headers/measurements.txt): standard 64px iPad / 60px phone, money 72px / 64px with 54px / 52px buttons, meeting two rows 62px / 60px + 44px, parent like standard (purple). Nothing calls it yet (PR 4, PR 5) — Proof: helpers.test.js "every slot combination renders in every variant (256 headers)", theComponentKitHoldsItsSizes
+- One page header: pageHeader({variant, back, title, context, actions, badge, sub}) in js/47-header.js draws back, title, context, at most two actions and the badge far right, every text escaped, and a 44px sub-bar under a 1.5px rule; the header ends in a 2.5px rule under its rows (2px and 1px on a 1x screen); row heights as the owner's header pictures (docs/handoff/consistency/headers/measurements.txt): standard 64px iPad / 60px phone with the kids' 52px buttons and badge, money 72px / 64px with 54px / 52px buttons, meeting two rows 62px / 60px + 44px, parent like standard (purple); step (◀ title ▶), tools, a named back and noPrint for the kid screens. Today, Week, Day, Sister Sync and Print use it (PR 4); the money pages, the meeting and the portal follow (PR 4, PR 5) — Proof: helpers.test.js "every slot combination renders in every variant (256 headers)", theComponentKitHoldsItsSizes
 - Kit classes .ui-btn (primary, secondary, icon, danger; lg 54px, lg two-line 66px), .ui-chip, .ui-tabs, .ui-card, .ui-sect-head, .ui-sheet, .ui-kids, .ui-stepper read only tokens and keep 44px targets; no screen uses them yet (PRs 7–12) — Proof: helpers.test.js "every listed kit class has a rule and every .ui-* rule is listed", theComponentKitHoldsItsSizes
 - Kit tokens in :root, shared by both looks: --radius-pill, --z-header 100, --z-nav 60, --z-sheet 300, --z-dialog 500 (each the layer's z-index today), --hdr-h 64px / 60px at ≤699px, --hdr-money-h 72px / 64px, --hdr-meeting-h 62px / 60px, --hdr-sub-h 44px, --hdr-title-rem (1.75rem / 1.45rem at ≤699px) times --text-scale, applied in .ph-title so a money surface's --text-scale 1 reaches it — Proof: tests/check-look-tokens.js, theComponentKitHoldsItsSizes
 
@@ -431,7 +433,7 @@ The test map: for a change in the area or files named, the tests it needs before
 - Tests: `js/03-sync.js`, `js/04-merge.js`, `js/02-state.js`, `js/38-conflicts.js` → `npm run test:merge`; `SMOKE_ONLY=rapidEditsCoalesceIntoOneWrite,aDraggedBlockIsStampedSoAMergeCannotLoseIt,stampsUseServerCorrectedTime,aConflictIsAParentsToDecideNotTheClocks,cloudSizeWarnsBeforeTheCeiling`
 - Tests: money rules and data (`js/18-rules.js`, `js/19-pocket.js`, `js/20-loan.js`, `js/21-money-data.js`, `js/40-stream.js`, `js/41-record.js`, `js/42-flow.js`, `js/43-sunday-core.js`) → `npm run test:money`, `test:stream`, `test:sunday`, `test:xp`; `SMOKE_ONLY=meetingMoneyFlowEndToEnd,sundayInEqualsOut,sundayPaydayAddsUp,onePileFigureOnEveryStep,fromMyBankAddsUp,takenOffIsAlwaysNegative,theMoneyStreamAgreesWithTheWallet`
 - Tests: money screens (`js/14-money.js`, `js/15-meeting.js`, `js/22-…25-money-*.js`, `js/44-sunday.js`, `js/45-requests.js`, `js/46-grownups.js`) → the money line above plus `SMOKE_ONLY=everyMoneyControlClicksClean,noLabelIsCutOnTheMoneyScreens` (about 2 minutes on CI on their own)
-- Tests: the component kit (`fmtMoney`, `fmtDay` in `js/05-helpers.js`, `js/47-header.js`, the `.ui-*` / `.ph-*` rules and `--hdr-*` / `--z-*` tokens in `css/app.css`) → `npm run test:helpers`; `SMOKE_ONLY=theComponentKitHoldsItsSizes`
+- Tests: the component kit (`fmtMoney`, `fmtDay` in `js/05-helpers.js`, `js/47-header.js`, the `.ui-*` / `.ph-*` rules and `--hdr-*` / `--z-*` tokens in `css/app.css`) → `npm run test:helpers`; `SMOKE_ONLY=theComponentKitHoldsItsSizes,kidScreensHaveOneStandardHeader,oneBackStackGoesWhereYouCameFrom`
 - Tests: buffers (travel and get-ready, `js/07-week-view.js`, `js/08-day-view.js`) → `npm run test:buffers`; `SMOKE_ONLY=aBufferStripNeverCoversACard,theStripStillSaysWhenToLeave,theDayViewClipsItsBuffersTheSameWay,printBuffers`
 - Tests: Week and Day (`js/07-week-view.js`, `js/08-day-view.js`, `js/09-sheets.js`, `js/39-block-drag.js`) → `SMOKE_ONLY=weekOpensOnTheLayoutYouCanPlanIn,weekScrollsAsOneSurface,theWeekGridKeepsItsColumnFloor,draggingABlockMovesItToTheTimeItWasDroppedAt,resizingABlockChangesOnlyItsDuration,theHourLadderLinesUpWithTheSchedule,onlyTheScheduleScrollsOnTheDayScreen,narrowScreensGetOneDay,copyDayReplacesCleanly`
 - Tests: Today and the reflection (`js/31-today.js`, `js/37-reflection.js`) → `SMOKE_ONLY=todayIsTheFrontDoor,todayAnswersWhatNow,todayLeadsWithWhatIsNext,todayNamesFreeTime,todayAgreesWithTheChoreScreen,todayMoneyRowMatchesMyMoney,theReflectionIsHerAnswer,catchUpReachesThisWeekOnly`
