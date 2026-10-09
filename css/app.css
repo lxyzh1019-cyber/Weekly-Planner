@@ -7105,6 +7105,9 @@
   font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
 }
 .ph-badge { gap: var(--space-1); padding: 0 var(--space-3) 0 var(--space-1); border-radius: var(--radius-pill); background: var(--bg); }
+/* display:inline-flex above outranks the browser's [hidden]; the meeting lock
+   hides the week's and the day's badge with `hidden` (applyMeetingLock). */
+.ph-badge[hidden] { display: none; }
 .ph-badge--avatar { width: 44px; padding: 0; }
 .ph-av { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-pill); }
 .ph--money .ph-main { height: var(--hdr-money-h); }
@@ -7115,11 +7118,20 @@
 /* The standard header is the kid screens' (Today, Week, Day, Sister Sync,
    Print): its buttons and badge are 52px, the kids' tap rule. */
 .ph--standard .ph-btn, .ph--standard .ph-badge { height: 52px; min-width: 52px; }
+/* The kid headers' badge is the round avatar at every width (D25). */
+.ph--standard .ph-badge--avatar { width: 52px; }
 .ph-back, .ph-actions .ph-btn { gap: var(--space-1); padding: 0 var(--space-3); }
 .ph-badge-text { white-space: nowrap; }
 /* ◀ title ▶ (Day: the date is the title) and Week's ◀ week ▶. */
 .ph-step { display: flex; align-items: center; justify-content: center; gap: var(--space-2); flex: 1 1 auto; min-width: 0; }
 .ph-step > .ph-title { flex: 0 1 auto; text-align: center; }
+/* The title as a button (step.titleAction): it reads as the title and keeps
+   the kids' 52px tap height. */
+.ph-title-btn {
+  display: inline-block; max-width: 100%; min-height: 52px; margin: 0; padding: 0 var(--space-1);
+  border: 0; background: none; color: inherit; font: inherit; line-height: 52px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+}
 .ph-step-label {
   min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
   font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
@@ -7129,28 +7141,30 @@
 .ph--standard .day-span-tab { min-height: 48px; }
 .ph-actions [data-ph-action="print-open"] { background: var(--btn-main); color: var(--btn-main-ink); }
 #screen-day > .ph { flex: none; }
-/* Below the iPad's landscape width the badge is the avatar alone, as the
-   header pictures draw it: a parent's "Parent (Jenn)" beside the Day's
-   date, 1 2 3 and 📑 left the date no room at 768px. The words stay in the
-   badge's text, and its aria-label says what it does. */
-@media (max-width: 1099px) {
-  .ph-badge { padding: 0; }
-  .ph-badge-text { display: none; }
+/* An iPad held upright (768px) has no room for the back button's word beside
+   the Day's longest date, 1 2 3, 📑 and the badge ("Wednesday 30 Sep"): the
+   ◀ keeps its "Back to <screen>" label, as on a phone. */
+@media (max-width: 899px) {
+  .ph-back-to { display: none; }
+  .ph-back { width: 52px; min-width: 52px; padding: 0; }
 }
 @media (max-width: 699px) {
   .ph-row { padding: 0 var(--space-2); gap: var(--space-1); }
-  .ph-context { display: none; }
+  /* Only the money header drops its date on a phone (D26). */
+  .ph--money .ph-context { display: none; }
   .ph--money .ph-btn { height: 52px; min-width: 52px; }
   /* A phone drops more words (the header pictures): the back button's,
      Week's title, the Day's 1 2 3 (one column is all a phone carries) and
-     the tab already selected — the other one is the switch. Its ◀ ▶ and ◀
-     back are 44px wide (52px tall), so the date between them has room. */
+     📑 (tapping the date is Copy a day there, D27), and the tab already
+     selected — the other one is the switch. Its ◀ ▶ and ◀ back are 44px
+     wide (52px tall), so the date between them has room. */
   .ph-back-to { display: none; }
   .ph-step { gap: 0; }
   .ph-step-btn, .ph-back { width: 44px; min-width: 44px; padding: 0; }
   .ph-step > .ph-title { font-size: calc(1rem * var(--text-scale, 1)); }
   .ph .ui-tabs > [aria-selected="true"] { display: none; }
-  #screen-week > .ph .ph-title, #screen-day > .ph .day-span-tabs { display: none; }
+  #screen-week > .ph .ph-title { display: none; }
+  #screen-day > .ph .ph-actions, #screen-day > .ph .ph-tools { display: none; }
   #screen-week > .ph .ph-tools { flex: 1 1 auto; }
 }
 

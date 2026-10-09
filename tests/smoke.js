@@ -11663,6 +11663,13 @@ function findChromium() {
         if (!locked.includes('#weekProfileBadge')) {
           problems.push('a waiting meeting did not hide the week profile switcher — a parent can press it and silently lose the sitting');
         }
+        /* `hidden` alone is not hidden: .ph-badge's display:inline-flex
+           outranks the browser's [hidden] rule, and the badge stayed on
+           screen and pressable (PR 4 review). What is drawn is asserted. */
+        const lockedBadge = document.getElementById('weekProfileBadge');
+        if (lockedBadge && lockedBadge.hidden && getComputedStyle(lockedBadge).display !== 'none') {
+          problems.push(`the locked week badge is hidden in markup but still drawn (display ${getComputedStyle(lockedBadge).display}) — a parent can still press it`);
+        }
         // …and only the two switchers the lock is about.
         const overreach = locked.filter(id => id !== '#weekProfileBadge' && id !== '#dayProfileBadge');
         if (overreach.length) {
@@ -11714,9 +11721,17 @@ function findChromium() {
         ['the day',     'dayProfileBadge',   () => openDay(getDayKeys(weekOffset)[0], 0)],
         ['Sister Sync', 'syncProfileBadge',  () => openSisterSync()],
       ];
+      /* The badge is the round avatar at every width (D25): it draws the
+         icon and says the words in its aria-label, "Jenn, switch profile".
+         `want` is profileBadgeText's wording, icon then words. */
       const expect = (who, label, id, want) => {
-        const got = (document.getElementById(id) || {}).textContent;
-        if (got !== want) problems.push(`${who} on ${label}: #${id} reads ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+        const el = document.getElementById(id) || {};
+        const [icon, ...rest] = want.split(' ');
+        const got = (el.textContent || '').trim();
+        const aria = el.getAttribute ? el.getAttribute('aria-label') : null;
+        if (got !== icon) problems.push(`${who} on ${label}: #${id} draws ${JSON.stringify(got)}, expected the avatar ${JSON.stringify(icon)} alone`);
+        if (aria !== `${rest.join(' ')}, switch profile`) problems.push(`${who} on ${label}: #${id} is labelled ${JSON.stringify(aria)}, expected ${JSON.stringify(rest.join(' ') + ', switch profile')}`);
+        if (want !== profileBadgeText(profile === 'parent' ? parentViewing : profile, profile === 'parent')) problems.push(`${who} on ${label}: profileBadgeText no longer gives ${JSON.stringify(want)}`);
       };
       const names = { jenn: 'Jenn', jess: 'Jess' };
       const icons = { jenn: '🐥', jess: '🦊' };
@@ -11750,50 +11765,58 @@ function findChromium() {
      standard page header now (PR 4), one row of a fixed height, so the budget
      is that height: the row --hdr-h (64px, 60px on a phone) and its end rule,
      the same for a parent as for the child. Nothing in the row may be pushed
-     out of it or cut: the badge shows all of its words (below 1100px only
-     the avatar, as the header pictures draw it, and keeps the words in its textContent), stays
-     52px, and the date title is never cut with an ellipsis. The bar no longer
-     shrinks on scroll (day-topbar--compact retired with the old bar), so a
-     scrolled schedule is measured too. */
+     out of it or cut: the badge is the 52px round avatar at every width
+     (D25) with its words in the aria-label, and the date title is never cut
+     with an ellipsis. Measured on the week's first day and on a wide fixed
+     day, Wednesday 30 September ("Wednesday 30 Sep" on the iPad). The bar no
+     longer shrinks on scroll (day-topbar--compact retired with the old bar),
+     so a scrolled schedule is measured too. */
   if (want('parentDayTopBarStaysCompact')) {
     const wasViewport = page.viewportSize();
     const findings = [];
     for (const look of ['pop', 'calm']) {
       await setLook(look);
-      for (const w of [360, 390, 768, 1024]) {
+      for (const w of [360, 375, 390, 768, 1024]) {
         await page.setViewportSize({ width: w, height: 844 });
         const r = await page.evaluate(() => {
           const out = [];
           const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
-          const wasReturn = mmReturn;
+          const wasReturn = mmReturn, wasOffset = weekOffset, wasStack = navReturnStack.slice();
           const phone = window.matchMedia('(max-width: 699px)').matches;
           try {
             mmReturn = null;
+            const days = [['first day', () => openDay(getDayKeys(wasOffset)[0], 0, null, wasOffset)],
+                          ['Wed 30 Sep', () => openDay('2026-09-30', 2, null, computeWeekOffsetForDayKey('2026-09-30'))]];
+            for (const [dayName, open] of days)
             for (const scrolled of [false, true]) {
               for (const who of ['parent:jenn', 'parent:jess', 'jenn', 'jess']) {
                 const [p, kid] = who.split(':');
                 profile = p; if (kid) parentViewing = kid;
-                openDay(getDayKeys(weekOffset)[0], 0);
+                open();
                 const ws = document.querySelector('#screen-day .day-workspace');
                 if (scrolled && ws) ws.scrollTop = 300;
                 const bar = document.querySelector('#screen-day > .ph');
                 const row = bar && bar.querySelector('.ph-main');
                 const b = document.getElementById('dayProfileBadge');
-                const tag = `${kid ? 'parent viewing ' + kid : kid || p}${scrolled ? ' (scrolled)' : ''}`;
+                const tag = `${dayName}, ${kid ? 'parent viewing ' + kid : kid || p}${scrolled ? ' (scrolled)' : ''}`;
                 if (!bar || !row || !b) { out.push(`${tag}: no Day header, row or badge`); continue; }
                 const want = parseFloat(getComputedStyle(row).height) + parseFloat(getComputedStyle(bar).borderBottomWidth);
                 const h = bar.getBoundingClientRect().height;
                 if (Math.abs(h - want) > 0.5) out.push(`${tag}: the Day bar is ${h}px, over its one-row ${want}px`);
                 if (Math.abs(parseFloat(getComputedStyle(row).height) - (phone ? 60 : 64)) > 0.5) out.push(`${tag}: the row is ${getComputedStyle(row).height}, expected ${phone ? 60 : 64}px`);
                 if (row.scrollWidth > row.clientWidth + 1) out.push(`${tag}: the row's things are ${row.scrollWidth}px in ${row.clientWidth}px — something is pushed out of the bar`);
-                const words = b.querySelector('.ph-badge-text');
-                if (words && getComputedStyle(words).display !== 'none' && (b.scrollWidth > b.clientWidth + 1)) out.push(`${tag}: the badge text does not fit (${b.scrollWidth} in ${b.clientWidth})`);
-                const narrow = window.matchMedia('(max-width: 1099px)').matches;
-                if (words && (getComputedStyle(words).display === 'none') !== narrow) out.push(`${tag}: the badge's words are ${narrow ? 'shown below 1100px' : 'hidden'}`);
+                if (!b.classList.contains('ph-badge--avatar') || b.querySelector('.ph-badge-text')) out.push(`${tag}: the badge is not the round avatar alone`);
+                if (!/, switch profile$/.test(b.getAttribute('aria-label') || '')) out.push(`${tag}: the badge's words are not in its aria-label (${JSON.stringify(b.getAttribute('aria-label'))})`);
                 const br = b.getBoundingClientRect();
                 if (br.width < 52 || br.height < 52) out.push(`${tag}: the badge is ${Math.round(br.width)}x${Math.round(br.height)}, under 52px`);
+                if (Math.abs(br.width - br.height) > 0.5) out.push(`${tag}: the badge is ${Math.round(br.width)}x${Math.round(br.height)}, not round`);
                 const title = bar.querySelector('.ph-title');
+                const titleBtn = bar.querySelector('.ph-title-btn');
                 if (!title || title.scrollWidth > title.clientWidth + 1) out.push(`${tag}: the date title is cut (${title ? title.textContent : 'none'})`);
+                if (titleBtn && titleBtn.scrollWidth > titleBtn.clientWidth + 1) out.push(`${tag}: the date button is cut (${titleBtn.textContent}, ${titleBtn.scrollWidth}px in ${titleBtn.clientWidth}px)`);
+                const k = currentDayKey;
+                const wantTitle = phone ? fmtDay(k, 'long') : `${DAY_LONG[dayIdxOfKey(k)]} ${fmtDay(k)}`;
+                if (dayViewKeys().length === 1 && title && title.textContent !== wantTitle) out.push(`${tag}: the date reads ${JSON.stringify(title.textContent)}, expected ${JSON.stringify(wantTitle)} (D28)`);
                 if (document.documentElement.scrollWidth > window.innerWidth) out.push(`${tag}: the page scrolls sideways`);
                 if (ws) ws.scrollTop = 0;
               }
@@ -11801,7 +11824,9 @@ function findChromium() {
           } finally {
             mmReturn = wasReturn;
             profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+            weekOffset = wasOffset;
             goToday();
+            navReturnStack = wasStack;
           }
           return out;
         });
@@ -19830,8 +19855,8 @@ function findChromium() {
         profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
         goToday();
         const shown = (document.querySelector('#screen-today > .ph .ph-context') || {}).textContent || '';
-        const wantWeekday = new Intl.DateTimeFormat(undefined, {
-          timeZone: 'America/Edmonton', weekday: 'long',
+        const wantWeekday = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Edmonton', weekday: 'short',
         }).format(new Date());
         const wantDay = String(Number(parts.day));
         if (!shown.trim()) bad.push('the header does not say what day it is');
@@ -27466,7 +27491,8 @@ function findChromium() {
           const row = host.querySelector('.ph-main');
           if (row && row.lastElementChild !== badge) out.push(`${label}: the badge is not far right`);
           const ctx = host.querySelector('.ph-context');
-          if (ctx && (getComputedStyle(ctx).display === 'none') !== phone) out.push(`${label}: the context is ${phone ? 'shown' : 'hidden'}`);
+          const ctxHides = phone && variant === 'money';
+          if (ctx && (getComputedStyle(ctx).display === 'none') !== ctxHides) out.push(`${label}: the context is ${ctxHides ? 'shown' : 'hidden'} (D26: only the money header hides it on a phone)`);
         }
         host.innerHTML = '<button class="ui-btn">A</button><button class="ui-btn ui-btn--lg">B</button><button class="ui-btn ui-btn--lg ui-btn--two-line">C<br>D</button>';
         [44, 54, 66].forEach((want, i) => {
@@ -27562,7 +27588,23 @@ function findChromium() {
                 if (r.width < 44 || r.height < 44) out.push(`${size} ${label}: a header button "${b.getAttribute('aria-label') || b.textContent.trim()}" is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
               }
               const ctx = hdr.querySelector('.ph-context');
-              if (ctx && (getComputedStyle(ctx).display === 'none') !== phone) out.push(`${size} ${label}: the date is ${phone ? 'shown on a phone' : 'hidden'}`);
+              if (ctx && getComputedStyle(ctx).display === 'none') out.push(`${size} ${label}: the date is hidden (D26: it shows on a phone too)`);
+              if (label === 'Day') {
+                // D27: the date is a button that opens Copy a day; a phone
+                // hides 📑 and the 1 2 3, the iPad keeps them.
+                const tb = hdr.querySelector('.ph-title > .ph-title-btn[data-ph-action="day-copy"]');
+                if (!tb || tb.getAttribute('aria-label') !== 'Copy a day') out.push(`${size} Day: the date is not the Copy a day button`);
+                const acts = hdr.querySelector('.ph-actions'), tools = hdr.querySelector('.ph-tools');
+                const off = (el) => !el || getComputedStyle(el).display === 'none';
+                if (off(acts) !== phone || off(tools) !== phone) out.push(`${size} Day: 📑 and 1 2 3 are ${phone ? 'shown on a phone' : 'hidden on the iPad'}`);
+                if (tb) {
+                  tb.click();
+                  const sheet = document.getElementById('templateOverlay');
+                  if (!sheet || !sheet.classList.contains('open')) out.push(`${size} Day: tapping the date did not open Copy a day`);
+                  closeSheet('templateOverlay');
+                }
+              }
+              if (label === 'Today' && ctx && ctx.textContent !== fmtDay(todayKey(), 'long')) out.push(`${size} Today: the date reads ${JSON.stringify(ctx.textContent)}, expected ${JSON.stringify(fmtDay(todayKey(), 'long'))}`);
             }
             const hs = [...new Set(Object.values(heights).map(v => v.toFixed(2)))];
             if (hs.length > 1) out.push(`${size}: the standard headers are not one height — ${JSON.stringify(heights)}`);
@@ -27609,6 +27651,35 @@ function findChromium() {
       if (!b || b.getAttribute('aria-label') !== 'Back to Today') bad.push(`from Today, the Day's ◀ is ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}`);
       if (b) b.click();
       if (active() !== 'screen-today') bad.push(`opened from Today, the Day's ◀ went to ${active()}`);
+      /* A Day opened from the meeting (mmOpenDayForBlocks, js/15) draws its
+         header as openDay does: the date, ◀ back to the meeting, and the
+         badge — which the sitting's lock hides and does not draw. It opened
+         on whatever header the Day last had before (PR 4 review), so the
+         header is blanked first. */
+      navReturnStack = [];
+      {
+        const wasViewing = parentViewing, wasMm = mmReturn;
+        try {
+          profile = 'parent'; parentViewing = 'jenn';
+          openFamilyMeeting();
+          document.querySelector('#screen-day > .ph').outerHTML = '<header class="ph"></header>';
+          mmOpenDayForBlocks('jenn', 1);
+          const hdr = document.querySelector('#screen-day > .ph');
+          const title = hdr && hdr.querySelector('.ph-title');
+          const badge = document.getElementById('dayProfileBadge');
+          if (active() !== 'screen-day') bad.push(`the meeting's day row opened ${active()}`);
+          if (!title || title.textContent !== dayHeadingText()) bad.push(`a Day opened from the meeting has the title ${title ? JSON.stringify(title.textContent) : 'none'}, expected ${JSON.stringify(dayHeadingText())}`);
+          if (!badge || !hdr.contains(badge)) bad.push('a Day opened from the meeting has no profile badge');
+          else if (!badge.hidden || getComputedStyle(badge).display !== 'none') bad.push("a Day opened from the meeting shows its profile badge — the sitting's lock must hide it");
+          b = back('screen-day');
+          if (!b || b.getAttribute('aria-label') !== 'Back to the meeting') bad.push(`from the meeting, the Day's ◀ is ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}`);
+          if (!document.querySelector('#daySpanTabs button')) bad.push('a Day opened from the meeting has no 1 2 3 tabs');
+        } finally {
+          mmReturn = wasMm; parentViewing = wasViewing; profile = 'jenn';
+          document.body.classList.remove('meeting-return-pending');
+          document.querySelectorAll('.ph-badge').forEach(x => { x.hidden = false; });
+        }
+      }
       // An empty stack falls back to the week.
       navReturnStack = [];
       if (navReturnTo('week') !== 'Week') bad.push('an empty stack does not name the week');

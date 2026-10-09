@@ -119,28 +119,34 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
 
 /* The Day header's title. Names one day, or the span it is showing — a
    heading that said "Tuesday" over three columns would be lying about two of
-   them. A phone, with five things in its 60px row, gets the short form the
-   header picture draws ("Tue 6 Oct", fmtDay). */
+   them. One day reads "Tuesday 6 Oct" on the iPad and the short "Tue 6 Oct"
+   on a phone, as the header pictures draw them (D28, fmtDay); the span form
+   stays until PR 6. */
 function dayHeadingText() {
   const keys = dayViewKeys();
   const first = formatDayKey(keys[0]);
   if (keys.length === 1) {
     const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
     if (phone) return fmtDay(keys[0], 'long');
-    return `${DAY_LONG[dayIdxOfKey(keys[0])]}, ${MONTH_SHORT[first.getMonth()]} ${first.getDate()}`;
+    return `${DAY_LONG[dayIdxOfKey(keys[0])]} ${fmtDay(keys[0])}`;
   }
   const last = formatDayKey(keys[keys.length - 1]);
   const lastPart = last.getMonth() === first.getMonth()
     ? `${last.getDate()}` : `${MONTH_SHORT[last.getMonth()]} ${last.getDate()}`;
   return `${MONTH_SHORT[first.getMonth()]} ${first.getDate()} – ${lastPart}`;
 }
+/* The date may be a button (step.titleAction): its text is written into the
+   button so the button stays. */
 function renderDayHeading() {
-  const el = document.querySelector('#screen-day > .ph .ph-title');
+  const el = document.querySelector('#screen-day > .ph .ph-title-btn')
+    || document.querySelector('#screen-day > .ph .ph-title');
   if (el) el.textContent = dayHeadingText();
 }
 /* The Day's standard header: ◀ back through the one back stack (named, as
    the picture draws it), the date as the title between ◀ ▶, the 1 / 2 / 3
    tabs (renderDaySpanTabs fills #daySpanTabs), 📑 Copy a day and the badge.
+   A phone hides the tabs and 📑 (css): tapping the date is Copy a day there,
+   the pictures' date menu (D27); the iPad keeps 📑 as well.
    The 🌙 sat here once (R5 §7 Q3): today's mood is asked on Today, and a
    past day is reflected on from its 📑 sheet. */
 function dayRenderHeader() {
@@ -148,7 +154,8 @@ function dayRenderHeader() {
     back: { to: navReturnTo('week'), named: true, data: { 'ph-action': 'back', 'ph-fallback': 'week' } },
     title: dayHeadingText(),
     step: { prev: { aria: 'Previous day', data: { 'ph-action': 'day-prev' } },
-            next: { aria: 'Next day', data: { 'ph-action': 'day-next' } } },
+            next: { aria: 'Next day', data: { 'ph-action': 'day-next' } },
+            titleAction: { aria: 'Copy a day', data: { 'ph-action': 'day-copy' } } },
     tools: '<div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>',
     actions: [{ label: '📑', aria: 'Copy a day', data: { 'ph-action': 'day-copy' } }],
     badge: kidHeadBadge('dayProfileBadge', isParent() ? parentViewing : profile, isParent()),

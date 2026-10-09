@@ -437,8 +437,10 @@ Kid-facing copy is a product surface, not filler. The rules:
   midday. A row's seed may return a sentence, which the sweep reports — the
   Day view rows say so when the ghost was not drawn. Joining found, besides the
   ghost's buttons: the top bar's 📋 at 38px and, once scrolled into its
-  compact form, the ◀ ▶ arrows at 30px and 📋 / profile badge at 34px (all
-  44px now — compact tightens padding and type, never targets); the block's
+  compact form, the ◀ ▶ arrows at 30px and 📋 / profile badge at 34px. The
+  compact bar is retired (PR 4): the Day's header is the standard page header
+  (`pageHeader`, js/47-header.js), one row of a fixed height that does not
+  shrink on scroll, its buttons and badge 52px; the block's
   ✓ tick at 32px (`.block-done-btn` keeps its 32px look, with an `::after`
   reaching 6px past it for a 44px target, and sits 6px in from the block's
   corner so the target stays inside the block's clip); and `.block-meta` at
@@ -1614,9 +1616,15 @@ box, and `enhanceAccessibility` (`js/99-main.js`) injected
 `aria-label="Open profile selector"` on **every** `.profile-badge` with no
 `[onclick]` filter — while `enhanceNonButtonClickables`, three lines above it,
 did filter, so the dead badges got a label and no role, no focus and no
-keyboard. All five are `<button class="profile-badge" onclick="…"
-aria-label="Switch profile">` now, and the aria pass only labels a badge that
-has a click path, so the next inert one cannot re-tell the lie.
+keyboard. Every kid header's badge (Today, Week, Day, Sister Sync) is now
+the page header's `<button class="ph-badge ph-badge--avatar"
+data-ph-action="profile">` (`kidHeadBadge`, js/47-header.js): the 52px round
+avatar at every width (D25), its words — the one wording, `profileBadgeParts`
+/ `profileBadgeText` — in the aria-label, "Jenn, switch profile" or "Parent
+(Jenn), switch profile". The aria pass in js/99-main.js labels no badge, so
+the next inert one cannot re-tell the lie. `.ph-badge` is `display:
+inline-flex`, which outranks the browser's `[hidden]`, so `.ph-badge[hidden]`
+is `display: none` — the meeting lock hides a badge with `hidden`.
 `everyProfileBadgeSwitchesProfile` asserts it by **activating** each badge and
 watching for `#profileSwitchOverlay`: a control can carry every attribute on the
 list and still open nothing. (checked by smoke: everyProfileBadgeSwitchesProfile)
@@ -2806,6 +2814,21 @@ invite wrong-day bug (PR #93): it outlives the Day view that set it. Now: (check
   for a day before today only — today's door is on Today, and a future day has
   nothing to look back on. The sheet captures the day when it opens and passes
   it; the Day view's evening toast now points to Today. (text only)
+- **The Day's ◀ goes back where the day was opened from** (PR 4). Every
+  header ◀ goes through one back stack, `navReturnPush` / `navReturnBack`
+  (js/05-helpers.js): the screen on show is pushed as a page opens — or a
+  named `from`, as the meeting's day rows push `'meeting'`
+  (`mmOpenDayForBlocks`, js/15, which also draws the Day's header and applies
+  the meeting lock) — and ◀ pops it and calls that screen's own open. The ◀
+  is labelled "Back to <screen>" from the same stack (`navReturnTo`); an
+  empty stack goes to the caller's fallback (the week). An entry is `{ screen
+  }` only — no scroll is kept. Device-local module state, never in `state`,
+  bounded by `NAV_RETURN_MAX`. The Day's ◀ used to say "◀ Week" and go to the
+  week from anywhere. On a phone the Day's 📑 and 1 2 3 are hidden and tapping
+  the date is Copy a day (`step.titleAction`, D27); the iPad keeps 📑. The
+  date reads "Tuesday 6 Oct" on the iPad and "Tue 6 Oct" on a phone (D28).
+  (checked by smoke: oneBackStackGoesWhereYouCameFrom,
+  kidScreensHaveOneStandardHeader)
 - **"Today's Vibe" is folded into the row**: the card, `renderVibe`,
   `setDayMood`, `#vibeMoods`, `#vibeSubtext`, `.vibe-card` and `.vibe-title` are
   gone. `.vibe-moods` / `.vibe-mood` stay (the sheet and the ritual). Today's

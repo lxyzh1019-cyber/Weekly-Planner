@@ -512,7 +512,13 @@ function mmOpenDayForBlocks(kid, dayIdx) {
   parentViewing = kid;
   currentDayKey = dayKey;
   dayViewAnchorKey = dayKey;
+  // The Day's header as openDay draws it: ◀ back to the meeting, the date and
+  // the badge, which the sitting's lock hides (js/11-parent.js).
+  navReturnPush('day', 'meeting');
+  dayRenderHeader();
+  applyMeetingLock();
   showScreen('day');
+  renderDaySpanTabs();
   buildTimeline();
 }
 /* What the "run the family meeting" buttons call. */

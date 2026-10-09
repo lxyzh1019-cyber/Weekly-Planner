@@ -1441,9 +1441,10 @@ function showScreen(id) {
    pushed as it opens, and ◀ pops it and opens it again. Generalised from Money
    school's own return (mnySchoolReturn, js/25), which moves onto it with the
    money headers. Module state on this device only — never in `state`, which
-   every write uploads whole. An entry is { screen, scrollY }; a screen this
-   table does not name is not pushed, and an empty stack goes to the caller's
-   fallback. NAV_RETURN_MAX keeps a long session from growing it without end. */
+   every write uploads whole. An entry is { screen }: each screen's own open()
+   puts it back as it draws (no scroll is kept); a screen this table does not
+   name is not pushed, and an empty stack goes to the caller's fallback.
+   NAV_RETURN_MAX keeps a long session from growing it without end. */
 const NAV_RETURN_MAX = 8;
 const NAV_RETURN_SCREENS = {
   today: { name: 'Today', open: () => goToday() },
@@ -1463,10 +1464,10 @@ function navActiveScreen() {
 }
 /* Remember where ◀ goes: `from` (default: the screen on show) unless it is
    the screen being opened, or a screen the table cannot reopen. */
-function navReturnPush(opening, from, scrollY) {
+function navReturnPush(opening, from) {
   const screen = from || navActiveScreen();
   if (!screen || screen === opening || !NAV_RETURN_SCREENS[screen]) return;
-  navReturnStack.push({ screen, scrollY: Number(scrollY) || 0 });
+  navReturnStack.push({ screen });
   if (navReturnStack.length > NAV_RETURN_MAX) navReturnStack.shift();
 }
 function navReturnPeek() {
@@ -1479,12 +1480,9 @@ function navReturnTo(fallback) {
   return (NAV_RETURN_SCREENS[screen] || NAV_RETURN_SCREENS.week).name;
 }
 function navReturnBack(fallback) {
-  const top = navReturnStack.pop() || { screen: fallback, scrollY: 0 };
+  const top = navReturnStack.pop() || { screen: fallback };
   const dest = NAV_RETURN_SCREENS[top.screen] || NAV_RETURN_SCREENS.week;
   dest.open();
-  if (top.scrollY > 0) {
-    try { window.scrollTo(0, top.scrollY); } catch (e) {}
-  }
 }
 
 /* Parent PIN — a *soft* child-lock, not real security (anyone reading the

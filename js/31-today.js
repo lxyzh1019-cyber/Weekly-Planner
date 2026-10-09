@@ -1312,10 +1312,11 @@ function tdRenderToday() {
   /* The badge says who is on screen, a grown-up included, in the one wording
      every badge shares (profileBadgeText, js/01-config.js). `kid` is
      activeProfile(), so for a parent it is already whoever is being viewed; an
-     unset profile gives an empty badge. */
+     unset profile gives an empty badge. The date shows on a phone too, as the
+     header picture draws it (D26): "Fri 9 Oct". */
   phMount('screen-today', {
     title: 'Today',
-    context: formatDayKey(todayKey()).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }),
+    context: fmtDay(todayKey(), 'long'),
     badge: kidHeadBadge('todayProfileBadge', kid, isParent()),
   });
   if (!kid || kid === 'parent') {

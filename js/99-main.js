@@ -305,7 +305,7 @@ function enhanceAccessibility(root = document) {
   applyIconButtonAriaLabels(root);
   /* The profile badges' labelling pass lived here. Every badge is a
      pageHeader button now (js/47-header.js), drawn with its own
-     aria-label "Switch profile", so there is nothing left to label. */
+     aria-label ("Jenn, switch profile"), so there is nothing left to label. */
   root.querySelectorAll('.mascot-close').forEach((closeBtn) => {
     if (!closeBtn.getAttribute('aria-label')) closeBtn.setAttribute('aria-label', 'Close owl helper');
   });

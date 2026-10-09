@@ -123,6 +123,49 @@ check('an unknown or missing variant is standard',
   check('an avatar badge draws only the icon, named by its aria-label',
     html.includes('class="ph-badge ph-badge--avatar" aria-label="Switch profile"') && html.includes('<span class="ph-av" aria-hidden="true">🐥</span>') && !html.includes('Jenn') || html);
 }
+// The kid screens' slots (PR 4): a named back, ◀ title ▶, tools, the badge's
+// id, noPrint and the title as a button (D27).
+{
+  const named = pageHeader({ back: { to: 'Week', named: true, data: { 'ph-action': 'back' } } });
+  const plain = pageHeader({ back: { to: 'Week' } });
+  check('back.named writes where ◀ goes beside it; a plain back does not',
+    named.includes('<span aria-hidden="true">◀</span> <span class="ph-back-to">Week</span></button>')
+    && named.includes('aria-label="Back to Week"') && !plain.includes('ph-back-to') || [named, plain]);
+}
+{
+  const html = pageHeader({ title: 'Tue 6 Oct', step: { prev: { aria: 'Previous day', data: { 'ph-action': 'day-prev' } },
+    next: { aria: 'Next day', data: { 'ph-action': 'day-next' } } } });
+  const prev = html.indexOf('aria-label="Previous day"'), title = html.indexOf('<h2 class="ph-title">Tue 6 Oct</h2>'), next = html.indexOf('aria-label="Next day"');
+  check('step draws ◀ title ▶ in one .ph-step, each arrow with its data',
+    html.includes('<div class="ph-step">') && count(html, /class="ph-btn ph-step-btn"/g) === 2
+    && prev >= 0 && prev < title && title < next
+    && html.includes('data-ph-action="day-prev"') && html.includes('data-ph-action="day-next"') || html);
+}
+{
+  const html = pageHeader({ title: 'My Week', context: 'x', tools: '<b>T</b>', actions: [{ label: 'Print' }], badge: { icon: '🐥', avatar: true, aria: 'a' } });
+  const t = html.indexOf('<div class="ph-tools"><b>T</b></div>');
+  check('tools sit after the title and context, before the actions and the badge',
+    t > html.indexOf('ph-context') && t < html.indexOf('ph-actions') && t < html.indexOf('ph-badge') && !pageHeader({ title: 'x' }).includes('ph-tools') || html);
+}
+{
+  const html = pageHeader({ badge: { icon: '🐥', avatar: true, aria: 'Jenn, switch profile', id: 'dayProfileBadge', data: { 'ph-action': 'profile' } } });
+  check('badge.id names the badge button (the meeting lock finds it by id)',
+    /<button type="button" class="ph-badge ph-badge--avatar" aria-label="Jenn, switch profile"[^>]* data-ph-action="profile" id="dayProfileBadge">/.test(html)
+    && !pageHeader({ badge: { icon: '🐥', avatar: true } }).includes(' id=') || html);
+}
+check('noPrint marks the header no-print; without it the header prints',
+  pageHeader({ title: 'Print Week', noPrint: true }).startsWith('<header class="ph ph--standard no-print">')
+  && !pageHeader({ title: 'Print Week' }).includes('no-print') || pageHeader({ noPrint: true }));
+{
+  const step = { prev: { aria: 'Previous day' }, next: { aria: 'Next day' }, titleAction: { aria: 'Copy a day', data: { 'ph-action': 'day-copy' } } };
+  const html = pageHeader({ title: 'Tue 6 Oct', step });
+  const evil = pageHeader({ title: '<i>x</i>', step: { titleAction: { aria: '"><img>', data: { 'ph-action': 'day-copy' } } } });
+  check('step.titleAction draws the title as one button inside the h2 (D27)',
+    html.includes('<h2 class="ph-title"><button type="button" class="ph-title-btn" data-ph-action="day-copy" aria-label="Copy a day">Tue 6 Oct</button></h2>')
+    && count(html, /class="ph-title-btn"/g) === 1
+    && !pageHeader({ title: 'Tue 6 Oct', step: { prev: {}, next: {} } }).includes('ph-title-btn')
+    && !/<img|<i>/.test(evil) || [html, evil]);
+}
 {
   const evil = '<img src=x onerror=alert(1)>"\'';
   const html = pageHeader({ back: { to: evil, data: { 'mny-action': evil, 'bad name': 'x', 'onclick': 'x' } }, title: evil, context: evil,

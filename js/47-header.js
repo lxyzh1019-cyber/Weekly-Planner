@@ -27,15 +27,20 @@
      back     { to, data, named }    ◀ with aria-label "Back to <to>"; `named`
               also writes <to> beside the ◀ (Day's "◀ Week")
      title    text                   the screen's name, no emoji (D5)
-     step     { prev, next }         ◀ ▶ either side of the title, each
-              { aria, data } (Day: the date is the title)
-     context  text                   e.g. the date; hidden at ≤699px (D4)
+     step     { prev, next, titleAction }  ◀ ▶ either side of the title,
+              each { aria, data } (Day: the date is the title); titleAction
+              { aria, data } makes the title itself a button
+              (.ph-title-btn: on a phone, tapping the Day's date is Copy a
+              day, D27)
+     context  text                   e.g. the date; a phone hides it on the
+              money header only (D26)
      tools    markup the caller built and escaped, in the row after the
               title (Week's stepper and view tabs, Day's 1 2 3)
      actions  [{ label, aria, data }] at most two; a third is not drawn
      badge    { text, icon, avatar, aria, data, id }  always far right;
-              `avatar` draws only the icon in a circle (the money pages);
-              otherwise the icon, then the text, which a phone hides
+              `avatar` draws only the icon in a circle, its words in the
+              aria-label (every kid header, D25); otherwise the icon, then
+              the text
      sub      markup the caller built and escaped (.ui-tabs, .ui-stepper,
               .ui-kids); drawn as the 44px sub-bar (--hdr-sub-h)
      noPrint  true: the header is not printed (Print's own header)
@@ -70,8 +75,7 @@ function phButton(cls, aria, data, contentHtml, id) {
 }
 
 /* The text badge keeps the icon and the text as two spans with a space
-   between, so its textContent is the caller's whole wording (profileBadgeText
-   gives "🐥 Jenn") while a phone hides the text and keeps the avatar. */
+   between, so its textContent is the caller's whole wording. */
 function phBadgeHtml(b) {
   const iconHtml = b.icon ? `<span class="ph-av" aria-hidden="true">${escapeHtml(b.icon)}</span>` : '';
   if (b.avatar) return phButton('ph-badge ph-badge--avatar', b.aria || b.text, b.data, iconHtml, b.id);
@@ -90,7 +94,11 @@ function pageHeader(o) {
   const backHtml = o.back
     ? phButton('ph-btn ph-back', 'Back to ' + (o.back.to || ''), o.back.data, '<span aria-hidden="true">◀</span>' + backNameHtml)
     : '';
-  const bareTitleHtml = o.title ? `<h2 class="ph-title">${escapeHtml(o.title)}</h2>` : '';
+  const titleAction = o.step && o.step.titleAction;
+  const titleInnerHtml = titleAction
+    ? `<button type="button" class="ph-title-btn"${phDataAttrs(titleAction.data)} aria-label="${escapeAttr(titleAction.aria || '')}">${escapeHtml(o.title || '')}</button>`
+    : escapeHtml(o.title || '');
+  const bareTitleHtml = o.title ? `<h2 class="ph-title">${titleInnerHtml}</h2>` : '';
   const titleHtml = o.step
     ? `<div class="ph-step">${phStepButton(o.step.prev, '◀')}${bareTitleHtml}${phStepButton(o.step.next, '▶')}</div>`
     : bareTitleHtml;
@@ -124,13 +132,17 @@ function phMount(screenId, o) {
   if (old) old.outerHTML = pageHeader(o);
 }
 
-/* The profile badge on every kid header: the one wording (profileBadgeText,
-   in two parts from profileBadgeParts), far right, opening the switcher.
-   `id` is the screen's own badge id — applyMeetingLock hides the week's and
-   the day's by id, so a header is mounted before the lock is applied. */
+/* The profile badge on every kid header: the 52px round avatar at every
+   width, as the owner's pictures draw it (D25), far right, opening the
+   switcher. Its words are the one wording (profileBadgeParts, the two parts
+   of profileBadgeText) in the aria-label: "Jenn, switch profile",
+   "Parent (Jenn), switch profile". `id` is the screen's own badge id —
+   applyMeetingLock hides the week's and the day's by id, so a header is
+   mounted before the lock is applied. */
 function kidHeadBadge(id, kid, asParent) {
   const parts = profileBadgeParts(kid, asParent);
-  return { id, icon: parts.icon, text: parts.name, aria: 'Switch profile', data: { 'ph-action': 'profile' } };
+  const aria = parts.name ? `${parts.name}, switch profile` : 'Switch profile';
+  return { id, icon: parts.icon, text: parts.name, avatar: true, aria, data: { 'ph-action': 'profile' } };
 }
 
 function kidHeadClick(e) {
