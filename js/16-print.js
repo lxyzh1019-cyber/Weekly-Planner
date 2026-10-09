@@ -62,11 +62,11 @@ function onPrintWindowChange() {
    (the week it was opened from), Print week, and 🖨 Print, which prints. */
 function openPrint() {
   navReturnPush('print');
-  phMount('screen-print', {
+  hdrMount('screen-print', {
     noPrint: true,
-    back: { to: navReturnTo('week'), data: { 'ph-action': 'back', 'ph-fallback': 'week' } },
+    back: { to: navReturnTo('week'), data: { 'hdr-action': 'back', 'hdr-fallback': 'week' } },
     title: 'Print Week',
-    actions: [{ label: '🖨 Print', aria: 'Print', data: { 'ph-action': 'print-now' } }],
+    actions: [{ label: '🖨 Print', aria: 'Print', cls: 'hdr-btn--word', data: { 'hdr-action': 'print-now' } }],
   });
   showScreen('print');
   renderPrintControls();

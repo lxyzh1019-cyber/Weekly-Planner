@@ -32,7 +32,7 @@ function changeSyncDay(d) { syncDayIdx = (syncDayIdx+d+7)%7; renderSync(); }
 
 function renderSync() {
   // A nav tab, so no ◀; Sister Sync is a child's screen and refuses a parent.
-  phMount('screen-sync', { title: 'Sister Sync', badge: kidHeadBadge('syncProfileBadge', profile, false) });
+  hdrMount('screen-sync', { title: 'Sister Sync', badge: kidHeadBadge('syncProfileBadge', profile, false) });
   const keys = getDayKeys(weekOffset);
   const key = keys[syncDayIdx];
   const d = formatDayKey(key);

@@ -1821,15 +1821,15 @@ function mnyTabsFor() {
 /* The tabs in the money header (mnyHead, js/22): icon and name, no numbers —
    the numbered five-page bar is retired. `cur` is the tab that is showing
    (aria-current), and it is not a link. Her two tabs both show their names
-   on the iPad; a grown-up's five (`ph-tabs--many`) show the current one's
+   on the iPad; a grown-up's five (`hdr-tabs--many`) show the current one's
    name and the others' icons, and a phone shows the current name only, as
    the owner's picture draws it. Every tab keeps its name in aria-label. */
 function mnyTabBar(cur) {
   const tabs = mnyTabsFor();
-  return `<nav class="ph-tabs${tabs.length > 2 ? ' ph-tabs--many' : ''}" aria-label="Money pages">${tabs.map((t) => {
+  return `<nav class="hdr-tabs${tabs.length > 2 ? ' hdr-tabs--many' : ''}" aria-label="Money pages">${tabs.map((t) => {
     const sel = t.id === cur;
-    const tag = t.who === 'kid' || t.who === 'optional' ? '' : `<span class="ph-tab-tag">${escapeHtml(t.who)}</span>`;
-    return `<button type="button" class="ph-tab"${sel ? ' aria-current="page"' : ''} data-mny-action="tab" data-mny-tab="${t.id}" aria-label="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}"><span aria-hidden="true">${t.icon}</span><span class="ph-tab-word">${escapeHtml(t.label)}</span>${tag}</button>`;
+    const tag = t.who === 'kid' || t.who === 'optional' ? '' : `<span class="hdr-tab-tag">${escapeHtml(t.who)}</span>`;
+    return `<button type="button" class="hdr-tab"${sel ? ' aria-current="page"' : ''} data-mny-action="tab" data-mny-tab="${t.id}" aria-label="${escapeAttr(t.label)}" title="${escapeAttr(t.label)}"><span aria-hidden="true">${t.icon}</span><span class="hdr-tab-word">${escapeHtml(t.label)}</span>${tag}</button>`;
   }).join('')}</nav>`;
 }
 

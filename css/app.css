@@ -113,7 +113,7 @@
     --z-overlay:  400;
     --z-toast:    999;
 
-    /* Consistency PR 3 — the component kit's names (.ui-*, .ph-*; nothing
+    /* Consistency PR 3 — the component kit's names (.ui-*, .hdr-*; nothing
        reads them yet). Shared by both looks: a size or a layer is not a
        look's. Each layer equals the z-index that layer uses today, so moving
        a surface onto its name changes no stacking: the header is the sticky
@@ -124,30 +124,45 @@
     --z-nav:    60;
     --z-sheet:  300;
     --z-dialog: 500;
-    /* The page header's rows, as the owner's header pictures draw them
-       (docs/handoff/consistency/headers/measurements.txt): standard 64px on the
-       iPad and at 700–1099px, 60px on a phone (≤699px, set beside the kit's
-       classes); money 72px / 64px; the meeting's first row 62px / 60px; the
-       sub-bar and the meeting's second row 44px everywhere. The rules are drawn
-       under the rows, not inside them. */
+    /* The page header (.hdr-*, Stage 20): every value from the per-screen
+       table in docs/handoff/header-exact-values.md (the owner's turn-2
+       picture, SRC lines there). Rows: standard 64px on the iPad, 60px on a
+       phone (≤699px, beside the kit's classes); money 72px / 64px; the
+       meeting's first row 62px / 60px; the sub-bar and the meeting's second
+       row 44px everywhere. The rules are drawn under the rows. The sizes the
+       picture types in px in BOTH looks are tokens so the one size reaches
+       both looks as drawn: the date and week label, every emoji, glyph and
+       button word. The titles are 30px / 28px / 26px × the look's scale
+       (SRC 50, 103, 168), taken here at the root so a money surface, which
+       sets its own --text-scale (Deviation 35), still draws its header at
+       the picture's size. */
     --hdr-h: 64px;
     --hdr-money-h: 72px;
     --hdr-meeting-h: 62px;
     --hdr-sub-h: 44px;
-    --hdr-title-rem: 1.75rem;
-    /* The rebuilt header (.hdr-*, Stage 20), values from the per-screen table
-       in docs/handoff/header-exact-values.md (the owner's turn-2 picture):
-       the bar's side padding and gap, and the sizes the picture types in px in
-       BOTH looks — the date / week label and the badge's emoji are not
-       multiplied by the look's scale there (SRC 51, 52), only the title is.
-       They are tokens so the one size reaches both looks as drawn; phone
-       values beside the kit's ≤699px block. */
     --hdr-pad: 18px;
     --hdr-gap: 16px;
+    --hdr-r2-pad: 18px;
+    --hdr-r2-gap: 10px;
+    --hdr-r2-size: 18px;
     --hdr-label-size: 22px;
     --hdr-emoji-size: 24px;
     --hdr-glyph-size: 17px;
     --hdr-word-size: 18px;
+    --hdr-icon-size: 20px;
+    --hdr-span-size: 19px;
+    --hdr-money-btn: 54px;
+    --hdr-money-glyph: 18px;
+    --hdr-money-help-size: 24px;
+    --hdr-money-emoji: 26px;
+    --hdr-tab-icon-size: 21px;
+    --hdr-meeting-icon-size: 22px;
+    --hdr-girls-gap: 8px;
+    --hdr-girl-emoji-size: 24px;
+    --hdr-pill-pad: 4px 14px;
+    --hdr-title-size: calc(30px * var(--text-scale, 1));
+    --hdr-title-small: calc(28px * var(--text-scale, 1));
+    --hdr-tab-size: calc(26px * var(--text-scale, 1));
 
     /* ════ Look tokens (Stage 1, looks-calm-pop) ════
        Every colour and font in this file reads one of these; each holds
@@ -794,34 +809,6 @@
     overflow: hidden;
     white-space: nowrap;
   }
-  /* 1 / 2 / 3 days at once. */
-  .day-span-tabs {
-    display: flex;
-    gap: 0.2rem;
-    border: 2px solid var(--ink);
-    border-radius: 12px;
-    padding: 2px;
-    background: var(--paper);
-    flex: 0 0 auto;
-  }
-  .day-span-tab {
-    min-width: 44px;
-    min-height: 44px;
-    border: 0;
-    border-radius: 9px;
-    background: transparent;
-    cursor: pointer;
-    font-family: var(--font-text);
-    font-size: calc(1.05rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    font-weight: 800;
-    color: var(--ink);
-  }
-  .day-span-tab.active { background: var(--pill-on); color: var(--pill-on-ink); }
-  /* Chosen, but the viewport can only carry fewer — say so rather than
-     silently disagreeing with the button that looks selected. */
-  /* Muted and struck through rather than faded: at 40% opacity the digit read
-     2.4:1 (thePopLookReadsEverywhere). */
-  .day-span-tab.unavailable { color: var(--ink-light); text-decoration: line-through; }
 
   /* Must chain .screen.active so #screen-day does not override .screen { display:none }. */
   /* BOUNDED, not min-height. With min-height the flex column grew to its own
@@ -6961,7 +6948,7 @@
 /* ══════════════════════════════════════════════════════════════
    THE COMPONENT KIT — Consistency PR 3 (no visible change)
    One button, chip, tab row, card, section head, sheet, kid switch and
-   stepper (.ui-*), and the page header pageHeader draws (.ph-*, js/47-header.js).
+   stepper (.ui-*), and the page header pageHeader draws (.hdr-*, js/47-header.js).
    Nothing uses them yet: PRs 4–12 move one surface at a time onto them and
    delete that surface's own classes. Token-driven only — colours, fonts,
    radii, borders, layers and header sizes all read a :root or look token, so
@@ -6970,9 +6957,15 @@
    owner's header pictures (PR 4, D21).
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 699px) {
-  :root { --hdr-h: 60px; --hdr-money-h: 64px; --hdr-meeting-h: 60px; --hdr-title-rem: 1.45rem; }
-  /* The rebuilt header on a phone (Today, SRC 122-125). */
-  :root { --hdr-pad: 12px; --hdr-gap: 10px; --hdr-label-size: 20px; --hdr-glyph-size: 16px; }
+  /* The page header on a phone (SRC 122-125, 133-151, 184-192, 235-250). */
+  :root {
+    --hdr-h: 60px; --hdr-money-h: 64px; --hdr-meeting-h: 60px;
+    --hdr-pad: 12px; --hdr-gap: 10px; --hdr-r2-pad: 12px; --hdr-r2-gap: 6px; --hdr-r2-size: 16px;
+    --hdr-label-size: 20px; --hdr-glyph-size: 16px;
+    --hdr-money-btn: 52px; --hdr-money-glyph: 16px; --hdr-money-help-size: 22px; --hdr-money-emoji: 24px;
+    --hdr-meeting-icon-size: 21px; --hdr-girls-gap: 4px; --hdr-girl-emoji-size: 22px; --hdr-pill-pad: 2px 10px;
+    --hdr-title-size: calc(26px * var(--text-scale, 1));
+  }
 }
 
 .ui-btn {
@@ -7045,183 +7038,20 @@
   font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
 }
 
-/* The page header. As the owner's pictures draw it, each row's height is its
-   content and the rules sit under the rows: a 2.5px solid rule ends the header
-   (2px on a 1x screen), and a 1.5px rule (1px at 1x) parts the first row from
-   a sub-bar or the meeting's second row. */
-.ph {
-  box-sizing: border-box; position: sticky; top: 0; z-index: var(--z-header);
-  background: var(--paper); color: var(--ink);
-  border-bottom: var(--bw-card) solid var(--ink);
-}
-.ph-row { box-sizing: content-box; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4); }
-.ph-main { height: var(--hdr-h); }
-.ph-sub { height: var(--hdr-sub-h); border-top: var(--bw-info) solid var(--ink); }
-.ph-title {
-  flex: 1 1 auto; min-width: 0; margin: 0; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-family: var(--font-head); font-weight: var(--head-weight, 400); font-size: calc(var(--hdr-title-rem) * var(--text-scale, 1));
-}
-.ph-context { flex: 0 1 auto; white-space: nowrap; color: var(--ink-light); font-family: var(--font-text); font-size: calc(1rem * var(--text-scale, 1)); }
-.ph-actions { display: flex; gap: var(--space-2); flex: none; }
-.ph-btn, .ph-badge {
-  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
-  height: 44px; min-width: 44px; padding: 0;
-  background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
-  font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
-}
-.ph-badge { gap: var(--space-1); padding: 0 var(--space-3) 0 var(--space-1); border-radius: var(--radius-pill); background: var(--bg); }
-/* display:inline-flex above outranks the browser's [hidden]; the meeting lock
-   hides the week's and the day's badge with `hidden` (applyMeetingLock). */
-.ph-badge[hidden] { display: none; }
-.ph-badge--avatar { width: 44px; padding: 0; }
-.ph-av { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-pill); }
-.ph--money .ph-main { height: var(--hdr-money-h); }
-.ph--money .ph-btn, .ph--money .ph-badge { height: 54px; min-width: 54px; }
-.ph--money .ph-badge--avatar { width: 54px; }
-/* A grown-up's avatar is the family, wider than one face. */
-.ph--money .ph-badge--avatar .ph-av { width: auto; min-width: 32px; }
-.ph--money .ph-back { width: 54px; padding: 0; }
-/* The tabs follow the title at the left, as drawn; the date goes right,
-   before ? and the avatar. */
-.ph--money .ph-title { flex: 0 1 auto; }
-.ph--money .ph-context { order: 1; margin-left: auto; }
-.ph--money .ph-actions { order: 2; }
-.ph--money .ph-badge { order: 3; }
-.ph--meeting .ph-main { height: var(--hdr-meeting-h); }
-.ph--meeting .ph-btn { height: 52px; min-width: 52px; }
-/* The meeting's second row, under a 1.5px dashed rule in the page's grid
-   colour, as the owner's picture draws it: the steps at the left, the week at
-   the right. */
-.ph-r2 { height: var(--hdr-sub-h); justify-content: space-between; border-top: var(--bw-info) dashed var(--page-grid); }
-.ph-r2-start, .ph-r2-end { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.ph-r2-end { flex: none; }
-.ph-week { white-space: nowrap; font-family: var(--font-text); font-weight: 700; font-size: calc(1.05rem * var(--text-scale, 1)); }
-.ph-lead { display: flex; align-items: center; gap: var(--space-2); flex: none; }
-/* The money tabs (mnyTabBar, js/21): pills in the title font, the current one
-   in the tab colour. A grown-up's five name only the current one. */
-.ph-tabs { display: flex; align-items: center; gap: var(--space-2); flex: none; min-width: 0; }
-.ph-tab {
-  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-  height: 54px; min-width: 54px; padding: 0 var(--space-4);
-  background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
-  font-family: var(--font-head); font-weight: var(--head-weight, 400); font-size: calc(1.4rem * var(--text-scale, 1));
-  line-height: 1; white-space: nowrap; cursor: pointer;
-}
-.ph-tab[aria-current="page"] { background: var(--tab-on); color: var(--tab-on-ink); cursor: default; }
-.ph-tab-tag { font-family: var(--font-text); font-size: max(13px, calc(0.7rem * var(--text-scale, 1))); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
-.ph-tabs--many .ph-tab:not([aria-current]) { padding: 0; }
-.ph-tabs--many .ph-tab:not([aria-current]) .ph-tab-word, .ph-tabs--many .ph-tab:not([aria-current]) .ph-tab-tag { display: none; }
-.ph-sub .ph-tab { height: 44px; min-width: 44px; font-size: calc(1.1rem * var(--text-scale, 1)); }
-.ph-sub .ui-kids { margin-left: auto; }
-/* The meeting's three steps: one segmented control in the middle of row 1. */
-.ph--meeting .ph-tools { flex: 1 1 auto; justify-content: center; }
-.ph-seg { display: flex; flex: none; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); overflow: hidden; background: var(--paper); }
-.ph-seg-btn {
-  height: 48px; min-width: 46px; padding: 0 var(--space-4); border: 0; background: var(--paper); color: var(--ink);
-  font-family: var(--font-text); font-size: calc(1.05rem * var(--text-scale, 1)); white-space: nowrap; cursor: pointer;
-}
-.ph-seg-btn + .ph-seg-btn { border-left: var(--bw-chip) solid var(--ink); }
-.ph-seg-btn[aria-current="step"] { background: var(--tab-on); color: var(--tab-on-ink); font-weight: 700; }
-.ph-seg-num { display: none; }
-/* The money pages and the meeting sit in padded columns: their header spans
-   the screen, and the meeting's is a band in the sheet's flex column, not a
-   pinned header over the cards (theMeetingKeepsItsHeadAndFeet). */
-#familyMeetingBody > .ph { position: relative; flex: none; margin: -1.2rem -1.2rem 8px; }
-.mm-screen:has(.sd) #familyMeetingBody > .ph { margin: 0 -14px 6px; }
-#mnyPage1Wrap > .ph, #mnySchoolWrap > .ph, #mnyStoryWrap > .ph { margin: -0.8rem -0.8rem 0; }
-@media (min-width: 768px) {
-  #mnyPage1Wrap > .ph, #mnySchoolWrap > .ph, #mnyStoryWrap > .ph { margin: 0 -14px; }
-}
-.ph--parent { background: var(--accent-purple); }
-/* The standard header is the kid screens' (Today, Week, Day, Sister Sync,
-   Print): its buttons and badge are 52px, the kids' tap rule. */
-.ph--standard .ph-btn, .ph--standard .ph-badge { height: 52px; min-width: 52px; }
-/* The kid headers' badge is the round avatar at every width (D25). */
-.ph--standard .ph-badge--avatar { width: 52px; }
-.ph-back, .ph-actions .ph-btn { gap: var(--space-1); padding: 0 var(--space-3); }
-.ph-badge-text { white-space: nowrap; }
-/* ◀ title ▶ (Day: the date is the title) and Week's ◀ week ▶. */
-.ph-step { display: flex; align-items: center; justify-content: center; gap: var(--space-2); flex: 1 1 auto; min-width: 0; }
-.ph-step > .ph-title { flex: 0 1 auto; text-align: center; }
-/* The title as a button (step.titleAction): it reads as the title and keeps
-   the kids' 52px tap height. */
-.ph-title-btn {
-  display: inline-block; max-width: 100%; min-height: 52px; margin: 0; padding: 0 var(--space-1);
-  border: 0; background: none; color: inherit; font: inherit; line-height: 52px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
-}
-.ph-step-label {
-  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
-  font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
-}
-.ph-tools { display: flex; align-items: center; gap: var(--space-2); flex: 0 1 auto; min-width: 0; }
-.ph .ui-tabs > button { flex: none; width: 52px; height: 52px; padding: 0; font-size: calc(1.2rem * var(--text-scale, 1)); }
-.ph--standard .day-span-tab { min-height: 48px; }
-.ph-actions [data-ph-action="print-open"] { background: var(--btn-main); color: var(--btn-main-ink); }
-#screen-day > .ph { flex: none; }
-/* An iPad held upright (768px) has no room for the back button's word beside
-   the Day's longest date, 1 2 3, 📑 and the badge ("Wednesday 30 Sep"): the
-   ◀ keeps its "Back to <screen>" label, as on a phone. */
-@media (max-width: 899px) {
-  .ph-back-to { display: none; }
-  .ph-back { width: 52px; min-width: 52px; padding: 0; }
-}
-@media (max-width: 699px) {
-  .ph-row { padding: 0 var(--space-2); gap: var(--space-1); }
-  /* Only the money header drops its date on a phone (D26); its title goes
-     too where the tabs in the row name the page, and the tabs join into one
-     control: the current one's name, the other's icon (the owner's
-     picture). The meeting drops its name and its week. */
-  .ph--money .ph-context { display: none; }
-  .ph--money .ph-btn, .ph--money .ph-badge { height: 52px; min-width: 52px; }
-  .ph--money .ph-badge--avatar, .ph--money .ph-back { width: 52px; min-width: 52px; }
-  .ph--money .ph-main:has(.ph-tabs) .ph-title { display: none; }
-  .ph--money .ph-actions { margin-left: auto; }
-  .ph-tabs { flex: 1 1 auto; gap: 0; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); overflow: hidden; background: var(--paper); }
-  .ph-tab { height: 48px; min-width: 44px; padding: 0 var(--space-2); border: 0; border-radius: 0; font-family: var(--font-text); font-weight: 700; font-size: calc(1.05rem * var(--text-scale, 1)); }
-  .ph-sub .ph-tabs { flex: none; gap: var(--space-1); border: 0; border-radius: 0; overflow: visible; background: none; }
-  .ph-sub .ph-tab { height: 44px; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); }
-  .ph-sub .ui-kids > button { min-width: 44px; padding: 0 var(--space-2); }
-  .ph-tab + .ph-tab { border-left: var(--bw-chip) solid var(--ink); }
-  .ph-tab[aria-current="page"] { flex: 1 1 auto; }
-  .ph-tab:not([aria-current]) .ph-tab-word, .ph-tab-tag, .ph-tabs--many .ph-tab-word, .ph-sub .ui-kids .ph-tab-word { display: none; }
-  .ph--meeting .ph-main:has(.ph-seg) .ph-title, .ph-r2 .ph-week, .ph-r2 .mm-weekbar-late { display: none; }
-  .ph-seg-btn { padding: 0; }
-  .ph-r2 .sd-steps { gap: var(--space-1); font-size: calc(0.95rem * var(--text-scale, 1)); }
-  .ph-r2 .sd-stepchip.on { padding: 2px var(--space-2); }
-  .ph-seg-word { display: none; }
-  .ph-seg-num { display: inline; }
-  /* A phone drops more words (the header pictures): the back button's,
-     Week's title, the Day's 1 2 3 (one column is all a phone carries) and
-     📑 (tapping the date is Copy a day there, D27), and the tab already
-     selected — the other one is the switch. Its ◀ ▶ and ◀ back are 44px
-     wide (52px tall), so the date between them has room. */
-  .ph-back-to { display: none; }
-  .ph-step { gap: 0; }
-  .ph-step-btn, .ph-back { width: 44px; min-width: 44px; padding: 0; }
-  /* The Day's ◀ ▶ are plain arrows on a phone, as its picture draws them:
-     no box, the same 44px tap area. */
-  #screen-day > .ph .ph-step-btn { background: none; border-color: transparent; box-shadow: none; }
-  .ph-step > .ph-title { font-size: calc(1rem * var(--text-scale, 1)); }
-  .ph .ui-tabs > [aria-selected="true"] { display: none; }
-  #screen-week > .ph .ph-title { display: none; }
-  #screen-day > .ph .ph-actions, #screen-day > .ph .ph-tools { display: none; }
-  #screen-week > .ph .ph-tools { flex: 1 1 auto; }
-}
-
 /* ══════════════════════════════════════════════════════════════
-   THE REBUILT PAGE HEADER (.hdr-*, Stage 20) — pageHeader({hdr: true}).
+   THE PAGE HEADER (.hdr-*, Stage 20) — pageHeader, js/47-header.js.
    Built new from the owner's turn-2 picture, value for value: the
    per-screen table in docs/handoff/header-exact-values.md (SRC = the copied
    source, docs/handoff/consistency/headers/source/header-system-turn2.dc.html).
    The row is a 1fr auto 1fr grid: the left group (back, title) starts
-   column 1, the centre (.hdr-context: the date, a stepper, the Day's date)
-   is column 2, so it sits in the middle of the BAR rather than of the space
-   the sides leave, and the right group (tools, actions, badge) ends column
-   3. Measured by everyHeaderMeasuresToTheExactValues. The pilot is Today;
-   the other screens keep .ph until part B moves them.
+   column 1, the centre (.hdr-context: the date, a stepper, the Day's date,
+   the meeting's steps) is column 2, so it sits in the middle of the BAR
+   rather than of the space the sides leave, and the right group (tools,
+   actions, badge) ends column 3. A row with no centre (.hdr-row--ends:
+   money, Sister Sync, Print) keeps its two groups at the ends. Buttons and
+   badges are border-box (52px is the whole button, the kids' tap rule); a
+   switch's cells are their picture size inside its 2px frame. Measured by
+   everyHeaderMeasuresToTheExactValues.
    ══════════════════════════════════════════════════════════════ */
 /* Bar: 64px (60 on a phone), #fff, a 2.5px ink rule under it (SRC 49, 122). */
 .hdr {
@@ -7240,29 +7070,37 @@
   font-family: var(--font-text); font-size: var(--hdr-label-size); font-weight: 600; color: var(--hdr-label-ink);
 }
 .hdr-end { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: var(--hdr-gap); }
-.hdr-lead, .hdr-actions, .hdr-tools { display: flex; align-items: center; gap: 8px; flex: none; }
-/* Title: head font 30px × the look's scale, 700, line-height 1 (SRC 50). */
+.hdr-row--ends { display: flex; justify-content: space-between; gap: var(--hdr-gap); }
+.hdr-row--ends > .hdr-start { flex: 1 1 auto; }
+.hdr-lead, .hdr-actions, .hdr-tools { display: flex; align-items: center; gap: var(--hdr-gap); flex: none; }
+/* Title: head font 30px × the look's scale, 700, line-height 1 (SRC 50);
+   the Day's date and the meeting's name 28px × (SRC 103, 210). */
 .hdr-title {
   margin: 0; white-space: nowrap; line-height: 1; color: var(--ink);
-  font-family: var(--font-head); font-weight: 700; font-size: calc(30px * var(--text-scale, 1));
+  font-family: var(--font-head); font-weight: 700; font-size: var(--hdr-title-size);
 }
-/* The Day's date as the title, in the centre: 28px × scale (SRC 103). */
-.hdr-context > .hdr-title { min-width: 220px; text-align: center; font-size: calc(28px * var(--text-scale, 1)); }
+.hdr-context > .hdr-title { min-width: 220px; text-align: center; font-size: var(--hdr-title-small); }
+.hdr--meeting .hdr-title { font-size: var(--hdr-title-small); }
 .hdr-title-btn {
   display: inline-block; min-height: 52px; margin: 0; padding: 0; border: 0; background: none;
   color: inherit; font: inherit; line-height: 52px; white-space: nowrap; cursor: pointer;
 }
-/* Buttons: 52px, white, 2px ink, radius 14, the look's hard shadow; ◀ ▶ glyph
-   17px, a word 18px (SRC 63, 100). */
+/* The week between its ◀ ▶: at least 200px (SRC 64). */
+.hdr-label { min-width: 200px; text-align: center; }
+/* Buttons: 52px, white, 2px ink, radius 14, the look's hard shadow; an
+   icon 20px, ◀ ▶ 17px, a word 18px (SRC 63, 100, 111). */
 .hdr-btn {
   box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-width: 52px; height: 52px; padding: 0;
   background: var(--paper); color: var(--ink);
   border: var(--bw-chip) solid var(--ink); border-radius: 14px; box-shadow: var(--hdr-sh);
-  font-family: var(--font-text); font-size: var(--hdr-word-size); cursor: pointer;
+  font-family: var(--font-text); font-size: var(--hdr-icon-size); line-height: 1; cursor: pointer;
 }
 .hdr-step { width: 52px; font-size: var(--hdr-glyph-size); }
-.hdr-back { padding: 0 16px; }
+.hdr-back { padding: 0 16px; font-size: var(--hdr-word-size); }
+.hdr-btn--word { padding: 0 16px; font-size: var(--hdr-word-size); }
+/* Print, on the preview only: the look's main fill, "Print" 18px 600 (SRC 90). */
+.hdr-print { padding: 0 18px; background: var(--btn-main); color: var(--btn-main-ink); font-size: var(--hdr-word-size); font-weight: 600; }
 /* Badge: 52×52 circle, pink, 2px ink, emoji 24px, no name (SRC 52). */
 .hdr-badge {
   box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
@@ -7271,24 +7109,143 @@
   border: var(--bw-chip) solid var(--ink); border-radius: 50%;
   font-family: var(--font-text); font-size: var(--hdr-emoji-size); line-height: 1; cursor: pointer;
 }
+.hdr-badge--text { width: auto; gap: 4px; padding: 0 12px 0 4px; border-radius: var(--radius-pill); }
+.hdr-badge-text { white-space: nowrap; font-size: var(--hdr-word-size); }
 /* display:inline-flex outranks the browser's [hidden]; the meeting lock hides
    a badge with `hidden` (applyMeetingLock). */
 .hdr-badge[hidden] { display: none; }
+/* One joined switch (Week's 📋 / 🖨, the Day's 1 2 3, the meeting's steps):
+   a 2px ink frame, radius 14, cells 48px high with 2px dividers, the chosen
+   cell the look's --sel (Pop yellow, Calm navy with white) (SRC 67-69, 106-110,
+   213-218). */
+.hdr-switch {
+  box-sizing: border-box; flex: none; display: flex;
+  border: var(--bw-chip) solid var(--ink); border-radius: 14px; overflow: hidden; background: var(--paper);
+}
+.hdr-switch-cell {
+  box-sizing: content-box; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 56px; height: 48px; margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-text); font-size: var(--hdr-icon-size); line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.hdr-switch-cell + .hdr-switch-cell { border-left: var(--bw-chip) solid var(--ink); }
+.hdr-switch-cell[aria-selected="true"], .hdr-switch-cell[aria-pressed="true"], .hdr-switch-cell[aria-current] { background: var(--sel); color: var(--sel-ink); }
+.hdr-span > .hdr-switch-cell { width: 52px; font-size: var(--hdr-span-size); }
+.hdr-span > [aria-pressed="true"], .hdr-steps > [aria-current] { font-weight: 600; }
+/* Chosen, but the screen can carry fewer days: struck through, not faded. */
+.hdr-switch-cell--off { color: var(--ink-light); text-decoration: line-through; }
+.hdr-steps > .hdr-switch-cell { width: auto; padding: 0 18px; font-size: var(--hdr-word-size); }
+.hdr-seg-num { display: none; }
 /* Second rows: 44px; the meeting's under a 1.5px dashed rule in the page's
-   grid colour (SRC 207, 222). */
+   grid colour, body 18px ink, the week at its right (SRC 207, 222-227). */
 .hdr-sub, .hdr-r2 {
-  box-sizing: content-box; height: var(--hdr-sub-h); padding: 0 var(--hdr-pad);
-  display: flex; align-items: center; gap: 10px;
-  font-family: var(--font-text); font-size: var(--hdr-word-size); color: var(--ink);
+  box-sizing: content-box; height: var(--hdr-sub-h); padding: 0 var(--hdr-r2-pad);
+  display: flex; align-items: center; gap: var(--hdr-r2-gap);
+  font-family: var(--font-text); font-size: var(--hdr-r2-size); color: var(--hdr-label-ink);
 }
 .hdr-sub { border-top: var(--bw-info) solid var(--ink); }
-.hdr-r2 { border-top: var(--bw-info) dashed var(--page-grid); }
+.hdr-r2 { justify-content: space-between; border-top: var(--bw-info) dashed var(--page-grid); }
+.hdr-r2-start, .hdr-r2-end { display: flex; align-items: center; gap: var(--hdr-r2-gap); min-width: 0; }
+.hdr-r2-end { flex: none; }
+.hdr-week { white-space: nowrap; font-weight: 600; }
+.hdr-sub .ui-kids { margin-left: auto; }
+/* Money: 72px, its buttons and badge 54px, ◀ 18px, ? 24px 600, the badge's
+   emoji 26px; her two tabs are pills in the head font, 26px × the look's
+   scale, the current one --sel (SRC 168-176). No title and no date: the
+   tabs name the page. */
+.hdr--money { --hdr-pad: 18px; --hdr-gap: 16px; }
 .hdr--money .hdr-row { height: var(--hdr-money-h); }
+.hdr--money .hdr-btn, .hdr--money .hdr-badge { min-width: var(--hdr-money-btn); width: var(--hdr-money-btn); height: var(--hdr-money-btn); }
+.hdr--money .hdr-back { padding: 0; font-size: var(--hdr-money-glyph); }
+.hdr--money .hdr-actions .hdr-btn { font-size: var(--hdr-money-help-size); font-weight: 600; }
+.hdr--money .hdr-badge { font-size: var(--hdr-money-emoji); }
+.hdr-tabs { display: flex; align-items: center; gap: 10px; flex: none; min-width: 0; }
+.hdr-tab {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 54px; padding: 0 22px;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  font-family: var(--font-head); font-weight: 700; font-size: var(--hdr-tab-size);
+  line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.hdr-tab[aria-current="page"] { background: var(--sel); color: var(--sel-ink); cursor: default; }
+/* A grown-up's five, in the sub-bar: the current one named, the others'
+   icons; a tag says whose page each is. */
+.hdr-tab-tag { font-family: var(--font-text); font-size: max(13px, calc(0.7rem * var(--text-scale, 1))); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+.hdr-tabs--many .hdr-tab:not([aria-current]) { padding: 0; min-width: 44px; }
+.hdr-tabs--many .hdr-tab:not([aria-current]) .hdr-tab-word, .hdr-tabs--many .hdr-tab:not([aria-current]) .hdr-tab-tag { display: none; }
+.hdr-sub .hdr-tab { min-height: 44px; height: 44px; min-width: 44px; font-size: calc(1.1rem * var(--text-scale, 1)); }
+/* The meeting: row 1 62px with the girls (8px apart) at its left, 🗣️ 22px. */
 .hdr--meeting .hdr-row { height: var(--hdr-meeting-h); }
+.hdr--meeting .hdr-lead { gap: var(--hdr-girls-gap); }
+.hdr--meeting .hdr-actions .hdr-btn { width: 52px; font-size: var(--hdr-meeting-icon-size); }
 .hdr--parent { background: var(--accent-purple); }
+/* A grown-up's header keeps the 44px parent buttons and badge (PR 5 rebuilds it). */
+.hdr--parent .hdr-btn, .hdr--parent .hdr-badge { height: 44px; min-width: 44px; }
+.hdr--parent .hdr-badge:not(.hdr-badge--text) { width: 44px; }
+/* The money pages and the meeting sit in padded columns: their header spans
+   the screen, and the meeting's is a band in the sheet's flex column, not a
+   pinned header over the cards (theMeetingKeepsItsHeadAndFeet). */
+#familyMeetingBody > .hdr { position: relative; flex: none; margin: -1.2rem -1.2rem 8px; }
+.mm-screen:has(.sd) #familyMeetingBody > .hdr { margin: 0 -14px 6px; }
+#mnyPage1Wrap > .hdr, #mnySchoolWrap > .hdr, #mnyStoryWrap > .hdr { margin: -0.8rem -0.8rem 0; }
+@media (min-width: 768px) {
+  #mnyPage1Wrap > .hdr, #mnySchoolWrap > .hdr, #mnyStoryWrap > .hdr { margin: 0 -14px; }
+}
+#screen-day > .hdr { flex: none; }
+/* Narrower than an iPad held sideways (and on a phone) the back button keeps
+   only its ◀, its "Back to <screen>" in the label: there is no room for the
+   word beside the Day's longest date (difference 3, kept). */
+@media (max-width: 899px) {
+  .hdr-back-to { display: none; }
+  .hdr-back { width: 52px; padding: 0; font-size: var(--hdr-glyph-size); }
+}
 @media (max-width: 699px) {
-  /* Phone title: head font 26px × the look's scale (SRC 123). */
-  .hdr-title { font-size: calc(26px * var(--text-scale, 1)); }
+  /* Week and Day on a phone (SRC 133-151): pad 10, gap 6, one flex row, the
+     centre taking the room between the sides — the week or the date between
+     its ◀ ▶ (the picture's flex:1). Week has no title and shows the switch's
+     other cell alone, a 52px button (🖨 opens the preview); the Day keeps ◀
+     back and the badge either side, so its date is in the middle of the bar,
+     body 20px 600, its ◀ ▶ plain arrows, and drops 1 2 3 and 📑 (tapping the
+     date is Copy a day there, D27). */
+  #screen-week > .hdr, #screen-day > .hdr { --hdr-pad: 10px; --hdr-gap: 6px; }
+  #screen-week > .hdr .hdr-row, #screen-day > .hdr .hdr-row { display: flex; }
+  #screen-week > .hdr .hdr-context, #screen-day > .hdr .hdr-context { flex: 1 1 auto; min-width: 0; gap: var(--hdr-gap); }
+  #screen-week > .hdr .hdr-label, #screen-day > .hdr .hdr-context > .hdr-title { flex: 1 1 auto; min-width: 0; }
+  #screen-week > .hdr .hdr-start { display: none; }
+  #screen-week > .hdr .hdr-switch { box-shadow: var(--hdr-sh); }
+  #screen-week > .hdr .hdr-switch > [aria-selected="true"] { display: none; }
+  #screen-week > .hdr .hdr-switch-cell { width: 48px; border-left: 0; }
+  #screen-day > .hdr .hdr-context > .hdr-title { font-family: var(--font-text); font-size: var(--hdr-label-size); font-weight: 600; }
+  #screen-day > .hdr .hdr-step { background: none; border-color: transparent; box-shadow: none; }
+  #screen-day > .hdr .hdr-tools, #screen-day > .hdr .hdr-actions { display: none; }
+  /* Money on a phone (SRC 184-192): 64px, pad 8, gap 6, 52px buttons; the
+     tabs one joined switch taking the room, the current one named 18px 600,
+     the other its icon 21px; the date (D26) hides. */
+  .hdr--money { --hdr-pad: 8px; --hdr-gap: 6px; }
+  .hdr--money .hdr-context { display: none; }
+  .hdr--money .hdr-lead { flex: 1 1 auto; min-width: 0; }
+  .hdr-tabs { flex: 1 1 auto; gap: 0; border: var(--bw-chip) solid var(--ink); border-radius: 14px; overflow: hidden; background: var(--paper); }
+  .hdr-tab {
+    box-sizing: content-box; flex: none; min-height: 0; width: 52px; height: 48px; padding: 0; border: 0; border-radius: 0;
+    font-family: var(--font-text); font-weight: 400; font-size: var(--hdr-tab-icon-size);
+  }
+  .hdr-tab + .hdr-tab { border-left: var(--bw-chip) solid var(--ink); }
+  .hdr-tab[aria-current="page"] { flex: 1 1 auto; width: auto; gap: 6px; font-size: var(--hdr-word-size); font-weight: 600; }
+  .hdr-tab:not([aria-current]) .hdr-tab-word, .hdr-tab-tag, .hdr-tabs--many .hdr-tab-word, .hdr-sub .ui-kids .hdr-tab-word { display: none; }
+  .hdr-sub .hdr-tabs { flex: none; gap: var(--space-1); border: 0; border-radius: 0; overflow: visible; background: none; }
+  .hdr-sub .hdr-tab { box-sizing: border-box; width: auto; height: 44px; min-width: 44px; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); }
+  .hdr-sub .ui-kids > button { min-width: 44px; padding: 0 var(--space-2); }
+  /* The meeting on a phone (SRC 235-250): pad 10, no title, steps as
+     numbers in 46px cells (✓ 18px, 2 3 19px), no week in row 2. The row's
+     gap is 4px, not the picture's 6: with 🔊 Sound kept beside 🗣️
+     (difference 2) the two girls, the steps and the two buttons need 378px
+     at 6px and a 390px phone has 370 (see header-exact-values.md). */
+  .hdr--meeting { --hdr-pad: 10px; --hdr-gap: 4px; }
+  .hdr--meeting .hdr-title, .hdr-r2 .hdr-week, .hdr-r2 .mm-weekbar-late { display: none; }
+  .hdr-steps > .hdr-switch-cell { width: 46px; padding: 0; }
+  .hdr-seg-word { display: none; }
+  .hdr-seg-num { display: inline; font-size: var(--hdr-span-size); }
 }
 
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */
@@ -8084,7 +8041,7 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 
 /* ── Plan v18 (owner, 2026-10-05): the phone ──
    C · Heads: the money pages' and the meeting's headers are pageHeader's
-   (PR 4, js/47-header.js and the .ph rules).
+   (PR 4, js/47-header.js and the .hdr rules).
    D · Tables: at least 15px on the phone.
    E · I choose: the columns stack, each says where its block starts. */
 .sd-col-start { display: none; }
@@ -8250,15 +8207,21 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
    wears a green ✓. The four Sunday steps as words between ›, the current one
    in a pill, a done one with ✓. */
 .mm-screen:has(.sd) { padding: 0 14px 6px; }
-.sd-avs { display: flex; gap: var(--space-2); }
-.sd-av { position: relative; width: 52px; height: 52px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; color: var(--mny-v15-ink); }
-.sd-av-pic { box-sizing: border-box; width: 52px; height: 52px; border-radius: var(--radius-full); border: var(--bw-chip) solid var(--mny-v15-ink); background: var(--mny-v15-white); display: flex; align-items: center; justify-content: center; font-size: calc(1.5rem * var(--text-scale, 1)); }
-.sd-av.on .sd-av-pic { border-width: var(--bw-card); background: var(--mny-v15-jenn); box-shadow: 0 0 0 var(--bw-rule) var(--mny-v15-red); }
+/* The girls as the owner's turn-2 meeting picture draws them (SRC 208-209,
+   236-237): 52px circles, 2px ink on white, emoji 24px (22 on a phone); the
+   chosen one 2.5px ink on the badge's pink inside a 3px pink ring — the
+   same literals in both looks (--hdr-badge-bg, --hdr-ring). */
+.sd-avs { display: flex; gap: var(--hdr-girls-gap); }
+.sd-av { position: relative; width: 52px; height: 52px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; color: var(--hdr-label-ink); }
+.sd-av-pic { box-sizing: border-box; width: 52px; height: 52px; border-radius: var(--radius-full); border: var(--bw-chip) solid var(--hdr-label-ink); background: var(--paper); display: flex; align-items: center; justify-content: center; font-size: var(--hdr-girl-emoji-size); }
+.sd-av.on .sd-av-pic { border-width: var(--bw-card); background: var(--hdr-badge-bg); box-shadow: 0 0 0 var(--bw-rule) var(--hdr-ring); }
 .sd-av-ok { position: absolute; right: -6px; top: -2px; width: 17px; height: 17px; border-radius: var(--radius-full); background: var(--mny-v15-teal-ink); color: var(--mny-v15-white); font-size: calc(0.8125rem * var(--text-scale, 1)); line-height: 17px; text-align: center; }
-.sd-steps { display: flex; gap: var(--space-2); align-items: center; white-space: nowrap; }
-.sd-stepsep { color: var(--ink-light); }
+/* Row 2's steps, as drawn (SRC 222-225, 248-250): ink words and › 10px apart
+   (6 on a phone), the current one a pill in the look's main fill, 600. */
+.sd-steps { display: flex; gap: var(--hdr-r2-gap); align-items: center; white-space: nowrap; }
+.sd-stepsep { color: var(--hdr-label-ink); }
 .sd-stepchip { display: inline-flex; align-items: center; white-space: nowrap; }
-.sd-stepchip.on { padding: 2px var(--space-3); border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill); background: var(--btn-main); color: var(--btn-main-ink); font-weight: 700; }
+.sd-stepchip.on { padding: var(--hdr-pill-pad); border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill); background: var(--btn-main); color: var(--btn-main-ink); font-weight: 600; }
 
 /* The content: main card and a 356px right side (§0), filling the screen. */
 .sd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 356px; gap: 14px; align-items: stretch; }

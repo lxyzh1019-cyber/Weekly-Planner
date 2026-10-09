@@ -246,7 +246,7 @@
   <!-- The standard page header, drawn by renderWeek (weekRenderHeader): My
        Week, the week stepper, the Full / Print preview tabs, Print only on
        the preview, the profile badge. One row at every size. -->
-  <header class="ph ph--standard"><div class="ph-row ph-main"></div></header>
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
   <!-- The offer to add the missing School Day cards, above the grid it is about,
@@ -464,7 +464,7 @@
        through the one back stack, the date as the title between ◀ ▶, the
        1 / 2 / 3 day tabs, 📑 Copy a day and the profile badge. One row: the
        schedule below is the screen's whole job. -->
-  <header class="ph ph--standard"><div class="ph-row ph-main"></div></header>
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
 
   <!-- One scroll container for the whole screen. It used to be three nested
        ones — workspace, lane, timeline-wrap — which on an iPad meant the schedule
@@ -485,7 +485,7 @@
 <div class="screen" id="screen-sync">
   <!-- The standard page header, drawn by renderSync: Sister Sync and the
        profile badge. No ◀ — it is a nav tab. -->
-  <header class="ph ph--standard"><div class="ph-row ph-main"></div></header>
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
 
   <div class="week-nav">
     <button class="btn-icon" onclick="changeSyncDay(-1)">◀</button>
@@ -741,7 +741,7 @@
 <div class="screen" id="screen-print">
   <!-- The standard page header, drawn by openPrint, never printed: ◀ back
        through the one back stack, Print week, 🖨 Print. -->
-  <header class="ph ph--standard no-print"><div class="ph-row ph-main"></div></header>
+  <header class="hdr hdr--standard no-print"><div class="hdr-row"></div></header>
   <div class="print-controls no-print">
     <label class="print-ctrl">🕐 Show
       <select id="printStartHour" aria-label="Print from hour" onchange="onPrintWindowChange()"></select>

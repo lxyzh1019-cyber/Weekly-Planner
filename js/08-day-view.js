@@ -64,7 +64,7 @@ function renderDaySpanTabs() {
   [1, 2, 3].forEach(n => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'day-span-tab' + (cur === n ? ' active' : '') + (n > avail ? ' unavailable' : '');
+    b.className = 'hdr-switch-cell' + (n > avail ? ' hdr-switch-cell--off' : '');
     b.textContent = String(n);
     b.setAttribute('aria-label', n === 1 ? 'Show one day' : `Show ${n} days side by side`);
     b.setAttribute('aria-pressed', cur === n ? 'true' : 'false');
@@ -141,28 +141,29 @@ function dayHeadingText() {
 function dayHeadingAria(text) { return `${text} — copy a day`; }
 function renderDayHeading() {
   const text = dayHeadingText();
-  const btn = document.querySelector('#screen-day > .ph .ph-title-btn');
-  const el = btn || document.querySelector('#screen-day > .ph .ph-title');
+  const btn = document.querySelector('#screen-day > .hdr .hdr-title-btn');
+  const el = btn || document.querySelector('#screen-day > .hdr .hdr-title');
   if (el) el.textContent = text;
   if (btn) btn.setAttribute('aria-label', dayHeadingAria(text));
 }
 /* The Day's standard header: ◀ back through the one back stack (named, as
    the picture draws it), the date as the title between ◀ ▶, the 1 / 2 / 3
-   tabs (renderDaySpanTabs fills #daySpanTabs), 📑 Copy a day and the badge.
+   span switch (renderDaySpanTabs fills #daySpanTabs), 📑 Copy a day and the
+   badge.
    A phone hides the tabs and 📑 (css): tapping the date is Copy a day there,
    the pictures' date menu (D27); the iPad keeps 📑 as well.
    The 🌙 sat here once (R5 §7 Q3): today's mood is asked on Today, and a
    past day is reflected on from its 📑 sheet. */
 function dayRenderHeader() {
   const title = dayHeadingText();
-  phMount('screen-day', {
-    back: { to: navReturnTo('week'), named: true, data: { 'ph-action': 'back', 'ph-fallback': 'week' } },
+  hdrMount('screen-day', {
+    back: { to: navReturnTo('week'), named: true, data: { 'hdr-action': 'back', 'hdr-fallback': 'week' } },
     title,
-    step: { prev: { aria: 'Previous day', data: { 'ph-action': 'day-prev' } },
-            next: { aria: 'Next day', data: { 'ph-action': 'day-next' } },
-            titleAction: { aria: dayHeadingAria(title), data: { 'ph-action': 'day-copy' } } },
-    tools: '<div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>',
-    actions: [{ label: '📑', aria: 'Copy a day', data: { 'ph-action': 'day-copy' } }],
+    step: { prev: { aria: 'Previous day', data: { 'hdr-action': 'day-prev' } },
+            next: { aria: 'Next day', data: { 'hdr-action': 'day-next' } },
+            titleAction: { aria: dayHeadingAria(title), data: { 'hdr-action': 'day-copy' } } },
+    tools: '<div class="hdr-switch hdr-span" id="daySpanTabs" role="group" aria-label="How many days to show"></div>',
+    actions: [{ label: '📑', aria: 'Copy a day', data: { 'hdr-action': 'day-copy' } }],
     badge: kidHeadBadge('dayProfileBadge', isParent() ? parentViewing : profile, isParent()),
   });
 }

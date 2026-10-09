@@ -1,59 +1,62 @@
 /* ════════════════════════════════════════════════════════════════
-   THE PAGE HEADER — one header for every screen (Consistency PR 3)
+   THE PAGE HEADER — one header for every screen (Consistency PR 3, rebuilt
+   in Stage 20 from the owner's turn-2 picture)
 
-   pageHeader({variant, back, lead, title, context, tools, actions, badge, sub})
-   returns the header's markup: `[◀ back?] [lead] [Title] [context] [tools]
-   [actions ≤2] [profile badge]`
-   in one row, and an optional sub-bar under it for tabs, a stepper or the kid
-   switch. PR 4 moves the kid screens onto it — Today, Week, Day, Sister Sync
-   and Print (phMount below), the money pages (mnyHead, js/22) and the
-   family meeting (mmHead, js/15) — and PR 5 the parent portal's .parent-bar. Its sizes are the --hdr-* tokens and
-   its classes the .ph-* rules in css/app.css.
+   pageHeader({variant, back, lead, title, step, context, centre, tools,
+   actions, badge, sub}) returns the header's markup: one row of three groups
+   on a grid (css/app.css, THE PAGE HEADER):
+     .hdr-start   [◀ back] [lead] [Title]
+     .hdr-context in the middle of the BAR — the date, the week's ◀ label ▶,
+                  the Day's ◀ date ▶ (its date is its title) or the meeting's
+                  steps
+     .hdr-end     [tools] [actions ≤2] [profile badge, always last]
+   and an optional second row under it. A header with no centre draws its two
+   groups at the ends (.hdr-row--ends). The values are the per-screen table in
+   docs/handoff/header-exact-values.md, measured by
+   everyHeaderMeasuresToTheExactValues (tests/smoke.js). PR 4 moves the kid
+   screens onto it — Today, Week, Day, Sister Sync and Print (hdrMount below),
+   the money pages (mnyHead, js/22) and the family meeting (mmHead, js/15) —
+   and PR 5 the parent portal's .parent-bar.
 
-   Variants, row heights as the owner's header pictures draw them
-   (docs/handoff/consistency/headers/measurements.txt). The rules sit under
-   the rows: a 2.5px rule ends the header (2px at 1x), a 1.5px rule (1px at 1x)
-   parts row 1 from a sub-bar or the meeting's second row.
-     standard  --hdr-h: 64px on the iPad, 60px on a phone (≤699px); the kid
-               screens, so its buttons and badge are 52px (the kids' tap
-               rule; parent buttons stay 44px)
-     money     --hdr-money-h: 72px / 64px, one row; 54px buttons, 52px on a phone
-     meeting   two rows, --hdr-meeting-h 62px / 60px + 44px, 52px buttons; `sub` fills the
-               second row (the Sunday steps or where the family left off, and
-               the week) instead of a sub-bar, under a 1.5px dashed rule in
-               the page's grid colour. The meeting screen's missing bottom
-               bar is the screen's, not this.
+   Variants (row heights from the table; a 2.5px ink rule ends the header):
+     standard  64px on the iPad, 60px on a phone (≤699px); the kid screens,
+               so its buttons and badge are 52px (the kids' tap rule)
+     money     72px / 64px, one row; 54px buttons and badge, 52px on a phone
+     meeting   two rows, 62px / 60px + 44px under a 1.5px dashed rule in the
+               page's grid colour; `sub` fills the second row
      parent    standard height on the portal's purple (--accent-purple)
 
    Slots, every text escaped here (ARCHITECTURE.md, Escaping):
      back     { to, data, named }    ◀ with aria-label "Back to <to>"; `named`
               also writes <to> beside the ◀ (Day's "◀ Week")
-     lead     markup the caller built and escaped, before the title (the
-              meeting's girls as round pictures)
+     lead     markup the caller built and escaped, in the left group after
+              ◀ (the meeting's girls, a kid's money tabs)
      title    text                   the screen's name, no emoji (D5)
-     step     { prev, next, titleAction }  ◀ ▶ either side of the title,
-              each { aria, data } (Day: the date is the title); titleAction
-              { aria, data } makes the title itself a button
-              (.ph-title-btn: on a phone, tapping the Day's date is Copy a
-              day, D27)
-     context  text                   e.g. the date; a phone hides it on the
-              money header only (D26)
-     tools    markup the caller built and escaped, in the row after the
-              title (Week's stepper and view tabs, Day's 1 2 3)
-     actions  [{ label, aria, data, pressed }] at most two; a third is not
-              drawn; `pressed` (true/false) writes aria-pressed (the
-              meeting's 🔊 Sound)
+     step     { prev, next, titleAction, labelId }  ◀ ▶ in the centre, each
+              { aria, data }, either side of `context` when there is one (the
+              Week's week; `labelId` is its id) or else of the title (the Day:
+              the date is the title, in the centre). titleAction { aria, data }
+              makes the title itself a button (.hdr-title-btn: on a phone,
+              tapping the Day's date is Copy a day, D27)
+     context  text                   the date; a phone hides it on the money
+              header only (D26)
+     centre   markup the caller built and escaped, in the centre (the
+              meeting's steps)
+     tools    markup the caller built and escaped, in the right group (the
+              Week's Full / Preview switch, the Day's 1 2 3)
+     actions  [{ label, aria, data, pressed, cls }] at most two; a third is
+              not drawn; `pressed` (true/false) writes aria-pressed (the
+              meeting's 🔊 Sound); `cls` adds a class (hdr-print: the Week's
+              Print; hdr-btn--word: a button with a word)
      badge    { text, icon, avatar, aria, data, id }  always far right;
               `avatar` draws only the icon in a circle, its words in the
               aria-label (every kid header, D25); otherwise the icon, then
               the text
-     sub      markup the caller built and escaped (.ui-tabs, .ui-stepper,
-              .ui-kids); drawn as the 44px sub-bar (--hdr-sub-h)
+     sub      markup the caller built and escaped: the second row (.hdr-sub,
+              or .hdr-r2 on the meeting)
      noPrint  true: the header is not printed (Print's own header)
      moneySurface  true: the header is a money root (data-money-surface,
               ARCHITECTURE.md) — the money pages' and the meeting's
-     hdr      true: draw the rebuilt .hdr-* header (Stage 20, below
-              hdrPageHeader) instead of .ph-*; Today first
    `data` is { 'mny-action': 'x', … } and becomes data-mny-action="x": the
    header wires no handler of its own; the screen's delegated listener reads
    the button the way it reads its own (ARCHITECTURE.md prefers data
@@ -64,13 +67,13 @@
    end lets tests/helpers.test.js render every slot combination in Node.
    ════════════════════════════════════════════════════════════════ */
 /* Each variant's class, written out whole so tests/check-dead-css.js finds it. */
-const PH_VARIANT_CLASS = { standard: 'ph--standard', money: 'ph--money', meeting: 'ph--meeting', parent: 'ph--parent' };
-const PH_VARIANTS = Object.keys(PH_VARIANT_CLASS);
-const PH_MAX_ACTIONS = 2;
+const HDR_VARIANT_CLASS = { standard: 'hdr--standard', money: 'hdr--money', meeting: 'hdr--meeting', parent: 'hdr--parent' };
+const HDR_VARIANTS = Object.keys(HDR_VARIANT_CLASS);
+const HDR_MAX_ACTIONS = 2;
 
 /* data-* attributes from { name: value }. A name that is not lower-case
    letters, digits and hyphens is dropped rather than written into markup. */
-function phDataAttrs(data) {
+function hdrDataAttrs(data) {
   if (!data) return '';
   return Object.keys(data)
     .filter(k => /^[a-z][a-z0-9-]*$/.test(k))
@@ -78,127 +81,81 @@ function phDataAttrs(data) {
     .join('');
 }
 
-function phButton(cls, aria, data, contentHtml, id, pressed) {
+function hdrButton(cls, aria, data, contentHtml, id, pressed) {
   const ariaAttr = aria ? ` aria-label="${escapeAttr(aria)}" title="${escapeAttr(aria)}"` : '';
   const idAttr = id ? ` id="${escapeAttr(id)}"` : '';
   const pressedAttr = typeof pressed === 'boolean' ? ` aria-pressed="${pressed}"` : '';
-  return `<button type="button" class="${cls}"${ariaAttr}${pressedAttr}${phDataAttrs(data)}${idAttr}>${contentHtml}</button>`;
+  return `<button type="button" class="${cls}"${ariaAttr}${pressedAttr}${hdrDataAttrs(data)}${idAttr}>${contentHtml}</button>`;
 }
 
 /* The text badge keeps the icon and the text as two spans with a space
    between, so its textContent is the caller's whole wording. */
-function phBadgeHtml(b) {
-  const iconHtml = b.icon ? `<span class="ph-av" aria-hidden="true">${escapeHtml(b.icon)}</span>` : '';
-  if (b.avatar) return phButton('ph-badge ph-badge--avatar', b.aria || b.text, b.data, iconHtml, b.id);
-  const textHtml = b.text ? `${iconHtml ? ' ' : ''}<span class="ph-badge-text">${escapeHtml(b.text)}</span>` : '';
-  return phButton('ph-badge', b.aria, b.data, iconHtml + textHtml, b.id);
+function hdrBadgeHtml(b) {
+  const iconHtml = b.icon ? `<span aria-hidden="true">${escapeHtml(b.icon)}</span>` : '';
+  if (b.avatar) return hdrButton('hdr-badge', b.aria || b.text, b.data, iconHtml, b.id);
+  const textHtml = b.text ? `${iconHtml ? ' ' : ''}<span class="hdr-badge-text">${escapeHtml(b.text)}</span>` : '';
+  return hdrButton('hdr-badge hdr-badge--text', b.aria, b.data, iconHtml + textHtml, b.id);
 }
 
-function phStepButton(s, glyph) {
-  return phButton('ph-btn ph-step-btn', s && s.aria, s && s.data, `<span aria-hidden="true">${glyph}</span>`);
+function hdrStepButton(s, glyph) {
+  return hdrButton('hdr-btn hdr-step', s && s.aria, s && s.data, `<span aria-hidden="true">${glyph}</span>`);
 }
 
 function pageHeader(o) {
   o = o || {};
-  const variant = PH_VARIANTS.indexOf(o.variant) >= 0 ? o.variant : 'standard';
-  if (o.hdr) return hdrPageHeader(o, variant);
-  const backNameHtml = o.back && o.back.named && o.back.to ? ` <span class="ph-back-to">${escapeHtml(o.back.to)}</span>` : '';
-  const backHtml = o.back
-    ? phButton('ph-btn ph-back', 'Back to ' + (o.back.to || ''), o.back.data, '<span aria-hidden="true">◀</span>' + backNameHtml)
-    : '';
-  const titleAction = o.step && o.step.titleAction;
-  const titleInnerHtml = titleAction
-    ? `<button type="button" class="ph-title-btn"${phDataAttrs(titleAction.data)} aria-label="${escapeAttr(titleAction.aria || '')}">${escapeHtml(o.title || '')}</button>`
-    : escapeHtml(o.title || '');
-  const bareTitleHtml = o.title ? `<h2 class="ph-title">${titleInnerHtml}</h2>` : '';
-  const titleHtml = o.step
-    ? `<div class="ph-step">${phStepButton(o.step.prev, '◀')}${bareTitleHtml}${phStepButton(o.step.next, '▶')}</div>`
-    : bareTitleHtml;
-  const leadHtml = o.lead ? `<div class="ph-lead">${o.lead}</div>` : '';
-  const contextHtml = o.context ? `<div class="ph-context">${escapeHtml(o.context)}</div>` : '';
-  const toolsHtml = o.tools ? `<div class="ph-tools">${o.tools}</div>` : '';
-  const actionsHtml = (o.actions || []).slice(0, PH_MAX_ACTIONS)
-    .map(a => phButton('ph-btn', a.aria, a.data, escapeHtml(a.label || ''), null, a.pressed))
-    .join('');
-  const actionsWrapHtml = actionsHtml ? `<div class="ph-actions">${actionsHtml}</div>` : '';
-  const badgeHtml = o.badge ? phBadgeHtml(o.badge) : '';
-  const subHtml = o.sub || '';
-  const mainRowHtml = `<div class="ph-row ph-main">${backHtml}${leadHtml}${titleHtml}${contextHtml}${toolsHtml}${actionsWrapHtml}${badgeHtml}</div>`;
-  const lowerHtml = !subHtml ? ''
-    : variant === 'meeting' ? `<div class="ph-row ph-r2">${subHtml}</div>`
-    : `<div class="ph-row ph-sub">${subHtml}</div>`;
-  const printCls = o.noPrint ? ' no-print' : '';
-  const surfaceAttr = o.moneySurface ? ' data-money-surface' : '';
-  return `<header class="ph ${PH_VARIANT_CLASS[variant]}${printCls}"${surfaceAttr}>${mainRowHtml}${lowerHtml}</header>`;
-}
-
-/* ── The rebuilt header (Stage 20): pageHeader({hdr: true, …}) ──
-   The same options, drawn as the owner's turn-2 picture draws them
-   (docs/handoff/header-exact-values.md, per-screen table) in new .hdr-*
-   markup, three groups on one grid row (css/app.css, THE REBUILT PAGE
-   HEADER): .hdr-start [back][lead][title] · .hdr-context in the middle of
-   the bar (the context text, or ◀ title ▶ when `step` is given — the Day's
-   date is its title) · .hdr-end [tools][actions][badge]. Both groups are
-   always drawn, so the badge is always the last thing in .hdr-end. The pilot
-   is Today; part B moves the other screens and retires the .ph form. */
-const HDR_VARIANT_CLASS = { standard: 'hdr--standard', money: 'hdr--money', meeting: 'hdr--meeting', parent: 'hdr--parent' };
-
-function hdrBadgeHtml(b) {
-  const iconHtml = b.icon ? `<span aria-hidden="true">${escapeHtml(b.icon)}</span>` : '';
-  if (b.avatar) return phButton('hdr-badge', b.aria || b.text, b.data, iconHtml, b.id);
-  const textHtml = b.text ? `${iconHtml ? ' ' : ''}<span class="hdr-badge-text">${escapeHtml(b.text)}</span>` : '';
-  return phButton('hdr-badge', b.aria, b.data, iconHtml + textHtml, b.id);
-}
-
-function hdrStepButton(s, glyph) {
-  return phButton('hdr-btn hdr-step', s && s.aria, s && s.data, `<span aria-hidden="true">${glyph}</span>`);
-}
-
-function hdrPageHeader(o, variant) {
+  const variant = HDR_VARIANTS.indexOf(o.variant) >= 0 ? o.variant : 'standard';
   const backNameHtml = o.back && o.back.named && o.back.to ? ` <span class="hdr-back-to">${escapeHtml(o.back.to)}</span>` : '';
   const backHtml = o.back
-    ? phButton('hdr-btn hdr-back', 'Back to ' + (o.back.to || ''), o.back.data, '<span aria-hidden="true">◀</span>' + backNameHtml)
+    ? hdrButton('hdr-btn hdr-back', 'Back to ' + (o.back.to || ''), o.back.data, '<span aria-hidden="true">◀</span>' + backNameHtml)
     : '';
-  const titleAction = o.step && o.step.titleAction;
+  const step = o.step;
+  const titleAction = step && step.titleAction;
   const titleInnerHtml = titleAction
-    ? `<button type="button" class="hdr-title-btn"${phDataAttrs(titleAction.data)} aria-label="${escapeAttr(titleAction.aria || '')}">${escapeHtml(o.title || '')}</button>`
+    ? `<button type="button" class="hdr-title-btn"${hdrDataAttrs(titleAction.data)} aria-label="${escapeAttr(titleAction.aria || '')}">${escapeHtml(o.title || '')}</button>`
     : escapeHtml(o.title || '');
   const titleHtml = o.title ? `<h2 class="hdr-title">${titleInnerHtml}</h2>` : '';
+  /* The title stays in the left group unless ◀ ▶ step through it (the Day). */
+  const titleInCentre = !!step && !o.context;
+  const labelIdAttr = step && step.labelId ? ` id="${escapeAttr(step.labelId)}"` : '';
+  const stepMiddleHtml = titleInCentre ? titleHtml
+    : `<span class="hdr-label"${labelIdAttr}>${escapeHtml(o.context || '')}</span>`;
+  const centreInner = step
+    ? hdrStepButton(step.prev, '◀') + stepMiddleHtml + hdrStepButton(step.next, '▶')
+    : o.centre ? o.centre
+    : o.context ? escapeHtml(o.context) : '';
+  const centreHtml = centreInner ? `<div class="hdr-context">${centreInner}</div>` : '';
   const leadHtml = o.lead ? `<div class="hdr-lead">${o.lead}</div>` : '';
-  const centreHtml = o.step
-    ? `<div class="hdr-context">${hdrStepButton(o.step.prev, '◀')}${titleHtml}${hdrStepButton(o.step.next, '▶')}</div>`
-    : o.context ? `<div class="hdr-context">${escapeHtml(o.context)}</div>` : '';
-  const startHtml = `<div class="hdr-start">${backHtml}${leadHtml}${o.step ? '' : titleHtml}</div>`;
+  const startHtml = `<div class="hdr-start">${backHtml}${leadHtml}${titleInCentre ? '' : titleHtml}</div>`;
   const toolsHtml = o.tools ? `<div class="hdr-tools">${o.tools}</div>` : '';
-  const actionsHtml = (o.actions || []).slice(0, PH_MAX_ACTIONS)
-    .map(a => phButton('hdr-btn', a.aria, a.data, escapeHtml(a.label || ''), null, a.pressed))
+  const actionsHtml = (o.actions || []).slice(0, HDR_MAX_ACTIONS)
+    .map(a => hdrButton('hdr-btn' + (a.cls ? ' ' + a.cls : ''), a.aria, a.data, escapeHtml(a.label || ''), null, a.pressed))
     .join('');
   const actionsWrapHtml = actionsHtml ? `<div class="hdr-actions">${actionsHtml}</div>` : '';
   const badgeHtml = o.badge ? hdrBadgeHtml(o.badge) : '';
   const endHtml = `<div class="hdr-end">${toolsHtml}${actionsWrapHtml}${badgeHtml}</div>`;
+  const rowCls = centreHtml ? 'hdr-row' : 'hdr-row hdr-row--ends';
   const subHtml = o.sub || '';
   const lowerHtml = !subHtml ? ''
     : variant === 'meeting' ? `<div class="hdr-r2">${subHtml}</div>`
     : `<div class="hdr-sub">${subHtml}</div>`;
   const printCls = o.noPrint ? ' no-print' : '';
   const surfaceAttr = o.moneySurface ? ' data-money-surface' : '';
-  return `<header class="hdr ${HDR_VARIANT_CLASS[variant]}${printCls}"${surfaceAttr}><div class="hdr-row">${startHtml}${centreHtml}${endHtml}</div>${lowerHtml}</header>`;
+  return `<header class="hdr ${HDR_VARIANT_CLASS[variant]}${printCls}"${surfaceAttr}><div class="${rowCls}">${startHtml}${centreHtml}${endHtml}</div>${lowerHtml}</header>`;
 }
 
 /* ── The kid screens' headers (PR 4) ──
-   Today, Week, Day, Sister Sync and Print each keep one <header class="ph …">
-   (Today: <header class="hdr …">, the Stage 20 pilot)
-   as a direct child of their screen; phMount swaps it for a fresh pageHeader
+   Today, Week, Day, Sister Sync and Print each keep one <header class="hdr …">
+   as a direct child of their screen; hdrMount swaps it for a fresh pageHeader
    on every render of that screen, so the header always says what the screen
    under it says. The money pages draw theirs at the top of their wrap
-   (mnyHead, js/22). Their buttons carry data-ph-action, answered by
+   (mnyHead, js/22). Their buttons carry data-hdr-action, answered by
    kidHeadClick below — bound once per screen in js/99-main.js
    (KID_HEAD_SCREENS), delegated like every rebuilt surface here. */
 const KID_HEAD_SCREENS = ['screen-today', 'screen-week', 'screen-day', 'screen-sync', 'screen-print',
   'screen-mymoney', 'screen-moneyschool', 'screen-moneystory'];
 
-function phMount(screenId, o) {
-  const old = document.querySelector('#' + screenId + ' > header.ph, #' + screenId + ' > header.hdr');
+function hdrMount(screenId, o) {
+  const old = document.querySelector('#' + screenId + ' > header.hdr');
   if (old) old.outerHTML = pageHeader(o);
 }
 
@@ -212,15 +169,15 @@ function phMount(screenId, o) {
 function kidHeadBadge(id, kid, asParent) {
   const parts = profileBadgeParts(kid, asParent);
   const aria = parts.name ? `${parts.name}, switch profile` : 'Switch profile';
-  return { id, icon: parts.icon, text: parts.name, avatar: true, aria, data: { 'ph-action': 'profile' } };
+  return { id, icon: parts.icon, text: parts.name, avatar: true, aria, data: { 'hdr-action': 'profile' } };
 }
 
 function kidHeadClick(e) {
   const el = e.target.closest('button');
-  if (!el || !el.dataset.phAction) return;
-  switch (el.dataset.phAction) {
+  if (!el || !el.dataset.hdrAction) return;
+  switch (el.dataset.hdrAction) {
     case 'profile': openProfileSwitcher(); break;
-    case 'back': navReturnBack(el.dataset.phFallback || 'week'); break;
+    case 'back': navReturnBack(el.dataset.hdrFallback || 'week'); break;
     case 'week-prev': changeWeek(-1); break;
     case 'week-next': changeWeek(1); break;
     case 'view-full': setWeekView('full'); break;
@@ -236,5 +193,5 @@ function kidHeadClick(e) {
 
 /* Node reach for tests/helpers.test.js. Same guard as 05-helpers. */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { pageHeader, PH_VARIANTS, PH_MAX_ACTIONS };
+  module.exports = { pageHeader, HDR_VARIANTS, HDR_MAX_ACTIONS };
 }

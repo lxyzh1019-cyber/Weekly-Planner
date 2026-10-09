@@ -1367,17 +1367,25 @@ function mrMoneyDays(weekKey, kid) {
    its first and last day — "Sun 11 – Sat 17 Oct", "Sun 27 Sep – Sat 3 Oct",
    "Mon 28 Sep – Sun 4 Oct" before the dated rule. The planner's weeks keep
    `mmWeekLabel` (Mon–Sun). */
-function mrMoneyWeekLabelPure(weekKey, isSunday, settledDays) {
+/* Its first and last day as two Dates; the label below and the meeting's
+   week line ("Week of Oct 5 – 11", js/15 mmWeekLine) both read them. */
+function mrMoneyWeekEndsPure(weekKey, isSunday, settledDays) {
   // The switch Sunday is named by both weeks; while this week is open it
   // belongs to the old one (which normally settles it first — Deviation 34),
   // so the first Sun–Sat week reads "Mon 5 – Sat 10 Oct".
   const open = !settledDays(weekKey), oldBefore = !isSunday(mrDayKeyAdd(weekKey, -7));
   let days = mrMoneyDaysPure(weekKey, isSunday, settledDays).filter(x => !x.taken && !(open && oldBefore && x.wk !== weekKey));
   if (!days.length) days = mrMoneyDayRefs(weekKey, isSunday(weekKey));
+  return [mrDayKeyDate(days[0].dayKey), mrDayKeyDate(days[days.length - 1].dayKey)];
+}
+function mrMoneyWeekLabelPure(weekKey, isSunday, settledDays) {
   const D = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const a = mrDayKeyDate(days[0].dayKey), b = mrDayKeyDate(days[days.length - 1].dayKey);
+  const [a, b] = mrMoneyWeekEndsPure(weekKey, isSunday, settledDays);
   return `${D[a.getDay()]} ${a.getDate()}${a.getMonth() === b.getMonth() ? '' : ' ' + M[a.getMonth()]} – ${D[b.getDay()]} ${b.getDate()} ${M[b.getMonth()]}`;
+}
+function mrMoneyWeekEnds(weekKey, kid) {
+  return mrMoneyWeekEndsPure(weekKey, mrMoneyWeekIsSunday, kid ? (wk => mrMoneySettledDays(wk, kid)) : (() => null));
 }
 function mrMoneyWeekLabel(weekKey, kid) {
   return mrMoneyWeekLabelPure(weekKey, mrMoneyWeekIsSunday, kid ? (wk => mrMoneySettledDays(wk, kid)) : (() => null));

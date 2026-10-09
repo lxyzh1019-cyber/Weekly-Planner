@@ -364,9 +364,12 @@ function clearWeekSignature() {
   renderWeekSignature(keys);
 }
 
-/* The week's standard header: My Week, the week stepper, the Full / Print
-   preview tabs, Print (only on the preview, the view it prints) and the
-   badge. Drawn before applyMeetingLock, which hides this badge by id. */
+/* The week's standard header (the owner's turn-2 picture): My Week, the
+   week stepper ◀ week ▶ in the middle of the bar, the Full / Preview switch
+   (one joined control, 📋 / 🖨), Print (only on the preview, the view it
+   prints) and the badge. A phone draws no title and shows the switch's other
+   cell alone (🖨 opens the preview). Drawn before applyMeetingLock, which
+   hides this badge by id. */
 function weekRenderHeader() {
   const keys = getDayKeys(weekOffset);
   const mon = formatDayKey(keys[0]);
@@ -376,24 +379,23 @@ function weekRenderHeader() {
   const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
   const endMonth = phone && sun.getMonth() === mon.getMonth() ? '' : `${MONTH_SHORT[sun.getMonth()]} `;
   const range = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${endMonth}${sun.getDate()}`;
-  const tab = (id, view, action, aria, icon, panel) => {
+  const cell = (id, view, action, aria, icon, panel) => {
     const on = weekView === view ? 'true' : 'false';
-    return `<button type="button" role="tab" id="${id}" aria-controls="${panel}" data-ph-action="${action}" aria-label="${aria}" title="${aria}" aria-selected="${on}">${icon}</button>`;
+    return `<button type="button" class="hdr-switch-cell" role="tab" id="${id}" aria-controls="${panel}" data-hdr-action="${action}" aria-label="${aria}" title="${aria}" aria-selected="${on}">${icon}</button>`;
   };
   const tools =
-    `<div class="ph-step">`
-    + `<button type="button" class="ph-btn ph-step-btn" data-ph-action="week-prev" aria-label="Previous week"><span aria-hidden="true">◀</span></button>`
-    + `<span class="ph-step-label" id="weekRangeLabel">${escapeHtml(range)}</span>`
-    + `<button type="button" class="ph-btn ph-step-btn" data-ph-action="week-next" aria-label="Next week"><span aria-hidden="true">▶</span></button>`
-    + `</div>`
-    + `<div class="ui-tabs ph-views" role="tablist" aria-label="How to show the week">`
-    + tab('viewTabFull', 'full', 'view-full', 'Full week', '📋', 'weekFull')
-    + tab('viewTabPrintPreview', 'preview', 'view-preview', 'Print preview', '🖨', 'weekPrintPreview')
+    `<div class="hdr-switch hdr-switch--view" role="tablist" aria-label="How to show the week">`
+    + cell('viewTabFull', 'full', 'view-full', 'Full week', '📋', 'weekFull')
+    + cell('viewTabPrintPreview', 'preview', 'view-preview', 'Print preview', '🖨', 'weekPrintPreview')
     + `</div>`;
-  phMount('screen-week', {
+  hdrMount('screen-week', {
     title: 'My Week',
+    context: range,
+    step: { prev: { aria: 'Previous week', data: { 'hdr-action': 'week-prev' } },
+            next: { aria: 'Next week', data: { 'hdr-action': 'week-next' } },
+            labelId: 'weekRangeLabel' },
     tools,
-    actions: weekView === 'preview' ? [{ label: 'Print', aria: 'Print this week', data: { 'ph-action': 'print-open' } }] : [],
+    actions: weekView === 'preview' ? [{ label: 'Print', aria: 'Print this week', cls: 'hdr-print', data: { 'hdr-action': 'print-open' } }] : [],
     badge: kidHeadBadge('weekProfileBadge', isParent() ? parentViewing : activeProfile(), isParent()),
   });
 }

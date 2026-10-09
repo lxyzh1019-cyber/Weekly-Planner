@@ -40,7 +40,7 @@
    on this device (`wp_sunday_sound`).
    ════════════════════════════════════════════════════════════════ */
 
-const SD_STEP_LABELS = ['1 · Guess', '2 · Payday', '3 · I choose', '4 · Sign'];
+const SD_STEP_LABELS = ['1 · Guess', '2 · Payday', '3 · I choose', '4 · Signed'];
 const SD_HOLD_MS = 2000;            // hold a box 2 s = +$5
 const SD_SIGN_MS = 1400;            // hold to sign 1.4 s (Plan v17 §3)
 const SD_SOUND_LS_KEY = 'wp_sunday_sound';

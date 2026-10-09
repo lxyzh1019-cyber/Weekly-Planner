@@ -167,28 +167,29 @@ function mnyRenderMyMoney() {
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
 
-/* The money pages' header (PR 4, the owner's money picture): the money
-   variant of pageHeader — ◀ back where she came from (the one back stack,
-   navReturn in js/05), the title, the day, her two tabs, ? and her avatar.
-   My money wears it, and so do the passbook's two pages (decision 14, My
-   money the current tab) and Money school. A phone drops the date (D26) and
-   the title, because the current tab already names the page. A grown-up's
-   five tabs and the kid switch go in the sub-bar under the row: they would
-   not fit beside it. `fallback` is where ◀ goes with nothing on the stack. */
+/* The money pages' header (PR 4; Stage 20, the owner's turn-2 money
+   picture): the money variant of pageHeader — ◀ back where she came from (the
+   one back stack, navReturn in js/05), her two tabs, ? and her avatar. The
+   tabs name the page, so a kid's header has no title and no date (D30); the
+   date lives on Today. My money wears it, and so do the passbook's two pages
+   (decision 14, My money the current tab) and Money school. A grown-up keeps
+   the title and the day, and the five tabs and the kid switch go in the
+   sub-bar under the row: they would not fit beside it. `fallback` is where ◀
+   goes with nothing on the stack. */
 function mnyHead(title, tab, screen, fallback) {
   const kid = mnyViewKid();
   const parent = isParent();
   const kids = parent
     ? `<div class="ui-kids" role="group" aria-label="Whose money">${['jenn', 'jess'].map(k =>
-        `<button type="button" data-mny-action="kid" data-mny-kid="${k}" aria-pressed="${k === kid}" aria-label="${escapeAttr(mnyKidName(k))}">${CT_PROFILE_ICON[k]}<span class="ph-tab-word"> ${escapeHtml(mnyKidName(k))}</span></button>`).join('')}</div>`
+        `<button type="button" data-mny-action="kid" data-mny-kid="${k}" aria-pressed="${k === kid}" aria-label="${escapeAttr(mnyKidName(k))}">${CT_PROFILE_ICON[k]}<span class="hdr-tab-word"> ${escapeHtml(mnyKidName(k))}</span></button>`).join('')}</div>`
     : '';
   return pageHeader({
     variant: 'money',
     moneySurface: true,
-    back: { to: navReturnTo(fallback), data: { 'ph-action': 'back', 'ph-fallback': fallback } },
-    title,
-    context: mnyTodayLine(),
-    tools: parent ? '' : mnyTabBar(tab),
+    back: { to: navReturnTo(fallback), data: { 'hdr-action': 'back', 'hdr-fallback': fallback } },
+    title: parent ? title : '',
+    context: parent ? mnyTodayLine() : '',
+    lead: parent ? '' : mnyTabBar(tab),
     actions: [{ label: '?', aria: 'How this page works', data: { 'mny-action': 'tourkid' } }],
     badge: kidHeadBadge(screen + 'ProfileBadge', kid, parent),
     sub: parent ? mnyTabBar(tab) + kids : '',
