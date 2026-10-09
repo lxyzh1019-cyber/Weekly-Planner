@@ -1,0 +1,587 @@
+## standard phone (390px) pop
+[
+ {
+  "name": "standard-today",
+  "height": 56,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x56"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "92.8x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "25.52px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ },
+ {
+  "name": "standard-day",
+  "height": 56,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x56"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "92.8x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "25.52px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## standard phone (390px) calm
+[
+ {
+  "name": "standard-today",
+  "height": 56,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x56"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "103.9x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "23.2px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ },
+ {
+  "name": "standard-day",
+  "height": 56,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x56"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "103.9x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "23.2px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## standard ipad (1024px) pop
+[
+ {
+  "name": "standard-today",
+  "height": 64,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x64"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "92.8x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "30.8px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ },
+ {
+  "name": "standard-day",
+  "height": 64,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x64"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "92.8x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "30.8px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
+
+## standard ipad (1024px) calm
+[
+ {
+  "name": "standard-today",
+  "height": 64,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x64"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "103.9x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "28px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ },
+ {
+  "name": "standard-day",
+  "height": 64,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x64"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "103.9x44"
+  ],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "28px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
+
+## money phone (390px) pop
+[
+ {
+  "name": "money",
+  "height": 72,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x72"
+  ],
+  "buttons": [
+   "54x54",
+   "54x54",
+   "54x54"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "25.52px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## money phone (390px) calm
+[
+ {
+  "name": "money",
+  "height": 72,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x72"
+  ],
+  "buttons": [
+   "54x54",
+   "54x54",
+   "54x54"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "23.2px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## money ipad (1024px) pop
+[
+ {
+  "name": "money",
+  "height": 72,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x72"
+  ],
+  "buttons": [
+   "54x54",
+   "54x54",
+   "54x54"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "30.8px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
+
+## money ipad (1024px) calm
+[
+ {
+  "name": "money",
+  "height": 72,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x72"
+  ],
+  "buttons": [
+   "54x54",
+   "54x54",
+   "54x54"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "28px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
+
+## meeting phone (390px) pop
+[
+ {
+  "name": "meeting",
+  "height": 106,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x54",
+   "390x52"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "25.52px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## meeting phone (390px) calm
+[
+ {
+  "name": "meeting",
+  "height": 106,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "390x54",
+   "390x52"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "23.2px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## meeting ipad (1024px) pop
+[
+ {
+  "name": "meeting",
+  "height": 106,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x54",
+   "1024x52"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "30.8px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
+
+## meeting ipad (1024px) calm
+[
+ {
+  "name": "meeting",
+  "height": 106,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(255, 255, 255)",
+  "rows": [
+   "1024x54",
+   "1024x52"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44",
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [
+   "44x44"
+  ],
+  "badge": [],
+  "pills": [],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "28px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
+
+## parent phone (390px) pop
+[
+ {
+  "name": "parent",
+  "height": 104,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(195, 174, 214)",
+  "rows": [
+   "390x56",
+   "390x48"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "99.6x44"
+  ],
+  "pills": [
+   "70.7x44",
+   "89.5x44",
+   "0x0",
+   "44x44"
+  ],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "25.52px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## parent phone (390px) calm
+[
+ {
+  "name": "parent",
+  "height": 104,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(222, 218, 248)",
+  "rows": [
+   "390x56",
+   "390x48"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "110.3x44"
+  ],
+  "pills": [
+   "79.7x44",
+   "108.5x44",
+   "0x0",
+   "42x44"
+  ],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "23.2px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": false
+ }
+]
+
+## parent ipad (1024px) pop
+[
+ {
+  "name": "parent",
+  "height": 112,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(195, 174, 214)",
+  "rows": [
+   "1024x64",
+   "1024x48"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "99.6x44"
+  ],
+  "pills": [
+   "78.7x44",
+   "97.5x44",
+   "116.8x44",
+   "0x0"
+  ],
+  "titleFont": "\"Gochi Hand\"",
+  "titleSize": "30.8px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
+
+## parent ipad (1024px) calm
+[
+ {
+  "name": "parent",
+  "height": 112,
+  "rule": "2.5px",
+  "position": "sticky",
+  "bg": "rgb(222, 218, 248)",
+  "rows": [
+   "1024x64",
+   "1024x48"
+  ],
+  "buttons": [
+   "44x44",
+   "44x44"
+  ],
+  "avatar": [],
+  "badge": [
+   "110.3x44"
+  ],
+  "pills": [
+   "87.7x44",
+   "116.5x44",
+   "144.3x44",
+   "0x0"
+  ],
+  "titleFont": "\"Baloo 2\"",
+  "titleSize": "28px",
+  "fontLoaded": true,
+  "overflowX": false,
+  "contextShown": true
+ }
+]
