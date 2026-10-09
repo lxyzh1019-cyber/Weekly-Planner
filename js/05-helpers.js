@@ -1455,7 +1455,13 @@ const NAV_RETURN_SCREENS = {
   week: { name: 'Week', open: () => goWeek() },
   sync: { name: 'Sister Sync', open: () => openSisterSync() },
   mymoney: { name: 'My money', open: () => mnyOpenMyMoney(mnyViewKid()) },
-  meeting: { name: 'the meeting', open: () => { showScreen('meeting'); renderMeetingMode(); } },
+  /* A Day opened from the sitting (mmOpenDayForBlocks) left a return behind:
+     going back through it restores the step, the day and the scroll, and
+     lifts the sitting's lock. Money school from the meeting leaves none. */
+  meeting: { name: 'the meeting', open: () => {
+    if (typeof mmHasReturn === 'function' && mmHasReturn()) mmReturnToMeeting();
+    else { showScreen('meeting'); renderMeetingMode(); }
+  } },
   parent: { name: 'Hub', open: () => showScreen('parent') },
   'parent-monthly': { name: 'Monthly', open: () => openParentMonthly(parentMonthlyKid) },
 };
@@ -1621,6 +1627,9 @@ async function selectProfile(p) {
      navigation below then draws the new one. */
   applyLook(lookStored(p));
   profile = p;
+  /* The way back belongs to the one who walked it: a new profile starts with
+     an empty stack, so her ◀ cannot lead to a page the last one opened. */
+  navReturnStack = [];
   if (p === 'parent') {
     parentViewing = 'jenn';
     showScreen('parent');

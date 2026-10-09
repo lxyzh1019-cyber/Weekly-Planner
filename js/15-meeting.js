@@ -477,6 +477,8 @@ function mmReturnToMeeting() {
   if (!mmHasReturn()) { showScreen('parent'); return; }
   const r = mmReturn;
   mmClearReturn();
+  // The week's and the day's badges come back with the sitting (js/11).
+  applyMeetingLock();
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctWeekKey = r.weekKey;
   mmSelectedDay = r.selectedDay;

@@ -371,7 +371,11 @@ function weekRenderHeader() {
   const keys = getDayKeys(weekOffset);
   const mon = formatDayKey(keys[0]);
   const sun = formatDayKey(keys[6]);
-  const range = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
+  /* A phone writes the month once when the week is in one ("Oct 5 – 11"),
+     as its header picture does; the iPad names it at both ends. */
+  const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
+  const endMonth = phone && sun.getMonth() === mon.getMonth() ? '' : `${MONTH_SHORT[sun.getMonth()]} `;
+  const range = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${endMonth}${sun.getDate()}`;
   const tab = (id, view, action, aria, icon) => {
     const on = weekView === view ? 'true' : 'false';
     return `<button type="button" role="tab" id="${id}" data-ph-action="${action}" aria-label="${aria}" title="${aria}" aria-selected="${on}">${icon}</button>`;

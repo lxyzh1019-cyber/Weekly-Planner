@@ -1302,6 +1302,15 @@ function tdOpenInvites() {
   window.scrollTo(0, Math.max(0, top));
 }
 
+/* Today's date as the header pictures draw it: "Tuesday 6 October" on the
+   iPad, the short "Tue 6 Oct" on a phone (fmtDay). */
+function tdHeadDate(key) {
+  const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
+  if (phone) return fmtDay(key, 'long');
+  const d = formatDayKey(key);
+  return `${DAY_LONG[dayIdxOfKey(key)]} ${d.getDate()} ${MONTH_LONG[d.getMonth()]}`;
+}
+
 function tdRenderToday() {
   const wrap = document.getElementById('tdWrap');
   if (!wrap) return;
@@ -1316,7 +1325,7 @@ function tdRenderToday() {
      header picture draws it (D26): "Fri 9 Oct". */
   phMount('screen-today', {
     title: 'Today',
-    context: fmtDay(todayKey(), 'long'),
+    context: tdHeadDate(todayKey()),
     badge: kidHeadBadge('todayProfileBadge', kid, isParent()),
   });
   if (!kid || kid === 'parent') {

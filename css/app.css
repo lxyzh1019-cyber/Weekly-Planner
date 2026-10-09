@@ -7168,6 +7168,9 @@
   .ph-back-to { display: none; }
   .ph-step { gap: 0; }
   .ph-step-btn, .ph-back { width: 44px; min-width: 44px; padding: 0; }
+  /* The Day's ◀ ▶ are plain arrows on a phone, as its picture draws them:
+     no box, the same 44px tap area. */
+  #screen-day > .ph .ph-step-btn { background: none; border-color: transparent; box-shadow: none; }
   .ph-step > .ph-title { font-size: calc(1rem * var(--text-scale, 1)); }
   .ph .ui-tabs > [aria-selected="true"] { display: none; }
   #screen-week > .ph .ph-title { display: none; }

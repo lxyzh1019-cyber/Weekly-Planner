@@ -27602,7 +27602,17 @@ function findChromium() {
                 // D27: the date is a button that opens Copy a day; a phone
                 // hides 📑 and the 1 2 3, the iPad keeps them.
                 const tb = hdr.querySelector('.ph-title > .ph-title-btn[data-ph-action="day-copy"]');
-                if (!tb || tb.getAttribute('aria-label') !== 'Copy a day') out.push(`${size} Day: the date is not the Copy a day button`);
+                if (!tb || tb.getAttribute('aria-label') !== `${dayHeadingText()} — copy a day`) out.push(`${size} Day: the date is not the Copy a day button named by its date (${tb ? JSON.stringify(tb.getAttribute('aria-label')) : 'missing'})`);
+                // The heading is read as the date, not as "Copy a day".
+                const h2 = tb && tb.closest('h2');
+                if (!h2 || h2.hasAttribute('aria-label') || !(tb.getAttribute('aria-label') || '').startsWith(tb.textContent)) out.push(`${size} Day: the heading's spoken name does not start with the date`);
+                /* ◀ ▶ are plain arrows on a phone (the Day picture), boxed on
+                   the iPad; the 44px tap area is held by the button loop above. */
+                for (const sb of hdr.querySelectorAll('.ph-step > .ph-step-btn')) {
+                  const cs = getComputedStyle(sb);
+                  const plain = cs.borderTopColor === 'rgba(0, 0, 0, 0)' && (cs.backgroundColor === 'rgba(0, 0, 0, 0)' || cs.backgroundColor === 'transparent') && cs.boxShadow === 'none';
+                  if (plain !== phone) out.push(`${size} Day: ${sb.getAttribute('aria-label')} is ${phone ? 'boxed on a phone' : 'a plain arrow on the iPad'}`);
+                }
                 const acts = hdr.querySelector('.ph-actions'), tools = hdr.querySelector('.ph-tools');
                 const off = (el) => !el || getComputedStyle(el).display === 'none';
                 if (off(acts) !== phone || off(tools) !== phone) out.push(`${size} Day: 📑 and 1 2 3 are ${phone ? 'shown on a phone' : 'hidden on the iPad'}`);
@@ -27613,7 +27623,22 @@ function findChromium() {
                   closeSheet('templateOverlay');
                 }
               }
-              if (label === 'Today' && ctx && ctx.textContent !== fmtDay(todayKey(), 'long')) out.push(`${size} Today: the date reads ${JSON.stringify(ctx.textContent)}, expected ${JSON.stringify(fmtDay(todayKey(), 'long'))}`);
+              /* The pictures' dates: Today "Tuesday 6 October" on the iPad and
+                 "Tue 6 Oct" on a phone; the week "Oct 5 – Oct 11" on the iPad
+                 and "Oct 5 – 11" / "Sep 28 – Oct 4" on a phone. */
+              if (label === 'Today') {
+                const tk = todayKey(), td = formatDayKey(tk);
+                const wantCtx = phone ? fmtDay(tk, 'long') : `${DAY_LONG[dayIdxOfKey(tk)]} ${td.getDate()} ${MONTH_LONG[td.getMonth()]}`;
+                const known = { '2026-10-07': phone ? 'Wed 7 Oct' : 'Wednesday 7 October', '2026-10-01': phone ? 'Thu 1 Oct' : 'Thursday 1 October' }[tk];
+                if (!ctx || ctx.textContent !== wantCtx || (known && ctx.textContent !== known)) out.push(`${size} Today: the date reads ${ctx ? JSON.stringify(ctx.textContent) : 'nothing'}, expected ${JSON.stringify(known || wantCtx)}`);
+              }
+              if (label === 'Week' && weekOffset === 0) {
+                const wl = document.getElementById('weekRangeLabel');
+                const ks = getDayKeys(0), a = formatDayKey(ks[0]), z = formatDayKey(ks[6]), M = (d) => MONTH_SHORT[d.getMonth()];
+                const wantRange = `${M(a)} ${a.getDate()} – ${phone && a.getMonth() === z.getMonth() ? '' : M(z) + ' '}${z.getDate()}`;
+                const known = { '2026-10-07': phone ? 'Oct 5 – 11' : 'Oct 5 – Oct 11', '2026-10-01': 'Sep 28 – Oct 4' }[todayKey()];
+                if (!wl || wl.textContent !== wantRange || (known && wl.textContent !== known)) out.push(`${size} Week: the range reads ${wl ? JSON.stringify(wl.textContent) : 'nothing'}, expected ${JSON.stringify(known || wantRange)}`);
+              }
             }
             const hs = [...new Set(Object.values(heights).map(v => v.toFixed(2)))];
             if (hs.length > 1) out.push(`${size}: the standard headers are not one height — ${JSON.stringify(heights)}`);
@@ -27773,7 +27798,7 @@ function findChromium() {
      aria-label, and there when pressed. The Day's ◀ said "◀ Week" and went to
      the week whether the day was opened from the week or from Today. The
      stack is device-local and never enters `state`. */
-  if (want('oneBackStackGoesWhereYouCameFrom')) checks.oneBackStackGoesWhereYouCameFrom = await page.evaluate(() => {
+  if (want('oneBackStackGoesWhereYouCameFrom')) checks.oneBackStackGoesWhereYouCameFrom = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const active = () => (document.querySelector('.screen.active') || {}).id;
@@ -27788,6 +27813,9 @@ function findChromium() {
       navDay(1);
       b = back('screen-day');
       if (!b || b.getAttribute('aria-label') !== 'Back to Week') bad.push('stepping to the next day lost the way back to the week');
+      // The date button's spoken name follows the day it now shows.
+      const tbn = document.querySelector('#screen-day > .ph .ph-title-btn');
+      if (!tbn || tbn.getAttribute('aria-label') !== `${dayHeadingText()} — copy a day`) bad.push(`after a step the date button is named ${tbn ? JSON.stringify(tbn.getAttribute('aria-label')) : 'nothing'}, not "${dayHeadingText()} — copy a day"`);
       if (b) b.click();
       if (active() !== 'screen-week') bad.push(`the Day's ◀ went to ${active()}, not the week`);
       // Today → Day → ◀ → Today
@@ -27807,6 +27835,10 @@ function findChromium() {
         try {
           profile = 'parent'; parentViewing = 'jenn';
           openFamilyMeeting();
+          const body = document.querySelector('#screen-meeting .mm-body');
+          if (body) body.scrollTop = 400;
+          const wantScroll = body ? body.scrollTop : 0;
+          if (wantScroll < 400) bad.push(`the meeting body only scrolls to ${wantScroll}px, so its return cannot be checked at 400`);
           document.querySelector('#screen-day > .ph').outerHTML = '<header class="ph"></header>';
           mmOpenDayForBlocks('jenn', 1);
           const hdr = document.querySelector('#screen-day > .ph');
@@ -27819,6 +27851,18 @@ function findChromium() {
           b = back('screen-day');
           if (!b || b.getAttribute('aria-label') !== 'Back to the meeting') bad.push(`from the meeting, the Day's ◀ is ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}`);
           if (!document.querySelector('#daySpanTabs button')) bad.push('a Day opened from the meeting has no 1 2 3 tabs');
+          /* ◀ goes back through the meeting's own return: the sitting is
+             open again, the return is spent, the lock is lifted and the body
+             is where it was (the scroll is put back a frame later). */
+          if (b) b.click();
+          if (active() !== 'screen-meeting') bad.push(`the Day's ◀ went to ${active()}, not the meeting`);
+          if (mmHasReturn()) bad.push("the Day's ◀ left the meeting's return unspent");
+          const lockedBadge = document.getElementById('dayProfileBadge');
+          if (document.body.classList.contains('meeting-return-pending') || (lockedBadge && lockedBadge.hidden)) bad.push("back in the meeting, the sitting's lock still hides the badges");
+          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+          const after = document.querySelector('#screen-meeting .mm-body');
+          if (!after || Math.abs(after.scrollTop - wantScroll) > 1) bad.push(`back in the meeting, the body is at ${after ? after.scrollTop : 'none'}px, not ${wantScroll}px`);
+          mmHide();
         } finally {
           mmReturn = wasMm; parentViewing = wasViewing; profile = 'jenn';
           document.body.classList.remove('meeting-return-pending');
@@ -27859,6 +27903,20 @@ function findChromium() {
           if (active() !== 'screen-meeting') bad.push(`Money school's ◀ went to ${active()}, not the meeting`);
           mmHide();
         } finally { parentViewing = wasViewing; profile = 'jenn'; }
+      }
+      /* A profile switch empties the stack: Week → My money → 🎓 → the badge
+         → her Today → My money, and ◀ goes to Today, not to a Week the last
+         profile opened. */
+      navReturnStack = [];
+      {
+        goWeek(); mnyOpenMyMoney('jenn'); mnyGoTab('school');
+        selectProfile('jess');
+        if (navReturnStack.length) bad.push(`a profile switch kept ${navReturnStack.length} step(s) of the last profile's way back`);
+        if (active() !== 'screen-today') bad.push(`the profile switch opened ${active()}, not Today`);
+        mnyOpenMyMoney(activeProfile());
+        b = document.querySelector('#mnyPage1Wrap > .ph .ph-back');
+        if (!b || b.getAttribute('aria-label') !== 'Back to Today') bad.push(`after a profile switch, My money's ◀ is ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}, not Back to Today`);
+        selectProfile('jenn');
       }
       // An empty stack falls back to the week.
       navReturnStack = [];

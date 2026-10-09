@@ -136,11 +136,15 @@ function dayHeadingText() {
   return `${MONTH_SHORT[first.getMonth()]} ${first.getDate()} – ${lastPart}`;
 }
 /* The date may be a button (step.titleAction): its text is written into the
-   button so the button stays. */
+   button so the button stays. Its spoken name starts with the date, so the
+   heading it sits in is read as the date and not as "Copy a day". */
+function dayHeadingAria(text) { return `${text} — copy a day`; }
 function renderDayHeading() {
-  const el = document.querySelector('#screen-day > .ph .ph-title-btn')
-    || document.querySelector('#screen-day > .ph .ph-title');
-  if (el) el.textContent = dayHeadingText();
+  const text = dayHeadingText();
+  const btn = document.querySelector('#screen-day > .ph .ph-title-btn');
+  const el = btn || document.querySelector('#screen-day > .ph .ph-title');
+  if (el) el.textContent = text;
+  if (btn) btn.setAttribute('aria-label', dayHeadingAria(text));
 }
 /* The Day's standard header: ◀ back through the one back stack (named, as
    the picture draws it), the date as the title between ◀ ▶, the 1 / 2 / 3
@@ -150,12 +154,13 @@ function renderDayHeading() {
    The 🌙 sat here once (R5 §7 Q3): today's mood is asked on Today, and a
    past day is reflected on from its 📑 sheet. */
 function dayRenderHeader() {
+  const title = dayHeadingText();
   phMount('screen-day', {
     back: { to: navReturnTo('week'), named: true, data: { 'ph-action': 'back', 'ph-fallback': 'week' } },
-    title: dayHeadingText(),
+    title,
     step: { prev: { aria: 'Previous day', data: { 'ph-action': 'day-prev' } },
             next: { aria: 'Next day', data: { 'ph-action': 'day-next' } },
-            titleAction: { aria: 'Copy a day', data: { 'ph-action': 'day-copy' } } },
+            titleAction: { aria: dayHeadingAria(title), data: { 'ph-action': 'day-copy' } } },
     tools: '<div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>',
     actions: [{ label: '📑', aria: 'Copy a day', data: { 'ph-action': 'day-copy' } }],
     badge: kidHeadBadge('dayProfileBadge', isParent() ? parentViewing : profile, isParent()),
