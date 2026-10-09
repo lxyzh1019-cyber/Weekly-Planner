@@ -241,7 +241,6 @@ const STATES = [
   { state: 'week-full',          users: ALL,     open: `() => { goWeek(); setWeekView('full'); }` },
   { state: 'week-print-preview', users: KIDS,    open: `() => { goWeek(); setWeekView('preview'); }` },
   { state: 'day',                users: ALL,     open: `() => { const k = todayKey(); openDay(k, getDayKeys(0).indexOf(k)); }` },
-  { state: 'chore',              users: ALL,     open: `() => openChoreTab()` },
   { state: 'mymoney',            users: ALL,     open: `(u) => mnyOpenMyMoney(u === 'parent' ? 'jenn' : u)` },
   { state: 'moneyschool',        users: ALL,     open: `(u) => mnyOpenSchool(u === 'parent' ? 'jenn' : u)` },
   { state: 'all-my-sundays',     users: KIDS,    open: `(u) => { mnyOpenMyMoney(u); mnyOpenSundays(); }` },
@@ -318,7 +317,6 @@ const STATES = [
   { state: 'parent-activity',    users: P, sheet: true, shows: '#parentActivityOverlay.open', open: `() => { setParentTab('options'); openParentActivityEditor(); }` },
   { state: 'new-rule',           users: P, sheet: true, shows: '#newRuleOverlay.open', open: `() => { setParentTab('rules'); openNewLevelRule(); }` },
   { state: 'new-routine',        users: P, sheet: true, shows: '#newRoutineOverlay.open', open: `() => { setParentTab('routines'); openNewRoutine(); }` },
-  { state: 'chore-group',        users: P, sheet: true, shows: '#choreGroupOverlay.open', open: `() => { openChoreTab(); ctOpenGroupEditor(null); }` },
 ];
 
 /* ── Pages ────────────────────────────────────────────────────────────── */
