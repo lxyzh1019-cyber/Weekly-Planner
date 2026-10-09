@@ -130,7 +130,7 @@ for look in ('pop', 'calm'):
     add(pair('preview', 'ipad', look, 4))
 for look in ('pop', 'calm'):
     add(solo('preview', 'phone', look, 'You drew no phone preview. Your decision: the header is the phone Week header with one 📋 button (back to Full) and Print at the top of the page. The picture is cut 130px below the bar to show the Print row.', h=4))
-add('<h3>Sister Sync and Print (you drew no picture; they follow Today)</h3>')
+add('<h3>Sister Sync and Print (you drew no picture; they follow Today; Print is now edge to edge, fixed after review)</h3>')
 for s, who in (('Sister Sync', 'sync-jenn'), ('Print', 'print-jenn')):
     for size in ('ipad', 'phone'):
         for look in ('pop', 'calm'):
@@ -179,10 +179,7 @@ extra = [
     f'<div class="diff"><h3>8. Meeting row 2 shows a different step{Q}</h3>'
     '<p>Your picture has "✓ Guess" done and Payday highlighted. The picture test opens the meeting at the Guess step, so Guess is highlighted and there is no tick. This is the page state, not the header. <span class="rec">Recommendation: nothing to change.</span></p>'
     + two('meeting', 'phone', 'calm') + '</div>',
-    f'<div class="diff"><h3>9. Print page: the header does not reach the top and sides{Q}</h3>'
-    '<p>Your table says Print follows Today. In the build the Print Week header starts about 16px down the page and its bottom line stops about 16px short of each side. Today\'s bar is edge to edge. <span class="rec">Recommendation: ask whether Print should be full width like Today.</span></p>'
-    + solo('today', 'ipad', 'pop', '', 'print-jenn', 4, 'Print · iPad · Pop (build only)') + '</div>',
-    f'<div class="diff"><h3>10. The little pictures (emoji) look different{Q}</h3>'
+    f'<div class="diff"><h3>9. The little pictures (emoji) look different{Q}</h3>'
     '<p>Your pictures were drawn with another emoji set: the chick, 📋, 🖨, 📑, 🗣️, 💰 and 🎓 have other colours and outlines (for example the 📋 on the yellow cell is pale in the build, and 🗣️ is blue, not dark grey). The sizes and places match. The build uses the phone\'s own emoji, so on a real iPad or phone they look like the device\'s set. <span class="rec">Recommendation: nothing to change.</span></p>'
     + two('week', 'ipad', 'pop') + '</div>',
 ]
