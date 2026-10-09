@@ -1620,13 +1620,13 @@ box, and `enhanceAccessibility` (`js/99-main.js`) injected
 `[onclick]` filter — while `enhanceNonButtonClickables`, three lines above it,
 did filter, so the dead badges got a label and no role, no focus and no
 keyboard. Every kid header's badge (Today, Week, Day, Sister Sync) is now
-the page header's `<button class="ph-badge ph-badge--avatar"
-data-ph-action="profile">` (`kidHeadBadge`, js/47-header.js): the 52px round
+the page header's `<button class="hdr-badge"
+data-hdr-action="profile">` (`kidHeadBadge`, js/47-header.js): the 52px round
 avatar at every width (D25), its words — the one wording, `profileBadgeParts`
 / `profileBadgeText` — in the aria-label, "Jenn, switch profile" or "Parent
 (Jenn), switch profile". The aria pass in js/99-main.js labels no badge, so
-the next inert one cannot re-tell the lie. `.ph-badge` is `display:
-inline-flex`, which outranks the browser's `[hidden]`, so `.ph-badge[hidden]`
+the next inert one cannot re-tell the lie. `.hdr-badge` is `display:
+inline-flex`, which outranks the browser's `[hidden]`, so `.hdr-badge[hidden]`
 is `display: none` — the meeting lock hides a badge with `hidden`.
 `everyProfileBadgeSwitchesProfile` asserts it by **activating** each badge and
 watching for `#profileSwitchOverlay`: a control can carry every attribute on the

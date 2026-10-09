@@ -27658,7 +27658,9 @@ function findChromium() {
       } else if (!none(r.centre)) {
         const c = read(tag, 'Centre', r.centre, `([\\d.]+)px (\\d{3}) ${HEX}`);
         if (c) w.centre = { kind: /^week label/.test(r.centre) ? 'label' : 'date', px: +c[0], weight: c[1], ink: c[2],
-          minWidth: +(opt(r.centre, 'min-width (\\d+)') || [0])[0], between: /between ◀ and ▶/.test(r.centre) };
+          minWidth: +(opt(r.centre, 'min-width (\\d+)') || [0])[0], between: /between ◀ and ▶/.test(r.centre),
+          // Where 20px does not fit (table notes 5, 6): "<px>px at ≤<width>", a week only when it spans two months.
+          narrow: opt(r.centre, '; (two-month week )?([\\d.]+)px at ≤(\\d+)') };
       }
       w.buttons = none(r.buttons) ? [] : r.buttons.split('; ').map(seg => {
         const name = (opt(seg, '^(◀ ▶|◀|\\?|🗣️|📑|🖨 Print|🖨|back|Print|Payday pill|week)') || [''])[0];
@@ -27871,7 +27873,9 @@ function findChromium() {
                   if (/\(gap 10\)/.test(want.parts)) near(px(getComputedStyle(ctx).columnGap), 10, 0.01, '◀ ▶ gap to the centre');
                   if (want.centre.kind === 'label' || want.centre.kind === 'date') {
                     const el = steps.length ? focus : ctx;
-                    font(el, want.centre.px, want.centre.weight, want.centre.ink, bodyFont, `the ${want.centre.kind}`);
+                    const nw = want.centre.narrow;
+                    const narrowed = nw && window.innerWidth <= +nw[2] && (!nw[0] || el.classList.contains('hdr-label--two-months'));
+                    font(el, narrowed ? +nw[1] : want.centre.px, want.centre.weight, want.centre.ink, bodyFont, `the ${want.centre.kind}`);
                     if (want.centre.minWidth) near(px(getComputedStyle(el).minWidth), want.centre.minWidth, 0.01, `the ${want.centre.kind}'s min-width`);
                     if (el.scrollWidth > el.clientWidth + 1) out.push(`${tag}: the ${want.centre.kind} "${el.textContent}" is cut`);
                   }

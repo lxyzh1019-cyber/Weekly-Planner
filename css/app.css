@@ -7248,6 +7248,24 @@
   .hdr-seg-num { display: inline; font-size: var(--hdr-span-size); }
 }
 
+/* Difference 15 and a week across two months, on a phone: 20px where it
+   fits, else the largest half-pixel size that fits the widest text at 360
+   wide, only on the widths where 20px does not fit (measured 2026-10-09,
+   docs/handoff/header-exact-values.md, notes 5 and 6). The Day's widest date
+   ("Wed 20 May", Calm 122.8px at 20px) has 110px at 360 and fits at 20px from
+   375; the widest two-month week ("Nov 30 – Dec 6", Calm 150px; "Apr 27 –
+   May 3", Pop 109.3px) has 108px at 360 and fits at 20px from 402 (Pop 362). */
+.hdr-label--two-months { font-size: var(--hdr-two-month-size, var(--hdr-label-size)); }
+@media (max-width: 374px) {
+  :root[data-look="calm"] #screen-day > .hdr { --hdr-label-size: 17.5px; }
+}
+@media (max-width: 401px) {
+  :root[data-look="calm"] { --hdr-two-month-size: 14px; }
+}
+@media (max-width: 361px) {
+  :root[data-look="pop"] { --hdr-two-month-size: 19.5px; }
+}
+
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */
 /* ══════════════════════════════════════════════════════════════
    SUNDAY v15 — GROWN-UPS AND HER REQUEST SHEETS (Plan v3 Stage 2)

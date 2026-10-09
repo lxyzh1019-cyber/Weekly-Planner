@@ -398,6 +398,11 @@ function weekRenderHeader() {
     actions: weekView === 'preview' ? [{ label: 'Print', aria: 'Print this week', cls: 'hdr-print', data: { 'hdr-action': 'print-open' } }] : [],
     badge: kidHeadBadge('weekProfileBadge', isParent() ? parentViewing : activeProfile(), isParent()),
   });
+  /* A week across two months ("Sep 28 – Oct 4") is wider than a phone's room
+     at 20px; css/app.css sizes it down only on the widths where it does not
+     fit (docs/handoff/header-exact-values.md, note 6). */
+  const label = document.getElementById('weekRangeLabel');
+  if (label) label.classList.toggle('hdr-label--two-months', sun.getMonth() !== mon.getMonth());
 }
 
 function renderWeek() {

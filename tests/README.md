@@ -104,6 +104,10 @@ step. The run prints each step it skipped. Declared checks alone: about 33 s
 wall (theComponentKitHoldsItsSizes and weekOpensOnTheLayoutYouCanPlanIn, 149 s
 before); a list with an undeclared check: about two and a half minutes. Add a
 check to `SETUP_NEEDS` only after reading what it relies on.
+`SMOKE_ONLY=everyHeaderMeasuresToTheExactValues` alone (declared; every kid
+header in both looks at 1194 and 390, read against
+`docs/handoff/header-exact-values.md`): about 13 s for the check, 50 s wall
+on the owner's PC (2026-10-09).
 
 Every run times each check and the setup just before it, prints the slowest,
 and writes `tests/out/smoke-ran-<date>.json`. To see where a CI run's time went:
