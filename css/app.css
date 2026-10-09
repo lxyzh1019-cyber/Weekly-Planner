@@ -7101,6 +7101,10 @@
 .hdr-btn--word { padding: 0 16px; font-size: var(--hdr-word-size); }
 /* Print, on the preview only: the look's main fill, "Print" 18px 600 (SRC 90). */
 .hdr-print { padding: 0 18px; background: var(--btn-main); color: var(--btn-main-ink); font-size: var(--hdr-word-size); font-weight: 600; }
+/* The same Print at the top of the preview page (#weekPagePrint), on a phone
+   only: there the header is Full's (owner, 2026-10-09; header-exact-values.md
+   note 3). */
+.wpp-print { display: none; }
 /* Badge: 52×52 circle, pink, 2px ink, emoji 24px, no name (SRC 52). */
 .hdr-badge {
   box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
@@ -7204,7 +7208,9 @@
   /* Week and Day on a phone (SRC 133-151): pad 10, gap 6, one flex row, the
      centre taking the room between the sides — the week or the date between
      its ◀ ▶ (the picture's flex:1). Week has no title and shows the switch's
-     other cell alone, a 52px button (🖨 opens the preview); the Day keeps ◀
+     other cell alone, a 52px button (🖨 opens the preview, 📋 goes back to
+     Full); the preview's header is Full's, its Print at the top of the page
+     (owner, 2026-10-09, note 3). The Day keeps ◀
      back and the badge either side, so its date is in the middle of the bar,
      body 20px 600, its ◀ ▶ plain arrows, and drops 1 2 3 and 📑 (tapping the
      date is Copy a day there, D27). */
@@ -7216,6 +7222,8 @@
   #screen-week > .hdr .hdr-switch { box-shadow: var(--hdr-sh); }
   #screen-week > .hdr .hdr-switch > [aria-selected="true"] { display: none; }
   #screen-week > .hdr .hdr-switch-cell { width: 48px; border-left: 0; }
+  #screen-week > .hdr .hdr-actions { display: none; }
+  .wpp-print:not([hidden]) { display: inline-flex; align-self: flex-start; margin: 0.5rem 0.75rem 0; }
   #screen-day > .hdr .hdr-context > .hdr-title { font-family: var(--font-text); font-size: var(--hdr-label-size); font-weight: 600; }
   #screen-day > .hdr .hdr-step { background: none; border-color: transparent; box-shadow: none; }
   #screen-day > .hdr .hdr-tools, #screen-day > .hdr .hdr-actions { display: none; }
@@ -7249,34 +7257,38 @@
   .hdr-seg-num { display: inline; font-size: var(--hdr-span-size); }
 }
 
-/* Difference 15 and a week across two months, on a phone: 20px where it
-   fits, else the largest half-pixel size that fits the widest text at 360
-   wide, only on the widths where 20px does not fit (measured 2026-10-09,
-   docs/handoff/header-exact-values.md, notes 5 and 6). The Day's widest date
-   ("Wed 20 May", Calm 122.8px at 20px) has 110px at 360 and fits at 20px from
-   375; the widest two-month week ("Nov 30 – Dec 6", Calm 150px; "Apr 27 –
-   May 3", Pop 109.3px) has 108px at 360 and fits at 20px from 402 (Pop 362). */
+/* Difference 15, a week across two months and Money school's selected tab,
+   on a phone: the picture's size (20px, the tab 18px) where it fits, else
+   stepped by width (owner, 2026-10-09) — steps at 360, 375 and 390 wide, each
+   the largest half-pixel size that fits the widest text at the step's lowest
+   width, up to the width where the picture's size fits. Measured with
+   tools/header-fit-sizes.js; the table is docs/handoff/header-exact-values.md,
+   notes 5-7. Later blocks are narrower and win. Calm's widest two-month week
+   ("Nov 30 – Dec 6", 150px at 20px) has 108px at 360, 123 at 375, 138 at 390
+   and fits at 20px from 402; Pop's ("Apr 27 – May 3", 109.3px) from 361.
+   Calm's widest Day date ("Wed 20 May", 122.8px) fits at 20px from 375.
+   "🎓 Money school" fits the joined switch at 18px from 401 (Calm) and 364
+   (Pop); Calm's 360 step is the 13px kid floor (12.5px would clear the last
+   half pixel, note 7). */
 .hdr-label--two-months { font-size: var(--hdr-two-month-size, var(--hdr-label-size)); }
+@media (max-width: 401px) {
+  :root[data-look="calm"] { --hdr-two-month-size: 18px; }
+}
+@media (max-width: 400px) {
+  :root[data-look="calm"] { --hdr-school-tab-size: 16.5px; }
+}
+@media (max-width: 389px) {
+  :root[data-look="calm"] { --hdr-two-month-size: 16px; --hdr-school-tab-size: 14.5px; }
+}
 @media (max-width: 374px) {
+  :root[data-look="calm"] { --hdr-two-month-size: 14px; --hdr-school-tab-size: 13px; }
   :root[data-look="calm"] #screen-day > .hdr { --hdr-label-size: 17.5px; }
 }
-@media (max-width: 401px) {
-  :root[data-look="calm"] { --hdr-two-month-size: 14px; }
-}
-@media (max-width: 361px) {
-  :root[data-look="pop"] { --hdr-two-month-size: 19.5px; }
-}
-
-/* Money school's selected tab on a phone: 18px where "🎓 Money school" fits
-   the joined switch, else the largest half-pixel size that fits at 360 wide,
-   only on the widths where 18px does not fit (measured 2026-10-09, note 7 in
-   docs/handoff/header-exact-values.md). The switch has 170px at 360, 200 at
-   390; Calm's Lexend name needs 18px from 401 wide, Pop's from 375. */
-@media (max-width: 401px) {
-  :root[data-look="calm"] { --hdr-school-tab-size: 13px; }
-}
-@media (max-width: 374px) {
+@media (max-width: 363px) {
   :root[data-look="pop"] { --hdr-school-tab-size: 17px; }
+}
+@media (max-width: 360px) {
+  :root[data-look="pop"] { --hdr-two-month-size: 19.5px; }
 }
 
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */

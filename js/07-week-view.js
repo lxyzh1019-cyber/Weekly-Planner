@@ -12,6 +12,8 @@ function setWeekView(v) {
   // The tabs that say which view this is are in the header renderWeek draws.
   document.getElementById('weekFull').style.display = weekView === 'full' ? 'flex' : 'none';
   document.getElementById('weekPrintPreview').style.display = weekView === 'preview' ? 'flex' : 'none';
+  // A phone's Print at the top of the preview page (css/app.css .wpp-print).
+  document.getElementById('weekPagePrint').hidden = weekView !== 'preview';
   /* The school-day offer above the grid is a SIBLING of #weekFull, so hiding
      the Full view does not take it with it — and renderSchoolDayBanner is only
      ever called from renderFullWeek, so without this it would keep whatever it
@@ -368,7 +370,9 @@ function clearWeekSignature() {
    week stepper ◀ week ▶ in the middle of the bar, the Full / Preview switch
    (one joined control, 📋 / 🖨), Print (only on the preview, the view it
    prints) and the badge. A phone draws no title and shows the switch's other
-   cell alone (🖨 opens the preview). Drawn before applyMeetingLock, which
+   cell alone (🖨 opens the preview, 📋 goes back); its preview keeps Full's
+   header and has Print at the top of the page instead (index.html
+   .wpp-print). Drawn before applyMeetingLock, which
    hides this badge by id. */
 function weekRenderHeader() {
   const keys = getDayKeys(weekOffset);

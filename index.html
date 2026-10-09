@@ -247,6 +247,10 @@
        Week, the week stepper, the Full / Print preview tabs, Print only on
        the preview, the profile badge. One row at every size. -->
   <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
+  <!-- A phone's Print, first on the preview page: the header there is Full's
+       (owner, 2026-10-09). Shown by setWeekView on the preview, by css/app.css
+       .wpp-print on a phone only. -->
+  <button type="button" class="hdr-btn hdr-print wpp-print" id="weekPagePrint" data-hdr-action="print-open" aria-label="Print this week" hidden>Print</button>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
   <!-- The offer to add the missing School Day cards, above the grid it is about,

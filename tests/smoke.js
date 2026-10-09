@@ -27638,6 +27638,13 @@ function findChromium() {
       return m.slice(1);
     };
     const opt = (cell, re) => { const m = new RegExp(re).exec(cell || ''); return m ? m.slice(1) : null; };
+    /* Where the picture's size does not fit (table notes 5-7, owner
+       2026-10-09): steps by width, "<px>px at ≤<w>, <px>px at ≤<w>, …" after
+       `lead`, read as [[px, w], …] narrowest first. */
+    const widthSteps = (cell, lead) => {
+      const m = new RegExp(`; ${lead}((?:[\\d.]+px at ≤\\d+(?:, )?)+)`).exec(cell || '');
+      return m ? [...m[1].matchAll(/([\d.]+)px at ≤(\d+)/g)].map(x => [+x[1], +x[2]]).sort((a, b) => a[1] - b[1]) : null;
+    };
     /* One row of the table as numbers. */
     const parseRow = (tag, r) => {
       const w = { parts: r.parts };
@@ -27659,11 +27666,11 @@ function findChromium() {
         const c = read(tag, 'Centre', r.centre, `([\\d.]+)px (\\d{3}) ${HEX}`);
         if (c) w.centre = { kind: /^week label/.test(r.centre) ? 'label' : 'date', px: +c[0], weight: c[1], ink: c[2],
           minWidth: +(opt(r.centre, 'min-width (\\d+)') || [0])[0], between: /between ◀ and ▶/.test(r.centre),
-          // Where 20px does not fit (table notes 5, 6): "<px>px at ≤<width>", a week only when it spans two months.
-          narrow: opt(r.centre, '; (two-month week )?([\\d.]+)px at ≤(\\d+)') };
+          // Where 20px does not fit (table notes 5, 6): steps by width, a week's only when it spans two months.
+          narrow: widthSteps(r.centre, '(?:two-month week )?'), narrowTwoMonths: /; two-month week /.test(r.centre) };
       }
       w.buttons = none(r.buttons) ? [] : r.buttons.split('; ').map(seg => {
-        const name = (opt(seg, '^(◀ ▶|◀|\\?|🗣️|📑|🖨 Print|🖨|back|Print|Payday pill|week)') || [''])[0];
+        const name = (opt(seg, '^(◀ ▶|◀|\\?|🗣️|📑|🖨 Print|🖨|📋|back|Print|Payday pill|week)') || [''])[0];
         const size = opt(seg, '(\\d+)×(\\d+)');
         const fill = opt(seg, `${HEX} / ${HEX}`);
         const fonts = [...seg.matchAll(/(?:glyph |body |, )(\d+)px(?: (\d{3}))?(?! #)(?=[ ,"]|$)/g)];
@@ -27680,8 +27687,8 @@ function findChromium() {
           pills: opt(r.sw, 'pills min-height (\\d+), pad 0 (\\d+), gap (\\d+), r999, (\\d+)px'), pillFont: opt(r.sw, '= ([\\d.]+)px (\\d{3});'),
           tabsGap: opt(r.sw, 'tabs gap (\\d+)'), joined: opt(r.sw, 'selected cell flex 1, h(\\d+), gap (\\d+), body (\\d+)px (\\d{3})'),
           otherIcon: opt(r.sw, '🎓 (\\d+)px'), span: /^span:/.test(r.sw),
-          // Where the picture's size does not fit the longer name (table note 7): "; Money school <px>px at ≤<width>".
-          schoolNarrow: opt(r.sw, '; Money school ([\\d.]+)px at ≤(\\d+)') };
+          // Where the picture's size does not fit the longer name (table note 7): "; Money school <steps>".
+          schoolNarrow: widthSteps(r.sw, 'Money school ') };
         if (!w.sw.selBg) problems.push(`${tag}: the table's Switch cell names no selected colour: ${JSON.stringify(r.sw)}`);
       }
       if (/^girls:/.test(r.badge)) {
@@ -27705,10 +27712,14 @@ function findChromium() {
     for (const look of ['pop', 'calm']) {
       await setLook(look);
       const lookName = look === 'pop' ? 'Pop' : 'Calm';
-      for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+      /* Every screen at 1194 and 390; at 375 and 360 (the lowest widths of the
+         narrow steps, table notes 5-7) the screens whose size steps by width. */
+      const stepped = ['Week Full', 'Week Preview', 'Day', 'Money school'];
+      for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone'], [375, 812, 'phone'], [360, 780, 'phone']]) {
         await page.setViewportSize({ width: w, height: h });
         for (const [label, screen, open] of screens) {
-          const tag = `[${look}] ${size} ${label}`;
+          if (size === 'phone' && w !== 390 && !stepped.includes(label)) continue;
+          const tag = `[${look}] ${size}${size === 'phone' && w !== 390 ? ' ' + w : ''} ${label}`;
           const find = (name) => rows.find(r => r.screen === name && r.size === size && r.look === lookName);
           let want = null;
           if (screen === 'Meeting') {
@@ -27717,12 +27728,8 @@ function findChromium() {
             want = parseRow(tag, r1); want.r2 = parseRow(tag + ' row 2', r2);
           } else {
             const r = find(screen);
-            /* The phone's Print preview is not drawn (table note 3): it is
-               held to the phone Week row's bar and badge and to the rules
-               every header keeps, without a centre. */
-            if (!r && screen === 'Week Preview' && size === 'phone') { want = parseRow(tag, find('Week Full')); want.previewPhone = true; }
-            else if (!r) { problems.push(`${tag}: no row in the per-screen table`); continue; }
-            else want = parseRow(tag, r);
+            if (!r) { problems.push(`${tag}: no row in the per-screen table`); continue; }
+            want = parseRow(tag, r);
           }
           problems.push(...await page.evaluate(([tag, open, want, phone]) => {
             const out = [];
@@ -27857,7 +27864,7 @@ function findChromium() {
                 if (Math.abs(hr.left) > 0.5 || Math.abs(hr.width - vw) > 0.5) out.push(`${tag}: the header is ${Math.round(hr.width)}px from ${Math.round(hr.left)}, not the screen's ${vw}`);
               }
               const steps = ctx ? [...ctx.querySelectorAll(':scope > .hdr-step')] : [];
-              if (want.centre && !want.previewPhone) {
+              if (want.centre) {
                 if (!ctx || !shown(ctx)) out.push(`${tag}: no centre in the bar`);
                 else {
                   const focus = steps.length === 2 ? ctx.querySelector(':scope > .hdr-label, :scope > .hdr-title') : ctx;
@@ -27876,13 +27883,14 @@ function findChromium() {
                   if (want.centre.kind === 'label' || want.centre.kind === 'date') {
                     const el = steps.length ? focus : ctx;
                     const nw = want.centre.narrow;
-                    const narrowed = nw && window.innerWidth <= +nw[2] && (!nw[0] || el.classList.contains('hdr-label--two-months'));
-                    font(el, narrowed ? +nw[1] : want.centre.px, want.centre.weight, want.centre.ink, bodyFont, `the ${want.centre.kind}`);
+                    // the narrowest step that holds this width, if any (a week's only across two months)
+                    const step = nw && (!want.centre.narrowTwoMonths || el.classList.contains('hdr-label--two-months')) && nw.find(x => window.innerWidth <= x[1]);
+                    font(el, step ? step[0] : want.centre.px, want.centre.weight, want.centre.ink, bodyFont, `the ${want.centre.kind}`);
                     if (want.centre.minWidth) near(px(getComputedStyle(el).minWidth), want.centre.minWidth, 0.01, `the ${want.centre.kind}'s min-width`);
                     if (el.scrollWidth > el.clientWidth + 1) out.push(`${tag}: the ${want.centre.kind} "${el.textContent}" is cut`);
                   }
                 }
-              } else if (ctx && shown(ctx) && !want.previewPhone) out.push(`${tag}: a centre is drawn ("${ctx.textContent.trim()}"), the picture has none (no date on the money header)`);
+              } else if (ctx && shown(ctx)) out.push(`${tag}: a centre is drawn ("${ctx.textContent.trim()}"), the picture has none (no date on the money header)`);
               // ── Title ──
               const titles = [...hdr.querySelectorAll('.hdr-title')].filter(shown);
               if (want.title) {
@@ -27934,26 +27942,41 @@ function findChromium() {
               // ── Named buttons ──
               const action = (label) => [...end.querySelectorAll('.hdr-actions > .hdr-btn')].find(b => b.textContent.trim() === label);
               for (const b of want.buttons) {
-                if (b.name === 'Payday pill' || b.name === 'week' || (want.previewPhone && b.name !== '◀ ▶')) continue;
+                if (b.name === 'Payday pill' || b.name === 'week') continue;
+                // A phone's preview has its Print at the top of the page, not in the bar (table note 3).
+                const pagePrint = b.name === 'Print' && open === 'week-preview' && phone;
                 const els = b.name === '◀ ▶' ? steps
                   : b.name === 'back' || (b.name === '◀' && isMoney) ? [back]
                   : b.name === '?' ? [action('?')] : b.name === '🗣️' ? [action('🗣️')] : b.name === '📑' ? [action('📑')]
-                  : b.name === '🖨 Print' ? [action('🖨 Print')] : b.name === 'Print' ? [end.querySelector('.hdr-print')]
-                  : b.name === '🖨' ? [end.querySelector('.hdr-switch')] : [];
+                  : b.name === '🖨 Print' ? [action('🖨 Print')] : pagePrint ? [document.getElementById('weekPagePrint')]
+                  : b.name === 'Print' ? [end.querySelector('.hdr-print')]
+                  : b.name === '🖨' || b.name === '📋' ? [end.querySelector('.hdr-switch')] : [];
                 if (!els.length || els.some(e => !e || !shown(e))) {
-                  if (!(b.name === '🗣️' && open === 'meeting-week')) out.push(`${tag}: no ${b.name} in the header`);
+                  if (!(b.name === '🗣️' && open === 'meeting-week')) out.push(`${tag}: no ${pagePrint ? 'Print at the top of the page' : b.name + ' in the header'}`);
                   continue;
                 }
-                els.forEach(e => box(e, b.name === '🖨' ? Object.assign({}, b, { px: 0 }) : b, b.name));
-                if (b.name === '🖨') {
+                const oneCell = b.name === '🖨' || b.name === '📋';
+                els.forEach(e => box(e, oneCell ? Object.assign({}, b, { px: 0 }) : b, pagePrint ? 'the page Print' : b.name));
+                if (oneCell) {
                   const cells = [...els[0].querySelectorAll('.hdr-switch-cell')].filter(shown);
-                  if (cells.length !== 1 || cells[0].textContent !== '🖨' || cells[0].getAttribute('data-hdr-action') !== 'view-preview') out.push(`${tag}: the phone's 🖨 is not the one Print preview button`);
-                  else if (b.px) near(px(getComputedStyle(cells[0]).fontSize), b.px, 0.05, 'the 🖨 icon');
+                  const goes = b.name === '🖨' ? 'view-preview' : 'view-full';
+                  if (cells.length !== 1 || cells[0].textContent !== b.name || cells[0].getAttribute('data-hdr-action') !== goes) out.push(`${tag}: the phone's ${b.name} is not the one ${b.name === '🖨' ? 'Print preview' : 'back to Full'} button (${cells.map(c => c.textContent).join(',')})`);
+                  else if (b.px) near(px(getComputedStyle(cells[0]).fontSize), b.px, 0.05, `the ${b.name} icon`);
+                }
+                if (pagePrint) {
+                  // At the top of the page: the first thing under the header (a parent's mode bar aside), above everything else on it.
+                  const kids = [...screen.children].filter(k => shown(k) && !/absolute|fixed/.test(getComputedStyle(k).position)), at = kids.indexOf(els[0]), pb = els[0].getBoundingClientRect();
+                  if (kids[0] !== hdr || at < 1 || kids.slice(1, at).some(k => k.id !== 'parentBannerWeek')
+                    || kids.slice(at + 1).some(k => k.getBoundingClientRect().top < pb.bottom - 0.5)) out.push(`${tag}: the page Print is not the first thing on the preview page (${kids.slice(0, at + 2).map(k => k.id || k.className).join(', ')})`);
+                  if (els[0].getBoundingClientRect().top < hdr.getBoundingClientRect().bottom - 0.5) out.push(`${tag}: the page Print is under the header`);
                 }
                 if (b.name === 'Print' && els[0].textContent.trim() !== 'Print') out.push(`${tag}: the Print button reads ${JSON.stringify(els[0].textContent)}`);
               }
               if (open === 'week-full' && end.querySelector('.hdr-print')) out.push(`${tag}: Print shows on the Full week — it belongs to the preview it prints`);
-              if (open === 'week-preview' && !shown(end.querySelector('.hdr-print'))) out.push(`${tag}: no Print on the preview`);
+              if (open === 'week-preview' && !phone && !shown(end.querySelector('.hdr-print'))) out.push(`${tag}: no Print on the preview`);
+              // The phone preview's header is Full's (owner, 2026-10-09): no 🖨 and no Print in the bar; the iPad has no page Print.
+              if (open === 'week-preview' && phone && [...hdr.querySelectorAll('button')].some(e => shown(e) && (/🖨|Print/.test(e.textContent) || e.getAttribute('data-hdr-action') === 'print-open'))) out.push(`${tag}: a 🖨 or Print button is in the phone preview's header`);
+              if (/^week/.test(open) && !(open === 'week-preview' && phone) && shown(document.getElementById('weekPagePrint'))) out.push(`${tag}: the page Print shows off the phone preview`);
               // Every header button is a kid's 52px (money 54 on the iPad); a switch's frame too.
               const minBtn = isMoney && !phone ? 54 : 52;
               for (const b of hdr.querySelectorAll('.hdr-btn, .hdr-badge, .hdr-switch, .hdr-tab, .hdr-title-btn, .sd-av')) {
@@ -28006,8 +28029,8 @@ function findChromium() {
                     switchFrame(tabs, 'the tab switch');
                     near(cur.getBoundingClientRect().height, +want.sw.joined[0], 0.5, 'the current tab height');
                     near(px(getComputedStyle(cur).columnGap), +want.sw.joined[1], 0.01, "the current tab's gap");
-                    const sn = want.sw.schoolNarrow, tabNarrow = sn && open === 'school' && window.innerWidth <= +sn[1];
-                    font(cur, tabNarrow ? +sn[0] : +want.sw.joined[2], want.sw.joined[3], null, bodyFont, 'the current tab');
+                    const sn = want.sw.schoolNarrow, tabStep = sn && open === 'school' && sn.find(x => window.innerWidth <= x[1]);
+                    font(cur, tabStep ? tabStep[0] : +want.sw.joined[2], want.sw.joined[3], null, bodyFont, 'the current tab');
                     cellSize(other, +want.sw.cell[0], +want.sw.cell[1], 'the other tab');
                     near(px(getComputedStyle(tabs.querySelectorAll('.hdr-tab')[1]).borderLeftWidth), want.sw.divider, 0.01, 'the tab divider');
                     near(px(getComputedStyle(other).fontSize), +want.sw.otherIcon[0], 0.05, "the other tab's icon");
@@ -28098,6 +28121,12 @@ function findChromium() {
                   }
                 }
               }
+              // Last, as it leaves the week: the phone preview's page Print opens Print.
+              const pagePrintBtn = open === 'week-preview' && phone && document.getElementById('weekPagePrint');
+              if (pagePrintBtn) {
+                pagePrintBtn.click();
+                if (document.querySelector('.screen.active').id !== 'screen-print') out.push(`${tag}: the page Print did not open Print`);
+              }
             } finally {
               profile = wasProfile; parentViewing = wasViewing; parentUnlockedThisSession = wasUnlocked; navReturnStack = [];
               if (dayViewSpan() !== wasSpan) setDayViewSpan(wasSpan);
@@ -28108,6 +28137,7 @@ function findChromium() {
             return out;
           }, [tag, open, want, size === 'phone']));
         }
+        if (size === 'phone' && w !== 390) continue;
         // A grown-up's money header: her five tabs and the kid switch in the
         // sub-bar under the row (difference 6, kept), nothing pushed out.
         problems.push(...await page.evaluate(([tag]) => {
