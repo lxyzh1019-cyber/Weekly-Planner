@@ -1,18 +1,10 @@
-// Weekly-Planner — the kid's chore tab (redesign 2a, "Kid" frame).
+// Weekly-Planner — a child's chore answers: the readers and writers Today,
+// its catch-up card, the parent portal and the Week tab share.
 //
-// One job: what do I do now, and what have I earned. No grading, no pool
-// editing, no sight of her sister. Everything here writes a CLAIM — an answer,
-// not a payment — which is why a kid can be handed this screen at all.
-//
-// Layout C from the design: the row is the tap target and the three quality
-// words appear only on the chore she just tapped. A settled chore collapses to
-// one quiet line, so a seven-chore day fits without scrolling past work that
-// was finished days ago.
-
-let ckView = 'day';        // 'day' | 'week'
-let ckOpenChore = null;    // the one chore showing its quality words
-let ckHistoryOpen = false;
-let ckElseOpen = false;    // the "I did something else today" picker
+// No grading, no pool editing. Everything here writes a CLAIM — an answer, not
+// a payment — or a routine tick. This was the kid's chore tab (redesign 2a);
+// the tab was retired in PR 2b once every row of docs/chore-relocation-map.md
+// had its new home, and what is left is what those homes call.
 
 /* The three answers, and what each is worth. She judges the work; the dollar
    follows. $0 is deliberately absent — "I didn't do it" isn't a claim, it's the
@@ -50,11 +42,6 @@ function ckActFor(block, kid) {
 function ckRoutineItems(routineId, kid) {
   return routineItemsFor(routineId, kid || (typeof ctActiveKid === 'function' ? ctActiveKid() : undefined));
 }
-/* The day's routine blocks, as the planner placed them. Nothing appears here
-   that the planner did not put on the day — the same rule the chores follow. */
-function ckRoutineBlocks(kid, dayIdx) {
-  return ckRoutineBlocksOn(kid, mrWeekDayKeys(ctWeekKey)[dayIdx]);
-}
 /* The same reader for a day named by its key. Today and its catch-up card ask
    about days this tab is not showing (R5 §5 C1), so the question takes the day
    rather than reading ctWeekKey/ctDay — one reader, two callers. */
@@ -69,9 +56,6 @@ function ckRoutineBlocksOn(kid, dayKey) {
     return { block: b, act, items, done, total: items.length, dayKey };
   }).filter(Boolean);
 }
-function ckTrainingBlock(kid, dayIdx) {
-  return ckTrainingBlockOn(kid, mrWeekDayKeys(ctWeekKey)[dayIdx]);
-}
 function ckTrainingBlockOn(kid, dayKey) {
   if (!dayKey) return null;
   const b = (getDayBlocks(dayKey, kid) || []).find(x => {
@@ -82,273 +66,11 @@ function ckTrainingBlockOn(kid, dayKey) {
   return { block: b, act: ckActFor(b, kid), dayKey };
 }
 
-/* ── The cap bar ───────────────────────────────────────────────────
-   Fines first, because they come off before anything is banked. The black tick
-   is the day's ceiling, and the blue tail past it is work that turned into XP
-   instead of money. A dial was tried and lost: it cannot show what happens PAST
-   the ceiling, and "almost full" reads as failure rather than a good day. */
-/* For a named kid, week and day. The rail and My money both draw it, through
-   ckEarnBoard (R5 §5 C2, row 11), so the two cannot show different figures for
-   one day. */
-function ckCapBarFor(kid, weekKey, dayIdx) {
-  // (weekKey, dayIdx) is the planner's day; its money is read from the money
-  // week that pays it (Deviation 34 — a Sunday may pay next Sunday).
-  const dayKey = mrWeekDayKeys(weekKey)[dayIdx];
-  const cd = mrChoreDay(kid, dayKey);
-  const r = mrRulesForWeek(cd.wk);
-  const cap = Number((r.chores || {}).dailyCap);
-  const chores = cd.week;
-  const day = cd.day;
-  const fines = mrFinesWeek(cd.wk, kid, chores.days.map(d => d.paid));
-  const fined = (fines.perDay.find(x => x.dayKey === dayKey) || {}).applied || 0;
-
-  // Claimed but not yet graded — what today could still become.
-  const e = mrEnsureEarnings(kid, weekKey);
-  const claims = e.claims[String(dayIdx)] || {};
-  let pending = 0;
-  Object.keys(claims).forEach(id => {
-    if (mrGetChoreGrade(kid, weekKey, dayIdx, id) > 0) return;
-    pending += ckGradePay(r, claims[id]);
-  });
-
-  const kept = Math.max(0, day.paid - fined);
-  const over = Math.max(0, day.raw - (cap || day.raw));   // past the ceiling → XP
-  const span = Math.max(cap || 0, fined + kept + pending + over, 1);
-  const pct = v => Math.max(0, Math.min(100, v / span * 100));
-
-  const segs = [];
-  if (fined)   segs.push({ w: pct(fined),   bg: 'var(--mny-earn-fined)', title: `${ckMoney(fined)} in fines, taken first` });
-  if (kept)    segs.push({ w: pct(kept),    bg: 'var(--mny-earn-kept)', title: `${ckMoney(kept)} kept` });
-  if (pending) segs.push({ w: pct(pending), bg: 'repeating-linear-gradient(45deg,var(--mny-earn-waiting) 0 7px,var(--mny-earn-waiting-stripe) 7px 14px)', title: `${ckMoney(pending)} claimed, waiting` });
-  if (over)    segs.push({ w: pct(over),    bg: 'var(--mny-earn-xp)', title: `${ckMoney(over)} turned into XP` });
-
-  const keys = [];
-  if (fined)   keys.push({ label: `−${ckMoney(fined)} fines, taken first`, bg: 'var(--mny-earn-fined)', fg: 'var(--mny-earn-fined-ink)' });
-  if (kept)    keys.push({ label: `${ckMoney(kept)} kept`, bg: 'var(--mny-earn-kept)', fg: 'var(--mny-earn-kept-ink)' });
-  if (pending) keys.push({ label: `${ckMoney(pending)} waiting`, bg: 'var(--mny-earn-waiting)', fg: 'var(--mny-earn-waiting-ink)' });
-  if (over)    keys.push({ label: `${ckMoney(over)} → XP`, bg: 'var(--mny-earn-xp)', fg: 'var(--mny-earn-xp-ink)' });
-  if (!keys.length) keys.push({ label: 'nothing yet today', bg: 'var(--paper)', fg: 'var(--ink-light)' });
-
-  // What the next fine would actually cost her — the exposure line.
-  const fineAmt = Number((((r.fines || {}).items || [])[0] || {}).amount) || 1;
-  const risk = kept > 0
-    ? `One more fine today takes ${ckMoney(Math.min(fineAmt, kept))} back off what you've earned.`
-    : 'Nothing banked yet today, so a fine costs nothing — a day never goes below $0.';
-  const room = cap != null && !Number.isNaN(cap)
-    ? `${ckMoney(Math.max(0, cap - day.paid))} of today's ${ckMoney(cap)} ceiling still open.`
-    : '';
-  return { segs, keys, risk, room, ceilPct: cap ? pct(cap) : 100, cap, day, pending, fined };
-}
-
-/* ── Header ── */
-function ckHeader(kid) {
-  const info = ctWeekInfo();
-  const lv = mrXpLevelInfo(kid, ctWeekKey);
-  // The streak of the money week the chosen day sits in (Deviation 34).
-  const st = mrStreakWeek(mrMoneyWeekOf(mrWeekDayKeys(ctWeekKey)[ctDay], kid), kid);
-  const label = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
-  const isThisWeek = ctWeekKey === ctThisWeekKey();
-  return `<div class="ck-head">
-    <div class="ck-head-who">
-      <span class="ck-head-icon">${CT_PROFILE_ICON[kid]}</span>
-      <div>
-        <div class="ck-head-name">${kid === 'jenn' ? 'Jenn' : 'Jess'}</div>
-        <div class="ck-weeknav">
-          <button type="button" class="ck-navbtn" data-ct-action="ck-week" data-delta="-1" aria-label="Previous week">‹</button>
-          <span class="ck-weeklabel">${label}</span>
-          <span class="ck-weeksub">${isThisWeek ? 'this week' : 'a week you already lived'}</span>
-          <button type="button" class="ck-navbtn" data-ct-action="ck-week" data-delta="1" aria-label="Next week">›</button>
-        </div>
-      </div>
-    </div>
-    ${ckLoopChips(kid)}
-    <div class="ck-chip">
-      <span class="ck-chip-icon">🔥</span>
-      <div><div class="ck-chip-big">${st.days}</div><div class="ck-chip-cap">day streak</div></div>
-    </div>
-    <div class="ck-chip">
-      <div><div class="ck-chip-big">${lv.level}</div><div class="ck-chip-cap ck-blue">${escapeHtml(lv.tier)}</div></div>
-      <div class="ck-xpwrap">
-        <div class="ck-xpbar"><div class="ck-xpfill" style="width:${lv.pct}%"></div></div>
-        <div class="ck-chip-cap">${lv.xp} XP</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ── Her half of the loop ──
-   She used to claim into silence: no count of what was still with Mom, and no
-   sign when an answer came back — she had to re-open the tab and re-read every
-   row to find out. Both numbers already existed; neither was ever shown.
-
-   Only on the live week, because "2 waiting" on a week from March is history,
-   not something to act on. */
-function ckLoopChips(kid) {
-  if (ctWeekKey !== ctThisWeekKey()) return '';
-  const waiting = mrWaitingCount(kid, ctWeekKey);
-  const fresh = mrNewlyGraded(kid, ctWeekKey);
-  let out = '';
-  if (waiting > 0) {
-    out += `<button type="button" class="ck-chip ck-chip-btn" data-ct-action="ck-waiting"
-        title="Go to the first one Mom hasn't answered yet">
-        <span class="ck-chip-icon">⏳</span>
-        <div><div class="ck-chip-big">${waiting}</div><div class="ck-chip-cap">waiting for Mom</div></div>
-      </button>`;
-  }
-  if (fresh.length) {
-    out += `<button type="button" class="ck-chip ck-chip-btn ck-chip-fresh" data-ct-action="ck-fresh"
-        title="Go to what Mom answered since you last looked">
-        <span class="ck-chip-icon">✨</span>
-        <div><div class="ck-chip-big">${fresh.length}</div><div class="ck-chip-cap">newly answered</div></div>
-      </button>`;
-  }
-  return out;
-}
-function ckGoWaiting() {
-  const d = mrFirstWaitingDay(ctActiveKid(), ctWeekKey);
-  if (d == null) { showToast('Nothing waiting — you are all caught up ✓'); return; }
-  ckSelectDay(d);
-}
-function ckGoFresh() {
-  const fresh = mrNewlyGraded(ctActiveKid(), ctWeekKey);
-  if (!fresh.length) return;
-  ckSelectDay(fresh.sort((a, b) => a.dayIdx - b.dayIdx)[0].dayIdx);
-}
-
-/* ── Control strip: which day, and the four dots that summarise it ── */
-function ckControls(kid) {
-  const info = ctWeekInfo();
-  const todayD = formatDayKey(todayKey());
-  // One pass for the whole strip rather than a read per dot per day.
-  const sessionsByDay = routineSessionsByDay(kid, ctWeekKey);
-  let cells = '';
-  for (let d = 0; d < 7; d++) {
-    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
-    const isToday = Math.round((date - todayD) / 86400000) === 0;
-    const sel = d === ctDay;
-    /* Three dot SLOTS always, so the seven day buttons keep identical widths —
-       but a session the day never asked for is drawn as a hollow placeholder
-       rather than a missed one. A permanently grey dot for something nobody
-       asked her to do is the complaint this change exists to answer. */
-    const askedToday = sessionsByDay[d];
-    let dots = CT_SESSIONS.map(s => askedToday.includes(s)
-      ? `<span class="ck-dot ${ctGetMandatory(ctWeekKey, d, s, kid) ? 'on' : ''}"></span>`
-      : `<span class="ck-dot ck-dot-na" title="Not planned this day"></span>`).join('');
-    const gradedToday = Object.keys(mrEnsureEarnings(kid, ctWeekKey).chores[String(d)] || {}).length > 0;
-    dots += `<span class="ck-dot ${gradedToday ? 'chore' : ''}"></span>`;
-    cells += `<button type="button" class="ck-day ${sel ? 'sel' : ''} ${isToday ? 'today' : ''}"
-      data-ct-action="ck-day" data-day="${d}" aria-pressed="${sel}" title="Show ${CT_DAYS[d]}">
-      <span class="ck-day-dow">${DAY_SHORT[d]}</span>
-      <span class="ck-day-date">${date.getDate()}</span>
-      <span class="ck-dots">${dots}</span></button>`;
-  }
-  return `<div class="ck-controls">
-    <div class="ck-ctl-group">
-      <span class="ck-ctl-cap">Looking at</span>
-      <div class="ck-seg">
-        <button type="button" class="ck-segbtn ${ckView === 'day' ? 'on' : ''}" data-ct-action="ck-view" data-view="day">Day</button>
-        <button type="button" class="ck-segbtn ${ckView === 'week' ? 'on' : ''}" data-ct-action="ck-view" data-view="week">Week</button>
-      </div>
-    </div>
-    <div class="ck-ctl-group ck-ctl-days">
-      <div class="ck-ctl-caprow">
-        <span class="ck-ctl-cap">Which day</span>
-        <span class="ck-legend"><span class="ck-dot on"></span>morning · after school · evening<span class="ck-dot chore"></span>chore graded</span>
-      </div>
-      <div class="ck-daystrip">${cells}</div>
-    </div>
-    <div class="ck-ctl-group">
-      <span class="ck-ctl-cap">Earlier</span>
-      <button type="button" class="ck-btn ${ckHistoryOpen ? 'on' : ''}" data-ct-action="ck-history">Before</button>
-    </div>
-  </div>`;
-}
-
-/* ── What you've earned before ── */
-function ckHistory(kid) {
-  if (!ckHistoryOpen) return '';
-  const cur = formatDayKey(ctWeekKey);
-  let rows = '';
-  for (let i = 1; i <= 8; i++) {
-    const mon = new Date(cur); mon.setDate(cur.getDate() - i * 7);
-    const wk = ctDateToKey(mon);
-    const money = ctWeekMoney(wk, kid);
-    const st = mrStreakWeek(wk, kid);
-    rows += `<button type="button" class="ck-hist-row" data-ct-action="ck-history-pick" data-week="${escapeAttr(wk)}">
-      <span class="ck-hist-label">${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()}</span>
-      <span class="ck-hist-detail">${st.days} day${st.days === 1 ? '' : 's'} all routines kept</span>
-      <span class="ck-hist-total">${ckMoney(money)}</span></button>`;
-  }
-  return `<div class="ck-card ck-history">
-    <div class="ck-h2">What you've earned before</div>
-    <div class="ck-sub">Tap a week to open it. Everything on this card changes to that week — the grades, the routines, all of it.</div>
-    ${rows}</div>`;
-}
-
-/* ── Routines ──
-   What is here is what the planner put on this day, and nothing else. A day with
-   no routine block shows no routines — travelling, a competition, a day at
-   grandma's are all days where morning/after-school/evening is the wrong shape,
-   and inventing three empty checklists for them would be asking a child to tick
-   something nobody planned. */
-function ckRoutines(kid) {
-  const blocks = ckRoutineBlocks(kid, ctDay);
-  if (!blocks.length) {
-    return `<div class="ck-sect"><div class="ck-h2">Routines</div>
-      <div class="ck-empty">No routine on this day's plan.</div></div>`;
-  }
-  /* One tap for the whole day. There was a per-block "all" and nothing above it,
-     so closing a normal evening was three taps in three places — and the routine
-     bonus needs all three, which made the thing she was aiming at the one thing
-     with no button. It replaces the section's instruction line rather than
-     adding to it: this screen is on a word ratchet, and a control says what a
-     sentence about the control was saying. */
-  const allDone = blocks.every(b => b.total > 0 && b.done >= b.total);
-  const dayBtn = blocks.length > 1
-    ? `<button type="button" class="ck-allbtn ck-allday" data-ct-action="ck-routine-all-day"
-         title="Close every item in every routine on this day">
-         <span class="ck-check ${allDone ? 'on' : ''}">${allDone ? '✓' : ''}</span>
-         <span>${allDone ? `all ${blocks.length} kept` : `all ${blocks.length} done`}</span></button>`
-    : '';
-  const body = blocks.map(({ block, act, items, done, total }) => {
-    const allOn = total > 0 && done >= total;
-    const rows = items.map(i => {
-      const on = !!(block.checklistState || {})[i.id];
-      return `<button type="button" class="ck-item ${on ? 'on' : ''}"
-        data-ct-action="ck-routine-item" data-block-id="${escapeAttr(block.id)}" data-item-id="${escapeAttr(i.id)}"
-        role="checkbox" aria-checked="${on}">
-        <span class="ck-check ${on ? 'on' : ''}">${on ? '✓' : ''}</span>
-        <span class="ck-item-icon">${routineItemIcon(i)}</span>
-        <span class="ck-item-name">${escapeHtml(i.text || '')}</span></button>`;
-    }).join('');
-    return `<div class="ck-block">
-      <div class="ck-block-head">
-        <span class="ck-block-icon">${act.icon || '📋'}</span>
-        <span class="ck-block-name">${escapeHtml(act.name || '')}</span>
-        <span class="ck-spacer"></span>
-        <button type="button" class="ck-allbtn" data-ct-action="ck-routine-all" data-block-id="${escapeAttr(block.id)}"
-          title="Close every item in this block at once">
-          <span class="ck-check ${allOn ? 'on' : ''}">${allOn ? '✓' : ''}</span>
-          <span>${allOn ? 'all done' : 'all'}</span></button>
-        <span class="ck-count">${done}/${total}</span>
-      </div>
-      <div class="ck-block-body">${rows}</div>
-    </div>`;
-  }).join('');
-  return `<div class="ck-sect">
-    <div class="ck-sect-head">
-      <div class="ck-h2">Routines</div>
-      <span class="ck-spacer"></span>
-      ${dayBtn}
-    </div>
-    ${body}</div>`;
-}
-
 /* ── Your own things, and helping out ──
    Standing responsibilities: they need no planner block, they are never paid,
    and only "nobody had to ask" earns XP. */
-/* Which items the two lanes hold on a day — read here and on Today, so the two
-   cannot list different things. */
+/* Which items the two lanes hold on a day — read by Today and by the portal's
+   on-her-behalf card, so the two cannot list different things. */
 function ckOwnLaneItems(kid, weekKey, dayIdx) {
   const day = mrChoresForDay(kid, weekKey, dayIdx);
   const r = mrRulesForWeek(weekKey);
@@ -360,132 +82,7 @@ function ckOwnLaneItems(kid, weekKey, dayIdx) {
     .map(x => ({ id: x.row.id, icon: x.row.icon, label: x.row.label, due: mrDueLabel(x.row) }));
   return { own, helping };
 }
-function ckOwnLanes(kid) {
-  const { own, helping } = ckOwnLaneItems(kid, ctWeekKey, ctDay);
 
-  const lane = (label, note, items) => {
-    if (!items.length) return '';
-    const done = items.filter(i => mrGetPersonal(kid, ctWeekKey, ctDay, i.id)).length;
-    const rows = items.map(i => {
-      const st = mrGetPersonal(kid, ctWeekKey, ctDay, i.id);
-      const mark = st === 'unasked' ? '⭐' : (st === 'done' ? '✓' : '');
-      return `<button type="button" class="ck-item ${st ? 'on' : ''}"
-        data-ct-action="cycle-personal" data-chore-id="${escapeAttr(i.id)}" aria-label="${escapeAttr(i.label)}">
-        <span class="ck-check ${st ? 'on' : ''}">${mark}</span>
-        <span class="ck-item-icon">${i.icon || '⭐'}</span>
-        <span class="ck-item-name">${escapeHtml(i.label)}${i.due ? `<span class="ck-item-due">by ${escapeHtml(i.due)}</span>` : ''}</span>
-        <span class="ck-item-note">${st === 'unasked' ? 'nobody asked ⭐' : (st === 'done' ? 'done' : '')}</span></button>`;
-    }).join('');
-    return `<div class="ck-lane">
-      <div class="ck-lane-head"><span class="ck-lane-name">${label}</span>
-        <span class="ck-lane-note">${note}</span><span class="ck-spacer"></span>
-        <span class="ck-count">${done}/${items.length}</span></div>
-      <div class="ck-block-body">${rows}</div></div>`;
-  };
-  const lanes = lane('Your own things', 'your room, your kit', own)
-              + lane('Helping out', 'nobody assigned it', helping);
-  if (!lanes) return '';
-  return `<div class="ck-sect">
-    <div class="ck-h2">Looking after your own things</div>
-    <div class="ck-sub">Tap when it's done. Tap twice if nobody had to ask — that's the XP.</div>
-    <div class="ck-lanes">${lanes}</div></div>`;
-}
-
-/* ── The chores: layout C ──
-   The row is the tap target. Only the chore she just tapped shows its three
-   answers, and a settled chore is a single quiet line. */
-function ckChores(kid) {
-  const r = mrRulesForWeek(ctWeekKey);
-  const day = mrChoresForDay(kid, ctWeekKey, ctDay);
-  const rows = day.rows.filter(x => x.row.lane === 'chores');
-  const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
-  const wk = mrChoreDay(kid, dayKey).week;
-  const freeIds = new Set(wk.freeUsed.filter(f => f.dayKey === dayKey).map(f => f.choreId));
-  const cap = (r.chores || {}).dailyCap;
-
-  const head = `<div class="ck-h2row"><span class="ck-h2">${CT_DAYS[ctDay]}'s chores</span>
-    <span class="ck-pill">up to ${ckMoney(cap)} a day</span></div>`;
-
-  if (!rows.length) {
-    return `<div class="ck-sect">${head}
-      <div class="ck-empty">Nothing on today's plan — so there is nothing here to answer for yet.</div>
-      ${ckSomethingElse(kid)}
-      ${day.unresolved.length ? `<div class="ck-warn">The planner asked for ${escapeHtml(day.unresolved.join(', '))}, which isn't in the chore list — tell a grown-up so it can count.</div>` : ''}
-    </div>`;
-  }
-
-  // Captured before the render marks them seen, so "new since you last looked"
-  // survives the very render that clears it.
-  const seenBefore = mrLastGradeSeen(kid);
-  const body = rows.map(({ row, unplanned }) => {
-    const grade = mrGetChoreGrade(kid, ctWeekKey, ctDay, row.id);
-    const claim = mrGetClaim(kid, ctWeekKey, ctDay, row.id);
-    const free = freeIds.has(row.id);
-    const open = ckOpenChore === row.id && !grade;
-    const due = mrDueLabel(row);
-
-    let state = 'todo', mark = '', status = `by ${escapeHtml(due)}`, pay = '', payCls = '';
-    const isFresh = mrGradedAt(kid, ctWeekKey, ctDay, row.id) > seenBefore;
-    if (grade > 0) {
-      state = 'graded'; mark = '✓';
-      const word = (CK_QUALITY.find(q => q.g === grade) || {}).word || '';
-      status = `${escapeHtml(word.toLowerCase())} · Mom agreed${isFresh ? ' · new ✨' : ''}`;
-      pay = free ? 'free' : ckMoney(ckGradePay(r, grade));
-      payCls = 'ck-green';
-    } else if (claim > 0) {
-      state = 'claimed'; mark = '✓';
-      const word = (CK_QUALITY.find(q => q.g === claim) || {}).word || '';
-      status = `you said ${escapeHtml(word.toLowerCase())} — waiting for Mom`;
-      pay = ckMoney(ckGradePay(r, claim));
-      payCls = 'ck-amber';
-    } else if (open) {
-      status = `by ${escapeHtml(due)} — say how it went`;
-    }
-
-    const quality = open ? `<div class="ck-quality">
-      <div class="ck-quality-cap">How did it go?</div>
-      <div class="ck-quality-row">${CK_QUALITY.map(q => `
-        <button type="button" class="ck-qbtn ${claim === q.g ? 'on' : ''}"
-          data-ct-action="ck-claim" data-chore-id="${escapeAttr(row.id)}" data-quality="${q.g}">
-          <span class="ck-qword">${escapeHtml(q.word)}</span>
-          <span class="ck-qpay">${ckMoney(ckGradePay(r, q.g))}</span></button>`).join('')}
-      </div></div>` : '';
-
-    return `<div class="ck-chore ck-chore-${state} ${open ? 'open' : ''} ${isFresh && grade > 0 ? 'ck-chore-fresh' : ''}">
-      <button type="button" class="ck-chore-row" data-ct-action="ck-chore-row" data-chore-id="${escapeAttr(row.id)}">
-        <span class="ck-check ${state !== 'todo' ? 'on' : ''} ${state === 'claimed' ? 'ring' : ''}">${mark}</span>
-        <span class="ck-chore-icon">${row.icon}</span>
-        <span class="ck-chore-name">${escapeHtml(row.label)}${unplanned ? ' <span class="ck-added">you added this</span>' : ''}
-          <span class="ck-chore-status">${status}</span></span>
-        <span class="ck-chore-pay ${payCls}">${pay}</span>
-      </button>${quality}</div>`;
-  }).join('');
-
-  const free = wk.freeLeft > 0
-    ? `${wk.freeLeft} free chore${wk.freeLeft === 1 ? '' : 's'} left this week — those belong to the family.`
-    : `Your free chores are used up — everything else this week pays.`;
-  return `<div class="ck-sect">${head}
-    <div class="ck-sub">Tap the row, then say how it went. Mom checks it after.</div>
-    ${body}
-    ${ckSomethingElse(kid)}
-    <div class="ck-note">${free}</div>
-    ${day.unresolved.length ? `<div class="ck-warn">The planner also asked for ${escapeHtml(day.unresolved.join(', '))}, which isn't in the chore list — tell a grown-up so it can count.</div>` : ''}
-  </div>`;
-}
-
-/* ── "I did something else" ──
-   The planner is where a chore is meant to be arranged, and that is a good
-   rule for what the app expects. It is a bad rule for what actually happens:
-   she vacuums without being asked, and until now there was nowhere to put it —
-   the work was uncountable and unpayable, and the only fix was a grown-up
-   scheduling it retroactively from the portal.
-
-   This is the kid-side door, and it does not weaken the gate: it files a
-   CLAIM, exactly like every other chore on this screen, and a parent still
-   grades it before a cent moves. */
-function ckUnlistedChores(kid) {
-  return ckUnlistedChoresFor(kid, ctWeekKey, ctDay);
-}
 /* The same list for any day: Today's "＋ I did something else" and the
    catch-up card's, and the portal's on-her-behalf picker, read it too. */
 function ckUnlistedChoresFor(kid, weekKey, dayIdx) {
@@ -493,113 +90,24 @@ function ckUnlistedChoresFor(kid, weekKey, dayIdx) {
   return mrPoolRows(weekKey).filter(row =>
     row.lane === 'chores' && !onDay.has(row.id) && (row.who === 'both' || row.who === kid));
 }
-function ckSomethingElse(kid) {
-  const left = ckUnlistedChores(kid);
-  if (!left.length) return '';
-  if (!ckElseOpen) {
-    return `<button type="button" class="ck-else-btn" data-ct-action="ck-else">
-      ＋ I did something else today</button>`;
-  }
-  const rows = left.map(row => `<button type="button" class="ck-else-row"
-      data-ct-action="ck-else-pick" data-chore-id="${escapeAttr(row.id)}">
-      <span class="ck-chore-icon">${row.icon}</span>
-      <span class="ck-chore-name">${escapeHtml(row.label)}</span>
-      <span class="ck-chore-pay">${ckMoney(ckGradePay(mrRulesForWeek(ctWeekKey), 3))}</span>
-    </button>`).join('');
-  return `<div class="ck-else">
-      <div class="ck-else-cap">Which one did you do?</div>
-      <div class="ck-sub">It goes to Mom the same way — she still decides what it was worth.</div>
-      ${rows}
-      <button type="button" class="ck-else-btn" data-ct-action="ck-else">Never mind ▾</button>
-    </div>`;
-}
-function ckToggleElse() { ckElseOpen = !ckElseOpen; renderChoreTab(); }
-function ckPickElse(choreId) {
-  const kid = ctActiveKid();
-  const row = mrPoolRow(choreId, ctWeekKey);
-  if (!row) return;
-  ckElseOpen = false;
-  openChoreClaimPrompt(kid, ctWeekKey, ctDay, choreId, row.label).then(() => renderChoreTab());
-}
-
-/* ── Learning ── */
-function ckLearning(kid) {
-  const r = mrRulesForWeek(ctWeekKey);
-  const items = (r.learning || {}).items || [];
-  if (!items.length) return '';
-  const rows = items.map(it => {
-    const units = mrGetLearning(kid, ctWeekKey, ctDay, it.id);
-    const worth = it.xpOnly ? 'XP only' : `${ckMoney(it.amount)} / ${it.perUnit} ${it.unit}`;
-    return `<div class="ck-learn ${units > 0 ? 'on' : ''}">
-      <span class="ck-item-icon">${it.xpOnly ? '🎮' : '📘'}</span>
-      <span class="ck-learn-name">${escapeHtml(it.label)}<span class="ck-item-due">${escapeHtml(worth)}</span></span>
-      <span class="ck-learn-count">${units} ${escapeHtml(it.unit)}</span>
-      <span class="ck-learn-btns">
-        <button type="button" class="ck-navbtn" data-ct-action="learn-minus" data-item-id="${escapeAttr(it.id)}" aria-label="Less ${escapeAttr(it.label)}">–</button>
-        <button type="button" class="ck-navbtn" data-ct-action="learn-plus" data-item-id="${escapeAttr(it.id)}" aria-label="More ${escapeAttr(it.label)}">+</button>
-      </span></div>`;
-  }).join('');
-  return `<div class="ck-sect"><div class="ck-h2">Learning you keep up</div>
-    <div class="ck-sub">Only whole bundles pay. Sunday she picks ${(r.learning || {}).sundayCheckCount} at random and asks — anything you can't answer for goes back to unpaid.</div>
-    ${rows}</div>`;
-}
-
-/* ── Training attitude: XP only, and only where training was planned ── */
-function ckAttitude(kid) {
-  const t = ckTrainingBlock(kid, ctDay);
-  if (!t) return '';
-  const a = mrGetAttitude(kid, ctWeekKey, ctDay);
-  const btns = (who, val, live) => [1, 2, 3, 4, 5].map(n =>
-    live
-      ? `<button type="button" class="ck-rate ${val === n ? 'on' : ''}" data-ct-action="ck-attitude" data-day="${ctDay}" data-n="${n}">${n}</button>`
-      : `<span class="ck-rate ${val === n ? 'on' : ''}">${n}</span>`).join('');
-  const rated = a.self > 0 && a.parent > 0;
-  const avg = rated ? Math.round((a.self + a.parent) / 2 * 10) / 10 : '—';
-  const gap = rated
-    ? (a.self === a.parent ? 'you two agreed' : `you said ${a.self > a.parent ? 'more' : 'less'} than Mom did`)
-    : 'waiting on Mom';
-  return `<div class="ck-sect ck-training">
-    <div class="ck-h2row"><span class="ck-h2">🏊 Training attitude</span>
-      <span class="ck-pill ck-pill-blue">XP only · no money</span></div>
-    <div class="ck-sub">${escapeHtml(t.act.name || 'Training')} — this block only exists today because training was planned.</div>
-    <div class="ck-rates">
-      <div><div class="ck-ctl-cap">You rate yourself</div><div class="ck-raterow">${btns('self', a.self, true)}</div></div>
-      <div><div class="ck-ctl-cap">Mom rated you</div><div class="ck-raterow">${btns('parent', a.parent, false)}</div></div>
-      <div class="ck-ratebox"><div class="ck-chip-big">${avg}<span class="ck-of">/5</span></div>
-        <div class="ck-chip-cap">${escapeHtml(gap)}</div></div>
-    </div></div>`;
-}
 
 /* ── Open loops: something taken out and never put back ── */
-/* What is in the box and not yet back, and the words for each — read here and
-   by Today's Open loops card (R5 §5 C2, row 13), so the two list the same. */
+/* What is in the box and not yet back, and the words for each — read by
+   Today's Open loops card (R5 §5 C2, row 13). */
 function ckOpenLoops(kid) {
   return mrBoxItems(kid).filter(b => !b.releasedAt);
 }
 function ckLoopState(b) {
   return b.repeat ? 'again this week · −$1' : 'in the box';
 }
-function ckLoops(kid) {
-  const boxed = ckOpenLoops(kid);
-  if (!boxed.length) return '';
-  const rows = boxed.map(b => `<div class="ck-loop">
-    <span class="ck-item-icon">📦</span>
-    <span class="ck-loop-name">${escapeHtml(b.label)}<span class="ck-item-due">back Sunday, or sooner for one unpaid job</span></span>
-    <span class="ck-pill ${b.repeat ? 'ck-pill-red' : ''}">${escapeHtml(ckLoopState(b))}</span></div>`).join('');
-  return `<div class="ck-sect"><div class="ck-h2">Open loops</div>
-    <div class="ck-sub">Being in the box is the consequence — money only comes into it the second time the same thing happens in a week.</div>
-    ${rows}</div>`;
-}
 
 /* ── The week, as a grid ──
-   Same data, wider frame. A cell she can tap is a cell the planner scheduled;
-   grey means it was never asked for, and a thing can't be judged on a day it
-   was never planned for. */
-/* What the grid shows, for a named kid and week — read by the grid below and by
-   the Week tab's read-only report (R5 §5 C2, row 14), so the two cannot show
-   different cells. Each cell carries its state (`na` not planned, `routine`
-   kept or not, `off` not on the plan, `graded`, `claimed`, `open`), its glyph
-   and its title; only the grid turns a claimable cell into a control. */
+   Grey means the planner never asked for it, and a thing can't be judged on a
+   day it was never planned for. What the grid shows, for a named kid and week —
+   read by the Week tab's read-only report (R5 §5 C2, row 14; the Chores
+   screen's grid read it too until PR 2b). Each cell carries its state (`na`
+   not planned, `routine` kept or not, `off` not on the plan, `graded`,
+   `claimed`, `open`), its glyph and its title. */
 function ckWeekGridData(kid, weekKey) {
   const r = mrRulesForWeek(weekKey);
   const mon = formatDayKey(weekKey);
@@ -667,196 +175,10 @@ function ckWeekGridData(kid, weekKey) {
     ].filter(l => l.rows.length),
   };
 }
-function ckWeekGrid(kid) {
-  const data = ckWeekGridData(kid, ctWeekKey);
-  let head = '<div class="ck-grid-row ck-grid-head"><div></div>';
-  data.head.forEach(h => { head += `<div class="ck-grid-dh">${h.dow}<small>${h.date}</small></div>`; });
-  head += '<div class="ck-grid-dh">week</div></div>';
 
-  const cellHtml = (c) => {
-    if (c.state === 'na') return `<div class="ck-cell ck-cell-na" title="${escapeAttr(c.title)}">${escapeHtml(c.text)}</div>`;
-    if (c.state === 'routine') return `<div class="ck-cell ${c.on ? 'done' : ''}">${escapeHtml(c.text)}</div>`;
-    if (c.state === 'off') return `<div class="ck-cell ck-cell-off" title="${escapeAttr(c.title)}"></div>`;
-    if (c.state === 'graded') return `<div class="ck-cell done" title="${escapeAttr(c.title)}">${escapeHtml(c.text)}</div>`;
-    return `<button type="button" class="ck-cell${c.state === 'claimed' ? ' claimed' : ''}" title="${escapeAttr(c.title)}"
-          data-ct-action="ck-week-cell" data-chore-id="${escapeAttr(c.choreId)}" data-day="${c.day}">${escapeHtml(c.text)}</button>`;
-  };
-  const laneHtml = (lane) => `<div class="ck-grid-lane"><div class="ck-grid-lanehead">${escapeHtml(lane.label)}</div>`
-    + lane.rows.map(row =>
-      `<div class="ck-grid-row"><div class="ck-grid-label"><span class="ck-grid-icon">${row.icon || ''}</span>${escapeHtml(row.name)}</div>${row.cells.map(cellHtml).join('')}<div class="ck-grid-total">${escapeHtml(row.total)}</div></div>`
-    ).join('') + '</div>';
-
-  return `<div class="ck-sect">
-    <div class="ck-h2">The whole week</div>
-    <div class="ck-sub">Same data, wider frame. Grey cells are days the planner did not schedule that thing — it can't be judged on a day it was never planned for.</div>
-    <div class="ck-gridwrap"><div class="ck-grid">
-      ${head}
-      ${data.lanes.map(laneHtml).join('')}
-    </div></div>
-    <div class="ck-legend2">
-      <span>✓ routine closed</span><span>$3 / $2 / $1 = chore checked</span>
-      <span>? = you answered, not checked yet</span><span>grey = never on the plan</span>
-    </div></div>`;
-}
-
-/* ── The earn board, pinned beside both views ── */
-/* The week's earnings, as the rail states them: the total kept after fines, a
-   day's ceiling bar and the ledger by channel. For a named kid, week and day —
-   My money draws the same board from it (R5 §5 C2, row 11). */
-function ckEarnBoard(kid, weekKey, dayIdx) {
-  // The money week the chosen day is paid in (Deviation 34).
-  const b = mrWeekBreakdown(mrMoneyWeekOf(mrWeekDayKeys(weekKey)[dayIdx], kid), kid);
-  const ledger = [];
-  if (b.chorePaid)      ledger.push({ name: 'Household chores', detail: `${CT_DAYS[dayIdx]} and the rest of the week`, amount: ckMoney(b.chorePaid), fg: 'ck-green' });
-  if (b.learnPaid)      ledger.push({ name: 'Learning', detail: 'whole bundles only', amount: ckMoney(b.learnPaid), fg: 'ck-green' });
-  if (b.streakBonus)    ledger.push({ name: 'Routines kept', detail: `${b.streak.days} days with all three closed`, amount: ckMoney(b.streakBonus), fg: 'ck-green' });
-  if (b.compPaid)       ledger.push({ name: 'Competition', detail: 'from the results sheet', amount: ckMoney(b.compPaid), fg: 'ck-green' });
-  if (b.fines.total)    ledger.push({ name: 'Fines', detail: 'taken before anything is banked', amount: '−' + ckMoney(b.fines.total), fg: 'ck-red' });
-  if (!ledger.length)   ledger.push({ name: 'Nothing yet', detail: 'do a household chore to start', amount: ckMoney(0), fg: '' });
-  return { net: b.net, bar: ckCapBarFor(kid, weekKey, dayIdx), ledger };
-}
-/* The eight weeks ending with the one named, oldest first, each with what it
-   earned (ctWeekMoney) and the words the bar is labelled with. The rail's
-   sparkline and Money story's bars (R5 §5 C2, row 12) both draw from this.
-   `peak` is her own best week of the eight, never less than $1. */
-function ckEightWeeks(kid, weekKey) {
-  const mon0 = ctMondayOf(formatDayKey(weekKey));
-  const weeks = [];
-  for (let i = 7; i >= 0; i--) {
-    const d = new Date(mon0); d.setDate(d.getDate() - i * 7);
-    const money = ctWeekMoney(ctDateToKey(d), kid);
-    weeks.push({ d, money, now: i === 0,
-      title: `Week of ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}: ${ckMoney(money)}` });
-  }
-  return { weeks, peak: Math.max(1, ...weeks.map(w => w.money)) };
-}
-function ckRail(kid) {
-  const board = ckEarnBoard(kid, ctWeekKey, ctDay);
-  const bar = board.bar;
-  const ledger = board.ledger;
-  const lv = mrXpLevelInfo(kid, ctWeekKey);
-  const xp = mrXpForWeek(ctWeekKey, kid);
-
-  // Scaled against her own best week, not a fixed ceiling — a bar chart whose
-  // tallest bar is short says nothing about how the eight weeks compare.
-  const { weeks, peak } = ckEightWeeks(kid, ctWeekKey);
-  const spark = weeks.map(w =>
-    `<span class="ck-spark ${w.now ? 'now' : ''}" style="height:${Math.max(4, Math.round(w.money / peak * 40))}px"
-      title="${escapeAttr(w.title)}"></span>`).join('');
-
-  /* The whole privilege ladder used to print every time — five rows of things
-     she cannot have yet, on a screen with a 200-word budget. What motivates is
-     what she has earned plus the one thing next; levels 5, 8 and 12 are a lookup
-     table, and a lookup table belongs behind a tap. */
-  const allPrivs = mrPrivileges(kid, ctWeekKey);
-  const nextLocked = allPrivs.find(p => !p.unlocked);
-  const shownPrivs = ckPrivsOpen()
-    ? allPrivs
-    : allPrivs.filter(p => p.unlocked || p === nextLocked);
-  const privsHidden = allPrivs.length - shownPrivs.length;
-  const privs = shownPrivs.map(p =>
-    `<div class="ck-priv ${p.unlocked ? 'on' : ''}">
-      <span class="ck-priv-name">${escapeHtml(p.label)}</span>
-      <span class="ck-priv-state">${p.unlocked ? 'yours' : `level ${p.levelReq}`}</span></div>`).join('')
-    + (privsHidden > 0 || ckPrivsOpen()
-      ? `<button type="button" class="ck-privs-more" data-ct-action="ck-privs">${
-          ckPrivsOpen() ? 'Show less ▾' : `See all ${allPrivs.length} ▸`}</button>`
-      : '');
-
-  return `<aside class="ck-rail">
-    <div>
-      <!-- "Earned this week", not "Your week": this is b.net, so it excludes
-           money from outside. Labelled as the week's total it would disagree
-           with "Money that came in" on My money every time she is given
-           something, and she has no way to tell which screen is lying. -->
-      <div class="ck-rail-cap">Earned this week</div>
-      <div class="ck-rail-total">${ckMoney(board.net)}</div>
-      <div class="ck-sub">kept after fines · a day never goes below $0</div>
-    </div>
-    <div class="ck-card">
-      <div class="ck-rail-cap">${CT_DAYS[ctDay]} · ${ckMoney(bar.cap)} ceiling</div>
-      <div class="ck-barwrap">
-        <div class="ck-bar">${bar.segs.map(s => `<div class="ck-barseg" style="width:${s.w}%;background:${s.bg}" title="${escapeAttr(s.title)}"></div>`).join('')}</div>
-        <span class="ck-ceil" style="left:${bar.ceilPct}%" title="the ${ckMoney(bar.cap)} ceiling"></span>
-      </div>
-      <div class="ck-keys">${bar.keys.map(k => `<span class="ck-key" style="background:${k.bg};color:${k.fg}">${escapeHtml(k.label)}</span>`).join('')}</div>
-      <div class="ck-risk">${escapeHtml(bar.risk)}</div>
-      <div class="ck-sub">${escapeHtml(bar.room)}</div>
-    </div>
-    <div class="ck-ledger">${ledger.map(l => `<div class="ck-ledger-row">
-      <span class="ck-ledger-name">${escapeHtml(l.name)}<span class="ck-item-due">${escapeHtml(l.detail)}</span></span>
-      <span class="ck-ledger-amt ${l.fg}">${l.amount}</span></div>`).join('')}</div>
-    <div class="ck-card">
-      <div class="ck-rail-cap">Your last 8 weeks</div>
-      <div class="ck-sparkrow">${spark}</div>
-    </div>
-    <div class="ck-card ck-xpcard">
-      <div class="ck-rail-cap ck-blue">XP — a separate currency</div>
-      <div class="ck-xprow"><span class="ck-rail-total">${lv.xp}</span>
-        <span class="ck-chip-cap">level ${lv.level} · ${escapeHtml(lv.tier)}</span></div>
-      <div class="ck-sub ck-green">${xp.total} XP earned this week</div>
-      ${ckPrivsOpen() ? `<div class="ck-sub">XP and dollars do not convert into each other. Money is what the work was worth; XP is what the habit was worth.</div>` : ''}
-      <div class="ck-rail-cap ck-blue ck-privcap">What XP buys</div>
-      ${privs}
-    </div>
-  </aside>`;
-}
-
-/* ── The tab ── */
-function ckRenderKidTab(kid) {
-  const html = ckBuildKidTab(kid);
-  // After building, not before: the rows above read lastGradeSeen to decide
-  // what to flag, so stamping first would clear the markers on the render that
-  // was meant to show them. A parent viewing her tab never consumes them.
-  mrMarkGradesSeen(kid);
-  return html;
-}
-function ckBuildKidTab(kid) {
-  const main = ckView === 'day'
-    ? `${ckRoutines(kid)}${ckOwnLanes(kid)}${ckChores(kid)}${ckLearning(kid)}${ckAttitude(kid)}${ckLoops(kid)}`
-    : ckWeekGrid(kid);
-  return `<div class="ck-tab">
-    ${ckHeader(kid)}
-    ${ckControls(kid)}
-    ${ckHistory(kid)}
-    <div class="ck-body">
-      <div class="ck-main">${main}</div>
-      ${ckRail(kid)}
-    </div>
-  </div>
-  ${ctMoneyDoor(kid)}`;
-}
-
-/* ── Actions ──
-   Every one of these writes a claim or a tick, never a grade. */
-function ckSetView(v) { ckView = v === 'week' ? 'week' : 'day'; ckOpenChore = null; ckElseOpen = false; renderChoreTab(); }
-function ckSelectDay(d) { ctDay = Math.max(0, Math.min(6, d)); ckOpenChore = null; ckElseOpen = false; renderChoreTab(); }
-function ckToggleHistory() { ckHistoryOpen = !ckHistoryOpen; renderChoreTab(); }
-/* The privilege ladder's open/closed state. localStorage rather than synced
-   state: it is a per-device view preference, and every state write here is a
-   full-document upload. Closed by default — see the note at the render site. */
-const CK_PRIVS_LS_KEY = 'wp_ck_privs_open';
-function ckPrivsOpen() { return localStorage.getItem(CK_PRIVS_LS_KEY) === '1'; }
-function ckTogglePrivs() {
-  try { localStorage.setItem(CK_PRIVS_LS_KEY, ckPrivsOpen() ? '0' : '1'); } catch (e) {}
-  renderChoreTab();
-}
-function ckPickWeek(wk) { ctWeekKey = wk; ctDay = 0; ckHistoryOpen = false; ckOpenChore = null; renderChoreTab(); }
-
-/* Tapping a settled row does nothing: a graded chore is Mom's answer, and this
-   screen is not where it gets changed. */
-function ckTapChoreRow(choreId) {
-  const kid = ctActiveKid();
-  if (mrGetChoreGrade(kid, ctWeekKey, ctDay, choreId) > 0) {
-    showToast('Mom already checked this one ✓');
-    return;
-  }
-  ckOpenChore = ckOpenChore === choreId ? null : choreId;
-  renderChoreTab();
-}
 /* ── The claim prompt, shared ──
-   A chore can be finished in three places: the chore tab, the day timeline and
-   the week planner. All three have to ask the same question and write the same
+   A chore can be finished in three places: Today, the day timeline and the
+   week planner. All three have to ask the same question and write the same
    record, or a chore ticked in one place never reaches Mom's queue from the
    others — which is exactly what used to happen when the planner wrote to the
    retired `optionalByWeek` store instead.
@@ -881,36 +203,9 @@ function openChoreClaimPrompt(kid, weekKey, dayIdx, choreId, label) {
     });
 }
 
-function ckClaim(choreId, quality) {
-  const kid = ctActiveKid();
-  const cur = mrGetClaim(kid, ctWeekKey, ctDay, choreId);
-  const next = cur === quality ? 0 : quality;   // tapping the same word takes it back
-  if (!mrSetClaim(kid, ctWeekKey, ctDay, choreId, next)) return;
-  ckOpenChore = null;
-  renderChoreTab();
-  if (next) showToast('Said and sent — Mom checks it after ✓');
-}
-/* In the week grid one tap cycles the claim: nothing → on time → late → redo →
-   nothing. Same cell, same day, same claim the day view writes. */
-function ckCycleWeekClaim(choreId, dayIdx) {
-  const kid = ctActiveKid();
-  if (mrGetChoreGrade(kid, ctWeekKey, dayIdx, choreId) > 0) {
-    showToast('Mom already checked this one ✓');
-    return;
-  }
-  const order = [0, 3, 2, 1];
-  const cur = mrGetClaim(kid, ctWeekKey, dayIdx, choreId);
-  const next = order[(order.indexOf(cur) + 1) % order.length];
-  if (mrSetClaim(kid, ctWeekKey, dayIdx, choreId, next)) renderChoreTab();
-}
-/* Routine ticks write to the planner block, exactly as the day view does, so
-   the two screens can never disagree about the same morning. */
-function ckToggleRoutineItem(blockId, itemId) {
-  if (ckWriteRoutineItem(ctActiveKid(), mrWeekDayKeys(ctWeekKey)[ctDay], blockId, itemId)) renderChoreTab();
-}
 /* The writer behind it, for a named kid and day. Today and its catch-up card
-   tick through this very function (R5 §5 C1), so a morning ticked there and a
-   morning ticked here are one write, not two copies that could drift. Returns
+   tick through this very function (R5 §5 C1), so the two are one write, not
+   two copies that could drift. Returns
    whether anything was written; the caller repaints its own screen. */
 function ckWriteRoutineItem(kid, dayKey, blockId, itemId) {
   const blocks = getDayBlocks(dayKey, kid);
@@ -921,31 +216,6 @@ function ckWriteRoutineItem(kid, dayKey, blockId, itemId) {
   setDayBlocks(dayKey, blocks, kid);
   ckRoutineChanged(b, dayKey, kid);
   return true;
-}
-function ckCloseRoutine(blockId) {
-  const kid = ctActiveKid();
-  const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
-  const blocks = getDayBlocks(dayKey, kid);
-  const b = blocks.find(x => x.id === blockId);
-  if (!b) return;
-  const act = ckActFor(b, kid);
-  const items = ckRoutineItems(act && act.routineId, kid);
-  if (!b.checklistState) b.checklistState = {};
-  const allOn = items.every(i => b.checklistState[i.id]);
-  items.forEach(i => { b.checklistState[i.id] = !allOn; });
-  setDayBlocks(dayKey, blocks, kid);
-  ckAfterRoutineChange(b, dayKey, kid);
-}
-/* Every routine on the day, in one press. Toggles as a unit — if any is still
-   open the press closes all of them, and only a day that is already fully closed
-   clears. Half-done then "all" meaning "clear" would lose work she had done.
-
-   It writes the same checklistState the per-block button writes and hands each
-   block to ckAfterRoutineChange, so ctAwardMandatoryFromRoutine still owns the
-   award. One write for the whole day: every mutation is a full-document upload,
-   and this used to be three of them. */
-function ckCloseAllRoutines() {
-  if (ckWriteAllRoutines(ctActiveKid(), mrWeekDayKeys(ctWeekKey)[ctDay])) renderChoreTab();
 }
 /* The writer behind the one-tap, for a named kid and day — Today's "all N
    done" and the catch-up card's call it (R5 §5 C1). Returns whether the day had
@@ -968,10 +238,6 @@ function ckWriteAllRoutines(kid, dayKey) {
   });
   return true;
 }
-function ckAfterRoutineChange(b, dayKey, kid) {
-  ckRoutineChanged(b, dayKey, kid);
-  renderChoreTab();
-}
 /* What follows every routine write, wherever it was made. */
 function ckRoutineChanged(b, dayKey, kid) {
   const act = ckActFor(b, kid);
@@ -983,9 +249,6 @@ function ckRoutineChanged(b, dayKey, kid) {
   // screen can ever return to incomplete.
   if (act && act.routineId) ctSyncMandatoryFromRoutine(act.routineId, kid, dayKey, isRoutineCompleted(b, kid));
   saveAll();
-}
-function ckRateSelf(dayIdx, n) {
-  if (ckRateSelfFor(ctActiveKid(), ctWeekKey, dayIdx, n)) renderChoreTab();
 }
 /* Her own rating for a named kid, week and day: the same number again takes it
    back. Today, its catch-up card and the portal's on-her-behalf card rate

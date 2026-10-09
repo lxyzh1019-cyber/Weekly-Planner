@@ -1401,7 +1401,7 @@ Today **owns no data and no rules — but it does invoke them.** Every number it
 shows is read through the accessors the owning screen uses, and every write goes
 through the function that already owned that write: `completeQuest` for a tick
 (XP and sticker counting come with it), `addQuickBreak` for a break, the reflect
-sheet's `saveReflection` for a mood, and since C1 (below) the chore tab's own
+sheet's `saveReflection` for a mood, and since C1 (below) the chore
 writers for a job's answer, routine ticks, her own things and her training
 rating. **Call an owner; never contain one.** A second place that *decides*
 how a chore is graded or how money moves is a second place that can disagree with
@@ -1413,34 +1413,38 @@ money.
 moves money.** A claim is her account of a job (`mrSetClaim` →
 `earnings.claims`), kept apart from the grade a grown-up gives
 (`mrSetChoreGrade`, parent-only → `earnings.chores`); only a grade is paid, and
-only a settled week moves money. Every surface a child answers on — the chore
-tab, Today and its catch-up card, the Day view's claim prompt on a finished
+only a settled week moves money. Every surface a child answers on — Today and
+its catch-up card, the Day view's claim prompt on a finished
 chore block — writes a claim and nothing else. `mrSetClaim` refuses a child
 answering for anyone but herself (`kid !== activeProfile()`); a parent may claim
 on her behalf ("she told us at the door"). This was written only in `docs/archive/PLAN.md`
 and a header comment in `js/31-today.js` until 2026-09-24 (R5 §5 C1). Known gap,
-not closed here: `mrSetClaim` has no lock for a week already settled, so a
-claim can still be written into one from the chore tab's week paging; the lock
+not closed here: `mrSetClaim` has no lock for a week already settled, and the
+chore tab's week paging that could reach one retired 2026-10-08; the lock
 belongs to the pocket-money handoff, with a comparison first, because claims
 feed pay. Today's catch-up card offers only unsettled weeks. (text only)
 
 **Chores answered in their new homes (R5 §5 C1, 2026-09-24).** Every action
 the Chores screen had now has a home outside it, and each home calls the SAME
-function the Chores screen calls, so the two cannot disagree
-(`bothPlacesAgree` holds it both ways). The Chores screen, its More tile and its
-21 smoke checks stay unchanged until the owner has ticked every row of
-`docs/chore-relocation-map.md`; retiring it (C3) is a later round. To make "the
-same function" literal, the chore tab's writers were split into a parameterised
-core (named kid, week/day) and the chore tab's wrapper (its own kid, `ctWeekKey`
-/ `ctDay`, then `renderChoreTab`): `ckWriteRoutineItem` / `ckWriteAllRoutines`
+function the Chores screen called, so the two could not disagree
+(`todayAndTheOwnersAgree` held it both ways). **Retired (C3, PR 2b, 2026-10-08):** the
+owner ticked all 19 rows of `docs/chore-relocation-map.md`, and the Chores
+screen went — `#screen-chore`, `openChoreTab` / `renderChoreTab`, the kid-tab
+renderers, its money card and matrix, the chore-group editor
+(`#choreGroupOverlay`) and the More 🧹 tile; its smoke checks were ported to
+the new homes or dropped. What its render did for the week (goal bonuses, group
+payouts) is `ctSelfHealWeek`, run by Today's render; the portal keeps
+`ctHandleWrapClick`. To make "the same function" literal, the chore writers are
+a parameterised core (named kid, week/day; the chore tab's own wrappers went in
+C3): `ckWriteRoutineItem` / `ckWriteAllRoutines`
 (+ `ckRoutineChanged`, the sync-and-award tail), `ckRateSelfFor`,
 `ctCyclePersonalFor`, `ctBumpLearningFor`, and the readers `ckRoutineBlocksOn`,
-`ckTrainingBlockOn`, `ckOwnLaneItems`, `ckUnlistedChoresFor`. Behaviour of the
-chore tab is unchanged. (checked by smoke: bothPlacesAgree)
+`ckTrainingBlockOn`, `ckOwnLaneItems`, `ckUnlistedChoresFor`. (checked by smoke: todayAndTheOwnersAgree)
 - **Row 1 — a job's answer, on Today.** A job row in "Jobs I can do" (paid
   `chores` lane only; `tdJobsToday`) carries `data-td-chore` and asks in place:
   `tdClaimJob` → `openChoreClaimPrompt` → `mrSetClaim`. The family-chores chip
-  (the same `data-td-action="chore"`, no chore) still opens the chore tab. (text only)
+  (the same `data-td-action="chore"`, no chore) and the ⏳ chips scroll to Jobs I
+  can do (`tdShowJobs`, since C3). (text only)
 - **Row 2 — ＋ I did something else**, under "Jobs I can do" for today and
   inside the catch-up card for an earlier day (`tdElseBlock` →
   `ckUnlistedChoresFor` → `tdClaimJob`). (text only)
@@ -1455,7 +1459,7 @@ chore tab is unchanged. (checked by smoke: bothPlacesAgree)
   Mum's rating is shown, never set. (text only)
 - **Row 6 — ✨ answered**: the ✨ chip (and an answered job row) opens "✨ Mum
   answered" on Today (`tdShowAnswered` / `tdAnsweredCard`), capturing the list
-  and then calling `mrMarkGradesSeen` — the chore tab's own stamp — so ✨
+  and then calling `mrMarkGradesSeen` — the stamp the chore tab used — so ✨
   clears from Today alone. A parent looking consumes nothing. (text only)
 - **Rows 7 and 8 — Parent › Now, "On her behalf"** (`pnAnswerCard`, see *The
   parent portal*): per child, per day of this week up to today. (text only)
@@ -1487,16 +1491,16 @@ chore tab is unchanged. (checked by smoke: bothPlacesAgree)
   only, the same floor and `mnyWeekSettled` rule as catch up; before today;
   minus days catch up already lists, which carry the same door), each as
   "＋ I did something else on Tue" through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
-  `mrSetClaim` — the owner the chore tab's `ckPickElse` uses. A claim on that
+  `mrSetClaim` — the owner the retired chore tab's `ckPickElse` used. A claim on that
   day and nothing else. Closed again by `goToday()`. This closes the C1 gap
-  noted in `docs/chore-relocation-map.md` row 2. (checked by smoke: todayAnswersAJobInPlace, somethingElseWorksForAnyOpenDay, somethingElseOnAFullyAnsweredEarlierDay, catchUpListsOnlyUnansweredDaysOfOpenWeeks, routinesTickFromToday, ownThingsFromToday, attitudeAfterTraining, answeredGradesClearFromToday, learningFromThePortal, parentAnswersForHerFromThePortal, bothPlacesAgree, todayHandsOffRatherThanActing)
+  noted in `docs/chore-relocation-map.md` row 2. (checked by smoke: todayAnswersAJobInPlace, somethingElseWorksForAnyOpenDay, somethingElseOnAFullyAnsweredEarlierDay, catchUpListsOnlyUnansweredDaysOfOpenWeeks, routinesTickFromToday, ownThingsFromToday, attitudeAfterTraining, answeredGradesClearFromToday, learningFromThePortal, parentAnswersForHerFromThePortal, todayAndTheOwnersAgree, todayHandsOffRatherThanActing)
 - View state (open catch-up day, open picker, open routine, the ✨ list) is in
   memory only; `goToday()` starts it closed.
 Held by `todayAnswersAJobInPlace`, `somethingElseWorksForAnyOpenDay`,
 `somethingElseOnAFullyAnsweredEarlierDay` (C1b),
 `catchUpListsOnlyUnansweredDaysOfOpenWeeks`, `routinesTickFromToday`,
 `ownThingsFromToday`, `attitudeAfterTraining`, `answeredGradesClearFromToday`,
-`learningFromThePortal`, `parentAnswersForHerFromThePortal`, `bothPlacesAgree`
+`learningFromThePortal`, `parentAnswersForHerFromThePortal`, `todayAndTheOwnersAgree`
 and the rewritten `todayHandsOffRatherThanActing` (it asserted the hand-off; it
 now asserts that answering in place writes the claim and leaves grades, pay and
 cash untouched, and that the money card and plan button still navigate). All
@@ -1504,17 +1508,17 @@ pin the clock (Thursday of this week) and run at 390×844.
 
 **Chores seen in their new homes (R5 §5 C2, 2026-09-25).** Every VIEW the
 Chores screen had now has a home outside it too, and each is drawn from the
-chore tab's own reader, so the two cannot show different figures. All are
+reader the chore tab used, so the two could not show different figures. All are
 read-only: C2 adds no writer of money, claims or XP, no `state.shared` key, and
-does not touch `js/04-merge.js`. The chore tab is unchanged in behaviour; to
-make "the same reader" literal a few of its readers now take a week (and day)
+does not touch `js/04-merge.js`. To make "the same reader" literal a few of its readers now take a week (and day)
 instead of reading `ctWeekKey` / `ctDay`: `ckCapBarFor` (the old `ckCapBar`
 wrapper went, nothing else called it), `ckEarnBoard` (total, bar, ledger),
 `ckEightWeeks` (the eight bars and their titles), `ckOpenLoops` +
 `ckLoopState`, `ckWeekGridData` (the grid's cells; `ckWeekGrid` renders it),
-and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`. (text only)
+and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`. `ckCapBarFor`,
+`ckEarnBoard`, `ckEightWeeks` and `ckWeekGrid` went with the screen in C3. (text only)
 - **Row 9 — 🔥 streak on Today's hero** (`tdQuestHero`, `.dq-hero-streak`):
-  `mrStreakWeek(this week)`, the chore tab header's number, grace day and sick
+  `mrStreakWeek(this week)`, the number the chore tab header showed, grace day and sick
   pause included. Zero reads "no streak yet". (text only)
 - **Row 10 — My level**: the hero's level is a button (`.dq-hero-level`,
   `data-td-action="level"`, ≥44px) opening `#tdLevelOverlay` (`tdOpenLevel` /
@@ -1523,14 +1527,15 @@ and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`. (text only)
   control. (text only)
 - **Row 11 — Earned this week on My money** (`mnyEarnBoardCard` — **retired in
   Sunday v15 Stage 3**, Plan v5 §K: My Money v2's ☀️ countdown and "This week"
-  card answer it; the chore tab's rail keeps the board), after the Today card: `ckEarnBoard` for the page's week and today — total kept after
+  card answer it; the chore tab's rail kept the board until C3), after the Today card: `ckEarnBoard` for the page's week and today — total kept after
   fines, today's ceiling bar (fines, kept, waiting, → XP) with its keys, the
   "one more fine" line and the room line, and the ledger by channel. No bar
   when today is not in the week showing. (text only)
 - **Row 12 — Your last 8 weeks on Money story** (`mnyEightWeeksCard`, between
   the Flow and Week by week): `ckEightWeeks(this week)`, each bar titled
   exactly as the rail's. The week-by-week list was already there and is not
-  repeated. (text only)
+  repeated. Retired since by decision 14 with the Story page; settled Sundays
+  are on All my Sundays. (text only)
 - **Row 13 — Open loops on Today** (`tdLoopsCard`, side column after the
   lanes): `ckOpenLoops` with `ckLoopState`'s words ("in the box" / "again this
   week · −$1"); no card when the box is empty. Boxing and releasing stay with a
@@ -1549,11 +1554,11 @@ and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`. (text only)
   the week's frozen money, paid-out state, goal and routine/chore matrix, from
   `ctWeekMoney`, `ctGetWeekGoals`, `ctMatrixRows` and `ctMatrixCellChecked`. No
   Clear week, no Export, no goal editing — those stay in App › Backup and data
-  (and on the chore tab until C3).
+  (the chore tab's copies went in C3).
 Held by `streakAndPrivilegesOnToday`, `earningsBarOnMyMoney`,
 `eightWeekBarsOnMoneyStory`, `openLoopsOnToday`, `weekChoreReportOnWeek` and
-`preSystemWeekReadableInHistory` — each compares its home with the chore tab on
-one fixture and asserts it carries no control; all pin the clock and run at
+`preSystemWeekReadableInHistory` — each compared its home with the chore tab on
+one fixture until C3 ported it, and asserts it carries no control; all pin the clock and run at
 390×844. Screenshots `c2_*` at phone and iPad width. (checked by smoke: streakAndPrivilegesOnToday, openLoopsOnToday, weekChoreReportOnWeek, preSystemWeekReadableInHistory)
 
 Today's vibe, to-do, goals, sticker and note panels ship collapsed behind one
@@ -3169,8 +3174,9 @@ true**. Two other things do, and both are still here:
 
 `moneySnapshots` still comes first in `ctWeekMoney`: weeks frozen at the
 original migration are a record, not a calculation. `ctWeekIsPreSystem` is the
-one owner of that question, and it is what now decides whether the chore tab
-draws the retired board — the honest test, where `mrUsesNewModel` sent every
+one owner of that question, and it is what now decides whether a week gets the
+pre-system board (Parent › History; the chore tab too, until it retired on
+2026-10-08) — the honest test, where `mrUsesNewModel` sent every
 past week there and left a child with no chore rows and nothing to claim.
 
 ## The repair — weeks the retired branch mispriced
@@ -3269,7 +3275,8 @@ them.** (checked by smoke: everyRecordHasOneDoor)
 recorded inside the Sunday meeting or through `ctPromptCompetition`'s chain of
 **eleven sequential prompts**; a gift went through `mnyPromptGift`'s four; a
 fine was a numbered list typed into a prompt box; a chore grade was reachable
-only from the chore tab, on the week and day that tab happened to be showing;
+only from the chore tab (retired 2026-10-08), on the week and day that tab
+happened to be showing;
 a move had no door at all until Stage 3 built one. (text only)
 
 **A prompt chain is the worst shape a form can have.** You cannot see what you

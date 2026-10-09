@@ -151,7 +151,7 @@ function tdSplitQuestsByNow(blocks) {
 }
 
 /* Closed by default and remembered in localStorage — the house disclosure
-   pattern (tdExtrasOpen, mnyPricesOpen, ckPrivsOpen). Never synced state:
+   pattern (tdExtrasOpen, mnyPricesOpen). Never synced state:
    every state write is a full-document upload. */
 const TD_EARLIER_LS_KEY = 'wp_td_earlier_open';
 function tdEarlierOpen() { return localStorage.getItem(TD_EARLIER_LS_KEY) === '1'; }
@@ -926,8 +926,8 @@ function tdReflectRow(kid) {
 }
 
 /* ── Answering chores on Today (R5 §5, C1 — 2026-09-24) ─────────────────────
-   Every action the Chores screen had now has a home here, and each one calls
-   the SAME function the Chores screen calls, so the two places cannot disagree:
+   Every action the Chores screen had has a home here, and each one calls the
+   SAME function the Chores screen called, so no two places can disagree:
      a job's answer        openChoreClaimPrompt → mrSetClaim   (row 1, 2)
      routine items / all   ckWriteRoutineItem / ckWriteAllRoutines  (row 3)
      own things            ctCyclePersonalFor → mrCyclePersonal (row 4)
@@ -935,9 +935,9 @@ function tdReflectRow(kid) {
      ✨ seen                mrMarkGradesSeen                      (row 6)
    and the 🕓 Catch up card (row 19) is those same answers for an earlier day
    of a week not yet settled. A child may create or update a claim; nothing
-   here grades, settles or moves money (ARCHITECTURE.md). The Chores screen
-   stays, unchanged, until the owner has confirmed every row of
-   docs/chore-relocation-map.md.
+   here grades, settles or moves money (ARCHITECTURE.md). The Chores screen was
+   retired in PR 2b, after the owner confirmed every row of
+   docs/chore-relocation-map.md (2026-10-08).
 
    View state only, in memory: which catch-up day is open, which day's
    "something else" picker is open, which of today's routines is open, and the
@@ -1197,8 +1197,7 @@ function tdCatchUpCard(kid) {
    EARLIER days of the week catch up reads (tdOpenWeeks — this week only, the
    same floor and settled rule), newest first, each as the catch-up card's
    own "＋ I did something else on Tue" (tdElseBlock → tdClaimJob →
-   openChoreClaimPrompt → mrSetClaim, the path the chore tab's ckPickElse
-   takes). A day catch up already lists is left to catch up, which carries the
+   openChoreClaimPrompt → mrSetClaim). A day catch up already lists is left to catch up, which carries the
    same door; today has its own under "Jobs I can do". Writes nothing itself. */
 let tdEarlierElseOpen = false;
 function tdEarlierElseDays(kid) {
@@ -1262,6 +1261,37 @@ function tdAnsweredCard(kid) {
    the challenges; landing at the top and making her scroll for what the note
    promised is the school banner under a 700px grid again. Scrolled after the
    render, and clear of the sticky topbar. */
+/* Today's "Jobs I can do" card, brought into view under the sticky topbar —
+   the family chip and the ⏳ chips land here (the answers live on it, rows 1
+   and 6). Same scroll as tdOpenInvites below. */
+function tdShowJobs() {
+  const card = document.querySelector('#tdWrap .td-jobs');
+  if (!card) return;
+  const bar = document.querySelector('#screen-today .topbar');
+  const top = card.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
+  window.scrollTo(0, Math.max(0, top));
+}
+
+/* ⏳ "with Mum" counts the whole week, but the jobs card lists today only, so the
+   chip goes to the first day with something waiting (what ckGoWaiting did on the
+   Chores screen until PR 2b): today → the jobs card; an earlier day → the Week
+   tab's 🧹 Chores this week report (row 14), opened, with the row of a chore
+   still waiting in view. */
+function tdGoWaiting(kid) {
+  const d = mrFirstWaitingDay(kid, ctThisWeekKey());
+  if (d == null || d === tdTodayIndex()) { tdShowJobs(); return; }
+  try { localStorage.setItem(WK_CHORES_LS_KEY, '1'); } catch (e) {}
+  weekOffset = 0;
+  goWeek();
+  const host = document.getElementById('weekChores');
+  if (!host || host.hidden) return;
+  const cell = host.querySelector('.wcr-cell--claimed');
+  const target = (cell && cell.closest('.wcr-row')) || host;
+  const bar = document.querySelector('#screen-week .topbar');
+  const top = target.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
+  window.scrollTo(0, Math.max(0, top));
+}
+
 function tdOpenInvites() {
   openSisterSync();
   const sync = document.getElementById('screen-sync');
@@ -1296,6 +1326,9 @@ function tdRenderToday() {
     return;
   }
   ctPrepareRead();
+  /* The goal-bonus and group-payout self-heal the retired Chores screen ran on
+     every render (PR 2b) — this week's, now that Today is where she looks. */
+  ctSelfHealWeek(ctThisWeekKey());
   /* The panels moved off the day timeline — to-dos, goals, breaks — read the
      global currentDayKey, which the day screen owns and sets in openDay. On
      Today that day is today, by definition. Point it here so they are about
@@ -1676,7 +1709,7 @@ function tdRenderToday() {
       ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
       ${tdAnsweredCard(kid)}
       ${tdProgressRibbon(kid, quests)}
-      <div class="td-card">
+      <div class="td-card td-jobs">
         <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
       ${tdRoutinesCard(kid)}
       ${tdLanesCard(kid)}
@@ -1849,11 +1882,11 @@ function tdHandleClick(e) {
   const day = el.getAttribute('data-td-day');
   const kid = activeProfile();
   /* A job row carries its chore and asks in place; the family chip (no chore)
-     still opens the chore tab, where a family chore gets planned. */
+     brings today's jobs into view (it opened the Chores screen, retired in PR 2b). */
   if (a === 'chore') {
     const id = el.getAttribute('data-td-chore');
     if (id) { tdClaimJob(todayKey(), id); return; }
-    openChoreTab(); if (d != null) ckSelectDay(d); return;
+    tdShowJobs(); return;
   }
   if (a === 'claim')      { tdClaimJob(day, el.getAttribute('data-td-chore')); return; }
   if (a === 'else')       { tdElseOpen = tdElseOpen === day ? null : day; tdRenderToday(); return; }
@@ -1887,7 +1920,8 @@ function tdHandleClick(e) {
     if (di >= 0 && ckRateSelfFor(kid, wk, di, Number(el.getAttribute('data-td-n')) || 0)) tdRenderToday();
     return;
   }
-  if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
+  // ⏳ — the first day with something with Mum: today's jobs card, or the Week report (rows 6, 14).
+  if (a === 'waiting') { tdGoWaiting(kid); return; }
   // ✨ — what Mum answered, shown here; opening it is the look (row 6).
   if (a === 'fresh') {
     tdShowAnswered(kid);
@@ -2024,7 +2058,7 @@ const TD_NAV = [
 /* Not on the money pages (Plan v17 §1, decision 14): 💰 My money, 🎓 Money
    school and the passbook's two pages (📖 All my Sundays, 📊 By month) wear
    the one-row money head with ◀, and the pages need the height. */
-const TD_NAV_SCREENS = ['screen-today', 'screen-week', 'screen-chore',
+const TD_NAV_SCREENS = ['screen-today', 'screen-week',
                         'screen-day', 'screen-sync'];
 
 function tdRenderNav() {
@@ -2063,7 +2097,6 @@ function tdOpenMore() {
      one door. Sister Sync is a nav tab now; Money school is money tab 5 and My
      money's 🎓 button, and Money story is My money's 📖 button. */
   const items = [
-    { icon: '🧹', label: 'Chores',       go: 'chores' },
     /* Print was here. It has a button on the week topbar, which is the week it
        prints — a second door to it from a menu is a second label that can
        drift, and printing is not something you go looking for in "more". */
@@ -2103,7 +2136,6 @@ function tdOpenMore() {
   ov.classList.add('open');
 }
 function tdGoMore(where) {
-  if (where === 'chores')  { openChoreTab(); return; }
   if (where === 'profile') { goProfile(); return; }
   if (where === 'look') {
     const kid = activeProfile();

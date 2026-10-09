@@ -10,8 +10,10 @@
 // in review.
 //
 // What it deliberately does NOT flag: names that are assembled at runtime from a
-// prefix, e.g. `'ck-' + lane` or `'mny-' + kind`. The literal never appears in
-// the source, so they are indistinguishable from dead names by grep. Any class
+// prefix, e.g. a lane or kind name glued onto a quoted prefix string. (Do not
+// quote a real prefix in this comment: this file is read as source too, and a
+// quoted prefix here would excuse every class that starts with it.) The
+// literal never appears in the source, so they are indistinguishable from dead names by grep. Any class
 // whose prefix is quoted somewhere in the source is treated as possibly-built
 // and left alone — that is ~25 names today, and the alternative is a check
 // nobody can keep green.

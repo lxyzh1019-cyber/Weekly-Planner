@@ -12,12 +12,13 @@ Each line says what you see or what the app does, then the test that proves it. 
 - The reflect sheet takes its day: How was today?, How was yesterday? or How was Tuesday?, and writes only that day's mood — Proof: todayAsksHowTodayWent
 - Today has no Vibe card; its fold reads To-dos and goals — Proof: todayIsWhereTheDayGetsDone
 - The ribbon's now-marker stays inside the strip at its first and last minute — Proof: aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon
-- Jobs I can do: a paid chore row on Today asks On time, Late or Had to redo it in place and then reads waiting — Proof: todayAnswersAJobInPlace, bothPlacesAgree, todayHandsOffRatherThanActing
+- Jobs I can do: a paid chore row on Today asks On time, Late or Had to redo it in place and then reads waiting — Proof: todayAnswersAJobInPlace, todayAndTheOwnersAgree, todayHandsOffRatherThanActing
 - ＋ I did something else today (or on an open catch-up day) files a claim — Proof: somethingElseWorksForAnyOpenDay
 - Routines card: each routine opens to its items, shows done/total and an all done button — Proof: routinesTickFromToday
 - Own things · helping out card cycles none, done, nobody asked (XP) — Proof: ownThingsFromToday
 - Training card after training ends: her 1 to 5 rating, tap again to take back, XP only, no money — Proof: attitudeAfterTraining
 - A ✨ chip opens the Mum answered card and clears itself; a parent's look consumes nothing — Proof: answeredGradesClearFromToday
+- A ⏳ N with Mum chip counts this week's answers Mum has not checked and goes to the first day with one: today → Jobs I can do; an earlier day → the Week tab's 🧹 Chores this week report, opened, with that chore's row in view — Proof: newAffordancesActuallyNavigate, kidSeesWaitingAndAnswered
 - 🕓 Catch up card lists earlier days of this week with an unanswered chore, routine or training, one day open at a time — Proof: catchUpListsOnlyUnansweredDaysOfOpenWeeks, catchUpReachesThisWeekOnly
 - Every Today control is at least 44px, words she acts on 15px, nothing under 13px, no sideways scroll at 390px — Proof: kidScreensMeetTheHouseRules
 - ＋ Add to an earlier day lists earlier days of this week for a claim; claim only, no grade — Proof: somethingElseOnAFullyAnsweredEarlierDay
@@ -26,7 +27,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - 📦 Open loops card lists unreleased boxed items; hidden when empty — Proof: openLoopsOnToday
 - The Undo toast sits under the reflect sheet: with the toast up, every mood dot on the sheet is still hit at 44px — Proof: reflectMoodsAre44pxTargets
 - Today is the front door: what now, what is next, free time, and a money row that agrees with My money — Proof: todayIsTheFrontDoor, todayAnswersWhatNow, todayLeadsWithWhatIsNext, todayNamesFreeTime, todayMoneyRowMatchesMyMoney
-- Today agrees with the Chores screen, and the reflection is her answer — Proof: todayAgreesWithTheChoreScreen, theReflectionIsHerAnswer
+- Today's chore counts agree with the owners every other place reads (the Chores screen it was compared with is retired), and the reflection is her answer — Proof: todayAgreesWithTheChoreScreen, theReflectionIsHerAnswer
 - Today looks as in the reference picture, iPad Pop — Proof: picture tests/reference/today-jenn-ipad-pop.png
 
 ## Week
@@ -96,14 +97,21 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Sister Sync is in the kid house-rules sweep; its invite answer buttons are 44px — Proof: kidScreensMeetTheHouseRules
 - Sister Sync looks as in the reference picture, iPad Pop — Proof: picture tests/reference/sync-jenn-ipad-pop.png
 
-## Chores
+## Chores (screen retired 2026-10-08)
 
-- The Chores screen stays and works as before; its writers are shared with Today and the parent portal — Proof: kidTabRenders
+- Intentionally removed (owner OK 2026-10-08, all 19 rows of docs/chore-relocation-map.md): the Chores screen, its kid and parent tabs, the week grid's claim cells, its My money door, the chore-group editor and its reference pictures. Each part lives on in the home below — Proof: docs/chore-relocation-map.md
+- Answer how a job went (row 1) → Today, in place — Proof: todayAnswersAJobInPlace, todayAndTheOwnersAgree, gradedJobIsClosedToHerOnToday
+- ＋ I did something else (row 2) → Today and 🕓 Catch up — Proof: somethingElseWorksForAnyOpenDay
+- Routine items and all done (row 3) → Today — Proof: routinesTickFromToday, routinesCloseInOneTap
+- Own things, training rating, answered grades seen (rows 4–6) → Today — Proof: ownThingsFromToday, attitudeAfterTraining, kidSeesWaitingAndAnswered, answeredGradesClearFromToday
+- Learning and answering a job for her (rows 7–8) → Parent portal › Now — Proof: learningFromThePortal, parentAnswersForHerFromThePortal
+- Streak, level, privileges ladder, open loops (rows 9, 10, 13) → Today — Proof: streakAndPrivilegesOnToday, openLoopsOnToday
+- Daily ceiling, fines, weekly total, ledger (row 11) → My money; 8-week bars (row 12) → All my Sundays (Money story retired earlier) — Proof: thePassbookOpensAllMySundaysAndByMonth; row 11 owner-checked on the iPad 2026-10-08, no check of its own
+- Week's chore report (row 14) → Week tab; missed days (row 19) → 🕓 Catch up — Proof: weekChoreReportOnWeek, catchUpReachesThisWeekOnly
+- Pre-system weeks' board (row 15) → Parent › History, read-only — Proof: preSystemWeekReadableInHistory
 - Chore readers are week-parameterised and shared; no new writer of money, claims or XP — Proof: weekChoreReportOnWeek
-- The Chores tab has one My money door under the board on every week — Proof: preSystemWeekReadableInHistory
-- Chore tab renders for a kid and a parent; a tap opens one chore only; a claim is made from the row; a graded row is closed to her — Proof: kidTabRenders, parentChoreTabRenders, tapOpensOneChoreOnly, claimFromTheRow, gradedRowIsClosedToHer
-- The week grid takes claims and greys what is closed; grading from the queue clears it; grading past the free two pays — Proof: weekGridClaimsAndGreys, gradeFromQueueClearsIt, gradingPastTheFreeTwoPays
-- Chores look as in the reference picture, iPad Pop — Proof: picture tests/reference/chore-jenn-ipad-pop.png
+- Grading from the parent queue clears it; grading past the free two pays — Proof: gradeFromQueueClearsIt, gradingPastTheFreeTwoPays
+- Sister Sync opens on today (the chore tab half of this check went with the screen) — Proof: sisterSyncOpensOnToday
 
 ## My money
 
@@ -274,10 +282,10 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Kid nav has five places, one fixed bar: Today, Week, Money, Sister Sync, More; no second nav row — Proof: kidNavIsUsableAndScoped
 - Sister Sync is a tab with aria-current, fits on one line at 375px also in the fallback font — Proof: sisterSyncIsABottomTab, sisterSyncTabFitsInTheFallbackFont
 - The kid nav shows only on a child's screens and never for a parent — Proof: kidNavIsUsableAndScoped
-- More holds exactly Chores and Switch (and the look tile), then the build number; Sisters, Money story and Money school tiles are gone — Proof: moreHasNoMoneySchool
+- More holds exactly Switch (and the look tile), then the build number; Chores (retired 2026-10-08), Sisters, Money story and Money school tiles are gone — Proof: moreHasNoMoneySchool
 - Money school is reached from the money head's tab and every ? explainer's Take me to Money school; All my Sundays and By month open from the passbook — Proof: explainerGoesToMoneySchoolAndBack
 - The sync tab lands on the Sister Sync screen and old routes still work — Proof: navReachesEverythingAndOldRoutesStillWork
-- Every profile badge (Today, Week, Day, Chores, Sister Sync) is a button that opens the one profile switcher and reads who is on screen, e.g. Parent (Jenn) or Jenn — Proof: everyProfileBadgeSaysTheSameThing, everyProfileBadgeSwitchesProfile
+- Every profile badge (Today, Week, Day, Sister Sync) is a button that opens the one profile switcher and reads who is on screen, e.g. Parent (Jenn) or Jenn — Proof: everyProfileBadgeSaysTheSameThing, everyProfileBadgeSwitchesProfile
 - One writer makes every badge's text; no badge spells it out — Proof: everyProfileBadgeSaysTheSameThing
 - Nothing is announced as a control that is not one, and the meeting lock hides only the two badges and lifts for a child — Proof: everyProfileBadgeSwitchesProfile
 - Sister Sync fits in the fallback font at 375px — Proof: sisterSyncTabFitsInTheFallbackFont
@@ -415,7 +423,7 @@ The test map: for a change in the area or files named, the tests it needs before
 - Tests: buffers (travel and get-ready, `js/07-week-view.js`, `js/08-day-view.js`) → `npm run test:buffers`; `SMOKE_ONLY=aBufferStripNeverCoversACard,theStripStillSaysWhenToLeave,theDayViewClipsItsBuffersTheSameWay,printBuffers`
 - Tests: Week and Day (`js/07-week-view.js`, `js/08-day-view.js`, `js/09-sheets.js`, `js/39-block-drag.js`) → `SMOKE_ONLY=weekOpensOnTheLayoutYouCanPlanIn,weekScrollsAsOneSurface,theWeekGridKeepsItsColumnFloor,draggingABlockMovesItToTheTimeItWasDroppedAt,resizingABlockChangesOnlyItsDuration,theHourLadderLinesUpWithTheSchedule,onlyTheScheduleScrollsOnTheDayScreen,narrowScreensGetOneDay,copyDayReplacesCleanly`
 - Tests: Today and the reflection (`js/31-today.js`, `js/37-reflection.js`) → `SMOKE_ONLY=todayIsTheFrontDoor,todayAnswersWhatNow,todayLeadsWithWhatIsNext,todayNamesFreeTime,todayAgreesWithTheChoreScreen,todayMoneyRowMatchesMyMoney,theReflectionIsHerAnswer,catchUpReachesThisWeekOnly`
-- Tests: Chores (`js/13-chores.js`, `js/26-chore-kid.js`, `js/27-chore-parent.js`) → `SMOKE_ONLY=kidTabRenders,tapOpensOneChoreOnly,claimFromTheRow,gradedRowIsClosedToHer,weekGridClaimsAndGreys,parentChoreTabRenders,gradeFromQueueClearsIt,gradingPastTheFreeTwoPays`
+- Tests: Chores (`js/13-chores.js`, `js/26-chore-kid.js`, `js/27-chore-parent.js`) → `SMOKE_ONLY=gradeFromQueueClearsIt,gradingPastTheFreeTwoPays,todayAnswersAJobInPlace,somethingElseWorksForAnyOpenDay,learningFromThePortal,parentAnswersForHerFromThePortal,weekChoreReportOnWeek,preSystemWeekReadableInHistory`
 - Tests: parent portal (`js/11-parent.js`, `js/28-chore-trends.js`, `js/29-chore-options.js`, `js/32-parent-now.js`, `js/33-parent-app.js`, `js/34-parent-copyweek.js`) → `SMOKE_ONLY=parentScreensMeetTheHouseRules,portalFitsAPhone,trendsRenders,trendsPagingIsBounded,optionsRenders,parentDayTopBarStaysCompact,parentNowCountsWhatIsWaiting`
 - Tests: Sister Sync and invites (`js/10-social.js`) → `SMOKE_ONLY=sisterSyncIsATimeline,anInviteCannotBeSentTwice,aMovedSharedBlockSaysSendAgain,sisterSyncTabFitsInTheFallbackFont`
 - Tests: profile and navigation (`js/17-ui-misc.js`, `js/99-main.js`) → `SMOKE_ONLY=everyProfileBadgeSwitchesProfile,everyProfileBadgeSaysTheSameThing,kidNavIsUsableAndScoped,navReachesEverythingAndOldRoutesStillWork`
@@ -429,6 +437,7 @@ The test map: for a change in the area or files named, the tests it needs before
 - Tests: a change across several areas, or one the map does not name → the full suite on GitHub (`gh workflow run ci.yml --ref <branch>`)
 - Tools: `tools/smoke-times.js <artifact folder> [top]` lists, from a CI run's `smoke-ran-<date>.json` files (`gh run download <run-id> -p 'smoke-screenshots-*' -D <folder>`), each date's wall time, time in checks and setup, then the slowest checks and the longest setup gaps over every date.
 - Tools: `tools/picture-diff-page.js <artifact folder> <out.html> [title]` makes the difference page: for every picture in a CI `pictures` artifact's `pictures-diff/`, the old reference (from `tests/reference/`, so run it before copying the new set in) and the new picture side by side, numbered, embedded in one HTML file (`gh run download <run-id> -n pictures -D <folder>`).
+- Tools: `tools/unused-globals.js [--tests]` lists top-level `js/` names (function, let, const) that no other code in `js/` or `index.html` names (with `--tests`, `tests/smoke.js` counts as a use too); comments stripped, a heuristic, so confirm each hit with a search.
 - Sizes: iPad 1194×834, phone 390×844
 - Looks: Pop, Calm
 - Figures: the picture-test fixture week (tests/pictures.js FIXTURE, clock Wed 7 Oct 2026 12:00 America/Edmonton, the Sunday signed 4 Oct 2026 19:00). Inputs read from the code: Jenn loan $1000, $336 paid, $70 a month, chores dishes / mop / vacuum / bins graded 3, gift $5 (Grandma), goal New skate guards $35, skating; Jess loan $600, $120 paid, $40 a month, chores dishes / bins / vacuum graded 2, gift $10 (Uncle Mike), goal Book set $50, swimming; each has one assistant-job session; Jess has a tone fine on Tuesday (Mom); Jenn expects $20 at Christmas. Outputs are computed by the app when the pictures are taken and are not written in the code, so each is named with where it shows:

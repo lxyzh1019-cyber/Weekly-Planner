@@ -4185,8 +4185,11 @@ function findChromium() {
     return !!el && el.style.display !== 'none' && el.children.length >= 5;
   });
 
-  // ── Redesign phase 2: the kid's chore tab ──
-  // Put a chore on the day the tab will open on, so there is something to answer for.
+  // ── Redesign phase 2: a chore on the kid's day ──
+  // The Chores screen that showed it was retired in PR 2b; answering a job is
+  // Today's (todayAnswersAJobInPlace, gradedJobIsClosedToHerOnToday), the week
+  // grid is the Week tab's report (weekChoreReportOnWeek) and catch up's.
+  // Later checks still read this block, so it stays.
   await page.evaluate(() => {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = activeProfile();
@@ -4194,82 +4197,6 @@ function findChromium() {
     setDayBlocks(dayKey, [...(getDayBlocks(dayKey, kid) || []),
       { id:'ckchore', actId:'chores', startMin: 17*60, durationMin: 30,
         choreTags:['Dishes & dishwasher'], checklistState:{} }], kid);
-  });
-  await page.evaluate(() => { openChoreTab(); ckSelectDay(2); });
-  await page.waitForTimeout(400);
-
-  // The four frames of the redesign are all on screen.
-  if (want('kidTabRenders')) checks.kidTabRenders = await page.evaluate(() =>
-    !!document.querySelector('.ck-tab') && !!document.querySelector('.ck-rail')
-    && document.querySelectorAll('.ck-day').length === 7
-    && !!document.querySelector('.ck-bar'));
-  // A kid's tab carries no grading control anywhere on it.
-  if (want('kidTabHasNoGrading')) checks.kidTabHasNoGrading = await page.evaluate(() =>
-    !document.querySelector('[data-ct-action="grade-chore"]'));
-  // Layout C: the row is the tap target, and only the tapped row opens.
-  if (want('tapOpensOneChoreOnly')) checks.tapOpensOneChoreOnly = await page.evaluate(() => {
-    const row = document.querySelector('[data-ct-action="ck-chore-row"]');
-    if (!row) return false;
-    row.click();
-    return document.querySelectorAll('.ck-chore.open').length === 1
-        && document.querySelectorAll('[data-ct-action="ck-claim"]').length === 3;
-  });
-  await page.screenshot({ path: shot('kid_chore_day') });
-  // Picking a word writes a claim, collapses the row, and moves no money.
-  if (want('claimFromTheRow')) checks.claimFromTheRow = await page.evaluate(() => {
-    const kid = activeProfile(), wk = ctWeekKey;
-    const before = mrWeekMoney(wk, kid);
-    const btn = document.querySelector('[data-ct-action="ck-claim"][data-quality="3"]');
-    if (!btn) return false;
-    btn.click();
-    return mrGetClaim(kid, wk, 2, 'dishes') === 3
-        && mrWeekMoney(wk, kid) === before
-        && document.querySelectorAll('.ck-chore.open').length === 0
-        && !!document.querySelector('.ck-chore-claimed');
-  });
-  // A graded chore is Mom's answer; the kid's row refuses to reopen it.
-  if (want('gradedRowIsClosedToHer')) checks.gradedRowIsClosedToHer = await page.evaluate(() => {
-    const kid = activeProfile(), wk = ctWeekKey;
-    const wasProfile = profile;
-    profile = 'parent'; mrSetChoreGrade(kid, wk, 2, 'dishes', 2); profile = wasProfile;
-    renderChoreTab();
-    document.querySelector('[data-ct-action="ck-chore-row"]').click();
-    const stillShut = document.querySelectorAll('.ck-chore.open').length === 0;
-    profile = 'parent'; mrSetChoreGrade(kid, wk, 2, 'dishes', 0); profile = wasProfile;
-    mrSetClaim(kid, wk, 2, 'dishes', 0);
-    renderChoreTab();
-    return stillShut;
-  });
-  // The week grid is an input, and a day the planner skipped is inert.
-  if (want('weekGridClaimsAndGreys')) checks.weekGridClaimsAndGreys = await page.evaluate(() => {
-    ckSetView('week');
-    const cells = document.querySelectorAll('[data-ct-action="ck-week-cell"]');
-    const off = document.querySelectorAll('.ck-cell-off').length;
-    if (!cells.length) return false;
-    cells[0].click();
-    const claimed = mrGetClaim(activeProfile(), ctWeekKey, 2, 'dishes') === 3;
-    mrSetClaim(activeProfile(), ctWeekKey, 2, 'dishes', 0);
-    return claimed && off > 0;
-  });
-  await page.screenshot({ path: shot('kid_chore_week') });
-  // At iPad landscape the earn board sits beside the work, not under it.
-  await page.setViewportSize({ width: 1194, height: 834 });
-  await page.evaluate(() => { ckSetView('day'); });
-  await page.waitForTimeout(300);
-  if (want('railSitsBesideAtIpad')) checks.railSitsBesideAtIpad = await page.evaluate(() => {
-    const main = document.querySelector('.ck-main').getBoundingClientRect();
-    const rail = document.querySelector('.ck-rail').getBoundingClientRect();
-    return rail.left >= main.right - 2 && rail.width > 200;
-  });
-  await page.screenshot({ path: shot('kid_chore_ipad') });
-  await page.setViewportSize({ width: 900, height: 1100 });
-  await page.waitForTimeout(200);
-  // A day with nothing planned says so rather than showing an empty box.
-  if (want('emptyDaySaysSo')) checks.emptyDaySaysSo = await page.evaluate(() => {
-    ckSelectDay(4);
-    const txt = document.querySelector('.ck-main').textContent;
-    ckSelectDay(2);
-    return /Nothing on today's plan/.test(txt);
   });
 
   /* Print is on the week it prints. It used to be reachable only from the More
@@ -5026,25 +4953,47 @@ function findChromium() {
   // ── The whole redesign, as one journey ──
   // Each phase is checked in isolation above; this is the only check that the
   // pieces actually join up: plan it, claim it, grade it, see it, settle it.
-  if (want('redesignEndToEnd')) checks.redesignEndToEnd = await page.evaluate(() => {
+  if (want('redesignEndToEnd')) checks.redesignEndToEnd = await page.evaluate(async () => {
     const kid = 'jenn', wk = ctWeekKey, day = 3, chore = 'vacuum';
     const step = {};
+    /* Today's job rows are today's, so the clock stands on Thursday of this
+       week — the pin c1.pin and pinClockToWeekday use further down, inline
+       because neither is defined yet. */
+    const RealDate = Date;
+    const [py, pm, pd] = getDayKeys(0)[day].split('-').map(Number);
+    const when = new RealDate(RealDate.UTC(py, pm - 1, pd, 19, 0, 0));
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    const pause = (ms) => new Promise(r => setTimeout(r, ms));
+    const dialogOpen = () => !!document.querySelector('#appDialogOverlay.open');
+    const hadOpen = localStorage.getItem('wp_week_chores_open'), hadOffset = weekOffset;
+    try {
     profile = 'parent'; parentViewing = kid; cpDay = day; cpView = 'day';
+    step.thisWeek = wk === ctThisWeekKey() && tdTodayIndex() === day;
 
     // 1. A parent puts the chore on Thursday from the portal.
     setParentTab('chores'); cpRenderChoreTab();
     document.querySelector(`[data-cp-action="schedule"][data-chore-id="${chore}"]`).click();
     step.scheduled = mrChoresForDay(kid, wk, day).rows.some(r => r.row.id === chore);
 
-    // 2. The kid opens her tab on that day and sees it — and nothing else did.
-    profile = kid; ctDay = day; ckView = 'day'; openChoreTab(); ckSelectDay(day);
-    const row = document.querySelector(`[data-ct-action="ck-chore-row"][data-chore-id="${chore}"]`);
+    // 2. Her Today has it as a job on that day — and nothing else did.
+    profile = kid; parentViewing = kid; goToday();
+    const row = document.querySelector(`#tdWrap [data-td-action="chore"][data-td-chore="${chore}"]`);
     step.sheSeesIt = !!row;
 
-    // 3. She says how it went. That is a claim, and it pays nothing.
+    // 3. She taps it and says how it went, in place. That is a claim, and it pays nothing.
     const moneyBefore = mrWeekMoney(wk, kid);
-    row.click();
-    document.querySelector(`[data-ct-action="ck-claim"][data-chore-id="${chore}"][data-quality="3"]`).click();
+    if (row) {
+      row.click();
+      for (let n = 0; n < 50 && !dialogOpen(); n++) await pause(20);
+      step.asked = dialogOpen();
+      step.diag = 'dialog: ' + ((document.getElementById('appDialogMsg') || {}).textContent || '') + ' / week settled: ' + JSON.stringify(((state.shared.chore.finalizedWeeks || {})[wk]) || null) + ' / thisWeek ' + ctThisWeekKey() + ' wk ' + wk;
+      const onTime = document.querySelectorAll('#appDialogOverlay.open .app-dialog-choice')[0];
+      if (onTime) onTime.click();
+      for (let n = 0; n < 50 && dialogOpen(); n++) await pause(20);
+      await pause(60);   // the claim lands after the dialog closes, as c1.answer waits for
+    }
     step.claimedNotPaid = mrGetClaim(kid, wk, day, chore) === 3
       && mrWeekMoney(wk, kid) === moneyBefore;
 
@@ -5052,16 +5001,20 @@ function findChromium() {
     profile = 'parent';
     setParentTab('chores'); cpDay = day; cpRenderChoreTab();
     step.inTheQueue = mrClaimQueue(wk, kid).some(q => q.choreId === chore && q.dayIdx === day);
-    document.querySelector(`[data-cp-action="grade"][data-chore-id="${chore}"][data-day="${day}"][data-grade="3"]`).click();
+    document.querySelector(`[data-cp-action="grade"][data-chore-id="${chore}"][data-day="${day}"][data-grade="3"]`)?.click();
     step.graded = mrGetChoreGrade(kid, wk, day, chore) === 3;
     step.queueCleared = !mrClaimQueue(wk, kid).some(q => q.choreId === chore && q.dayIdx === day);
 
-    // 5. Her week grid fills that one cell and greys the days nobody planned.
-    profile = kid; openChoreTab(); ckSetView('week');
-    const grid = document.querySelector('.ck-grid');
-    step.gridFilled = grid.querySelectorAll('.ck-cell.done').length > 0
-      && grid.querySelectorAll('.ck-cell-off').length > 0;
-    ckSetView('day');
+    // 5. Her week report on the Week tab fills that one cell and greys the days nobody planned.
+    profile = kid; weekOffset = 0; goWeek();
+    const toggle = document.getElementById('weekChoresToggle');
+    if (toggle && toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
+    const label = (mrPoolRow(chore, wk) || {}).label;
+    const wcr = [...document.querySelectorAll('#weekChoresBody .wcr-row')]
+      .find(r => (r.querySelector('.wcr-label') || {}).textContent.includes(label));
+    const cells = wcr ? [...wcr.querySelectorAll('.wcr-cell')] : [];
+    step.gridFilled = !!cells[day] && cells[day].classList.contains('wcr-cell--done')
+      && cells.some(c => c.classList.contains('wcr-cell--off'));
 
     // 6. Trends counts the week, and the meeting is still the only settler.
     profile = 'parent';
@@ -5081,9 +5034,15 @@ function findChromium() {
     setParentTab('chores'); cpRenderChoreTab();
     const off = document.querySelector(`[data-cp-action="unschedule"][data-chore-id="${chore}"]`);
     if (off) off.click();
+    } finally {
+      if (dialogOpen()) _closeAppDialog(null);
+      Date = RealDate;
+      weekOffset = hadOffset;
+      try { if (hadOpen === null) localStorage.removeItem('wp_week_chores_open'); else localStorage.setItem('wp_week_chores_open', hadOpen); } catch (e) {}
+    }
 
-    const failed = Object.keys(step).filter(k => !step[k]);
-    return failed.length === 0 || failed;
+    const failed = Object.keys(step).filter(k => !step[k] && k !== 'diag');
+    return failed.length === 0 || failed.concat([step.diag, `(claim ${mrGetClaim(kid, wk, day, chore)}, today index ${tdTodayIndex()}, job rows ${JSON.stringify(tdJobsToday(kid).rows.map(r => r.row.id + ':' + r.state))})`]);
   });
 
   // Every routine checklist item shows an icon, wherever it is ticked — from
@@ -5102,18 +5061,35 @@ function findChromium() {
       .every(r => r.items.every(i => !!i.icon));
     return guessed && neverBlank && presets;
   });
-  if (want('kidTabShowsRoutineIcons')) checks.kidTabShowsRoutineIcons = await page.evaluate(() => {
-    profile = 'jenn'; selectProfile('jenn');
-    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
-    const keys = mrWeekDayKeys(ctWeekKey);
-    setDayBlocks(keys[2], [{ id:'ri1', actId:'routine_morning', startMin: 7*60,
-      durationMin: 30, checklistState:{} }], 'jenn');
-    openChoreTab(); ckSelectDay(2);
-    // .ck-block, not .ck-block-body: the own/helping lanes reuse the body class.
-    const icons = [...document.querySelectorAll('.ck-block .ck-item-icon')];
-    const want = ROUTINE_PRESETS.morning.items;
-    return icons.length === want.length
-        && icons.every((el, i) => el.textContent.trim() === want[i].icon);
+  /* Today's routine card, opened, shows each item's icon (the Chores screen
+     that used to show them was retired in PR 2b). Clock on Wednesday, the
+     day the routine is planned. */
+  if (want('todayShowsRoutineIcons')) checks.todayShowsRoutineIcons = await page.evaluate(() => {
+    const RealDate = Date;
+    const [py, pm, pd] = getDayKeys(0)[2].split('-').map(Number);
+    const when = new RealDate(RealDate.UTC(py, pm - 1, pd, 19, 0, 0));
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    try {
+      profile = 'jenn'; selectProfile('jenn');
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+      const keys = mrWeekDayKeys(ctWeekKey);
+      setDayBlocks(keys[2], [{ id:'ri1', actId:'routine_morning', startMin: 7*60,
+        durationMin: 30, checklistState:{} }], 'jenn');
+      goToday();
+      const head = document.querySelector('#tdWrap .td-routines [data-td-action="routine-open"][data-td-block="ri1"]');
+      if (!head) return ["no morning routine on Today's routine card"];
+      if (head.getAttribute('aria-expanded') !== 'true') head.click();
+      const icons = [...document.querySelectorAll('#tdWrap .td-routines .td-item-icon')];
+      const want = ROUTINE_PRESETS.morning.items;
+      const got = icons.map(el => el.textContent.trim());
+      return (got.length === want.length && got.every((t, i) => t === want[i].icon))
+        || [`the open routine shows icons ${JSON.stringify(got)}, want ${JSON.stringify(want.map(i => i.icon))}`];
+    } finally {
+      delete tdRoutineOpen.ri1;
+      Date = RealDate;
+    }
   });
 
   // ── In a hand ──
@@ -5130,7 +5106,7 @@ function findChromium() {
       // Nothing may extend past the viewport, and the page must not scroll
       // sideways. 1px of tolerance for sub-pixel rounding.
       if (document.body.scrollWidth > w + 1) bad.overflow.push('body:' + document.body.scrollWidth);
-      document.querySelectorAll('.ck-tab *, .cp-tab *, .ctr-tab *').forEach(el => {
+      document.querySelectorAll('.cp-tab *, .ctr-tab *').forEach(el => {
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height) return;
         // A box that scrolls its own overflow is allowed to be wider inside.
@@ -5144,7 +5120,7 @@ function findChromium() {
       // measure height only, which is how a 36x36 week arrow passed for months:
       // tall enough was never the problem, wide enough was.
       document.querySelectorAll(
-        '.ck-chore-row, .ck-qbtn, .ck-day, .ck-segbtn, .ck-item, .ck-rate, .ck-navbtn,' +
+        '.ck-segbtn, .ck-rate, .ck-navbtn,' +
         '.cp-gbtn, .cp-kid, .co-lane, .co-who, .ck-else-btn'
       ).forEach(el => {
         const r = el.getBoundingClientRect();
@@ -5411,7 +5387,6 @@ function findChromium() {
       goToday(); if (!tdExtrasOpen()) tdToggleExtras();
       undo();
     }, 'screen-today/extras'],
-    ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
     /* My Money v2 with something in every card (Sunday v15 Stage 3): a loan of
        two rows, Savings, a lock, two goal jars, four Sundays in the passbook,
@@ -6182,22 +6157,6 @@ function findChromium() {
   await page.screenshot({ path: shot('phone_mymoney') });
   await page.setViewportSize({ width: 900, height: 1100 });
   await page.waitForTimeout(200);
-
-  // Kid tab, both phone widths.
-  await page.evaluate(() => {
-    profile = 'jenn'; selectProfile('jenn');
-    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
-    const keys = mrWeekDayKeys(ctWeekKey);
-    setDayBlocks(keys[2], [{ id:'ph1', actId:'chores', startMin: 17*60, durationMin: 30,
-      choreTags:['dishes','vacuum'], checklistState:{} }], 'jenn');
-    openChoreTab(); ckSelectDay(2);
-  });
-  const kid393 = await phoneAudit(393, 852, 'kid@393');
-  await page.screenshot({ path: shot('phone_kid') });
-  const kid375 = await phoneAudit(375, 667, 'kid@375');
-  if (want('kidTabFitsAPhone')) checks.kidTabFitsAPhone =
-    (kid393.overflow.length + kid393.small.length + kid375.overflow.length + kid375.small.length) === 0
-    || [kid393, kid375];
 
   // The portal's three tabs, on the smaller phone.
   await page.evaluate(() => {
@@ -11271,7 +11230,7 @@ function findChromium() {
       .includes('no longer decide it');
     mmHide();
 
-    // The portal, not openChoreTab — that renders the KID frame for everyone
+    // The portal: the parent's half of the week lives there
     // (round 1 moved the parent's half of the week into js/27-chore-parent.js).
     // setParentTab only toggles panels — the render has to be asked for.
     cpDay = 2; cpView = 'day';
@@ -11291,9 +11250,12 @@ function findChromium() {
      inherit a week an earlier check happened to settle (commitKidWeek on the
      current week, the meeting's own flows): each one opens its week first,
      inline, because a page reload between them would drop a shared helper. */
+  /* On Today since PR 2b retired the Chores screen: "＋ I did something else
+     today" under her jobs (row 2). Clock on Thursday of this week, inline —
+     c1.pin is defined further down. */
   if (want('unplannedChoreIsClaimable')) checks.unplannedChoreIsClaimable = await page.evaluate(async () => {
-    // openChoreClaimPrompt resolves a promise whose .then re-renders the chore
-    // tab. A fixed delay that expires early lets that render land in the MIDDLE
+    // openChoreClaimPrompt resolves a promise whose .then re-renders Today.
+    // A fixed delay that expires early lets that render land in the MIDDLE
     // of the next check — where it silently consumes the "newly answered"
     // marker that check is about to assert on. Wait for the dialog to actually
     // be gone instead of guessing.
@@ -11304,78 +11266,127 @@ function findChromium() {
       }
       return false;
     };
-    profile = 'jess'; parentViewing = 'jess';
-    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
-    const kid = 'jess', wk = ctWeekKey;
-    ['jenn', 'jess'].forEach(k => { const c = state.shared.chore; if (c.finalizedWeeks && c.finalizedWeeks[wk]) delete c.finalizedWeeks[wk][k]; if (c.weekPlans && c.weekPlans[wk]) delete c.weekPlans[wk][k]; });   // open the week (see the note above unplannedChoreIsClaimable)
-    const e = mrEnsureEarnings(kid, wk);
-    e.claims = {}; e.chores = {}; e.gradedAt = {};
-    mrWeekDayKeys(wk).forEach(k => setDayBlocks(k, [], kid));
+    const RealDate = Date;
+    const [py, pm, pd] = getDayKeys(0)[3].split('-').map(Number);
+    const when = new RealDate(RealDate.UTC(py, pm - 1, pd, 19, 0, 0));
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    const bad = [];
+    try {
+      profile = 'jess'; parentViewing = 'jess';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+      const kid = 'jess', wk = ctWeekKey;
+      if (wk !== ctThisWeekKey()) return [`precondition: the planner's week ${wk} is not this week ${ctThisWeekKey()}`];
+      ['jenn', 'jess'].forEach(k => { const c = state.shared.chore; if (c.finalizedWeeks && c.finalizedWeeks[wk]) delete c.finalizedWeeks[wk][k]; if (c.weekPlans && c.weekPlans[wk]) delete c.weekPlans[wk][k]; });   // open the week (see the note above unplannedChoreIsClaimable)
+      const e = mrEnsureEarnings(kid, wk);
+      e.claims = {}; e.chores = {}; e.gradedAt = {};
+      mrWeekDayKeys(wk).forEach(k => setDayBlocks(k, [], kid));
 
-    openChoreTab(); ckSelectDay(3);
-    const nothingPlanned = document.querySelectorAll('[data-ct-action="ck-chore-row"]').length === 0;
-    const doorExists = !!document.querySelector('[data-ct-action="ck-else"]');
-    document.querySelector('[data-ct-action="ck-else"]').click();
-    const offered = document.querySelectorAll('[data-ct-action="ck-else-pick"]').length > 0;
-    document.querySelectorAll('[data-ct-action="ck-else-pick"]')[0].click();
-    await new Promise(r => setTimeout(r, 30));
-    document.querySelectorAll('.app-dialog-choice')[0].click();
-    if (!await settled()) return false;
-    await new Promise(r => setTimeout(r, 30));   // let the .then re-render land
+      goToday();
+      if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore]')) bad.push('Today offers a job with nothing planned');
+      const door = document.querySelector(`#tdWrap [data-td-action="else"][data-td-day="${todayKey()}"]`);
+      if (!door) return bad.concat(['no "＋ I did something else today" on Today']);
+      door.click();
+      const picks = document.querySelectorAll(`#tdWrap [data-td-action="else-pick"][data-td-day="${todayKey()}"]`);
+      if (!picks.length) return bad.concat(['"I did something else" offers no chores']);
+      const label = (picks[0].querySelector('.td-row-name') || {}).textContent.trim();
+      picks[0].click();
+      await new Promise(r => setTimeout(r, 30));
+      const choice = document.querySelectorAll('#appDialogOverlay.open .app-dialog-choice')[0];
+      if (!choice) return bad.concat(['picking a chore did not ask how it went']);
+      choice.click();
+      if (!await settled()) return bad.concat(['the question did not close']);
+      await new Promise(r => setTimeout(r, 30));   // let the .then re-render land
 
-    const inQueue = mrClaimQueue(wk, kid).length === 1;
-    const onHerTab = document.querySelectorAll('[data-ct-action="ck-chore-row"]').length === 1;
-    const markedAdded = !!document.querySelector('.ck-added');
-    const paysNothingYet = mrChoreWeek(wk, kid).paid === 0;   // a parent still decides
-    return nothingPlanned && doorExists && offered && inQueue
-        && onHerTab && markedAdded && paysNothingYet;
+      if (mrClaimQueue(wk, kid).length !== 1) bad.push(`the claim queue holds ${mrClaimQueue(wk, kid).length}, want 1`);
+      const waiting = [...document.querySelectorAll('#tdWrap .td-row--waiting')].map(el => el.textContent.replace(/\s+/g, ' ').trim());
+      if (!waiting.some(t => t.includes(label))) bad.push(`Today does not show "${label}" with Mum (waiting rows: ${JSON.stringify(waiting)})`);
+      if (mrChoreWeek(wk, kid).paid !== 0) bad.push('the unplanned claim paid before a parent decided');
+    } finally {
+      if (document.querySelector('#appDialogOverlay.open')) _closeAppDialog(null);
+      tdElseOpen = null;
+      Date = RealDate;
+    }
+    return bad.length ? bad : true;
   });
 
   // Her half of the loop: what is with Mom, and what came back while she
   // wasn't looking — and the marker must survive the render that shows it.
+  // On Today since PR 2b: the ⏳ chip and the ✨ chip (row 6).
   if (want('kidSeesWaitingAndAnswered')) checks.kidSeesWaitingAndAnswered = await page.evaluate(() => {
     const bad = [];
-    profile = 'jess'; parentViewing = 'jess';
-    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
-    const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
-    ['jenn', 'jess'].forEach(k => { const c = state.shared.chore; if (c.finalizedWeeks && c.finalizedWeeks[wk]) delete c.finalizedWeeks[wk][k]; if (c.weekPlans && c.weekPlans[wk]) delete c.weekPlans[wk][k]; });   // open the week (see the note above unplannedChoreIsClaimable)
-    const e = mrEnsureEarnings(kid, wk);
-    e.claims = {}; e.chores = {}; e.gradedAt = {};
-    mrSetClaim(kid, wk, 1, 'dishes', 3);
-    mrSetClaim(kid, wk, 3, 'mop', 2);
+    const RealDate = Date;
+    const [py, pm, pdd] = getDayKeys(0)[3].split('-').map(Number);
+    const when = new RealDate(RealDate.UTC(py, pm - 1, pdd, 19, 0, 0));
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    try {
+      profile = 'jess'; parentViewing = 'jess';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+      const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
+      if (wk !== ctThisWeekKey()) return [`precondition: the planner's week ${wk} is not this week ${ctThisWeekKey()}`];
+      ['jenn', 'jess'].forEach(k => { const c = state.shared.chore; if (c.finalizedWeeks && c.finalizedWeeks[wk]) delete c.finalizedWeeks[wk][k]; if (c.weekPlans && c.weekPlans[wk]) delete c.weekPlans[wk][k]; });   // open the week (see the note above unplannedChoreIsClaimable)
+      const e = mrEnsureEarnings(kid, wk);
+      e.claims = {}; e.chores = {}; e.gradedAt = {};
+      mrSetClaim(kid, wk, 1, 'dishes', 3);
+      mrSetClaim(kid, wk, 3, 'mop', 2);
 
-    openChoreTab(); ckSelectDay(0);
-    const wc = mrWaitingCount(kid, wk);
-    if (wc !== 2) bad.push(`waiting count is ${wc}, expected 2`);
-    if (!document.getElementById('choreWrap').textContent.includes('waiting for Mom'))
-      bad.push('her tab does not say "waiting for Mom"');
+      goToday();
+      const wc = mrWaitingCount(kid, wk);
+      if (wc !== 2) bad.push(`waiting count is ${wc}, expected 2`);
+      const chip = document.querySelector('#tdWrap [data-td-action="waiting"]');
+      if (!chip || !/2\D*with Mum/.test(chip.textContent)) bad.push(`Today's ⏳ chip reads "${chip ? chip.textContent.trim() : 'nothing'}", want 2 with Mum`);
+      else {
+        // Tuesday's dishes are the first thing waiting, so the tap opens the
+        // Week tab's chores report, not Today's jobs card (newAffordancesActuallyNavigate
+        // checks where each case lands).
+        const wasChoresOpen = localStorage.getItem(WK_CHORES_LS_KEY);
+        chip.click();
+        if (!document.getElementById('screen-week').classList.contains('active')) bad.push('the ⏳ chip, Tuesday waiting, did not open the Week tab');
+        if (wasChoresOpen == null) localStorage.removeItem(WK_CHORES_LS_KEY);
+        else localStorage.setItem(WK_CHORES_LS_KEY, wasChoresOpen);
+      }
 
-    /* Say when she last looked, rather than inheriting it from the render above.
-       Rendering her tab stamps lastGradeSeen to now; grading below stamps
-       gradedAt from the same clock a few instructions later, and mrNewlyGraded
-       compares the two with a strict `>`. Both can land in the same millisecond,
-       and then a genuinely new grade reads as already-seen. That is what made
-       this check fail intermittently on CI while passing every time locally —
-       a millisecond boundary, not a regression. */
-    pd.progress.lastGradeSeen = syncNow() - 1000;
+      /* Say when she last looked, rather than inheriting it from a render.
+         Grading below stamps gradedAt from the same clock a few instructions
+         later, and mrNewlyGraded compares the two with a strict `>`. Both can
+         land in the same millisecond, and then a genuinely new grade reads as
+         already-seen. That is what made this check fail intermittently on CI
+         while passing every time locally — a millisecond boundary, not a
+         regression. */
+      pd.progress.lastGradeSeen = syncNow() - 1000;
 
-    const was = profile;
-    profile = 'parent'; ctParentKid = kid;
-    mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
-    // A parent looking at her tab must NOT consume her "new" markers.
-    renderChoreTab();
-    const afterParent = mrNewlyGraded(kid, wk).length;
-    if (afterParent !== 1) bad.push(`a parent's look left ${afterParent} new marker(s), expected 1`);
-    profile = was;
+      const was = profile;
+      profile = 'parent'; ctParentKid = kid; parentViewing = kid;
+      mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
+      // A parent looking at her Today must NOT consume her "new" markers.
+      goToday();
+      const afterParent = mrNewlyGraded(kid, wk).length;
+      if (afterParent !== 1) bad.push(`a parent's look left ${afterParent} new marker(s), expected 1`);
+      profile = was;
 
-    renderChoreTab();
-    if (!document.getElementById('choreWrap').textContent.includes('newly answered'))
-      bad.push('her tab does not say "newly answered"');
-    renderChoreTab();                                  // she has now seen it
-    const left = mrNewlyGraded(kid, wk).length;
-    if (left !== 0) bad.push(`${left} new marker(s) survived her own look, expected 0`);
-    const after = mrWaitingCount(kid, wk);
-    if (after !== 1) bad.push(`waiting count is ${after} after one grade, expected 1`);
+      // Drawing Today shows the ✨ chip and does not consume it; opening it does.
+      goToday(); goToday();
+      const fresh = document.querySelector('#tdWrap [data-td-action="fresh"].td-chip-fresh');
+      if (!fresh || !/1\D*answered/.test(fresh.textContent)) bad.push(`Today's ✨ chip reads "${fresh ? fresh.textContent.trim() : 'nothing'}", want 1 answered`);
+      if (mrNewlyGraded(kid, wk).length !== 1) bad.push('drawing Today consumed the new marker before she opened it');
+      if (fresh) fresh.click();
+      const card = document.querySelector('#tdWrap .td-answered');
+      const dishes = (mrPoolRow('dishes', wk) || {}).label || 'dishes';
+      if (!card || !card.textContent.includes(dishes)) bad.push('opening ✨ does not show what Mum answered');
+      const left = mrNewlyGraded(kid, wk).length;
+      if (left !== 0) bad.push(`${left} new marker(s) survived her own look, expected 0`);
+      const after = mrWaitingCount(kid, wk);
+      if (after !== 1) bad.push(`waiting count is ${after} after one grade, expected 1`);
+      const ok = document.querySelector('#tdWrap [data-td-action="answered-ok"]');
+      if (ok) ok.click();
+      if (document.querySelector('#tdWrap [data-td-action="fresh"].td-chip-fresh')) bad.push('the ✨ chip is still there after she looked');
+    } finally {
+      tdAnsweredShown = null;
+      Date = RealDate;
+    }
     // Findings, not a bare false — CLAUDE.md: return true or the findings.
     return bad.length === 0 || bad;
   });
@@ -11555,7 +11566,6 @@ function findChromium() {
         ['Today',       'todayProfileBadge', () => goToday()],
         ['the week',    'weekProfileBadge',  () => { goWeek(); renderWeek(); }],
         ['the day',     'dayProfileBadge',   () => openDay(getDayKeys(weekOffset)[0], 0)],
-        ['the chores',  'choreProfileBadge', () => openChoreTab()],
         ['Sister Sync', 'syncProfileBadge',  () => openSisterSync()],
       ];
       for (const [label, id, nav] of screens) {
@@ -11679,7 +11689,6 @@ function findChromium() {
         ['Today',       'todayProfileBadge', () => goToday()],
         ['the week',    'weekProfileBadge',  () => { goWeek(); renderWeek(); }],
         ['the day',     'dayProfileBadge',   () => openDay(getDayKeys(weekOffset)[0], 0)],
-        ['the chores',  'choreProfileBadge', () => openChoreTab()],
         ['Sister Sync', 'syncProfileBadge',  () => openSisterSync()],
       ];
       const expect = (who, label, id, want) => {
@@ -11690,12 +11699,12 @@ function findChromium() {
       const icons = { jenn: '🐥', jess: '🦊' };
       for (const kid of ['jenn', 'jess']) {
         // A parent viewing her — Sister Sync is a child's screen and refuses a parent.
-        for (const [label, id, nav] of screens.slice(0, 4)) {
+        for (const [label, id, nav] of screens.filter(([l]) => l !== 'Sister Sync')) {
           profile = 'parent'; parentViewing = kid; ctParentKid = kid;
           nav();
           expect(`a parent viewing ${names[kid]}`, label, id, `👨‍👩‍👧‍👦 Parent (${names[kid]})`);
         }
-        // The child herself, on all five.
+        // The child herself, on all four.
         for (const [label, id, nav] of screens) {
           profile = kid;
           nav();
@@ -11809,14 +11818,61 @@ function findChromium() {
     mmHide();
     e.overrides = {};
 
-    // Her "waiting for Mom" chip → the first day something is waiting on.
+    /* Her ⏳ "with Mum" chip counts the whole week, so it goes to the first day
+       with something waiting: today's → the jobs card on Today; an earlier
+       day's → the Week tab's 🧹 Chores this week report (it jumped to that day
+       on the Chores screen until PR 2b). Either way the waiting chore's label
+       must be on screen where the tap lands. The clock is pinned to Thursday so
+       "today" and "an earlier day" exist whatever date the suite runs on. */
     profile = 'jess';
-    e.chores = {}; e.claims = {};
-    mrSetClaim(kid, wk, 4, 'mop', 3);
-    openChoreTab(); ckSelectDay(0);
-    ckGoWaiting();
-    const toWaiting = ctDay === 4;
-
+    const RealDate = Date;
+    const [py, pm, pdd] = getDayKeys(0)[3].split('-').map(Number);
+    const when = new RealDate(RealDate.UTC(py, pm - 1, pdd, 19, 0, 0));   // Thursday, midday in Edmonton
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    const wasChoresOpen = localStorage.getItem(WK_CHORES_LS_KEY);
+    const labelInView = (rootSel, label, barSel) => {
+      const root = document.querySelector(rootSel);
+      if (!root) return `${rootSel} is not there`;
+      const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walk.nextNode()) && !node.textContent.includes(label)) {}
+      if (!node) return `"${label}" is not in ${rootSel}`;
+      const range = document.createRange(); range.selectNodeContents(node);
+      const r = range.getBoundingClientRect();
+      const bar = document.querySelector(barSel);
+      const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+      return (r.width > 0 && r.top >= top - 1 && r.bottom <= window.innerHeight + 1) ? ''
+        : `"${label}" is at ${Math.round(r.top)}–${Math.round(r.bottom)}, the screen shows ${Math.round(top)}–${window.innerHeight}`;
+    };
+    const tapWaiting = (dayIdx, choreId) => {
+      e.chores = {}; e.claims = {};
+      mrSetClaim(kid, wk, dayIdx, choreId, 3);
+      const label = (mrPoolRow(choreId, wk) || {}).label || choreId;
+      goToday(); window.scrollTo(0, 0);
+      const chip = document.querySelector('#tdWrap [data-td-action="waiting"]');
+      if (!chip) return 'no ⏳ chip on Today';
+      chip.click();
+      if (dayIdx === 3) {
+        return !document.getElementById('screen-today').classList.contains('active') ? 'it left Today'
+          : labelInView('#tdWrap .td-jobs', label, '#screen-today .topbar');
+      }
+      return !document.getElementById('screen-week').classList.contains('active') ? 'it did not open the Week tab'
+        : document.getElementById('weekChoresBody')?.hidden !== false ? 'the 🧹 Chores this week report is not open'
+        : labelInView('#weekChoresBody', label, '#screen-week .topbar');
+    };
+    let waitToday, waitEarlier;
+    try {
+      waitToday = tapWaiting(3, 'mop');
+      waitEarlier = tapWaiting(1, 'dishes');
+    } finally {
+      Date = RealDate;
+      if (wasChoresOpen == null) localStorage.removeItem(WK_CHORES_LS_KEY);
+      else localStorage.setItem(WK_CHORES_LS_KEY, wasChoresOpen);
+      e.chores = {}; e.claims = {};
+      goToday(); window.scrollTo(0, 0);
+    }
     // The short-block training chip → the sheet with all four checks on it.
     profile = 'jenn'; parentViewing = 'jenn';
     const dk = getDayKeys(0)[1];
@@ -11834,7 +11890,8 @@ function findChromium() {
     const problems = [];
     if (!toTheChange) problems.push('"See the change" on an override notice does not reach the money screen with that row open — landed on '
       + mmStepId() + ', row ' + String(mnyExpandRow));
-    if (!toWaiting) problems.push('her "waiting for Mom" chip does not jump to the first day something is waiting on — landed on day ' + ctDay + ', not 4');
+    if (waitToday) problems.push(`her ⏳ "with Mum" chip, today's chore waiting, does not show it on the jobs card: ${waitToday}`);
+    if (waitEarlier) problems.push(`her ⏳ "with Mum" chip, an earlier day's chore waiting, does not show it in the Week tab's chores report: ${waitEarlier}`);
     if (!toSheet) problems.push('the training chip on a short block does not open the sheet with all four checks on it');
     return problems.length ? problems : true;
   });
@@ -12228,7 +12285,6 @@ function findChromium() {
       ['day',   () => { openDay(getDayKeys(0)[1], 1); }, true],
       ['sheet', () => { openDay(getDayKeys(0)[1], 1); openEditSheet('xss5-blk'); }, true],
       ['sync',  () => { openSisterSync(); }, true],
-      ['chore', () => { openChoreTab(); ckSelectDay(1); }, true],
     ];
     for (const [name, nav, wantsLiteral] of SURFACES) {
       const r = await page.evaluate(async ({ src, payload }) => {
@@ -12275,7 +12331,6 @@ function findChromium() {
     };
     const cases = [
       // Plan v17 §1: My money's 🎁 Gifts toggle is gone — the gifts live in ⏳ Asked parents › see all.
-      ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }, '[data-ct-action="ck-privs"]'],
       ['screen-week',    () => { goWeek(); renderWeek(); }, '#weekGlance .week-glance-toggle'],
     ];
     for (const [id, nav, sel] of cases) {
@@ -13599,8 +13654,8 @@ function findChromium() {
   });
 
   /* Row 3. Today's routine card opens to its items, and "all N done" closes the
-     day — through the chore tab's own routine writers (ckToggleRoutineItem's
-     and ckCloseAllRoutines'), so ctSyncMandatoryFromRoutine still owns the
+     day — through the routine owners (ckWriteRoutineItem and
+     ckWriteAllRoutines), so ctSyncMandatoryFromRoutine still owns the
      "kept" mark. An earlier day's unticked routine is in catch up. */
   if (want('routinesTickFromToday')) checks.routinesTickFromToday = await page.evaluate(async () => {
     const bad = [];
@@ -13669,7 +13724,7 @@ function findChromium() {
 
   /* Row 4. Own things / Helping out on Today: none → done → nobody asked (XP) →
      none, through mrCyclePersonal (the chore tab's ctCyclePersonalChore path),
-     and the chore tab shows the same answer. Never money. */
+     and Today shows the answer it was given. Never money. */
   if (want('ownThingsFromToday')) checks.ownThingsFromToday = await page.evaluate(() => {
     const bad = [];
     const unpin = c1.pin(3);
@@ -13693,11 +13748,9 @@ function findChromium() {
       if (mrGetPersonal('jenn', wk, 3, first.id) !== 'done') bad.push(`one tap reads ${mrGetPersonal('jenn', wk, 3, first.id)}, want done`);
       tap();
       if (mrGetPersonal('jenn', wk, 3, first.id) !== 'unasked') bad.push(`two taps read ${mrGetPersonal('jenn', wk, 3, first.id)}, want unasked (the XP one)`);
-      // The chore tab shows the same answer.
-      openChoreTab(); ckSelectDay(3);
-      const there = document.querySelector(`#choreWrap [data-ct-action="cycle-personal"][data-chore-id="${first.id}"]`);
-      if (!there || !there.classList.contains('on') || !/nobody asked/.test(there.textContent)) bad.push('the chore tab does not show the answer given on Today');
-      goToday();
+      // Today shows the answer it was given.
+      const there = document.querySelector(`#tdWrap .td-lanes [data-td-action="personal"][data-td-chore="${first.id}"]`);
+      if (!there || !there.classList.contains('on') || !/nobody asked/.test(there.textContent)) bad.push('Today does not show the answer it was given');
       tap();
       if (mrGetPersonal('jenn', wk, 3, first.id) !== null) bad.push('a third tap did not clear it');
       if (mnyCash('jenn') !== cash || mrChoreWeek(wk, 'jenn').paid !== paid) bad.push('own things moved money');
@@ -13734,9 +13787,6 @@ function findChromium() {
         const a = mrGetAttitude('jenn', wk, 3);
         if (a.self !== 4) bad.push(`rating 4 on Today wrote ${a.self}`);
         if (a.parent) bad.push('her rating wrote the parent\'s');
-        openChoreTab(); ckSelectDay(3);
-        const onChores = document.querySelector('#choreWrap [data-ct-action="ck-attitude"].on');
-        if (!onChores || onChores.textContent.trim() !== '4') bad.push('the chore tab does not show the 4 given on Today');
         goToday();
         if (!rate(today, 4) || rate(today, 4).getAttribute('aria-pressed') !== 'true') bad.push('the 4 does not read as chosen');
       }
@@ -13808,10 +13858,11 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  /* Row 1 and row 3, both ways: an answer given on Today shows on the Chores
-     screen, and an answer given on the Chores screen shows on Today — because
-     both call the same owners. */
-  if (want('bothPlacesAgree')) checks.bothPlacesAgree = await page.evaluate(async () => {
+  /* Row 1 and row 3, both ways: an answer given on Today lands in the owners'
+     records, and an answer written through the owners (as the parent portal
+     and the planner do) shows on Today. Until PR 2b the other side was the
+     Chores screen; it is retired, so the owners stand in for it. */
+  if (want('todayAndTheOwnersAgree')) checks.todayAndTheOwnersAgree = await page.evaluate(async () => {
     const bad = [];
     const unpin = c1.pin(3);
     const k = c1.keep('jenn');
@@ -13826,42 +13877,35 @@ function findChromium() {
       ], 'jenn');
       const items = routineItemsFor('morning', 'jenn');
 
-      // Today → Chores: a claim.
+      // Today → the owner: a claim.
       goToday();
       const row = document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="vacuum"]');
       if (!row) bad.push('no Vacuum job row on Today');
       else { row.click(); await c1.answer(1); }
-      openChoreTab(); ckSelectDay(3);
-      const vac = [...document.querySelectorAll('#choreWrap .ck-chore')].find(el => el.querySelector('[data-chore-id="vacuum"]'));
-      if (!vac || !vac.classList.contains('ck-chore-claimed') || !/you said late/.test(vac.textContent)) bad.push('the chore tab does not show "late" given on Today');
+      if (mrGetClaim('jenn', wk, 3, 'vacuum') !== 2) bad.push(`"late" on Today wrote claim ${mrGetClaim('jenn', wk, 3, 'vacuum')}, want 2`);
 
-      // Chores → Today: a claim.
-      const mopRow = document.querySelector('#choreWrap [data-ct-action="ck-chore-row"][data-chore-id="mop"]');
-      if (mopRow) mopRow.click();
-      const q = document.querySelector('#choreWrap [data-ct-action="ck-claim"][data-chore-id="mop"][data-quality="3"]');
-      if (q) q.click(); else bad.push('could not answer Mop on the chore tab');
+      // The owner → Today: a claim.
+      mrSetClaim('jenn', wk, 3, 'mop', 3);
       goToday();
       const mopLabel = (mrPoolRow('mop', wk) || {}).label || 'Mop';
-      if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="mop"]')) bad.push('Mop, answered on the chore tab, is still offered as a job on Today');
+      if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="mop"]')) bad.push('Mop, already answered, is still offered as a job on Today');
       const waiting = [...document.querySelectorAll('#tdWrap .td-row--waiting')].some(el => el.textContent.includes(mopLabel));
-      if (!waiting) bad.push('Today does not show Mop as waiting after it was answered on the chore tab');
+      if (!waiting) bad.push('Today does not show Mop as waiting after it was answered elsewhere');
 
-      // Chores → Today: a routine tick; then Today → Chores.
+      // The owner → Today: a routine tick; then Today → the owner.
       if (items.length >= 2) {
-        openChoreTab(); ckSelectDay(3);
-        const it = document.querySelector(`#choreWrap [data-ct-action="ck-routine-item"][data-block-id="bp-r"][data-item-id="${items[0].id}"]`);
-        if (it) it.click(); else bad.push('could not tick the routine on the chore tab');
+        if (!ckWriteRoutineItem('jenn', today, 'bp-r', items[0].id)) bad.push('could not tick the routine through its owner');
         goToday();
         const head = document.querySelector('#tdWrap .td-routines [data-td-action="routine-open"][data-td-block="bp-r"]');
-        if (!head || !head.textContent.includes(`1/${items.length}`)) bad.push(`Today's routine reads "${head ? head.textContent.trim() : '(none)'}" after one tick on the chore tab`);
+        if (!head || !head.textContent.includes(`1/${items.length}`)) bad.push(`Today's routine reads "${head ? head.textContent.trim() : '(none)'}" after one tick elsewhere`);
         if (head) head.click();
         const second = document.querySelector(`#tdWrap .td-routines [data-td-action="routine-item"][data-td-block="bp-r"][data-td-item="${items[1].id}"]`);
         if (second) second.click(); else bad.push('could not tick the routine on Today');
-        openChoreTab(); ckSelectDay(3);
-        const count = [...document.querySelectorAll('#choreWrap .ck-block')].map(el => el.textContent).join(' ');
-        if (!count.includes(`2/${items.length}`)) bad.push('the chore tab does not show the tick given on Today');
+        const st = ((getDayBlocks(today, 'jenn') || []).find(b => b.id === 'bp-r') || {}).checklistState || {};
+        if (!st[items[0].id] || !st[items[1].id]) bad.push('the routine block does not hold both ticks after one on Today');
       }
     } finally {
+      delete tdRoutineOpen['bp-r'];
       unpin(); k.restore(); goToday();
     }
     return bad.length ? bad : true;
@@ -13901,10 +13945,6 @@ function findChromium() {
       if (mrGetLearning('jess', wk, 3, item.id) !== 1) bad.push(`+ + − on Now left ${mrGetLearning('jess', wk, 3, item.id)} units, want 1`);
       if (!((document.querySelector('#pnToldBody .pn-answer') || {}).textContent || '').includes(item.label)) bad.push('the learning row does not name the item');
       document.querySelector('#pnToldBody [data-pn-action="told-close"]').click();
-      // The chore tab shows the same count.
-      ctParentKid = 'jess'; openChoreTab(); ckSelectDay(3);
-      const there = [...document.querySelectorAll('#choreWrap .ck-learn')].find(el => el.textContent.includes(item.label));
-      if (!there || !/\b1\b/.test((there.querySelector('.ck-learn-count') || {}).textContent || '')) bad.push('the chore tab does not show the learning logged on Now');
       // Only a grown-up logs learning.
       profile = 'jess';
       if (typeof ctBumpLearningFor === 'function') ctBumpLearningFor('jess', wk, 3, item.id, 1);
@@ -13967,9 +14007,10 @@ function findChromium() {
       const card = q('.pn-answer');
       if (card && card.querySelector('[data-pn-action="grade"], [data-ct-action="grade-chore"], [data-pn-action="meeting"]')) bad.push('the on-her-behalf card carries a grading or settling control');
       pnSheetOpen = false; closeSheet('pnToldOverlay');
-      // Her chore tab shows it.
-      profile = 'jenn'; openChoreTab(); ckSelectDay(1);
-      if (!document.querySelector('#choreWrap .ck-chore-claimed')) bad.push('her chore tab does not show the claim made on her behalf');
+      // Her Today has it: catch up does not ask her about Mop on Tuesday again.
+      profile = 'jenn'; parentViewing = 'jenn'; goToday();
+      if (document.querySelector(`#tdWrap [data-td-action="claim"][data-td-day="${tue}"][data-td-chore="mop"]`)) bad.push('her Today still asks about the Mop answered on her behalf');
+      if (mrGetClaim('jenn', wk, 1, 'mop') !== 3) bad.push('her claim did not survive her Today drawing');
     } finally {
       unpin(); k.restore(); goToday();
     }
@@ -14015,10 +14056,45 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
+  /* Row 1, the closed side: a job Mum has graded is her answer, and Today does
+     not ask about it again — it reads done, and tapping it asks nothing and
+     writes nothing. (gradedRowIsClosedToHer held this on the Chores screen
+     until PR 2b retired it.) */
+  if (want('gradedJobIsClosedToHerOnToday')) checks.gradedJobIsClosedToHerOnToday = await page.evaluate(async () => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      const wk = k.wk, today = mrWeekDayKeys(wk)[3];
+      setDayBlocks(today, [{ id: 'gc-ch', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes'] }], 'jenn');
+      profile = 'parent'; mrSetChoreGrade('jenn', wk, 3, 'dishes', 2); profile = 'jenn';
+      goToday();
+      if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="dishes"]')) bad.push('a graded job is still offered as a job on Today');
+      const label = (mrPoolRow('dishes', wk) || {}).label || 'Dishes';
+      const done = [...document.querySelectorAll('#tdWrap .td-row--done')].find(el => el.textContent.includes(label));
+      if (!done) bad.push(`Today does not show ${label} as done once Mum graded it`);
+      else {
+        done.click();
+        await new Promise(r => setTimeout(r, 60));
+        if (c1.dialogOpen()) bad.push('tapping a graded job asked how it went');
+        if (mrGetClaim('jenn', wk, 3, 'dishes')) bad.push('tapping a graded job wrote a claim');
+        if (mrGetChoreGrade('jenn', wk, 3, 'dishes') !== 2) bad.push('tapping a graded job changed Mum\'s grade');
+      }
+    } finally {
+      tdAnsweredShown = null;
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
   /* ── C2: every chore VIEW has a home outside the Chores screen ────────────
      R5 §5 rows 9–15. Each new home reads the SAME reader the Chores screen
-     reads, so each check below compares the new home with the chore tab on
-     one fixture, and asserts the new home is read-only. Still 390×844 and
+     read, so each check below compares the new home with that reader on one
+     fixture (the screen itself went in PR 2b), and asserts the new home is
+     read-only. Still 390×844 and
      clock-pinned (c1.pin(3)). */
 
   /* Rows 9 and 10. The Today hero carries her 🔥 streak (mrStreakWeek, the
@@ -14042,10 +14118,6 @@ function findChromium() {
       const streak = document.querySelector('#tdWrap .dq-hero-streak');
       if (!streak) bad.push('no 🔥 streak on the Today hero');
       else if (!streak.textContent.includes(`${days} day streak`)) bad.push(`Today's streak reads "${streak.textContent.trim()}", want ${days} day streak`);
-      openChoreTab();
-      const chip = [...document.querySelectorAll('#choreWrap .ck-chip')].find(c => /day streak/.test(c.textContent));
-      const choreDays = chip ? (chip.querySelector('.ck-chip-big') || {}).textContent : null;
-      if (String(choreDays) !== String(days)) bad.push(`the chore tab says ${choreDays}, Today says ${days}`);
 
       goToday();
       const lv = document.querySelector('#tdWrap [data-td-action="level"]');
@@ -14119,10 +14191,7 @@ function findChromium() {
       const phone = rows.find(r => r.textContent.includes('Phone'));
       if (!phone || !/again this week · −\$1/.test(phone.textContent)) bad.push('a repeat is not marked "again this week · −$1"');
       if (card.querySelector('button, input, select')) bad.push('the open loops card carries a control');
-      openChoreTab();
-      const there = [...document.querySelectorAll('#choreWrap .ck-loop')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
-      if (there.length !== rows.length) bad.push(`the chore tab lists ${there.length}, Today ${rows.length}`);
-      goToday();
+      if (ckOpenLoops('jenn').length !== rows.length) bad.push(`the box holds ${ckOpenLoops('jenn').length} open loops, Today lists ${rows.length}`);
       p.boxItems = [];
       goToday();
       if (document.querySelector('#tdWrap .td-loops')) bad.push('an empty box still draws the card');
@@ -14158,10 +14227,10 @@ function findChromium() {
 
       const rowsOf = (sel, cellSel) => [...document.querySelectorAll(sel)].map(r =>
         [...r.querySelectorAll(cellSel)].map(c => c.textContent.trim()).join('|'));
-      openChoreTab(); ckSetView('week');
-      const grid = rowsOf('#choreWrap .ck-grid-row:not(.ck-grid-head)', '.ck-grid-label, .ck-cell, .ck-grid-total');
-      ckSetView('day');
-      if (!grid.length) return ['precondition: the chore tab week grid is empty'];
+      // What the week grid's reader says, row by row (label, seven cells, total).
+      const grid = ckWeekGridData('jenn', wk).lanes.flatMap(l => l.rows).map(row =>
+        [((row.icon || '') + row.name).trim(), ...row.cells.map(c => String(c.text).trim()), row.total].join('|'));
+      if (!grid.length) return ['precondition: the week grid reader is empty'];
 
       goWeek(); renderWeek();
       const toggle = document.getElementById('weekChoresToggle');
@@ -14171,7 +14240,7 @@ function findChromium() {
       const body = document.getElementById('weekChoresBody');
       if (!body || body.hidden) return bad.concat(['the chores report does not open']);
       const report = rowsOf('#weekChoresBody .wcr-row', '.wcr-label, .wcr-cell, .wcr-total');
-      if (JSON.stringify(report) !== JSON.stringify(grid)) bad.push(`the Week report ${JSON.stringify(report)} differs from the chore tab's grid ${JSON.stringify(grid)}`);
+      if (JSON.stringify(report) !== JSON.stringify(grid)) bad.push(`the Week report ${JSON.stringify(report)} differs from the week grid reader ${JSON.stringify(grid)}`);
       if (body.querySelector('button, input, select')) bad.push('the Week report carries a control — answering is catch up\'s job');
       const tiny = [...body.querySelectorAll('*')].filter(el =>
         [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
@@ -14230,24 +14299,6 @@ function findChromium() {
       if (chore && (cell(chore, 2) || '').trim() !== '✓') bad.push(`${chore} on Wednesday is not ticked on the board`);
       if (board.querySelector('button, input, select, [onclick]')) bad.push('the pre-system board carries a control — it is read-only');
       if (/Clear week|Export backup|Save goals/i.test(document.getElementById('ptab-history-wrap').textContent)) bad.push('History offers clear week, export or goal editing');
-      /* The chore tab's old board: its money card is one door to 💰 My money
-         now (decision 9) — and so is every other week's tab, in the rail. */
-      ctParentKid = 'jenn'; openChoreTab(); ctWeekKey = oldWk; renderChoreTab();
-      const door = document.querySelector('#choreWrap .ct-money-door');
-      if (!door || !/My money/.test(door.textContent)) bad.push("the chore tab's old board has no 💰 My money door where the money card sat");
-      if (document.querySelector('#choreWrap .ct-money-total')) bad.push("the chore tab's old board still draws the retired money card");
-      ctWeekKey = ctThisWeekKey(); renderChoreTab();
-      /* Build 2026-10-06c: under the board on every week, with its line (the
-         stage 8 drawing), and no longer a small link in the rail. */
-      const card = document.querySelector('#choreWrap .ck-tab + .ct-money-card');
-      if (!card || !card.querySelector('.ct-money-door')) bad.push("this week's chore tab has no 💰 My money door under the board");
-      else if (!/what I earned, my loan wall, what I own/.test(card.textContent)) bad.push("the chore tab's 💰 door lacks its line");
-      if (document.querySelector('#choreWrap .ck-rail .ct-money-door')) bad.push("this week's chore tab still has the 💰 door in its rail");
-      ctWeekKey = oldWk; renderChoreTab();
-      // And the same ticks: Morning is ticked on Tuesday and not on Monday there too.
-      const tabCell = (d) => document.querySelector(`#choreWrap .cm-cell[data-ct-action="matrix-mandatory"][data-session="Morning"][data-day="${d}"]`);
-      if (!tabCell(1) || tabCell(1).getAttribute('aria-checked') !== 'true') bad.push("the chore tab's old board does not tick Morning on Tuesday — the fixture and the board disagree");
-      if (tabCell(0) && tabCell(0).getAttribute('aria-checked') === 'true') bad.push("the chore tab's old board ticks Morning on Monday");
     } finally {
       if (had.snap === undefined) delete c.moneySnapshots[oldWk]; else c.moneySnapshots[oldWk] = had.snap;
       if (had.goals === undefined) delete c.goalsByWeek[oldWk]; else c.goalsByWeek[oldWk] = had.goals;
@@ -14350,7 +14401,7 @@ function findChromium() {
       await home('today', label, () => { profile = 'jenn'; goToday(); window.scrollTo(0, 0); });
       await home('my_level', label, () => { const b = document.querySelector('#tdWrap [data-td-action="level"]'); if (b) b.click(); });
       await page.evaluate(() => { const ov = document.getElementById('tdLevelOverlay'); if (ov) ov.classList.remove('open'); });
-      await home('my_money', label, () => { openChoreTab(); mnyOpenMyMoney('jenn'); window.scrollTo(0, 0); });
+      await home('my_money', label, () => { mnyOpenMyMoney('jenn'); window.scrollTo(0, 0); });
       await home('money_sundays', label, () => { mnyOpenSundays(); window.scrollTo(0, 0); });
       await home('week_chores', label, () => {
         try { localStorage.setItem('wp_week_chores_open', '1'); } catch (e) {}
@@ -14733,20 +14784,22 @@ function findChromium() {
     // More opens a sheet, and a row in it navigates.
     click('#kidNav [data-td-nav="more"]');
     const sheetOpen = document.getElementById('tdMoreOverlay').classList.contains('open');
-    click('#tdMoreOverlay [data-td-more="chores"]');
-    const toChores = activeId() === 'screen-chore';
+    // (🧹 Chores was the row here until PR 2b retired that screen; ◀ Switch is.)
+    const wasUnlocked = parentUnlockedThisSession;
+    click('#tdMoreOverlay [data-td-more="profile"]');
+    const toSwitch = activeId() === 'screen-profile';
     const sheetClosed = !document.getElementById('tdMoreOverlay').classList.contains('open');
+    profile = 'jenn'; parentViewing = 'jenn'; parentUnlockedThisSession = wasUnlocked;
 
     // The pre-existing globals the rest of the suite drives the app with.
     goWeek();              const oldWeek   = activeId() === 'screen-week';
     // goQuestBoard was checked here; the Quest Board is retired.
     const oldQuest = true;
-    openChoreTab();        const oldChore  = activeId() === 'screen-chore';
     mnyOpenMyMoney('jenn'); const oldMoney = activeId() === 'screen-mymoney';
     openSisterSync();      const oldSync   = activeId() === 'screen-sync';
     goToday();
-    return toWeek && toMoney && toSync && backToToday && sheetOpen && toChores && sheetClosed
-        && oldWeek && oldQuest && oldChore && oldMoney && oldSync;
+    return toWeek && toMoney && toSync && backToToday && sheetOpen && toSwitch && sheetClosed
+        && oldWeek && oldQuest && oldMoney && oldSync;
   });
 
   /* Sister Sync is a bottom tab (the owner's decision, 2026-09-24). Its only
@@ -14826,7 +14879,8 @@ function findChromium() {
     return result;
   })();
 
-  /* More holds only what has no other home: 🧹 Chores and ◀ Switch, the 🎨
+  /* More holds only what has no other home: ◀ Switch (🧹 Chores went with its
+     screen in PR 2b), the 🎨
      look tile (Looks stage 3, L4 — it names the look it switches to, Calm
      from the default Pop), plus the build number (theBuildNumberIsOnThePage). Money school and Money story both
      belong to the Money tab and were a third and second door there; each is
@@ -14841,9 +14895,9 @@ function findChromium() {
     document.querySelector('#kidNav [data-td-nav="more"]')?.click();
     const tiles = [...document.querySelectorAll('#tdMoreOverlay .td-more-tile')];
     const got = tiles.map(t => t.getAttribute('data-td-more')).join(' · ');
-    if (got !== 'chores · profile · look') problems.push(`the More tiles are "${got}", expected exactly "chores · profile · look" (Chores · Switch · 🎨)`);
+    if (got !== 'profile · look') problems.push(`the More tiles are "${got}", expected exactly "profile · look" (Switch · 🎨)`);
     const labels = tiles.map(t => t.querySelector('.td-more-label')?.textContent.trim()).join(' · ');
-    if (labels !== 'Chores · Switch · Calm look') problems.push(`the More tile labels are "${labels}", expected "Chores · Switch · Calm look"`);
+    if (labels !== 'Switch · Calm look') problems.push(`the More tile labels are "${labels}", expected "Switch · Calm look"`);
     document.getElementById('tdMoreOverlay')?.classList.remove('open');
 
     // Money school from the head's 🎓 tab (decision 14: two tabs, no numbers).
@@ -17502,8 +17556,8 @@ function findChromium() {
      Calm both were a navy square with white text (today navy by L9, the
      selected pill navy since Stage 3), so a parent could not tell which
      square was chosen. Selected is the filled one; today is navy by frame in
-     Calm (L9) and keeps its own fill in Pop. Chores' day strip (.ck-day) is
-     the other place a today mark and a selection share a row. */
+     Calm (L9) and keeps its own fill in Pop. (Chores' day strip, the other
+     such row, went with the Chores screen in PR 2b.) */
   if (want('todayAndSelectedDifferInBothLooks')) checks.todayAndSelectedDifferInBothLooks = await (async () => {
     const bad = [];
     const NAVY = 'rgb(28, 34, 64)';
@@ -17521,13 +17575,7 @@ function findChromium() {
       pnOpenToldSheet();
       const on = sig(document.querySelector('#pnToldBody .pn-day.on'));
       pnSheetOpen = false; closeSheet('pnToldOverlay');
-      const host = document.createElement('div');
-      host.className = 'ck-daystrip';
-      host.innerHTML = '<button class="ck-day sel">1</button><button class="ck-day today">2</button>';
-      document.body.appendChild(host);
-      const ckSel = sig(host.children[0]), ckToday = sig(host.children[1]);
-      host.remove();
-      return { now, on, ckSel, ckToday };
+      return { now, on };
     });
     try {
       for (const look of ['pop', 'calm']) {
@@ -17537,7 +17585,6 @@ function findChromium() {
         if (!r.now) { bad.push(`${look}: Parent › Now drew no today square (.pn-day.now), so nothing was compared`); continue; }
         if (!r.on) { bad.push(`${look}: Parent › Now drew no selected day (.pn-day.on), so nothing was compared`); continue; }
         if (r.now.bg === r.on.bg) bad.push(`${look}: Parent › Now's today square and selected day share the fill ${r.now.bg}`);
-        if (r.ckSel.bg === r.ckToday.bg) bad.push(`${look}: Chores' selected day and today share the fill ${r.ckSel.bg}`);
         // L9: in Calm today's mark is navy (Pop's rail square keeps its own colour).
         if (look === 'calm' && ![r.now.bg, r.now.ring, r.now.edge].some(v => String(v).includes(NAVY))) {
           bad.push(`calm: Parent › Now's today square carries no navy (L9): ${JSON.stringify(r.now)}`);
@@ -18595,14 +18642,13 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* THE TWO SCREENS ABOUT TODAY OPEN ON TODAY.
+  /* SISTER SYNC OPENS ON TODAY.
      Sister Sync forced syncDayIdx = 0 on every open — Monday of the week being
      viewed — while the copy underneath read "you're both free … today", so from
-     Tuesday onward it named one day and answered about another. The chore tab
-     had the same shape of bug one level along: it worked today out correctly on
-     open but ctChangeWeek reset it to Monday, so paging a week and coming back
-     left it on a day nobody was looking at. Both read the same helper now. */
-  if (want('choreTabAndSisterSyncOpenOnToday')) checks.choreTabAndSisterSyncOpenOnToday = await page.evaluate(() => {
+     Tuesday onward it named one day and answered about another. (The chore tab
+     had the same shape of bug and was checked here too, until PR 2b retired
+     it.) */
+  if (want('sisterSyncOpensOnToday')) checks.sisterSyncOpensOnToday = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
     const bad = [];
     const todayIdx = getDayKeys(0).indexOf(todayKey());
@@ -18615,17 +18661,6 @@ function findChromium() {
     if (!label.includes(String(d.getDate())) || !label.includes(MONTH_SHORT[d.getMonth()])) {
       bad.push(`Sister Sync says "${label}", not today's date`);
     }
-
-    openChoreTab();
-    if (ctDay !== todayIdx) bad.push(`the chore tab opened on day ${ctDay}, today is ${todayIdx}`);
-    // Page away and back: the day must not have collapsed to Monday.
-    ctChangeWeek(-1);
-    ctChangeWeek(1);
-    if (ctDay !== todayIdx) bad.push(`paging weeks left the chore tab on day ${ctDay}, not ${todayIdx}`);
-    // A week that does not contain today has no "today" to land on.
-    ctChangeWeek(-1);
-    if (ctDay !== 0) bad.push(`another week opened on day ${ctDay}, expected its first day`);
-    ctChangeWeek(1);
     goToday();
     return bad.length === 0 || bad;
   });
@@ -18634,16 +18669,18 @@ function findChromium() {
      There was an "all" button per routine block and nothing above them, so
      closing a normal evening was three presses in three places; the routine
      bonus needs all three, which made the thing she was aiming at the one thing
-     with no control. The bulk button writes the same checklistState the per-block
-     one writes and hands each block to ckAfterRoutineChange, so
-     ctAwardMandatoryFromRoutine still owns the award — Today's rule, applied
-     here: call an owner, never contain one. */
+     with no control. The bulk button (Today's routine card since PR 2b) writes
+     through ckWriteAllRoutines, the same checklistState the per-item ticks
+     write, and hands each block to ckAfterRoutineChange, so
+     ctAwardMandatoryFromRoutine still owns the award — Today's rule: call an
+     owner, never contain one. */
   if (want('routinesCloseInOneTap')) checks.routinesCloseInOneTap = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const bad = [];
     const kid = 'jenn';
-    const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
+    const dayKey = todayKey(), d = tdTodayIndex(), wk = ctThisWeekKey();
+    if (d == null) return ['today is not in this week, so this cannot be tested'];
     const before = (getDayBlocks(dayKey, kid) || []).slice();
     try {
       setDayBlocks(dayKey, [
@@ -18651,44 +18688,44 @@ function findChromium() {
         { id: 'rt-a', actId: 'routine_afterschool', startMin: 15 * 60, durationMin: 30 },
         { id: 'rt-e', actId: 'routine_evening',     startMin: 20 * 60, durationMin: 20 },
       ], kid);
-      openChoreTab();
+      goToday();
 
-      const btn = () => document.querySelector('#choreWrap [data-ct-action="ck-routine-all-day"]');
-      if (!btn()) return ['no one-tap control above the day\'s routines'];
+      const btn = () => document.querySelector(`#tdWrap .td-routines [data-td-action="routine-all"][data-td-day="${dayKey}"]`);
+      if (!btn()) return ["no one-tap control on Today's routine card"];
       const r = btn().getBoundingClientRect();
       if (r.width < 44 || r.height < 44) bad.push(`the bulk button is ${Math.round(r.width)}x${Math.round(r.height)}, under 44`);
+      if (!/all 3 done/.test(btn().textContent)) bad.push(`the bulk button reads "${btn().textContent.trim()}", want "all 3 done"`);
 
       btn().click();
-      const closed = ckRoutineBlocks(kid, ctDay);
+      const closed = ckRoutineBlocksOn(kid, dayKey);
       const allShut = closed.length === 3 && closed.every(b => b.total > 0 && b.done >= b.total);
       if (!allShut) bad.push('one tap did not close all three routines');
-      // The award path fired for each — the same one the per-block button uses.
-      const kept = CT_SESSIONS.filter(s => ctGetMandatory(ctWeekKey, ctDay, s, kid)).length;
+      // The award path fired for each — the same one the per-item ticks use.
+      const kept = CT_SESSIONS.filter(s => ctGetMandatory(wk, d, s, kid)).length;
       if (kept !== 3) bad.push(`${kept} routines recorded as kept, expected 3`);
 
       // Pressing it again on a fully closed day clears, and only then.
       btn().click();
-      const reopened = ckRoutineBlocks(kid, ctDay);
+      const reopened = ckRoutineBlocksOn(kid, dayKey);
       if (reopened.some(b => b.done > 0)) bad.push('a second tap did not clear the day');
 
       // Half-done must close rather than clear: "all" cannot lose work she did.
-      ckToggleRoutineItem('rt-m', ckRoutineItems('morning')[0].id);
+      ckWriteRoutineItem(kid, dayKey, 'rt-m', ckRoutineItems('morning')[0].id);
+      goToday();
       btn().click();
-      const afterHalf = ckRoutineBlocks(kid, ctDay);
+      const afterHalf = ckRoutineBlocksOn(kid, dayKey);
       if (!afterHalf.every(b => b.total > 0 && b.done >= b.total)) {
         bad.push('pressing "all" on a half-done day cleared it instead of closing it');
       }
 
       // Nothing planned, nothing to tick — a travel day is not three empty lists.
       setDayBlocks(dayKey, [], kid);
-      renderChoreTab();
+      goToday();
       if (btn()) bad.push('the bulk button shows on a day with no routines planned');
-      if (!/No routine on this day/i.test(document.getElementById('choreWrap').textContent)) {
-        bad.push('a day with no routines does not say so');
-      }
+      if (document.querySelector('#tdWrap .td-routines')) bad.push('a day with no routines still draws the routine card');
     } finally {
       setDayBlocks(dayKey, before, kid);
-      renderChoreTab();
+      goToday();
     }
     return bad.length === 0 || bad;
   });
@@ -27218,8 +27255,8 @@ function findChromium() {
     const bad = [];
     const count = (re) => (html.match(re) || []).length;
     if (count(/<main\b/g) !== 1) bad.push(`${count(/<main\b/g)} <main> elements, want 1`);
-    // 7 topbars, plus the parent portal's one-row <header class="parent-bar"> (Plan v9 §N).
-    if (count(/<header class="topbar/g) !== 7) bad.push(`${count(/<header class="topbar/g)} topbars are <header>, want 7`);
+    // 6 topbars (the Chores screen and its header retired in PR 2b), plus the parent portal's one-row <header class="parent-bar"> (Plan v9 §N).
+    if (count(/<header class="topbar/g) !== 6) bad.push(`${count(/<header class="topbar/g)} topbars are <header>, want 6`);
     if (count(/<header class="parent-bar"/g) !== 1) bad.push('the parent portal one-row bar is not a <header>');
     if (count(/<div class="topbar(?:\s|")/g)) bad.push('a topbar is still a <div>');
     const toggles = html.match(/<div class="(?:buffer|repeat)-toggle[^>]*>/g) || [];
@@ -27242,8 +27279,10 @@ function findChromium() {
        23: up one for Grown-ups' ✏️ fix sheets (#grownupsOverlay, Sunday v15
        Stage 4b, js/46-grownups.js), through openSheet / closeSheet too.
        24: up one for Parent › Now's 🚪 "She told me…" (#pnToldOverlay, Plan v9
-       §N, js/32-parent-now.js), through openSheet / closeSheet too. */
-    if (overlays.length !== 24) bad.push(`${overlays.length} static overlays, expected 24`);
+       §N, js/32-parent-now.js), through openSheet / closeSheet too.
+       23 again: down one when the Chores screen and its group sheet
+       (#choreGroupOverlay) retired in PR 2b. */
+    if (overlays.length !== 23) bad.push(`${overlays.length} static overlays, expected 23`);
     // Six destinations since 💰 Money became its own (Plan v9 §N).
     if (count(/role="tabpanel"/g) !== 6) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 6 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
