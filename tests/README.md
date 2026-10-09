@@ -9,9 +9,10 @@ npm run test:fast   # check + every unit suite (merge, buffers, stream, xp, mone
 
 The test map is the `Tests:` lines in `FEATURES.md` (`## References`): for each
 area or file, the tests a change there needs. The short loop plus the map's
-Node suites stays under 3 minutes. The `SMOKE_ONLY=…` lists there are optional:
-each one pays a few minutes of setup on a laptop, so they are outside the
-3-minute short loop. The rules are in `ARCHITECTURE.md`, Verification.
+Node suites stays under 3 minutes. The `SMOKE_ONLY=…` lists there are optional
+and outside the 3-minute short loop: a list whose checks are all declared in
+`SETUP_NEEDS` (below) takes about half a minute on the owner's PC, any other
+list about two and a half. The rules are in `ARCHITECTURE.md`, Verification.
 
 Before a pull request opens — the full suite green on GitHub: the `checks` job,
 the browser job (cleanup-tool tests), the picture job, and one smoke job per
@@ -95,8 +96,14 @@ body does not run, so a subset can pass or fail where the full run would not.
 That is why it names itself `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a
 pass of the suite`, exits 1 on a name that matches no check, and refuses to run
 under CI. Give a new check the same `if (want('name'))` prefix as its
-neighbours. A subset still pays all the setup between checks, a few minutes on
-a laptop, whatever it names.
+neighbours. A subset still runs the setup between checks, except the steps
+`SETUP_NEEDS` in `smoke.js` lets it skip: the kid and parent house-rules walks
+(about 85 s and 30 s on the owner's PC) run only when a chosen check needs
+them or a chosen check is not declared there — an undeclared check gets every
+step. The run prints each step it skipped. Declared checks alone: about 33 s
+wall (theComponentKitHoldsItsSizes and weekOpensOnTheLayoutYouCanPlanIn, 149 s
+before); a list with an undeclared check: about two and a half minutes. Add a
+check to `SETUP_NEEDS` only after reading what it relies on.
 
 Every run times each check and the setup just before it, prints the slowest,
 and writes `tests/out/smoke-ran-<date>.json`. To see where a CI run's time went:

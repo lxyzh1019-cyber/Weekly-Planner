@@ -326,7 +326,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 ## Data and rules
 
-- Smoke subset: SMOKE_ONLY=a,b runs only the named smoke checks, refuses an unknown name, prints PARTIAL RUN and never counts as a pass of the suite — Proof: tests/check-ci-scripts.js
+- Smoke subset: SMOKE_ONLY=a,b runs only the named smoke checks, refuses an unknown name, prints PARTIAL RUN and never counts as a pass of the suite; it skips the kid and parent house-rules walks unless a chosen check needs them or is not declared in SETUP_NEEDS (it prints each skipped step) — Proof: tests/check-ci-scripts.js; SMOKE_ONLY=kidScreensMeetTheHouseRules runs its walk and passes, SMOKE_ONLY=theComponentKitHoldsItsSizes,weekOpensOnTheLayoutYouCanPlanIn skips both (33 s wall)
 - Short loop: npm run test:fast runs the static checks (steady-share and money-surface included) and the seven unit suites; npm test adds cleanup and smoke; CI runs checks, browser and one smoke job per date — Proof: tests/check-ci-scripts.js
 - Dead-action guard: an onclick or data-action in the markup must name a function or handler that exists — Proof: tests/check-dead-actions.js
 - Gate runs on Windows: npm test passes in a Windows checkout with no environment variables (LF files, Node suites set UTC themselves) — Proof: none found
@@ -429,7 +429,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 ## References
 
-The test map: for a change in the area or files named, the tests it needs before a push. The short loop is `npm run test:fast` (about 30 s) plus the Node suites named below (all inside `test:fast`), under 3 minutes. The `SMOKE_ONLY=…` lists are optional and outside that 3-minute target: a `SMOKE_ONLY` run pays a few minutes of setup on a laptop whatever it names. The full suite runs on GitHub before the pull request.
+The test map: for a change in the area or files named, the tests it needs before a push. The short loop is `npm run test:fast` (about 30 s) plus the Node suites named below (all inside `test:fast`), under 3 minutes. The `SMOKE_ONLY=…` lists are optional and outside that 3-minute target: a `SMOKE_ONLY` run takes about half a minute on the owner's PC when every check it names is declared in `SETUP_NEEDS` (tests/smoke.js), about two and a half minutes otherwise. The full suite runs on GitHub before the pull request.
 
 - Tests: any `js/`, `css/app.css`, `index.html`, `sw.js` → `npm run test:fast` (static checks: syntax, globals, shared-merge, escaping, look tokens, money words, steady share, money surface, dead CSS/ids/actions, CI scripts, SW shell)
 - Tests: `js/03-sync.js`, `js/04-merge.js`, `js/02-state.js`, `js/38-conflicts.js` → `npm run test:merge`; `SMOKE_ONLY=rapidEditsCoalesceIntoOneWrite,aDraggedBlockIsStampedSoAMergeCannotLoseIt,stampsUseServerCorrectedTime,aConflictIsAParentsToDecideNotTheClocks,cloudSizeWarnsBeforeTheCeiling`
