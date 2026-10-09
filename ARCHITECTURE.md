@@ -1427,7 +1427,7 @@ feed pay. Today's catch-up card offers only unsettled weeks. (text only)
 **Chores answered in their new homes (R5 §5 C1, 2026-09-24).** Every action
 the Chores screen had now has a home outside it, and each home calls the SAME
 function the Chores screen called, so the two could not disagree
-(`bothPlacesAgree` held it both ways). **Retired (C3, PR 2b, 2026-10-08):** the
+(`todayAndTheOwnersAgree` held it both ways). **Retired (C3, PR 2b, 2026-10-08):** the
 owner ticked all 19 rows of `docs/chore-relocation-map.md`, and the Chores
 screen went — `#screen-chore`, `openChoreTab` / `renderChoreTab`, the kid-tab
 renderers, its money card and matrix, the chore-group editor
@@ -1439,7 +1439,7 @@ a parameterised core (named kid, week/day; the chore tab's own wrappers went in
 C3): `ckWriteRoutineItem` / `ckWriteAllRoutines`
 (+ `ckRoutineChanged`, the sync-and-award tail), `ckRateSelfFor`,
 `ctCyclePersonalFor`, `ctBumpLearningFor`, and the readers `ckRoutineBlocksOn`,
-`ckTrainingBlockOn`, `ckOwnLaneItems`, `ckUnlistedChoresFor`. (checked by smoke: bothPlacesAgree)
+`ckTrainingBlockOn`, `ckOwnLaneItems`, `ckUnlistedChoresFor`. (checked by smoke: todayAndTheOwnersAgree)
 - **Row 1 — a job's answer, on Today.** A job row in "Jobs I can do" (paid
   `chores` lane only; `tdJobsToday`) carries `data-td-chore` and asks in place:
   `tdClaimJob` → `openChoreClaimPrompt` → `mrSetClaim`. The family-chores chip
@@ -1493,14 +1493,14 @@ C3): `ckWriteRoutineItem` / `ckWriteAllRoutines`
   "＋ I did something else on Tue" through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
   `mrSetClaim` — the owner the retired chore tab's `ckPickElse` used. A claim on that
   day and nothing else. Closed again by `goToday()`. This closes the C1 gap
-  noted in `docs/chore-relocation-map.md` row 2. (checked by smoke: todayAnswersAJobInPlace, somethingElseWorksForAnyOpenDay, somethingElseOnAFullyAnsweredEarlierDay, catchUpListsOnlyUnansweredDaysOfOpenWeeks, routinesTickFromToday, ownThingsFromToday, attitudeAfterTraining, answeredGradesClearFromToday, learningFromThePortal, parentAnswersForHerFromThePortal, bothPlacesAgree, todayHandsOffRatherThanActing)
+  noted in `docs/chore-relocation-map.md` row 2. (checked by smoke: todayAnswersAJobInPlace, somethingElseWorksForAnyOpenDay, somethingElseOnAFullyAnsweredEarlierDay, catchUpListsOnlyUnansweredDaysOfOpenWeeks, routinesTickFromToday, ownThingsFromToday, attitudeAfterTraining, answeredGradesClearFromToday, learningFromThePortal, parentAnswersForHerFromThePortal, todayAndTheOwnersAgree, todayHandsOffRatherThanActing)
 - View state (open catch-up day, open picker, open routine, the ✨ list) is in
   memory only; `goToday()` starts it closed.
 Held by `todayAnswersAJobInPlace`, `somethingElseWorksForAnyOpenDay`,
 `somethingElseOnAFullyAnsweredEarlierDay` (C1b),
 `catchUpListsOnlyUnansweredDaysOfOpenWeeks`, `routinesTickFromToday`,
 `ownThingsFromToday`, `attitudeAfterTraining`, `answeredGradesClearFromToday`,
-`learningFromThePortal`, `parentAnswersForHerFromThePortal`, `bothPlacesAgree`
+`learningFromThePortal`, `parentAnswersForHerFromThePortal`, `todayAndTheOwnersAgree`
 and the rewritten `todayHandsOffRatherThanActing` (it asserted the hand-off; it
 now asserts that answering in place writes the claim and leaves grades, pay and
 cash untouched, and that the money card and plan button still navigate). All

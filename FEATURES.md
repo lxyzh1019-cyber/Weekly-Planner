@@ -12,7 +12,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - The reflect sheet takes its day: How was today?, How was yesterday? or How was Tuesday?, and writes only that day's mood — Proof: todayAsksHowTodayWent
 - Today has no Vibe card; its fold reads To-dos and goals — Proof: todayIsWhereTheDayGetsDone
 - The ribbon's now-marker stays inside the strip at its first and last minute — Proof: aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon
-- Jobs I can do: a paid chore row on Today asks On time, Late or Had to redo it in place and then reads waiting — Proof: todayAnswersAJobInPlace, bothPlacesAgree, todayHandsOffRatherThanActing
+- Jobs I can do: a paid chore row on Today asks On time, Late or Had to redo it in place and then reads waiting — Proof: todayAnswersAJobInPlace, todayAndTheOwnersAgree, todayHandsOffRatherThanActing
 - ＋ I did something else today (or on an open catch-up day) files a claim — Proof: somethingElseWorksForAnyOpenDay
 - Routines card: each routine opens to its items, shows done/total and an all done button — Proof: routinesTickFromToday
 - Own things · helping out card cycles none, done, nobody asked (XP) — Proof: ownThingsFromToday
@@ -26,7 +26,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - 📦 Open loops card lists unreleased boxed items; hidden when empty — Proof: openLoopsOnToday
 - The Undo toast sits under the reflect sheet: with the toast up, every mood dot on the sheet is still hit at 44px — Proof: reflectMoodsAre44pxTargets
 - Today is the front door: what now, what is next, free time, and a money row that agrees with My money — Proof: todayIsTheFrontDoor, todayAnswersWhatNow, todayLeadsWithWhatIsNext, todayNamesFreeTime, todayMoneyRowMatchesMyMoney
-- Today's chore counts agree with the owners every other place reads (the Chores screen it was compared with is retired), and the reflection is her answer — Proof: TODO-RENAME(todayAgreesWithTheChoreScreen), theReflectionIsHerAnswer
+- Today's chore counts agree with the owners every other place reads (the Chores screen it was compared with is retired), and the reflection is her answer — Proof: todayAgreesWithTheChoreScreen, theReflectionIsHerAnswer
 - Today looks as in the reference picture, iPad Pop — Proof: picture tests/reference/today-jenn-ipad-pop.png
 
 ## Week
@@ -99,7 +99,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 ## Chores (screen retired 2026-10-08)
 
 - Intentionally removed (owner OK 2026-10-08, all 19 rows of docs/chore-relocation-map.md): the Chores screen, its kid and parent tabs, the week grid's claim cells, its My money door, the chore-group editor and its reference pictures. Each part lives on in the home below — Proof: docs/chore-relocation-map.md
-- Answer how a job went (row 1) → Today, in place — Proof: todayAnswersAJobInPlace, TODO-RENAME(bothPlacesAgree)
+- Answer how a job went (row 1) → Today, in place — Proof: todayAnswersAJobInPlace, todayAndTheOwnersAgree, gradedJobIsClosedToHerOnToday
 - ＋ I did something else (row 2) → Today and 🕓 Catch up — Proof: somethingElseWorksForAnyOpenDay
 - Routine items and all done (row 3) → Today — Proof: routinesTickFromToday, routinesCloseInOneTap
 - Own things, training rating, answered grades seen (rows 4–6) → Today — Proof: ownThingsFromToday, attitudeAfterTraining, kidSeesWaitingAndAnswered, answeredGradesClearFromToday
@@ -110,7 +110,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - Pre-system weeks' board (row 15) → Parent › History, read-only — Proof: preSystemWeekReadableInHistory
 - Chore readers are week-parameterised and shared; no new writer of money, claims or XP — Proof: weekChoreReportOnWeek
 - Grading from the parent queue clears it; grading past the free two pays — Proof: gradeFromQueueClearsIt, gradingPastTheFreeTwoPays
-- Sister Sync opens on today (the chore tab half of this check went with the screen) — Proof: TODO-RENAME(choreTabAndSisterSyncOpenOnToday)
+- Sister Sync opens on today (the chore tab half of this check went with the screen) — Proof: sisterSyncOpensOnToday
 
 ## My money
 
