@@ -23,6 +23,8 @@ Single working record for this repository. Updated by the main session at the en
 - [agreed] [in v7] Night check 2026-10-08: anything reachable only on Chores and not in the relocation map is kept and asked about in the morning — search: not in the relocation map
 - [agreed] [in v7] Night check 2026-10-08: Plan v7 is shown in the morning (build-number hiding in Stage 36; Stage 38 wording "in parts" fixed) — search: Plan v7 in the morning
 - [agreed] [in v7] Night check 2026-10-08: the header pictures page for Stage 17 is made overnight — search: header pictures page overnight
+- [agreed] Owner 2026-10-09 (yes to micro-plan): the measurement check asserts the header bottom line is solid navy, set to 2.5px, drawn 2px at device pixel ratio 1 and 2.5px at ratio 2, on every header at 1194 and 390, Pop and Calm — search: bottom line solid navy
+- [agreed] Owner 2026-10-09: page answers — Money school 13px at 360 kept; "◀ Today" kept when she came from Today; meeting steps centred and 🔊 kept; emoji differ only because each device draws its own — search: page answers
 - [agreed] Owner 2026-10-09 ("all as your recommended"): phone Week preview keeps ◀ week ▶ as in Full with one 📋 button back to Full; Print moves to the top of the preview page — search: one 📋 button back to Full
 - [agreed] Owner 2026-10-09: on narrow phones a size shrinks only as much as each width needs (stepped by width, not one size up to the limit) — search: only as much as each width needs
 - [agreed] Owner 2026-10-09: the phone meeting keeps 4px gaps and the Sound button — search: keeps 4px gaps
