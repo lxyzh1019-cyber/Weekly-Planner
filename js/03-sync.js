@@ -695,7 +695,6 @@ function refreshCurrentScreen() {
   else if (active.id === 'screen-day') {
     if (!(typeof blockDragActive === 'function' && blockDragActive())) buildTimeline();
   }
-  else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();
   else if (active.id === 'screen-parent') renderParentHome();
   else if (active.id === 'screen-mymoney' && typeof mnyRenderMyMoney === 'function') mnyRenderMyMoney();

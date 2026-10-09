@@ -969,10 +969,6 @@ function mrGradedAt(kid, weekKey, dayIdx, choreId) {
 function mrWaitingCount(kid, weekKey) {
   return mrClaimQueue(weekKey, kid).length;
 }
-function mrFirstWaitingDay(kid, weekKey) {
-  const q = mrClaimQueue(weekKey, kid);
-  return q.length ? q[0].dayIdx : null;
-}
 function mrLastGradeSeen(kid) {
   const pr = getProfData(kid).progress || {};
   return Number(pr.lastGradeSeen) || 0;

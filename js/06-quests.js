@@ -429,10 +429,7 @@ function claimChoresFromBlock(blk, dayKey, kid) {
   pending.reduce(
     (chain, t) => chain.then(() => openChoreClaimPrompt(kid, wk, dayIdx, t.choreId, t.label)),
     Promise.resolve()
-  ).then(() => {
-    const active = document.querySelector('.screen.active');
-    if (active && active.id === 'screen-chore') renderChoreTab();
-  });
+  );
 }
 
 /* A PARENT confirming a chore block is the grading act, not a claim — she is
@@ -662,7 +659,6 @@ function refreshAfterCompletion() {
   if (active.id === 'screen-week') renderWeek();
   else if (active.id === 'screen-day') buildTimeline();
   else if (active.id === 'screen-today') tdRenderToday();
-  else if (active.id === 'screen-chore' && typeof renderChoreTab === 'function') renderChoreTab();
 }
 
 function showQuestCompletePopup(act, result) {
@@ -689,8 +685,7 @@ function showQuestCompletePopup(act, result) {
 }
 
 /* Defaults to Today now that the Quest Board is gone — it is where a quest gets
-   ticked, so it is where the sparkles belong. Callers that name their own host
-   (the chore screen does) are unaffected. */
+   ticked, so it is where the sparkles belong. */
 function spawnQuestSparkles(hostId = 'screen-today') {
   const sparkles = ['✨','⭐','💫','🌟'];
   const host = document.getElementById(hostId) || document.getElementById('screen-today');
@@ -762,12 +757,4 @@ async function pickProfileFromSwitcher(p) {
   await selectProfile(p);
 }
 function goWeek()    { selectedActivity=null; showScreen('week'); renderWeek(); }
-function openChoreTab() {
-  selectedActivity = null;
-  ctSetCurrentWeekFromPlanner();  // Sync with current weekOffset
-  // Today, resolved the one way the rest of the chore tab resolves a day.
-  ctDay = ctTodayIndex();
-  showScreen('chore');
-  renderChoreTab();
-}
 

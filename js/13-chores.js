@@ -12,7 +12,6 @@ const CT_PROFILE_ICON = { jenn:'🐥', jess:'🦊' };
 let ctWeekKey = null;  // "YYYY-MM-DD" Monday of current chore week (synced with weekOffset)
 let ctDay = 0;
 let ctParentKid = 'jenn';
-let ctEditingGroupId = null;  // group id being edited in the money-group sheet, null = creating new
 
 function ctMondayOf(date) {
   const d = new Date(date);
@@ -72,46 +71,6 @@ function ctPickableChoreNames() {
   const hidden = new Set(c.hiddenChores || []);
   const set = new Set([...CT_CHORES, ...(c.customChores || [])]);
   return [...set].filter(n => !hidden.has(n));
-}
-function ctAddChore(name) {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  const trimmed = (name || '').trim();
-  if (!trimmed) return false;
-  // un-hide if it was hidden; add to custom if genuinely new
-  c.hiddenChores = (c.hiddenChores || []).filter(n => n !== trimmed);
-  const known = new Set([...CT_CHORES, ...(c.customChores || [])]);
-  if (!known.has(trimmed)) c.customChores.push(trimmed);
-  saveAll();
-  return true;
-}
-function ctRemoveChore(name) {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  // Custom names are removed outright; base names are hidden (data keyed by
-  // name in past weeks/groups stays intact).
-  if ((c.customChores || []).includes(name)) {
-    c.customChores = c.customChores.filter(n => n !== name);
-  }
-  if (CT_CHORES.includes(name) && !(c.hiddenChores || []).includes(name)) {
-    c.hiddenChores.push(name);
-  }
-  saveAll();
-}
-function ctRenameChore(oldName, newName) {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  const nn = (newName || '').trim();
-  if (!nn || nn === oldName) return;
-  // Only custom chores can be renamed in place; base names are added-as-new.
-  if ((c.customChores || []).includes(oldName)) {
-    c.customChores = c.customChores.map(n => n === oldName ? nn : n);
-    // repoint any group references
-    (c.groups || []).forEach(g => { g.choreIds = (g.choreIds || []).map(id => id === oldName ? nn : id); });
-  } else {
-    ctAddChore(nn);
-  }
-  saveAll();
 }
 function ctEnsureProfile(p) {
   if (!p.chore) p.chore = {};
@@ -193,10 +152,6 @@ function ctGoalLabel(goal) {
   if (g.money != null) bits.push(`$${Number(g.money).toFixed(2)}`);
   return bits.join(' · ');
 }
-function ctGoalPoints(goal) {
-  const g = ctNormalizeGoal(goal);
-  return g && g.points != null ? g.points : null;
-}
 function ctGetWeekGoals(weekKey) {
   ctEnsureShared();
   const g = state.shared.chore.goalsByWeek[weekKey] || {};
@@ -223,7 +178,6 @@ function ctSetGoalBonus(weekKey, kid, val) {
 /* ── Chore-group helpers (priced pocket-money model) ── */
 function ctGroups() { ctEnsureShared(); return state.shared.chore.groups; }
 function ctGroupsForKid(kid) { return ctGroups().filter(g => g.kid === kid || g.kid === 'both'); }
-function ctGroupById(gid) { return ctGroups().find(g => g.id === gid) || null; }
 function ctAllChoreNames() {
   // Full union for validation: base + parent-custom + any names introduced by
   // groups (includes hidden names so existing tagged blocks still resolve).
@@ -433,42 +387,11 @@ function ctSweepGroupPayouts(weekKey, kid) {
   for (let d = 0; d < 7; d++) any = any.concat(ctCheckGroupPayouts(weekKey, d, kid));
   return any;
 }
-// Shared toast + celebration for freshly-fired group payouts.
-function ctCelebrateGroupPayouts(fired, hostId) {
-  if (!fired || !fired.length) return;
-  const total = fired.reduce((s,g)=>s + (Number(g.valueDollars)||0), 0);
-  const label = fired.length === 1 ? `${fired[0].icon || ''} ${fired[0].name}`.trim() : `${fired.length} groups`;
-  // Under the rulebook model routines are tracked but pay nothing, so the
-  // group value must not be announced as money — ctWeekMoney ignores it, and
-  // promising a kid $2 she never receives is worse than saying nothing.
-  showToast(true
-    ? `✅ ${label} complete!`
-    : `💰 ${label} complete! +$${total.toFixed(2)}`);
-  if (typeof spawnQuestSparkles === 'function') spawnQuestSparkles(hostId || 'screen-chore');
-}
 function ctSetCurrentWeekFromPlanner() {
   ctWeekKey = dateToLocalKey(getWeekStart(weekOffset));
 }
 function ctWeekKeyForDate(dayKey) {
   return ctDateToKey(ctMondayOf(formatDayKey(dayKey)));
-}
-function ctToggleMandatory(session, kid) {
-  const isAuto = ctGetMandatoryAuto(ctWeekKey, ctDay, session, kid);
-  if (isAuto && !isParent()) return;
-  const prev = ctGetMandatory(ctWeekKey, ctDay, session, kid);
-  ctSetMandatory(ctWeekKey, ctDay, session, kid, !prev);
-  ctMaybeFireGoalBonus(ctWeekKey, kid);
-  saveAll();
-  renderChoreTab();
-}
-function ctToggleOptional(choreName, kid) {
-  const prev = ctGetOptional(ctWeekKey, ctDay, kid, choreName);
-  ctSetOptional(ctWeekKey, ctDay, kid, choreName, !prev);
-  const fired = !prev ? ctCheckGroupPayouts(ctWeekKey, ctDay, kid) : [];
-  ctMaybeFireGoalBonus(ctWeekKey, kid);
-  saveAll();
-  renderChoreTab();
-  ctCelebrateGroupPayouts(fired, 'screen-chore');
 }
 async function ctClearWeek() {
   const info = ctWeekInfo();
@@ -491,7 +414,6 @@ async function ctClearWeek() {
   delete state.shared.chore.moneySnapshots[ctWeekKey];  // safe-delete: stamped below
   ctStampWeekState(ctWeekKey);
   saveAll();
-  renderChoreTab();
 }
 function ctExportBackup() {
   ctEnsureShared();
@@ -524,19 +446,6 @@ function ctExportBackup() {
   URL.revokeObjectURL(link.href);
   showToast('Chore backup exported ✅');
 }
-// Delegated click handler for the chore tab (#choreWrap). Names travel only via
-// data-attributes, so no user text is ever interpolated into inline handlers.
-/* Grade a household chore for the day being viewed, then re-render so the
-   day/week totals and the free-chore counter update together. */
-function ctGradeChore(choreId, grade) {
-  const kid = isParent() ? ctParentKid : activeProfile();
-  if (mrSetChoreGrade(kid, ctWeekKey, ctDay, choreId, grade)) renderChoreTab();
-}
-function ctCyclePersonalChore(choreId) {
-  const kid = isParent() ? ctParentKid : activeProfile();
-  ctCyclePersonalFor(kid, ctWeekKey, ctDay, choreId);
-  renderChoreTab();
-}
 /* The caller path for a named kid, week and day — Today's Own things card and
    the portal's on-her-behalf card cycle through it (R5 §5 C1), so the words and
    the one writer (mrCyclePersonal) are the chore tab's own. */
@@ -545,26 +454,14 @@ function ctCyclePersonalFor(kid, weekKey, dayIdx, choreId) {
   if (next === 'unasked') showToast('⭐ Done without being asked — that earns XP');
   return next;
 }
+// The ct-actions the parent portal's chore panel forwards (cpHandleCtClick,
+// js/27-chore-parent.js). Names travel only via data-attributes, so no user
+// text is ever interpolated into inline handlers.
 function ctHandleWrapClick(e) {
   const el = e.target.closest('[data-ct-action]');
   if (!el || el.disabled) return;
   const a = el.dataset.ctAction;
-  if (a === 'toggle-mandatory') ctToggleMandatory(el.dataset.session, el.dataset.kid);
-  else if (a === 'toggle-optional') ctToggleOptional(el.dataset.chore, el.dataset.kid);
-  else if (a === 'matrix-mandatory') ctMatrixToggleMandatory(+el.dataset.day, el.dataset.session, el.dataset.kid);
-  else if (a === 'matrix-optional') ctMatrixToggleOptional(+el.dataset.day, el.dataset.chore, el.dataset.kid);
-  else if (a === 'edit-group') ctOpenGroupEditor(el.dataset.groupId);
-  else if (a === 'delete-group') ctDeleteGroup(el.dataset.groupId);
-  else if (a === 'new-group') ctOpenGroupEditor(null);
-  else if (a === 'add-chore') ctPromptAddChore();
-  else if (a === 'rename-chore') ctPromptRenameChore(el.dataset.chore);
-  else if (a === 'remove-chore') ctPromptRemoveChore(el.dataset.chore);
-  else if (a === 'grade-chore') ctGradeChore(el.dataset.choreId, +el.dataset.grade);
-  else if (a === 'cycle-personal') ctCyclePersonalChore(el.dataset.choreId);
-  else if (a === 'learn-plus') ctBumpLearning(el.dataset.itemId, +1);
-  else if (a === 'learn-minus') ctBumpLearning(el.dataset.itemId, -1);
-  else if (a === 'sunday-check') ctRunSundayCheck();
-  else if (a === 'toggle-sick') ctToggleSickDay(+el.dataset.day);
+  if (a === 'sunday-check') ctRunSundayCheck();
   /* The Record sheet (js/41-record.js) replaced ctPromptCompetition's chain of
      eleven sequential prompts. Same writer, one screen, and the answers stay
      visible while they are given. */
@@ -573,34 +470,11 @@ function ctHandleWrapClick(e) {
   else if (a === 'del-comp')  { ctRemoveCompetition(el.dataset.compId); }
   else if (a === 'box-item') ctPromptBoxItem();
   else if (a === 'release-box') ctReleaseBox(el.dataset.boxId);
-  else if (a === 'add-fine') ctPromptFine();
-  else if (a === 'del-fine') ctRemoveFineById(el.dataset.fineId);
   else if (a === 'honesty') ctPromptHonesty();
-  // ── kid tab (js/26-chore-kid.js) ──
-  else if (a === 'ck-view') ckSetView(el.dataset.view);
-  else if (a === 'ck-day') ckSelectDay(+el.dataset.day);
-  else if (a === 'ck-week') ctChangeWeek(+el.dataset.delta);
-  else if (a === 'ck-history') ckToggleHistory();
-  else if (a === 'ck-privs') ckTogglePrivs();
-  else if (a === 'ck-history-pick') ckPickWeek(el.dataset.week);
-  else if (a === 'ck-chore-row') ckTapChoreRow(el.dataset.choreId);
-  else if (a === 'ck-claim') ckClaim(el.dataset.choreId, +el.dataset.quality);
-  else if (a === 'ck-week-cell') ckCycleWeekClaim(el.dataset.choreId, +el.dataset.day);
-  else if (a === 'ck-routine-item') ckToggleRoutineItem(el.dataset.blockId, el.dataset.itemId);
-  else if (a === 'ck-routine-all') ckCloseRoutine(el.dataset.blockId);
-  else if (a === 'ck-routine-all-day') ckCloseAllRoutines();
-  else if (a === 'ck-attitude') ckRateSelf(+el.dataset.day, +el.dataset.n);
-  else if (a === 'ck-waiting') ckGoWaiting();
-  else if (a === 'ck-fresh') ckGoFresh();
-  else if (a === 'ck-else') ckToggleElse();
-  else if (a === 'ck-else-pick') ckPickElse(el.dataset.choreId);
 }
 
 function ctActiveKid() { return isParent() ? ctParentKid : activeProfile(); }
 
-function ctBumpLearning(itemId, delta) {
-  if (ctBumpLearningFor(ctActiveKid(), ctWeekKey, ctDay, itemId, delta)) renderChoreTab();
-}
 /* Parent-only, for a named kid, week and day — Parent › Now logs learning
    through this (R5 §5 C1). mrSetLearning stays the one writer. */
 function ctBumpLearningFor(kid, weekKey, dayIdx, itemId, delta) {
@@ -608,10 +482,6 @@ function ctBumpLearningFor(kid, weekKey, dayIdx, itemId, delta) {
   const cur = mrGetLearning(kid, weekKey, dayIdx, itemId);
   mrSetLearning(kid, weekKey, dayIdx, itemId, Math.max(0, cur + delta));
   return true;
-}
-function ctToggleSickDay(dayIdx) {
-  mrToggleSick(ctActiveKid(), ctWeekKey, dayIdx);
-  renderChoreTab();
 }
 /* Sunday check: pick N logged items at random and ask. Anything she can't
    answer for is voided — the units stop paying and get re-queued. */
@@ -633,11 +503,11 @@ async function ctRunSundayCheck() {
       { okLabel: 'Yes, she knows it', danger: false });
     if (!ok) { mrVoidLearning(kid, ctWeekKey, p.d, p.it.id); voided++; }
   }
-  renderChoreTab();
+  cpRenderChoreTab();
   showToast(voided ? `🔍 ${voided} voided — unpaid and to do again` : '🔍 All checked — all paid');
 }
 
-function ctRemoveCompetition(id) { mrDeleteCompetition(ctActiveKid(), id); renderChoreTab(); }
+function ctRemoveCompetition(id) { mrDeleteCompetition(ctActiveKid(), id); cpRenderChoreTab(); }
 
 async function ctPromptBoxItem() {
   if (!isParent()) return;
@@ -657,7 +527,7 @@ async function ctPromptBoxItem() {
     if (!go) return;
   }
   const e = mrBoxItem(ctActiveKid(), label, ctWeekKey);
-  renderChoreTab();
+  cpRenderChoreTab();
   if (e) showToast(e.repeat ? `📦 Boxed again this week — that's also −$1` : '📦 Boxed until Sunday');
 }
 /* Early release costs one unpaid job, chosen by Mom. The job is named first,
@@ -670,7 +540,7 @@ async function ctReleaseBox(id) {
   const b = mrBoxItems(kid).find(x => x.id === id);
   if (!b) return;
   const cfg = mrBoxCfg(mrRulesForWeek(ctWeekKey));
-  if (!cfg.redemptionJob) { mrReleaseBoxItem(kid, id); renderChoreTab(); return; }
+  if (!cfg.redemptionJob) { mrReleaseBoxItem(kid, id); cpRenderChoreTab(); return; }
 
   const job = ((await showPrompt(
     `Early release: ${b.label}\nWhich unpaid job did she do to earn it back?`,
@@ -682,24 +552,10 @@ async function ctReleaseBox(id) {
     { okLabel: 'Give it back' });
   if (!ok) return;
   mrReleaseBoxItem(kid, id, { job });
-  renderChoreTab();
+  cpRenderChoreTab();
   showToast(`📦 Released early — ${job}`);
 }
 
-async function ctPromptFine() {
-  if (!isParent()) return;
-  const r = mrRulesForWeek(ctWeekKey);
-  const items = (r.fines || {}).items || [];
-  const list = items.map((f, i) => `${i + 1}. ${f.label}`).join('\n');
-  const pick = await showPrompt(`Which one?\n${list}`, { value: '1', type: 'number' });
-  if (pick == null) return;
-  const item = items[(parseInt(pick, 10) || 1) - 1];
-  if (!item) return;
-  mrAddFine(ctActiveKid(), item.id, ctWeekInfo().keys[ctDay]);
-  renderChoreTab();
-  showToast(`−$${Number(item.amount).toFixed(2)} · ${item.label}`);
-}
-function ctRemoveFineById(id) { mrRemoveFine(ctActiveKid(), id); renderChoreTab(); }
 
 async function ctPromptHonesty() {
   if (!isParent()) return;
@@ -707,54 +563,12 @@ async function ctPromptHonesty() {
   const ch = ((await showPrompt('Which claim? chores / learning / competition', { value: 'chores' })) || '').trim().toLowerCase();
   if (!['chores', 'learning', 'competition'].includes(ch)) { showToast('Pick chores, learning or competition'); return; }
   const e = mrRecordHonesty(kid, ch);
-  renderChoreTab();
+  cpRenderChoreTab();
   if (!e) return;
   const msg = e.step === 1 ? 'Claim void. Recorded — talk about it Sunday.'
     : e.step === 2 ? `Claim void. ${ch} pays nothing this week.`
     : 'Claim void. Loses free-chore pick and loan-surplus choice — back next week.';
   showToast(`⚖️ Step ${e.step} this week — ${msg}`);
-}
-async function ctPromptAddChore() {
-  const name = ((await showPrompt('New chore name:', { value:'' })) || '').trim();
-  if (!name) return;
-  if (ctAddChore(name)) { showToast(`Added "${name}" 🧽`); renderChoreTab(); }
-}
-async function ctPromptRenameChore(oldName) {
-  const nn = ((await showPrompt('Rename chore:', { value:oldName })) || '').trim();
-  if (!nn || nn === oldName) return;
-  const isCustom = (state.shared.chore.customChores || []).includes(oldName);
-  ctRenameChore(oldName, nn);
-  showToast(isCustom ? `Renamed to "${nn}"` : `Added "${nn}" (base chores keep their name)`);
-  renderChoreTab();
-}
-async function ctPromptRemoveChore(name) {
-  const isCustom = (state.shared.chore.customChores || []).includes(name);
-  if (!(await showConfirm(isCustom ? `Remove "${name}"?` : `Hide "${name}" from the pickable list? (Past weeks keep their data.)`, { danger:true, okLabel:isCustom?'Remove':'Hide' }))) return;
-  ctRemoveChore(name);
-  showToast(isCustom ? `Removed "${name}"` : `Hid "${name}"`);
-  renderChoreTab();
-}
-/* ════════════════════════════════════════════════════════════════
-   1a — KID WEEK MATRIX: one tap-to-toggle grid for the whole week
-════════════════════════════════════════════════════════════════ */
-// Toggle a matrix cell on an explicit day (the per-day handlers above use the
-// selected ctDay; the matrix needs any day).
-function ctMatrixToggleMandatory(dayIdx, session, kid) {
-  if (ctGetMandatoryAuto(ctWeekKey, dayIdx, session, kid) && !isParent()) return;
-  const prev = ctGetMandatory(ctWeekKey, dayIdx, session, kid);
-  ctSetMandatory(ctWeekKey, dayIdx, session, kid, !prev);
-  ctMaybeFireGoalBonus(ctWeekKey, kid);
-  saveAll();
-  renderChoreTab();
-}
-function ctMatrixToggleOptional(dayIdx, choreName, kid) {
-  const prev = ctGetOptional(ctWeekKey, dayIdx, kid, choreName);
-  ctSetOptional(ctWeekKey, dayIdx, kid, choreName, !prev);
-  const fired = !prev ? ctCheckGroupPayouts(ctWeekKey, dayIdx, kid) : [];
-  ctMaybeFireGoalBonus(ctWeekKey, kid);
-  saveAll();
-  renderChoreTab();
-  ctCelebrateGroupPayouts(fired, 'screen-chore');
 }
 
 // Row icons so every routine/chore reads at a glance (1a/1b mock).
@@ -797,172 +611,10 @@ function ctMatrixCellChecked(kid, dayIdx, row, weekKey = ctWeekKey) {
     ? ctGetMandatory(weekKey, dayIdx, row.key, kid)
     : ctGetOptional(weekKey, dayIdx, kid, row.key);
 }
-function ctMatrixCellAuto(kid, dayIdx, row) {
-  return row.kind === 'mandatory' && ctGetMandatoryAuto(ctWeekKey, dayIdx, row.key, kid);
-}
 
-function ctRenderWeekMatrix(kid) {
-  const rows = ctMatrixRows(kid);
-  const info = ctWeekInfo();
-  const todayD = formatDayKey(todayKey());
-  // Day status per column: 'past' | 'today' | 'future'
-  const dayStatus = [];
-  let todayCol = -1;
-  for (let d = 0; d < 7; d++) {
-    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
-    const cmp = Math.round((date - todayD) / (24*60*60*1000));
-    if (cmp < 0) dayStatus.push('past');
-    else if (cmp === 0) { dayStatus.push('today'); todayCol = d; }
-    else dayStatus.push('future');
-  }
-
-  const icon = CT_PROFILE_ICON[kid];
-  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
-
-  // Kid pills (parent may switch which kid they're viewing; a kid sees their own).
-  const pill = (k) => {
-    const active = k === kid;
-    const canSwitch = isParent();
-    const attrs = canSwitch ? `onclick="ctParentKid='${k}';renderChoreTab()"` : (active ? '' : 'disabled');
-    return `<button type="button" class="cm-pill ${active?'active':''}" ${attrs}>${CT_PROFILE_ICON[k]} ${k==='jenn'?'Jenn':'Jess'}</button>`;
-  };
-
-  // Money status chip from the primary chore group.
-  const groups = ctGroupsForKid(kid).filter(g => g.cadence !== 'daily');
-  let chip = '';
-  if (groups.length) {
-    const g = groups[0];
-    const ids = g.choreIds || []; const m = ids.length;
-    const n = ids.filter(cn => [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn))).length;
-    const fired = ctGroupFiredWeekly(ctWeekKey, g.id, kid);
-    const val = (Number(g.valueDollars)||0).toFixed(2);
-    chip = fired ? `$${val} earned · confirm at meeting` : `${n}/${m} chores → $${val} when all done`;
-  } else {
-    chip = 'No chore groups yet';
-  }
-
-  // Header row.
-  let cells = '';
-  cells += `<div class="cm-corner"></div>`;
-  for (let d = 0; d < 7; d++) {
-    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
-    cells += `<div class="cm-dayhead ${dayStatus[d]==='today'?'cm-today':''}">${DAY_SHORT[d]}<small>${date.getDate()}</small></div>`;
-  }
-  cells += `<div class="cm-wkhead">wk</div>`;
-
-  /* Which routines each day actually asked for — one pass, read by the cells,
-     the row totals and the progress bar below. */
-  const cmSessionsByDay = routineSessionsByDay(kid, ctWeekKey);
-
-  // Section + data rows.
-  let lastSection = null;
-  rows.forEach(row => {
-    if (row.section !== lastSection) {
-      cells += `<div class="cm-section">${escapeHtml(row.section)}</div>`;
-      lastSection = row.section;
-    }
-    cells += `<div class="cm-rowlabel" title="${escapeAttr(row.label)}"><span class="cm-rowicon">${row.icon||''}</span>${escapeHtml(row.label)}</div>`;
-    let weekN = 0, weekAsked = 0;
-    for (let d = 0; d < 7; d++) {
-      const on = ctMatrixCellChecked(kid, d, row);
-      if (on) weekN++;
-      const auto = ctMatrixCellAuto(kid, d, row);
-      // Read-only for kids: they can view here but tick completion in their Day /
-      // Week view (which syncs back). Only parents toggle cells directly.
-      const readOnly = !isParent();
-      const disabled = readOnly || (auto && !isParent());
-      const st = dayStatus[d];
-      /* Still tappable — this is the form, and a parent recording a routine
-         that happened on an unplanned day is the whole reason the row stays.
-         Just quieter, and it says so, so the row total below reads honestly. */
-      const unplanned = row.kind === 'mandatory' && !cmSessionsByDay[d].includes(row.key);
-      if (!unplanned) weekAsked++;
-      const glyph = on ? '✓' : (st === 'future' ? '' : '·');
-      const dataAttrs = row.kind === 'mandatory'
-        ? `data-ct-action="matrix-mandatory" data-session="${escapeAttr(row.key)}"`
-        : `data-ct-action="matrix-optional" data-chore="${escapeAttr(row.key)}"`;
-      cells += `<button type="button" class="cm-cell ${on?'on':''} cm-${st}${unplanned?' cm-unplanned':''}${readOnly?' cm-readonly':(disabled?' cm-disabled':'')}"`
-        + ` role="checkbox" aria-checked="${on}"`
-        + ` title="${unplanned ? escapeAttr('Not planned this day') : ''}"`
-        + ` aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}${unplanned ? ', not planned this day' : ''}"`
-        + ` ${dataAttrs} data-day="${d}" data-kid="${kid}"${disabled ? ' disabled' : ''}>${glyph}</button>`;
-    }
-    /* Out of the days that asked, not out of seven. A weekday-only routine read
-       5/7 forever and looked like failure when it was kept every day it was
-       wanted. A chore row asks every day, so its denominator is still seven. */
-    cells += `<div class="cm-rowtotal">${weekN}/${weekAsked || 7}</div>`;
-  });
-
-  /* Bottom row: per-day mini progress bars (% of that day's items done).
-     The denominator is THAT DAY's items, not the whole matrix: a Saturday asks
-     two routines, so counting it out of three read as 33% for a day she kept
-     everything she was asked to. */
-  const rowsAskedOn = (d) => rows.filter(row =>
-    row.kind !== 'mandatory' || cmSessionsByDay[d].includes(row.key));
-  cells += `<div class="cm-rowlabel cm-progress-label">Progress</div>`;
-  for (let d = 0; d < 7; d++) {
-    if (dayStatus[d] === 'future') { cells += `<div class="cm-bar cm-bar-future">–</div>`; continue; }
-    const mine = rowsAskedOn(d);
-    const totalRows = mine.length || 1;
-    const done = mine.reduce((s,row)=> s + (ctMatrixCellChecked(kid, d, row) ? 1 : 0), 0);
-    const pct = Math.round(done / totalRows * 100);
-    cells += `<div class="cm-bar"><div class="cm-bar-fill" style="height:${pct}%"></div><span class="cm-bar-pct">${pct}%</span></div>`;
-  }
-  cells += `<div class="cm-corner"></div>`;
-
-  // Footer: summary + 8-week sparkline of weekly money.
-  const mandatory = ctMandatoryPoints(ctWeekKey, kid);
-  const allGroupChores = [];
-  ctGroupsForKid(kid).forEach(g => (g.choreIds||[]).forEach(cn => allGroupChores.push(cn)));
-  const choresDone = allGroupChores.filter(cn => [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn))).length;
-
-  const mon0 = ctMondayOf(formatDayKey(ctWeekKey));
-  let spark = '';
-  for (let i = 7; i >= 0; i--) {
-    const d = new Date(mon0); d.setDate(d.getDate() - i*7);
-    const wkKey = ctDateToKey(d);
-    const money = ctWeekMoney(wkKey, kid);
-    const h = Math.max(6, Math.round(money / CT_MONEY_CAP * 100));
-    spark += `<span class="cm-spark-bar ${i===0?'cm-spark-now':''}" style="height:${h}%" title="Week of ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}: $${money.toFixed(2)}"></span>`;
-  }
-
-  return `<div class="chore-card cm-card">
-    <div class="cm-head">
-      <div class="cm-pills">${pill('jenn')}${pill('jess')}</div>
-      <span class="cm-money-chip">${chip}</span>
-    </div>
-    <div class="cm-grid">${cells}</div>
-    <div class="cm-footer">
-      <span class="cm-footer-summary">${icon} ${name} this week: ${mandatory}/21 routines · ${choresDone}/${allGroupChores.length||0} chores</span>
-      <span class="cm-spark" aria-label="Last 8 weeks of pocket money">${spark}</span>
-    </div>
-  </div>`;
-}
-
-
-
-
-
-
-
-/* 💰 The Chores tab's money card is one door now (decision 9): what a week
-   paid and what she has are 💰 My money's to say. Drawn on every week — the
-   old board's grid here, the kid tab's rail under "Earned this week" (js/26). */
-/* 💰 The chore tab's one door to My money (decision 9), under the board on
-   every week, where the pocket-money card stood — the stage 8 drawing: the
-   door and the line saying what is behind it. */
-function ctMoneyDoor(kid) {
-  return `<div class="ct-money-card"><button type="button" class="mv2-door ct-money-door" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money <span class="mv2-chev" aria-hidden="true">▸</span></button>
-    <span class="ct-money-sub">what I earned, my loan wall, what I own</span></div>`;
-}
-function ctRenderMoneyCard(kid) {
-  return `<div class="chore-card--full">${ctMoneyDoor(kid)}</div>`;
-}
 /* ── A week from before the chore pool, read-only (R5 §5 C2, row 15) ──
-   renderChoreTab draws such a week with the old board: ctRenderWeekControls,
-   ctRenderWeekMatrix and ctRenderMoneyCard, where a parent also finds Clear
-   week, Export backup and the goal inputs. Parent › History shows the same week
-   through the same readers — ctGetWeekGoals, ctMatrixRows, ctMatrixCellChecked
+   The Chores screen drew such a week with its old board (retired, PR 2b).
+   Parent › History shows the week through the same readers — ctGetWeekGoals, ctMatrixRows, ctMatrixCellChecked
    and ctWeekMoney — with no control at all: a week that was lived is a record,
    not a form, and clearing or exporting one is App › Backup and data's job. */
 function ctPreSystemBoard(kid, weekKey) {
@@ -1000,182 +652,6 @@ function ctPreSystemBoard(kid, weekKey) {
       ${body}
     </div></div>
   </div>`;
-}
-function ctRenderWeekControls() {
-  const info = ctWeekInfo();
-  const g = ctGetWeekGoals(ctWeekKey);
-  // Interim control: it edits the legacy points goal only. A routine/money goal
-  // set elsewhere shows read-only here and is preserved when this box is left
-  // blank (see ctSaveGoalsFromUi) — the full two-part editor lands with the
-  // parent setup screen.
-  const goalRow = (kid, id, label) => {
-    const pts = ctGoalPoints(g[kid]);
-    if (!isParent()) return g[kid] ? `<div class="ct-meta">${label} goal: ${ctGoalLabel(g[kid])}</div>` : '';
-    if (g[kid] && pts == null) return `<div class="ct-meta">${label} goal: ${ctGoalLabel(g[kid])}</div>`;
-    return `<input id="${id}" class="input" type="number" min="1" max="60" value="${pts != null ? pts : ''}" placeholder="${label} goal" aria-label="${label} weekly point goal"/>`;
-  };
-  const goalRowJenn = goalRow('jenn', 'ctGoalJenn', 'Jenn');
-  const goalRowJess = goalRow('jess', 'ctGoalJess', 'Jess');
-  const parentControls = isParent() ? `
-    <div class="chore-card">
-      <h3>Parent controls</h3>
-      <div class="ct-meta">Week goals and validation controls.</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.4rem">
-        ${goalRowJenn}${goalRowJess}
-      </div>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
-        <button class="pill-btn" onclick="ctSaveGoalsFromUi()">Save goals</button>
-        <button class="pill-btn danger" onclick="ctClearWeek()">Clear week</button>
-        <button class="pill-btn" onclick="ctExportBackup()">Export backup</button>
-      </div>
-      <div style="display:flex;gap:0.4rem;margin-top:0.5rem">
-        <button class="pill-btn ${ctParentKid==='jenn'?'active':''}" onclick="ctParentKid='jenn';renderChoreTab()">Jenn view</button>
-        <button class="pill-btn ${ctParentKid==='jess'?'active':''}" onclick="ctParentKid='jess';renderChoreTab()">Jess view</button>
-      </div>
-    </div>` : (
-    (goalRowJenn || goalRowJess) ? `
-    <div class="chore-card">
-      <h3>Goals</h3>
-      ${goalRowJenn}${goalRowJess}
-    </div>` : '');
-  const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} — ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
-  // Day picker only matters for the parent day-by-day management view; the kid
-  // matrix already shows all 7 days, so the day pills are dropped there.
-  const dayPills = isParent()
-    ? `<div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.5rem">
-        ${CT_DAYS.map((d,i)=>`<button class="pill-btn ${i===ctDay?'active':''}" onclick="ctSelectDay(${i})">${d}</button>`).join('')}
-      </div>` : '';
-  // Kids can view their chores here but tick completion in their Day / Week view
-  // (which syncs back automatically) — this board is read-only for them.
-  const kidNote = !isParent()
-    ? `<div class="ct-meta" style="margin-top:0.5rem;font-style:italic">👀 View only — tick chores &amp; routines done in your <b>Day</b> or <b>Week</b> view and they'll fill in here.</div>`
-    : '';
-  return `<div class="chore-card">
-    <div class="ct-weeknav">
-      <button class="btn-icon" onclick="ctChangeWeek(-1)" aria-label="Previous week">◀</button>
-      <h3 class="ct-weeknav-label">Week of ${escapeHtml(weekLabel)}</h3>
-      <button class="btn-icon" onclick="ctChangeWeek(1)" aria-label="Next week">▶</button>
-    </div>
-    ${dayPills}
-    ${kidNote}
-  </div>${parentControls}`;
-}
-/* Which slot of the chore tab's current week today is — 0 when today is not in
-   it at all, which is the right answer for a week paged away from.
-
-   Read through mrWeekDayKeys, the same list ckRoutineBlocks and every grade
-   lookup index into. openChoreTab worked this out a second way, by subtracting
-   getWeekStart(weekOffset) from today and clamping; the two agreed, but two
-   answers to "which day is showing" is one more than the screen can afford, and
-   ctChangeWeek had a third — it dropped to Monday, so paging a week and coming
-   back left the tab on a day nobody was looking at. One reader now. */
-function ctTodayIndex() {
-  const i = mrWeekDayKeys(ctWeekKey || ctThisWeekKey()).indexOf(todayKey());
-  return i >= 0 ? i : 0;
-}
-function ctChangeWeek(delta) {
-  const mon = formatDayKey(ctWeekKey || ctThisWeekKey());
-  mon.setDate(mon.getDate() + delta * 7);
-  ctWeekKey = ctDateToKey(mon);
-  ctDay = ctTodayIndex();
-  renderChoreTab();
-}
-function ctSelectDay(dayIdx) {
-  ctDay = Math.max(0, Math.min(6, dayIdx));
-  renderChoreTab();
-}
-function ctSaveGoalsFromUi() {
-  const cur = ctGetWeekGoals(ctWeekKey);
-  // A missing input means "not editing this kid" — a routine/money goal renders
-  // as text, so blanking it here must not delete a goal this box cannot express.
-  const read = (id, kid) => {
-    const el = document.getElementById(id);
-    if (!el) return cur[kid];
-    const n = parseInt(el.value || '', 10);
-    return Number.isInteger(n) ? n : null;
-  };
-  const j = read('ctGoalJenn', 'jenn');
-  const k = read('ctGoalJess', 'jess');
-  // ctSetWeekGoals already clears a bonus when its goal is removed. Do NOT blanket-reset
-  // both bonuses — that would strip a bonus a kid already banked when a goal is re-saved.
-  ctSetWeekGoals(ctWeekKey, j, k);
-  ctMaybeFireGoalBonus(ctWeekKey, 'jenn');   // a lowered goal may already be met
-  ctMaybeFireGoalBonus(ctWeekKey, 'jess');
-  saveAll();
-  renderChoreTab();
-}
-/* ── Parent money-group editor (reuses the .sheet overlay pattern) ── */
-function ctRenderChoreEditorList(selectedIds) {
-  const sel = new Set(selectedIds || []);
-  const names = [...new Set([...ctAllChoreNames(), ...sel])];  // include any names already on the group
-  const host = document.getElementById('cgChoreList');
-  if (!host) return;
-  host.innerHTML = names.map(n => `
-    <label class="cg-chore-row">
-      <input type="checkbox" data-chore="${escapeAttr(n)}" ${sel.has(n) ? 'checked' : ''}>
-      <span>${escapeHtml(n)}</span>
-    </label>`).join('');
-}
-function ctOpenGroupEditor(groupId) {
-  if (!isParent()) { showToast('Only parents can edit money groups 🔒'); return; }
-  ctEnsureShared();
-  ctEditingGroupId = groupId || null;
-  const g = groupId ? ctGroupById(groupId) : null;
-  document.getElementById('cgTitle').textContent = g ? '💰 Edit Money Group' : '💰 New Money Group';
-  document.getElementById('cgName').value = g ? g.name : '';
-  document.getElementById('cgIcon').value = g ? (g.icon || '') : '';
-  document.getElementById('cgKid').value = g ? g.kid : 'both';
-  document.getElementById('cgCadence').value = g ? g.cadence : 'weekly';
-  document.getElementById('cgValue').value = g ? g.valueDollars : 1;
-  document.getElementById('cgNewChore').value = '';
-  ctRenderChoreEditorList(g ? g.choreIds : []);
-  openSheet('choreGroupOverlay');
-}
-function ctAddCustomChoreToEditor() {
-  const input = document.getElementById('cgNewChore');
-  const name = (input.value || '').trim();
-  if (!name) return;
-  const existing = [...document.querySelectorAll('#cgChoreList input[data-chore]')].map(el => el.dataset.chore);
-  if (existing.includes(name)) { showToast('That chore is already listed'); input.value = ''; return; }
-  // preserve current checkbox selections, then append the new (checked) chore
-  const selected = existing.filter((_, i) => document.querySelectorAll('#cgChoreList input[data-chore]')[i].checked);
-  ctRenderChoreEditorList([...selected, name]);
-  input.value = '';
-}
-function ctConfirmGroupFromUi() {
-  if (!isParent()) return;
-  const name = (document.getElementById('cgName').value || '').trim();
-  const icon = (document.getElementById('cgIcon').value || '').trim();
-  const kid = document.getElementById('cgKid').value;
-  const cadence = document.getElementById('cgCadence').value === 'daily' ? 'daily' : 'weekly';
-  const valueDollars = parseFloat(document.getElementById('cgValue').value);
-  const choreIds = [...document.querySelectorAll('#cgChoreList input[data-chore]:checked')].map(el => el.dataset.chore);
-  if (!name) { showToast('Give the group a name'); return; }
-  if (!(valueDollars > 0)) { showToast('Set a dollar value above 0'); return; }
-  if (!choreIds.length) { showToast('Pick at least one chore'); return; }
-  ctEnsureShared();
-  if (ctEditingGroupId) {
-    const g = ctGroupById(ctEditingGroupId);
-    // updatedAt lets the sync merge keep the newer edit when two devices touch groups.
-    if (g) { g.name = name; g.icon = icon; g.kid = kid; g.cadence = cadence; g.valueDollars = valueDollars; g.choreIds = choreIds; g.updatedAt = syncNow(); }
-  } else {
-    state.shared.chore.groups.push({ id:'grp-'+Date.now().toString(36), name, icon, kid, choreIds, valueDollars, cadence, updatedAt: syncNow() });
-  }
-  ctEditingGroupId = null;
-  saveAll();
-  closeSheet('choreGroupOverlay');
-  renderChoreTab();   // render sweep fires any payout the edit newly satisfies
-  showToast('Group saved 💰');
-}
-async function ctDeleteGroup(groupId) {
-  if (!isParent()) return;
-  const g = ctGroupById(groupId);
-  if (!g) return;
-  if (!(await showConfirm(`Delete "${g.name}"? Money already earned from it stays.`, { danger:true, okLabel:'Delete' }))) return;
-  state.shared.chore.groups = ctGroups().filter(x => x.id !== groupId);
-  tombstoneIds('grp:', [groupId]); // record the delete so it can't resurrect from another device's copy
-  saveAll();
-  renderChoreTab();
 }
 // Full pocket-money history: every week ever recorded at a family meeting, drawn
 // from finalizedWeeks (the authoritative "paid" ledger — unbounded, unlike the
@@ -1269,7 +745,7 @@ function ctMigrateToGroups() {
   const c = state.shared.chore;
   if (c.groupsMigration?.done) return;
   // Ensure legacy numbered-key weeks are date-keyed BEFORE we snapshot history — this can be
-  // reached from the Quest Board (kids' default landing) before renderChoreTab runs it. Idempotent.
+  // reached from the Quest Board (kids' default landing) before anything else runs it. Idempotent.
   ctMigrateNumberedKeys();
   const migrationWeek = ctThisWeekKey();
 
@@ -1310,38 +786,14 @@ function ctTryMigrateLegacy() {
 // Legacy standalone Chore-Tracker (chore-tracker/family-data) has been retired.
 // Any previously-imported data remains in state.shared.chore; ctTryMigrateLegacy still
 // applies a stored payload once, and ctMigrateNumberedKeys still runs on local data.
-function renderChoreTab() {
-  ctPrepareRead();
-  // ctWeekKey is set once in openChoreTab and preserved across renders (navigation)
-  if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
-  const wrap = document.getElementById('choreWrap');
-  if (!wrap) return;
-  const badge = document.getElementById('choreProfileBadge');
-  if (badge) badge.textContent = profileBadgeText(isParent() ? ctParentKid : activeProfile(), isParent());
-  const kid = isParent() ? ctParentKid : activeProfile();
-  ctMaybeFireGoalBonus(ctWeekKey, 'jenn');
-  ctMaybeFireGoalBonus(ctWeekKey, 'jess');
-  // Silent self-heal: fire payouts satisfied by remote-synced checks or by a group
-  // created/edited after its chores were already ticked.
-  const swept = ctSweepGroupPayouts(ctWeekKey, 'jenn').length + ctSweepGroupPayouts(ctWeekKey, 'jess').length;
+/* The silent self-heal the Chores screen's render ran (it is retired, PR 2b):
+   fire a goal bonus or a group payout that remote-synced checks, or a group
+   created/edited after its chores were ticked, have already satisfied. Today's
+   render runs it now, for this week. Idempotent; saves only when a payout fires. */
+function ctSelfHealWeek(weekKey) {
+  ctMaybeFireGoalBonus(weekKey, 'jenn');
+  ctMaybeFireGoalBonus(weekKey, 'jess');
+  const swept = ctSweepGroupPayouts(weekKey, 'jenn').length + ctSweepGroupPayouts(weekKey, 'jess').length;
   if (swept) saveAll();
-
-  // One screen, one job. The parent's half of the week moved to the portal
-  // (js/27-chore-parent.js), so this is the kid frame for everyone — a parent
-  // opening it is asking "what does she see", which is worth being able to do.
-  //
-  /* Weeks frozen at the ORIGINAL migration have no chore pool to read, so they
-     keep the old board rather than rendering an empty redesign. This used to
-     ask `mrUsesNewModel`, which on a self-seeded clock sent every past week
-     here — no chore rows, nothing to claim. `moneySnapshots` is the honest
-     test: it names the weeks that genuinely predate the chore pool, and it is
-     what `ctWeekMoney` already checks before anything else. */
-  wrap.innerHTML = !ctWeekIsPreSystem(ctWeekKey, kid) ? ckRenderKidTab(kid) : `
-    <div class="chore-grid">
-      ${ctRenderWeekControls()}
-      ${ctRenderWeekMatrix(kid)}
-      ${ctRenderMoneyCard(kid)}
-    </div>
-  `;
 }
 

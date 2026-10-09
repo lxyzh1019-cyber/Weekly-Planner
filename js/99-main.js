@@ -42,12 +42,7 @@ if (document.fonts) {
   document.fonts.addEventListener('loadingdone', wfTypeInvalidate);
   document.fonts.ready.then(wfTypeInvalidate);
 }
-// Chore tab uses event delegation on #choreWrap (survives innerHTML re-renders).
-(function(){
-  const wrap = document.getElementById('choreWrap');
-  if (wrap) wrap.addEventListener('click', ctHandleWrapClick);
-})();
-// Today delegates for the same reason: every render replaces the whole wrap.
+// Today uses event delegation: every render replaces the whole wrap.
 // Bound to the screen rather than #tdWrap, because the panels moved off the day
 // timeline are static siblings of the wrap — one listener has to cover both, and
 // the screen element is the one thing here that is never replaced.

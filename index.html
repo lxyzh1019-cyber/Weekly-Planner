@@ -164,7 +164,7 @@
          place a break. -->
 
     <!-- Collapsed by default and remembered in localStorage — the house
-         disclosure pattern (mnyPricesOpen / ckPrivsOpen / weekGlanceOpen). Never
+         disclosure pattern (mnyPricesOpen / weekGlanceOpen). Never
          synced state: every state write is a full-document upload. Three panels
          under one toggle keeps this screen inside its 200-word budget. -->
     <button type="button" class="td-fold-btn" id="tdExtrasBtn" onclick="tdToggleExtras()"></button>
@@ -385,22 +385,6 @@
       <div id="achievementsList"></div>
     </div>
   </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     SCREEN: CHORE TAB
-════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-chore">
-  <header class="topbar">
-    <div class="topbar-left">
-      <button class="btn-icon" onclick="goWeek()">◀</button>
-      <h2>Weekly Chore 🧹</h2>
-    </div>
-    <div class="topbar-actions">
-      <button class="profile-badge" onclick="openProfileSwitcher()" id="choreProfileBadge" aria-label="Switch profile"></button>
-    </div>
-  </header>
-  <div class="chore-wrap" id="choreWrap"></div>
 </div>
 
 <!-- ═══════════════════ POCKET MONEY ═══════════════════
@@ -1523,40 +1507,6 @@
       <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2" aria-label="Level-up icon (emoji)">
     </div>
     <button class="btn-confirm" onclick="confirmNewRule()">Save Rule ✨</button>
-  </div>
-</div>
-
-<!-- New / Edit Money Group -->
-<div class="overlay" id="choreGroupOverlay" onclick="overlayClick(event,'choreGroupOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cgTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="cgTitle">💰 New Money Group</h3>
-    <div class="custom-builder">
-      <label for="cgName">Group name</label>
-      <input type="text" id="cgName" maxlength="40" placeholder="e.g. Clean Home Crew" aria-label="Group name">
-      <label for="cgIcon">Icon (emoji)</label>
-      <input type="text" id="cgIcon" maxlength="2" placeholder="🧹" aria-label="Group icon (emoji)">
-      <label for="cgKid">Who</label>
-      <select id="cgKid">
-        <option value="both">Both</option>
-        <option value="jenn">Jenn</option>
-        <option value="jess">Jess</option>
-      </select>
-      <label for="cgCadence">Pays</label>
-      <select id="cgCadence">
-        <option value="weekly">Weekly — all chores done sometime this week</option>
-        <option value="daily">Daily — all chores done the same day</option>
-      </select>
-      <label for="cgValue">Value ($)</label>
-      <input type="number" id="cgValue" min="0.25" max="6" step="0.25" value="1" aria-label="Group value in dollars">
-      <label>Chores in this group</label>
-      <div id="cgChoreList"></div>
-      <div style="display:flex;gap:0.4rem;margin-top:0.3rem">
-        <input type="text" id="cgNewChore" placeholder="Add custom chore" maxlength="30" aria-label="Add a custom chore">
-        <button type="button" class="pill-btn" onclick="ctAddCustomChoreToEditor()">Add</button>
-      </div>
-    </div>
-    <button class="btn-confirm" onclick="ctConfirmGroupFromUi()">Save Group ✨</button>
   </div>
 </div>
 
