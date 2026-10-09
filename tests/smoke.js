@@ -27630,6 +27630,14 @@ function findChromium() {
       .map(l => l.split(' | ').map(c => c.replace(/^\| ?| ?\|$/g, '').trim()))
       .map(c => ({ screen: c[0], size: c[1], look: c[2], parts: c[3], bar: c[4], title: c[5], centre: c[6], buttons: c[7], sw: c[8], badge: c[9] }));
     if (!rows.length) problems.push(`no per-screen table in ${tableFile}`);
+    /* The header's authored bottom-rule width, from the stylesheet text (the
+       page's own sheet cannot be read from file://): the .hdr rule's
+       border-bottom, its var(--x) resolved from the custom property's definition. */
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'css', 'app.css'), 'utf8');
+    const hdrBorder = /^\s*\.hdr\s*\{[^}]*?border-bottom:\s*([^;}]+)/m.exec(cssText);
+    const hdrWidthText = hdrBorder ? hdrBorder[1].replace(/var\((--[\w-]+)\)/g, (m, name) => { const d = new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(cssText); return d ? d[1].trim() : m; }) : '';
+    const authoredRule = hdrWidthText ? (/([\d.]+)px/.exec(hdrWidthText) || [])[1] : null;
+    const authoredRuleNum = authoredRule === undefined || authoredRule === null ? null : +authoredRule;
     const HEX = '(#[0-9a-f]{6}|#[0-9a-f]{3})';
     const none = (cell) => !cell || /^—/.test(cell);
     const read = (tag, what, cell, re) => {
@@ -27731,7 +27739,7 @@ function findChromium() {
             if (!r) { problems.push(`${tag}: no row in the per-screen table`); continue; }
             want = parseRow(tag, r);
           }
-          problems.push(...await page.evaluate(([tag, open, want, phone]) => {
+          problems.push(...await page.evaluate(([tag, open, want, phone, authoredRule]) => {
             const out = [];
             const wasProfile = profile, wasViewing = parentViewing, wasSpan = dayViewSpan(), wasUnlocked = parentUnlockedThisSession;
             const emoji = /\p{Extended_Pictographic}/u;
@@ -27837,7 +27845,17 @@ function findChromium() {
               if (hs.backgroundColor !== 'rgb(255, 255, 255)') out.push(`${tag}: the bar is ${hs.backgroundColor}, the picture's #fff`);
               const endRule = isMeeting ? want.r2.bar : want.bar;
               const rule = px(hs.borderBottomWidth);
-              if (!ruleOk(rule, endRule.rule) || hs.borderBottomStyle !== endRule.style || hs.borderBottomColor !== rgb(endRule.ink)) out.push(`${tag}: the rule under the header is ${rule}px ${hs.borderBottomStyle} ${hs.borderBottomColor}, the picture's ${endRule.rule}px ${endRule.style} ${endRule.ink}`);
+              /* The bottom rule is exact (owner, 2026-10-09): solid navy #1c2240;
+                 authored 2.5px, read from css/app.css's .hdr rule (through its custom
+                 property; the page's sheet is unreadable from file://), not the
+                 computed value Chrome rounds; drawn 2px at devicePixelRatio 1 and 2.5px at 2. */
+              {
+                if (authoredRule !== 2.5) out.push(`${tag}: the rule under the header is authored ${authoredRule}px in css/app.css's .hdr rule, the picture's 2.5px`);
+                const drawn = window.devicePixelRatio === 2 ? 2.5 : 2;
+                if (window.devicePixelRatio !== 1 && window.devicePixelRatio !== 2) out.push(`${tag}: devicePixelRatio is ${window.devicePixelRatio}, the check knows 1 and 2`);
+                if (Math.abs(rule - drawn) > 0.001) out.push(`${tag}: the rule under the header is drawn ${rule}px at devicePixelRatio ${window.devicePixelRatio}, expected ${drawn}px`);
+              }
+              if (hs.borderBottomStyle !== 'solid' || hs.borderBottomColor !== rgb('#1c2240') || endRule.style !== 'solid' || endRule.ink !== '#1c2240') out.push(`${tag}: the rule under the header is ${hs.borderBottomStyle} ${hs.borderBottomColor}, the picture's solid #1c2240 (table: ${endRule.style} ${endRule.ink})`);
               let wantH = rowH + rule;
               const r2 = hdr.querySelector(':scope > .hdr-r2'), sub = hdr.querySelector(':scope > .hdr-sub');
               if (isMeeting) {
@@ -28135,7 +28153,7 @@ function findChromium() {
               goToday();
             }
             return out;
-          }, [tag, open, want, size === 'phone']));
+          }, [tag, open, want, size === 'phone', authoredRuleNum]));
         }
         if (size === 'phone' && w !== 390) continue;
         // A grown-up's money header: her five tabs and the kid switch in the
