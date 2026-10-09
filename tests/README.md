@@ -132,7 +132,9 @@ on canvases in the browser (no extra package); only the pictures that differ
 are printed, with a diff in `tests/out/pictures-diff/`. A missing reference, or
 a reference no state makes, is a failure. Every run first checks the compare
 itself: a picture against itself gives 0 differences, and one planted changed
-pixel is caught.
+pixel is caught. The footer build line (`.app-build`, on the parent App panel
+and the More sheet) is written as `Build 0000-00-00` before every shot, so a
+new `APP_BUILD` needs no new pictures.
 
 **Retries.** A picture that differs is shot again, alone, in a brand-new
 browser context (a new renderer process), up to 2 times. It passes only when a

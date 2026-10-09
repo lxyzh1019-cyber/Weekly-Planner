@@ -9,12 +9,16 @@
    parent portal's .parent-bar. Its sizes are the --hdr-* tokens and its
    classes the .ph-* rules in css/app.css.
 
-   Variants (the height is the header's own, its one 2.5px rule inside it):
-     standard  --hdr-h: 64px on the iPad, 56px on a phone (≤699px)
-     money     72px, 54px buttons, one row
-     meeting   two rows, 54px + 52px = 106px; `sub` fills the second row (the
-               step, its dots and the step buttons) instead of a sub-bar. The
-               meeting screen's missing bottom bar is the screen's, not this.
+   Variants, row heights as the owner's header pictures draw them
+   (docs/handoff/consistency/headers/measurements.txt). The rules sit under
+   the rows: a 2.5px rule ends the header (2px at 1x), a 1.5px rule (1px at 1x)
+   parts row 1 from a sub-bar or the meeting's second row.
+     standard  --hdr-h: 64px on the iPad, 60px on a phone (≤699px)
+     money     --hdr-money-h: 72px / 64px, one row; 54px buttons, 52px on a phone
+     meeting   two rows, --hdr-meeting-h 62px / 60px + 44px; `sub` fills the
+               second row (the step, its dots and the step buttons) instead
+               of a sub-bar. The meeting screen's missing bottom bar is the
+               screen's, not this.
      parent    standard height on the portal's purple (--accent-purple)
 
    Slots, every text escaped here (ARCHITECTURE.md, Escaping):
@@ -25,7 +29,7 @@
      badge    { text, icon, avatar, aria, data }  always far right; `avatar`
               draws only the icon in a circle (the money pages)
      sub      markup the caller built and escaped (.ui-tabs, .ui-stepper,
-              .ui-kids); drawn as the 48px sub-bar (--hdr-sub-h)
+              .ui-kids); drawn as the 44px sub-bar (--hdr-sub-h)
    `data` is { 'mny-action': 'x', … } and becomes data-mny-action="x": the
    header wires no handler of its own; the screen's delegated listener reads
    the button the way it reads its own (ARCHITECTURE.md prefers data

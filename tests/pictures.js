@@ -391,6 +391,16 @@ async function unstick(page) {
   });
 }
 
+// The footer build stamp (`.app-build`, "Build <APP_BUILD>", on the parent App
+// panel and the More sheet) changes with every release, not with the screen.
+// It is written as one fixed text before every shot, so a new APP_BUILD gives
+// no differences and needs no new pictures (D23). The line keeps its place.
+async function fixBuildStamp(page) {
+  await page.evaluate(() => {
+    document.querySelectorAll('.app-build').forEach(e => { e.textContent = 'Build 0000-00-00'; });
+  });
+}
+
 // A picture is kept only when two taken in a row are the same, so a late
 // re-render (a web font arriving, a measured label re-drawn) cannot be caught
 // half way. Up to five tries.
@@ -400,6 +410,7 @@ async function stillShot(page, sheet) {
   let last = null;
   for (let i = 0; i < 5; i++) {
     await unstick(page);
+    await fixBuildStamp(page);
     await settle(page);
     const png = await page.screenshot({ fullPage: !sheet, animations: 'disabled', caret: 'hide' });
     if (last && last.equals(png)) return png;
