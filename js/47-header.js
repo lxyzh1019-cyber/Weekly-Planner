@@ -18,7 +18,7 @@
                screens, so its buttons and badge are 52px (the kids' tap
                rule; parent buttons stay 44px)
      money     --hdr-money-h: 72px / 64px, one row; 54px buttons, 52px on a phone
-     meeting   two rows, --hdr-meeting-h 62px / 60px + 44px; `sub` fills the
+     meeting   two rows, --hdr-meeting-h 62px / 60px + 44px, 52px buttons; `sub` fills the
                second row (the Sunday steps or where the family left off, and
                the week) instead of a sub-bar, under a 1.5px dashed rule in
                the page's grid colour. The meeting screen's missing bottom

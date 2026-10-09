@@ -266,7 +266,7 @@
        builds a live one from CAT_HEX (#tgLegend) that everyone can see. -->
 
   <!-- Full week view — the one the week opens on, and the only one you plan in. -->
-  <div id="weekFull" style="display:flex">
+  <div id="weekFull" role="tabpanel" aria-labelledby="viewTabFull" style="display:flex">
     <div class="weekly-full-wrap">
       <div class="weekly-full" id="weeklyFullGrid"></div>
       <!-- Under the grid it describes, same as the Day Blocks copy. -->
@@ -293,7 +293,7 @@
        before spending paper. renderPrintSheet (js/16-print.js) is the one
        renderer; this is a second HOST, never a second copy of it. Its output
        carries no handlers, which is what makes read-only free to enforce. -->
-  <div id="weekPrintPreview" style="display:none">
+  <div id="weekPrintPreview" role="tabpanel" aria-labelledby="viewTabPrintPreview" style="display:none">
     <div class="wpp-wrap">
       <p class="wpp-note">This is what the Print button prints. Tap 🖨 Print to open it full size.</p>
       <div class="print-sheet wpp-sheet" id="weekPreviewSheet" aria-label="Print preview of this week"></div>

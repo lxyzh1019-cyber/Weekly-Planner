@@ -15517,11 +15517,23 @@ function findChromium() {
     if (!/Copy a day/.test(title)) bad.push(`the 📋 sheet is titled "${title.trim()}", not Copy a day`);
     const rest = document.getElementById('restDayBtn');
     if (!rest || !rest.closest('#templateOverlay')) bad.push('😌 Rest is no longer on the 📋 sheet');
-    const opener = document.querySelector('[onclick="openTemplateSheet()"]');
-    if (!opener) bad.push('the 📋 button is gone');
-    else if (/template/i.test((opener.getAttribute('aria-label') || '') + (opener.getAttribute('title') || ''))) {
-      bad.push('the 📋 button is still labelled as templates');
+    /* The sheet's door is the Day header's 📑 Copy a day (PR 4), and on a
+       phone the Day's date as well (D27): both carry data-ph-action="day-copy",
+       which kidHeadClick answers with openTemplateSheet. */
+    openDay(todayKey(), getDayKeys(0).indexOf(todayKey()));
+    const openers = [...document.querySelectorAll('#screen-day > header.ph [data-ph-action="day-copy"]')];
+    const opener = openers.find(b => b.classList.contains('ph-btn'));
+    if (!opener) bad.push('the 📑 Copy a day button is gone from the Day header');
+    else {
+      opener.click();
+      if (!ov.classList.contains('open')) bad.push('the 📑 Copy a day button does not open the sheet');
+      closeSheet('templateOverlay');
     }
+    openers.forEach(b => {
+      if (/template/i.test((b.getAttribute('aria-label') || '') + (b.getAttribute('title') || ''))) {
+        bad.push('a Copy a day door is still labelled as templates');
+      }
+    });
     return bad.length === 0 || bad;
   });
 
@@ -27334,8 +27346,9 @@ function findChromium() {
        23 again: down one when the Chores screen and its group sheet
        (#choreGroupOverlay) retired in PR 2b. */
     if (overlays.length !== 23) bad.push(`${overlays.length} static overlays, expected 23`);
-    // Six destinations since 💰 Money became its own (Plan v9 §N).
-    if (count(/role="tabpanel"/g) !== 6) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 6 (one per tab)`);
+    // Six destinations since 💰 Money became its own (Plan v9 §N), and the
+    // Week's Full / Print preview views since their tabs moved into its header (PR 4).
+    if (count(/role="tabpanel"/g) !== 8) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 8 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
     if (want('theMarkupSaysWhatThingsAre')) checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;
   }
@@ -27391,8 +27404,13 @@ function findChromium() {
   // them are not, and a screen reader must not be told a tab exists for them.
   if (want('theParentPortalTellsATabFromARegion')) checks.theParentPortalTellsATabFromARegion = await page.evaluate(() => {
     const bad = [];
+    // Every tab on the page points at its panel — the portal's and, since
+    // PR 4, the Week header's Full / Print preview pair (#weekFull,
+    // #weekPrintPreview) — but only the portal's are its destinations.
     const tabs = [...document.querySelectorAll('[role="tab"]')];
-    if (tabs.length !== 6) bad.push(`${tabs.length} tabs, expected 6 (💰 Money is its own, Plan v9 §N)`);
+    const portalTabs = document.querySelectorAll('.parent-tabs [role="tab"]').length;
+    if (portalTabs !== 6) bad.push(`${portalTabs} portal tabs, expected 6 (💰 Money is its own, Plan v9 §N)`);
+    if (tabs.length !== 8) bad.push(`${tabs.length} tabs on the page, expected 8 (the portal's 6 and the Week's 2)`);
     tabs.forEach(t => {
       const panel = document.getElementById(t.getAttribute('aria-controls') || '');
       if (!panel) { bad.push(`${t.id}: aria-controls points at nothing`); return; }
@@ -27434,7 +27452,9 @@ function findChromium() {
   // standard and parent 64px / 60px (--hdr-h), money 72px / 64px, the
   // meeting's 62px / 60px; a sub-bar or the meeting's second row 44px under a
   // rule; the header ends in its own rule, so its height is the rows plus the
-  // rules as drawn. Every header button 44px, the money row's 54px / 52px. The
+  // rules as drawn. Header buttons 52px on the kid headers (standard and the
+  // meeting, whose 🗣️ the pictures draw 52px), 44px on the parent's, the
+  // money row's 54px / 52px. The
   // kit's buttons hold 44px, `lg` 54px and `lg two-line` 66px. Only the kit's
   // own test nodes are measured; a real page header (PRs 4–5 put them on the
   // screens) must be pageHeader's markup — a variant class and the main row
@@ -27467,7 +27487,7 @@ function findChromium() {
           ['parent', {}, phone ? 60 : 64, 0, 44],
           ['parent', { sub }, phone ? 60 : 64, 44, 44],
           ['money', {}, phone ? 64 : 72, 0, phone ? 52 : 54],
-          ['meeting', { sub }, phone ? 60 : 62, 44, 44],
+          ['meeting', { sub }, phone ? 60 : 62, 44, 52],
         ];
         const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
         for (const [variant, extra, wantMain, wantLower, wantBtn] of cases) {

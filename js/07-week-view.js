@@ -376,9 +376,9 @@ function weekRenderHeader() {
   const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
   const endMonth = phone && sun.getMonth() === mon.getMonth() ? '' : `${MONTH_SHORT[sun.getMonth()]} `;
   const range = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${endMonth}${sun.getDate()}`;
-  const tab = (id, view, action, aria, icon) => {
+  const tab = (id, view, action, aria, icon, panel) => {
     const on = weekView === view ? 'true' : 'false';
-    return `<button type="button" role="tab" id="${id}" data-ph-action="${action}" aria-label="${aria}" title="${aria}" aria-selected="${on}">${icon}</button>`;
+    return `<button type="button" role="tab" id="${id}" aria-controls="${panel}" data-ph-action="${action}" aria-label="${aria}" title="${aria}" aria-selected="${on}">${icon}</button>`;
   };
   const tools =
     `<div class="ph-step">`
@@ -387,8 +387,8 @@ function weekRenderHeader() {
     + `<button type="button" class="ph-btn ph-step-btn" data-ph-action="week-next" aria-label="Next week"><span aria-hidden="true">▶</span></button>`
     + `</div>`
     + `<div class="ui-tabs ph-views" role="tablist" aria-label="How to show the week">`
-    + tab('viewTabFull', 'full', 'view-full', 'Full week', '📋')
-    + tab('viewTabPrintPreview', 'preview', 'view-preview', 'Print preview', '🖨')
+    + tab('viewTabFull', 'full', 'view-full', 'Full week', '📋', 'weekFull')
+    + tab('viewTabPrintPreview', 'preview', 'view-preview', 'Print preview', '🖨', 'weekPrintPreview')
     + `</div>`;
   phMount('screen-week', {
     title: 'My Week',
