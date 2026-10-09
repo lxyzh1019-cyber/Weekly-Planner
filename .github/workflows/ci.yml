@@ -51,6 +51,9 @@ jobs:
       - name: Buffer-clip unit tests
         run: npm run test:buffers
 
+      - name: Component kit unit tests (fmtMoney, fmtDay, pageHeader)
+        run: npm run test:helpers
+
       # The money stream (js/40-stream.js): every dollar as a movement, with
       # every balance derived from it. Holds the invariant the whole redesign
       # rests on — opening + in - out === what is in hand — over a thousand

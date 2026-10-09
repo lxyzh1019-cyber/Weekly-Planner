@@ -1590,6 +1590,40 @@ async function selectProfile(p) {
    would not resolve it: bufferClip takes plain numbers and needs nothing, and
    bufferDrawSegments is exported for completeness but is only ever called from
    the browser, where 01 has already loaded. */
+
+/* ── One money format, one day format (Consistency PR 3, decision D2) ──
+   The app writes money and days with some eighteen local formatters that
+   disagree ("$-3.00" beside "−$3"). These two are the one answer; PR 6 moves
+   every caller onto them and deletes the rest. Nothing calls them yet.
+   Both read only their arguments — no clock, no state, no browser — so
+   tests/helpers.test.js holds them in Node.
+
+   fmtMoney: "$3" for whole dollars, "$2.50" otherwise; a negative is "−$3"
+   (U+2212, the minus sign, not a hyphen); { signed: true } adds "+" to a
+   positive amount ("+$3"), zero stays "$0". Rounded to the cent first, the
+   way money2 rounds (js/14-money.js), so it agrees with mnyShort$ and sdD. */
+function fmtMoney(v, opts) {
+  const n = Math.round((Number(v) || 0) * 100) / 100;
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '−' : (opts && opts.signed && n > 0 ? '+' : '');
+  return sign + '$' + (abs % 1 ? abs.toFixed(2) : String(abs));
+}
+/* fmtDay: a "YYYY-MM-DD" key as 'short' "27 Sep" (mnyDayMonth), 'long'
+   "Sat 3 Oct" (mnyDayName) or 'weekday' "Sat" (guDayName). Calendar
+   arithmetic on the key's own local date (formatDayKey), so the device's
+   time zone cannot move it a day. */
+function fmtDay(key, form) {
+  const d = formatDayKey(key);
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  const dayMonth = d.getDate() + ' ' + MONTH_SHORT[d.getMonth()];
+  if (form === 'weekday') return day;
+  if (form === 'long') return day + ' ' + dayMonth;
+  return dayMonth;
+}
+
+/* fmtMoney, fmtDay and the two text escapers join the guard for
+   tests/helpers.test.js, which also renders js/47-header.js's pageHeader in
+   Node and needs escapeHtml and escapeAttr as globals to do it. */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { bufferClip };
+  module.exports = { bufferClip, fmtMoney, fmtDay, escapeHtml, escapeAttr };
 }
