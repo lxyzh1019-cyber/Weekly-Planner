@@ -1,5 +1,9 @@
-// Renders the 16 header pictures and measures the rendered DOM, using headless Chrome over its debug port.
-// Run: node render.mjs            (writes <variant>-<phone|ipad>-<pop|calm>.png and measurements.txt)
+// Renders the 16 header pictures from the owner's Claude Design page (source/header-system.dc.html) with headless Chrome
+// over its debug port, and measures each header in the rendered page.
+// Run: node render.mjs   (needs internet for the page's Google Fonts; writes <variant>-<phone|ipad>-<pop|calm>.png and measurements.txt)
+// How the page is built: it shows everything on one canvas. Look = the section: id "2a" is Pop, "2b" is Calm (turn 2, the newest set;
+// "1a"/"1b" below them are the older turn 1). Inside a look, section children 1..4 are standard, money, meeting, parent; in each, the
+// first column (1198 wide) is the iPad Pro 11in landscape set and the second column (394 wide) is the phone set (390 wide).
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -9,9 +13,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORT = 9333;
-// page height = header + about 150px of page (standard stacks two panels with a 28px label strip each)
-const heights = { standard: { phone: 2 * (56 + 150 + 28), ipad: 2 * (64 + 150 + 28) }, money: { phone: 72 + 150, ipad: 72 + 150 }, meeting: { phone: 106 + 150, ipad: 106 + 150 }, parent: { phone: 56 + 48 + 150, ipad: 64 + 48 + 150 } };
-const widths = { phone: 390, ipad: 1024 };
+const looks = { pop: '2a', calm: '2b' };
+const variants = ['standard', 'money', 'meeting', 'parent']; // section children 1..4
+const sizes = ['ipad', 'phone']; // columns 0 and 1
 
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'hdr-'))}`, 'about:blank'], { stdio: 'ignore' });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -24,22 +28,34 @@ ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && waiting.has(d.
 const send = (method, params = {}) => new Promise((res) => { const n = ++id; waiting.set(n, res); ws.send(JSON.stringify({ id: n, method, params })); });
 const evaluate = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true })).result.result.value;
 
+await send('Emulation.setDeviceMetricsOverride', { width: 2600, height: 1000, deviceScaleFactor: 1, mobile: false });
+await send('Page.navigate', { url: pathToFileURL(join(here, 'source', 'header-system.dc.html')).href });
+await sleep(6000);
+
+// One panel = a bordered, rounded box (overflow hidden). Its header = the rows with a solid background (white or purple); the
+// transparent last row is the cream filler page under it. Each row is reported as content height + bottom rule.
+const measure = `(function(look,vi,ci){
+  var col=document.getElementById(look).children[vi].children[1].children[ci], out=[];
+  var boxes=[];
+  [].forEach.call(col.children,function(p){ if(p.children.length&&getComputedStyle(p).overflow==='hidden')boxes.push([p,'(no label)']); else [].forEach.call(p.children,function(b){ if(getComputedStyle(b).overflow==='hidden'&&b.children.length)boxes.push([b,p.children[0]!==b?p.children[0].textContent.trim():'(no label)']); }); });
+  boxes.forEach(function(x){
+    var box=x[0], rows=[], total=0;
+    [].forEach.call(box.children,function(r){var c=getComputedStyle(r); if(c.backgroundColor==='rgba(0, 0, 0, 0)')return; var h=Math.round(r.getBoundingClientRect().height*10)/10, rule=parseFloat(c.borderBottomWidth); total+=h; rows.push((h-(h>rule?rule:0))+'+'+rule);});
+    out.push({label:x[1],panelWidth:Math.round(box.getBoundingClientRect().width),rows:rows,headerHeight:Math.round(total*10)/10});
+  });
+  var r=col.getBoundingClientRect();
+  return JSON.stringify({rect:{x:r.x,y:r.y+scrollY,w:r.width,h:r.height},panels:out});
+})`;
+
 const report = [];
-for (const v of Object.keys(heights)) for (const size of ['phone', 'ipad']) for (const look of ['pop', 'calm']) {
-  const w = widths[size], h = heights[v][size];
-  await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 2, mobile: false });
-  await send('Page.navigate', { url: pathToFileURL(join(here, v + '.html')).href + `?look=${look}` });
-  for (let i = 0; i < 100; i++) { await sleep(150); if (await evaluate("document.body && document.body.getAttribute('data-done')") === '1') break; }
-  await sleep(300);
-  const m = await evaluate(`JSON.stringify([...document.querySelectorAll('.ph')].map(function(hd){
-    var q=function(s){return [...hd.querySelectorAll(s)].map(function(e){var r=e.getBoundingClientRect();return Math.round(r.width*10)/10+'x'+Math.round(r.height*10)/10;});};
-    var t=hd.querySelector('.ph-title'), cs=getComputedStyle(t);
-    return {name:hd.getAttribute('data-name'), height:hd.getBoundingClientRect().height, rule:getComputedStyle(hd,'::after').height, position:getComputedStyle(hd).position, bg:getComputedStyle(hd).backgroundColor,
-      rows:q('.ph-row'), buttons:q('.ph-btn'), avatar:q('.ph-badge--avatar'), badge:q('.ph-badge:not(.ph-badge--avatar)'), pills:q('.ph-pill'), titleFont:cs.fontFamily.split(',')[0], titleSize:cs.fontSize, fontLoaded:document.fonts.check('20px '+cs.fontFamily.split(',')[0]),
-      overflowX: document.documentElement.scrollWidth>innerWidth, contextShown: (function(){var c=hd.querySelector('.ph-context');return !!c && getComputedStyle(c).display!=='none';})()};}))`);
-  report.push(`## ${v} ${size} (${w}px) ${look}\n${JSON.stringify(JSON.parse(m), null, 1)}`);
-  const shot = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: w, height: h, scale: 1 } });
-  writeFileSync(join(here, `${v}-${size}-${look}.png`), Buffer.from(shot.result.data, 'base64'));
+for (const [look, lid] of Object.entries(looks)) for (let vi = 0; vi < variants.length; vi++) for (let ci = 0; ci < sizes.length; ci++) {
+  const name = `${variants[vi]}-${sizes[ci]}-${look}`;
+  const m = JSON.parse(await evaluate(`${measure}('${lid}',${vi + 1},${ci})`));
+  const pad = 6;
+  const clip = { x: Math.floor(m.rect.x - pad), y: Math.floor(m.rect.y - pad), width: Math.ceil(m.rect.w + 2 * pad), height: Math.ceil(m.rect.h + 2 * pad), scale: 2 };
+  const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip });
+  writeFileSync(join(here, `${name}.png`), Buffer.from(shot.result.data, 'base64'));
+  report.push(`## ${name}  (picture ${clip.width}x${clip.height} css px, saved at 2x)\n` + m.panels.map((p) => `- ${p.label.slice(0, 90)}\n    panel width ${p.panelWidth}px; header height ${p.headerHeight}px; rows (content+rule) ${p.rows.join(' , ')}`).join('\n'));
 }
-writeFileSync(join(here, 'measurements.txt'), report.join('\n\n'));
+writeFileSync(join(here, 'measurements.txt'), `Header heights measured in headless Chrome from the owner's design (source/header-system.dc.html), css px.\nHeader height = all bar rows (content + bottom rule, as drawn at 1x); the cream area under the bar is filler page, not counted.\n\n` + report.join('\n\n') + '\n');
 ws.close(); chrome.kill();

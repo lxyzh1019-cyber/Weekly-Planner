@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Caveat:wght@600;700&family=Gochi+Hand&family=Lexend:wght@400;500;600&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e9e6df;color:#1c2240;font-family:'Lexend',system-ui,sans-serif}
+a{color:#1a5fd0}a:hover{color:#1c2240}
+</style>
+</helmet>
+
+<section style="padding:56px;display:flex;flex-direction:column;gap:32px;border-bottom:3px solid #1c2240">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1300px">
+    <div style="font:700 14px 'Lexend',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#5a6380">Weekly Planner · header system · turn 2</div>
+    <h1 style="margin:0;font:800 44px/1.1 'Baloo 2',sans-serif">v2: calmer, one date, nothing pushed down</h1>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;max-width:1612px">
+      <div style="padding:16px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">1 · Week is one row again</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">Full / Preview becomes a two-part switch. Print appears only in Preview. No kid tab screen has a second row.</span></div>
+      <div style="padding:16px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">2 · One date, big and dark</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">22px in navy ink, not 15–19px grey. Shown once: on Today as the date, on Week and Day as the stepper label. Gone from Money, the meeting row and the parent bar.</span></div>
+      <div style="padding:16px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">3 · At most 5 things per row</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">4 on the phone. Icons alone when they mean one thing everywhere (◀ ▶ ? ⚙️, the avatar, 📋 Full, 🖨 Preview); icon + words when a child could not guess it (Print, money tabs, meeting steps). Every icon has a spoken name.</span></div>
+      <div style="padding:16px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">4 · Height budget, tested</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">64 standard and parent · 72 money · 106 meeting · phone 60. Kid buttons 52px (the kids' tap rule); parent buttons 44px. Each frame shows its height now vs v2.</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+  <sc-for list="{{ looks2 }}" as="lk" hint-placeholder-count="2">
+  <div id="{{ lk.id }}" style="--bg:{{ lk.bg }};--grid:{{ lk.grid }};--sub:{{ lk.sub }};--head:{{ lk.head }};--body:{{ lk.body }};--hs:{{ lk.hs }};--main:{{ lk.main }};--mainInk:{{ lk.mainInk }};--sel:{{ lk.sel }};--selInk:{{ lk.selInk }};--purple:{{ lk.purple }};--sh:{{ lk.sh }};display:flex;flex-direction:column;gap:36px;width:1680px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;min-width:48px;height:36px;padding:0 12px;background:#1c2240;color:#fff;border-radius:10px;font:700 18px 'Lexend',sans-serif">{{ lk.id }}</span>
+      <span style="font:800 32px 'Baloo 2',sans-serif">{{ lk.name }}</span>
+      <span style="font:400 16px 'Lexend',sans-serif;color:#5a6380">{{ lk.note }}</span>
+    </div>
+
+    <!-- STANDARD v2 -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Standard</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">Today · Week · Day (Sister Sync, Print and Monthly follow Today's pattern)</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Today · now ≈62px → v2 64px · 3 things</span>
+            <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:64px;display:flex;align-items:center;gap:16px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+                <span style="font-family:var(--head);font-size:calc(30px * var(--hs));font-weight:700;line-height:1;color:#1c2240">Today</span>
+                <span style="flex:1;text-align:center;font-family:var(--body);font-size:22px;font-weight:600;color:#1c2240">Tuesday 6 October</span>
+                <span aria-label="Jenn, switch profile" style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Week · Full · now one row ≈62px → v1 116px ✗ → v2 64px · 4 things (no Print here)</span>
+            <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:64px;display:flex;align-items:center;gap:16px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+                <span style="font-family:var(--head);font-size:calc(30px * var(--hs));font-weight:700;line-height:1;color:#1c2240">My Week</span>
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+                  <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:17px;color:#1c2240">◀</span>
+                  <span style="min-width:200px;text-align:center;font-family:var(--body);font-size:22px;font-weight:600;color:#1c2240">Oct 5 – Oct 11</span>
+                  <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:17px;color:#1c2240">▶</span>
+                </div>
+                <div style="display:flex;border:2px solid #1c2240;border-radius:14px;overflow:hidden;background:#fff">
+                  <span style="height:48px;display:flex;align-items:center;width:56px;justify-content:center;background:var(--sel);color:var(--selInk);font-size:20px" aria-label="Full week">📋</span>
+                  <span style="height:48px;display:flex;align-items:center;width:56px;justify-content:center;border-left:2px solid #1c2240;font-size:20px" aria-label="Print preview">🖨</span>
+                </div>
+                <span aria-label="Jenn, switch profile" style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Week · Preview selected · Print appears only here · 5 things</span>
+            <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:64px;display:flex;align-items:center;gap:16px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+                <span style="font-family:var(--head);font-size:calc(30px * var(--hs));font-weight:700;line-height:1;color:#1c2240">My Week</span>
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+                  <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:17px;color:#1c2240">◀</span>
+                  <span style="min-width:200px;text-align:center;font-family:var(--body);font-size:22px;font-weight:600;color:#1c2240">Oct 5 – Oct 11</span>
+                  <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:17px;color:#1c2240">▶</span>
+                </div>
+                <div style="display:flex;border:2px solid #1c2240;border-radius:14px;overflow:hidden;background:#fff">
+                  <span style="height:48px;display:flex;align-items:center;width:56px;justify-content:center;font-size:20px" aria-label="Full week">📋</span>
+                  <span style="height:48px;display:flex;align-items:center;width:56px;justify-content:center;border-left:2px solid #1c2240;background:var(--sel);color:var(--selInk);font-size:20px" aria-label="Print preview">🖨</span>
+                </div>
+                <span style="min-height:52px;display:flex;align-items:center;gap:6px;padding:0 18px;background:var(--main);color:var(--mainInk);border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-family:var(--body);font-size:18px;font-weight:600">Print</span>
+                <span aria-label="Jenn, switch profile" style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Day · now ≈62px → v2 64px · 5 things (the date is the title)</span>
+            <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:64px;display:flex;align-items:center;gap:16px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+                <span style="min-height:52px;display:flex;align-items:center;gap:6px;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-family:var(--body);font-size:18px;color:#1c2240">◀ Week</span>
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+                  <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:17px;color:#1c2240">◀</span>
+                  <span style="min-width:220px;text-align:center;font-family:var(--head);font-size:calc(28px * var(--hs));font-weight:700;line-height:1;color:#1c2240">Tuesday 6 Oct</span>
+                  <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:17px;color:#1c2240">▶</span>
+                </div>
+                <div style="display:flex;border:2px solid #1c2240;border-radius:14px;overflow:hidden;background:#fff">
+                  <span style="width:52px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:19px;font-weight:600">1</span>
+                  <span style="width:52px;height:48px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-family:var(--body);font-size:19px;color:#1c2240">2</span>
+                  <span style="width:52px;height:48px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-family:var(--body);font-size:19px;color:#1c2240">3</span>
+                </div>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:20px" aria-label="Copy a day">📑</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Today · phone 60px · 3 things</span>
+            <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:60px;display:flex;align-items:center;gap:10px;padding:0 12px;background:#fff;border-bottom:2.5px solid #1c2240">
+                <span style="font-family:var(--head);font-size:calc(26px * var(--hs));font-weight:700;line-height:1;color:#1c2240">Today</span>
+                <span style="flex:1;text-align:center;font-family:var(--body);font-size:20px;font-weight:600;color:#1c2240">Tue 6 Oct</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Week · phone 60px · 4 things</span>
+            <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:60px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:2.5px solid #1c2240">
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:16px;color:#1c2240">◀</span>
+                <span style="flex:1;text-align:center;font-family:var(--body);font-size:20px;font-weight:600;color:#1c2240">Oct 5 – 11</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:16px;color:#1c2240">▶</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:20px">🖨</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Day · phone 60px · 4 things</span>
+            <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:60px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:2.5px solid #1c2240">
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-family:var(--body);font-size:15px;color:#1c2240">Week</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#1c2240">◀</span>
+                <span style="flex:1;text-align:center;font-family:var(--body);font-size:20px;font-weight:600;color:#1c2240">Tue 6 Oct</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#1c2240">▶</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+          <div style="width:390px;font:400 14px/1.45 'Lexend',sans-serif;color:#3a4160;text-wrap:pretty">On the phone, 🖨 opens Preview, and Print shows only there. 📑 Copy a day (its own icon now, so 📋 means only Full) moves into the date menu. The iPad keeps them in the bar. The badge is always the 52px avatar.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONEY v2 -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Money</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">the tabs name the page · the date lives on Today</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">My money · now 72px, 7 things → v2 72px · 4 things</span>
+          <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:72px;display:flex;align-items:center;gap:16px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:18px;color:#1c2240">◀</span>
+              <div style="display:flex;gap:10px">
+                <span style="min-height:54px;display:flex;align-items:center;gap:8px;padding:0 22px;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:999px;font-family:var(--head);font-size:calc(26px * var(--hs));font-weight:700;line-height:1">💰 My money</span>
+                <span style="min-height:54px;display:flex;align-items:center;gap:8px;padding:0 22px;background:#fff;border:2px solid #1c2240;border-radius:999px;font-family:var(--head);font-size:calc(26px * var(--hs));font-weight:700;line-height:1;color:#1c2240">🎓 Money school</span>
+              </div>
+              <span style="flex:1"></span>
+              <span style="width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-family:var(--body);font-size:24px;font-weight:600;color:#1c2240">?</span>
+              <span style="width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:26px">🐥</span>
+            </div>
+            <div style="height:48px"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">phone 64px · 4 things</span>
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:64px;display:flex;align-items:center;gap:6px;padding:0 8px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:16px;color:#1c2240">◀</span>
+              <div style="flex:1;display:flex;border:2px solid #1c2240;border-radius:14px;overflow:hidden;background:#fff">
+                <span style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:18px;font-weight:600;white-space:nowrap">💰 My money</span>
+                <span style="width:52px;height:48px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-size:21px">🎓</span>
+              </div>
+              <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-family:var(--body);font-size:22px;font-weight:600;color:#1c2240">?</span>
+              <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+            </div>
+            <div style="height:48px"></div>
+          </div>
+          <div style="width:390px;font:400 14px/1.45 'Lexend',sans-serif;color:#3a4160;text-wrap:pretty">The selected tab shows its name, the other shows its icon. Money school swaps the two.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MEETING v2 -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Family meeting</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">106px kept · the week moves next to the Sunday steps</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">now 106px, 9 things → v2 106px · row 1: 4 things, row 2: steps + week</span>
+          <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:62px;display:flex;align-items:center;gap:16px;padding:0 18px;background:#fff;border-bottom:1.5px dashed var(--grid)">
+              <div style="display:flex;gap:8px">
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2.5px solid #1c2240;border-radius:50%;font-size:24px;box-shadow:0 0 0 3px #ff5c8a">🐥</span>
+                <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:50%;font-size:24px">🦊</span>
+              </div>
+              <span style="font-family:var(--head);font-size:calc(28px * var(--hs));font-weight:700;line-height:1;color:#1c2240">Family meeting</span>
+              <div style="flex:1;display:flex;justify-content:center">
+                <div style="display:flex;border:2px solid #1c2240;border-radius:14px;overflow:hidden;background:#fff">
+                  <span style="height:48px;display:flex;align-items:center;padding:0 18px;font-family:var(--body);font-size:18px;color:#1c2240">✓ The week</span>
+                  <span style="height:48px;display:flex;align-items:center;padding:0 18px;border-left:2px solid #1c2240;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:18px;font-weight:600">The money</span>
+                  <span style="height:48px;display:flex;align-items:center;padding:0 18px;border-left:2px solid #1c2240;font-family:var(--body);font-size:18px;color:#1c2240">Close</span>
+                </div>
+              </div>
+              <span aria-label="Parent's card" style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:22px">🗣️</span>
+            </div>
+            <div style="height:44px;display:flex;align-items:center;gap:10px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240;font-family:var(--body);font-size:18px;color:#1c2240">
+              <span>✓ Guess</span><span>›</span>
+              <span style="padding:4px 14px;background:var(--main);color:var(--mainInk);border:2px solid #1c2240;border-radius:999px;font-weight:600">Payday</span><span>›</span>
+              <span>I choose</span><span>›</span><span>Signed</span>
+              <span style="flex:1"></span>
+              <span style="font-weight:600">Week of Oct 5 – 11</span>
+            </div>
+            <div style="height:40px"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">phone 104px</span>
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:60px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:1.5px dashed var(--grid)">
+              <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2.5px solid #1c2240;border-radius:50%;font-size:22px;box-shadow:0 0 0 3px #ff5c8a">🐥</span>
+              <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:50%;font-size:22px">🦊</span>
+              <div style="flex:1;display:flex;justify-content:center">
+                <div style="display:flex;border:2px solid #1c2240;border-radius:14px;overflow:hidden;background:#fff">
+                  <span style="width:46px;height:48px;display:flex;align-items:center;justify-content:center;font-family:var(--body);font-size:18px;color:#1c2240">✓</span>
+                  <span style="width:46px;height:48px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:19px;font-weight:600">2</span>
+                  <span style="width:46px;height:48px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-family:var(--body);font-size:19px;color:#1c2240">3</span>
+                </div>
+              </div>
+              <span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:21px">🗣️</span>
+            </div>
+            <div style="height:44px;display:flex;align-items:center;gap:6px;padding:0 12px;background:#fff;border-bottom:2.5px solid #1c2240;font-family:var(--body);font-size:16px;color:#1c2240">
+              <span>✓ Guess ›</span>
+              <span style="padding:2px 10px;background:var(--main);color:var(--mainInk);border:2px solid #1c2240;border-radius:999px;font-weight:600">Payday</span>
+              <span>› I choose › Signed</span>
+            </div>
+            <div style="height:40px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PARENT v2 -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Parent</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">44px buttons (grown-ups) · no date in the bar · one purple bar</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Portal · now ≈58px → v2 64px · 3 groups</span>
+            <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:64px;display:flex;align-items:center;gap:12px;padding:0 18px;background:var(--purple);border-bottom:2.5px solid #1c2240">
+                <span style="min-height:44px;display:flex;align-items:center;gap:6px;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:17px;font-weight:600;color:#1c2240">🔒 Parent ▾</span>
+                <div style="flex:1;display:flex;gap:6px">
+                  <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:17px;font-weight:600">📥 Now</span>
+                  <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:17px;color:#1c2240">Meeting</span>
+                  <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:17px;color:#1c2240">History</span>
+                  <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:17px;color:#1c2240">Money</span>
+                  <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:17px;color:#1c2240">Setup</span>
+                  <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:18px">⚙️</span>
+                </div>
+                <div style="display:flex;border:2px solid #1c2240;border-radius:999px;overflow:hidden;background:#fff">
+                  <span style="min-height:42px;display:flex;align-items:center;padding:0 16px;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:17px;font-weight:600">Both</span>
+                  <span style="min-height:42px;display:flex;align-items:center;gap:4px;padding:0 14px;border-left:2px solid #1c2240;font-family:var(--body);font-size:17px;color:#1c2240">🐥 Jenn</span>
+                  <span style="min-height:42px;display:flex;align-items:center;gap:4px;padding:0 14px;border-left:2px solid #1c2240;font-family:var(--body);font-size:17px;color:#1c2240">🦊 Jess</span>
+                </div>
+              </div>
+              <div style="height:48px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">Parent viewing Jenn's week · now ≈102px (strip + bar) → v2 108px · row 1 = the kid's Week bar in purple</span>
+            <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+              <div style="height:64px;display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--purple);border-bottom:1.5px solid #1c2240">
+                <span style="min-height:44px;display:flex;align-items:center;gap:6px;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:17px;color:#1c2240">◀ Now</span>
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+                  <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px;color:#1c2240">◀</span>
+                  <span style="min-width:200px;text-align:center;font-family:var(--body);font-size:22px;font-weight:600;color:#1c2240">Oct 5 – Oct 11</span>
+                  <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px;color:#1c2240">▶</span>
+                </div>
+                <div style="display:flex;border:2px solid #1c2240;border-radius:12px;overflow:hidden;background:#fff">
+                  <span style="height:42px;display:flex;align-items:center;width:50px;justify-content:center;background:var(--sel);color:var(--selInk);font-size:19px" aria-label="Full week">📋</span>
+                  <span style="height:42px;display:flex;align-items:center;width:50px;justify-content:center;border-left:2px solid #1c2240;font-size:19px" aria-label="Print preview">🖨</span>
+                </div>
+                <span aria-label="Viewing Jenn, switch profile" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:22px">🐥</span>
+              </div>
+              <div style="height:44px;display:flex;align-items:center;gap:10px;padding:0 18px;background:var(--purple);border-bottom:2.5px solid #1c2240">
+                <span style="flex:1;font-family:var(--body);font-size:17px;color:#1c2240">Reviewing Jenn's week</span>
+                <span style="min-height:36px;display:flex;align-items:center;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:16px;color:#1c2240">Mark reviewed</span>
+                <span style="min-height:36px;display:flex;align-items:center;padding:0 14px;background:var(--main);color:var(--mainInk);border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:16px;font-weight:600">✓ Confirm all</span>
+              </div>
+              <div style="height:40px"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font:600 13px 'Lexend',sans-serif;color:#5a6380">phone 60px · 3 things</span>
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:60px;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--purple);border-bottom:2.5px solid #1c2240">
+              <span style="min-height:44px;display:flex;align-items:center;padding:0 12px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:16px;font-weight:600;color:#1c2240">🔒 ▾</span>
+              <span style="flex:1;font-family:var(--head);font-size:calc(24px * var(--hs));font-weight:700;line-height:1;color:#1c2240">Now</span>
+              <div style="display:flex;border:2px solid #1c2240;border-radius:999px;overflow:hidden;background:#fff">
+                <span style="width:46px;height:42px;display:flex;align-items:center;justify-content:center;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:15px;font-weight:600">All</span>
+                <span style="width:46px;height:42px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-size:19px">🐥</span>
+                <span style="width:46px;height:42px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-size:19px">🦊</span>
+              </div>
+            </div>
+            <div style="height:48px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-for>
+  </div>
+</section>
+
+<section style="padding:56px;display:flex;flex-direction:column;gap:32px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1300px">
+    <div style="font:700 14px 'Lexend',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#5a6380">Weekly Planner · header system · turn 1</div>
+    <h1 style="margin:0;font:800 44px/1.1 'Baloo 2',sans-serif">One header, four variants</h1>
+    <p style="margin:0;font:400 18px/1.5 'Lexend',sans-serif;color:#3a4160;max-width:980px;text-wrap:pretty">Each header uses the same slot order: <b>◀ back</b> (only on screens without the bottom nav) · <b>title</b> (no emoji) · <b>context</b> (a date or a ◀ period ▶ stepper) · <b>up to 2 actions</b> · <b>profile badge</b>, always at the far right. A second row is optional and has one style everywhere. All four variants use paper, a 2.5px navy rule underneath, stay pinned while scrolling, and use 44px+ buttons. Shown at iPad 1194 and phone 390, in <a href="#1a">1a Pop</a> and <a href="#1b">1b Calm</a>.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+  <sc-for list="{{ looks }}" as="lk" hint-placeholder-count="2">
+  <div id="{{ lk.id }}" style="--ink:#1c2240;--bg:{{ lk.bg }};--grid:{{ lk.grid }};--sub:{{ lk.sub }};--head:{{ lk.head }};--body:{{ lk.body }};--hs:{{ lk.hs }};--main:{{ lk.main }};--mainInk:{{ lk.mainInk }};--sel:{{ lk.sel }};--selInk:{{ lk.selInk }};--purple:{{ lk.purple }};--sh:{{ lk.sh }};display:flex;flex-direction:column;gap:36px;width:1680px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;min-width:48px;height:36px;padding:0 12px;background:#1c2240;color:#fff;border-radius:10px;font:700 18px 'Lexend',sans-serif">{{ lk.id }}</span>
+      <span style="font:800 32px 'Baloo 2',sans-serif">{{ lk.name }}</span>
+      <span style="font:400 16px 'Lexend',sans-serif;color:#5a6380">{{ lk.note }}</span>
+    </div>
+
+    <!-- ═══ STANDARD ═══ -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Standard</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">64px iPad / 56px phone · Today, Week, Day, Sister Sync, Print, Monthly</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <!-- Today -->
+          <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:64px;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="font-family:var(--head);font-size:calc(30px * var(--hs));font-weight:700;line-height:1">Today</span>
+              <span style="flex:1;text-align:center;font-family:var(--body);font-size:19px;color:var(--sub)">Tuesday 6 October</span>
+              <span style="min-height:44px;display:flex;align-items:center;gap:8px;padding:0 14px 0 6px;background:#ffe4ec;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:18px"><span style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:50%;font-size:20px">🐥</span>Jenn</span>
+            </div>
+            <div style="height:56px"></div>
+          </div>
+          <!-- Week -->
+          <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:64px;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="font-family:var(--head);font-size:calc(30px * var(--hs));font-weight:700;line-height:1">My Week</span>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+                <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px">◀</span>
+                <span style="min-width:190px;text-align:center;font-family:var(--body);font-size:20px;font-weight:600">Oct 5 – Oct 11</span>
+                <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px">▶</span>
+              </div>
+              <span style="min-height:44px;display:flex;align-items:center;gap:6px;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:17px">🖨 Print</span>
+              <span style="min-height:44px;display:flex;align-items:center;gap:8px;padding:0 14px 0 6px;background:#ffe4ec;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:18px"><span style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:50%;font-size:20px">🐥</span>Jenn</span>
+            </div>
+            <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="min-height:40px;display:flex;align-items:center;padding:0 16px;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px;font-weight:600">📋 Full</span>
+              <span style="min-height:40px;display:flex;align-items:center;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px">🖨 Print preview</span>
+            </div>
+            <div style="height:40px"></div>
+          </div>
+          <!-- Day -->
+          <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:64px;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px">◀</span>
+              <span style="font-family:var(--head);font-size:calc(30px * var(--hs));font-weight:700;line-height:1">Day</span>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+                <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px">◀</span>
+                <span style="min-width:190px;text-align:center;font-family:var(--body);font-size:20px;font-weight:600">Tue 6 Oct</span>
+                <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px">▶</span>
+              </div>
+              <div style="display:flex;border:2px solid #1c2240;border-radius:12px;overflow:hidden">
+                <span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:17px;font-weight:600">1</span>
+                <span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;background:#fff;border-left:2px solid #1c2240;font-family:var(--body);font-size:17px">2</span>
+                <span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;background:#fff;border-left:2px solid #1c2240;font-family:var(--body);font-size:17px">3</span>
+              </div>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:19px">📋</span>
+              <span style="min-height:44px;display:flex;align-items:center;gap:8px;padding:0 14px 0 6px;background:#ffe4ec;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:18px"><span style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:50%;font-size:20px">🐥</span>Jenn</span>
+            </div>
+            <div style="height:56px"></div>
+          </div>
+        </div>
+        <!-- phone -->
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:56px;display:flex;align-items:center;gap:10px;padding:0 12px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="font-family:var(--head);font-size:calc(26px * var(--hs));font-weight:700;line-height:1">Today</span>
+              <span style="flex:1;text-align:center;font-family:var(--body);font-size:15px;color:var(--sub)">Tue 6 Oct</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:22px">🐥</span>
+            </div>
+            <div style="height:56px"></div>
+          </div>
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:56px;display:flex;align-items:center;gap:8px;padding:0 12px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="flex:1;font-family:var(--head);font-size:calc(26px * var(--hs));font-weight:700;line-height:1">My Week</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:18px">🖨</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:22px">🐥</span>
+            </div>
+            <div style="height:52px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:14px">◀</span>
+              <span style="flex:1;text-align:center;font-family:var(--body);font-size:16px;font-weight:600">Oct 5 – 11</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:14px">▶</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:12px;font-size:18px">📋</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:18px">🖨</span>
+            </div>
+            <div style="height:40px"></div>
+          </div>
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:56px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:14px">◀</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:14px">◀</span>
+              <span style="flex:1;text-align:center;font-family:var(--body);font-size:16px;font-weight:600">Tue 6 Oct</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:14px">▶</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:18px">📋</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:22px">🐥</span>
+            </div>
+            <div style="height:56px"></div>
+          </div>
+          <div style="width:390px;font:400 14px/1.45 'Lexend',sans-serif;color:#3a4160;text-wrap:pretty">Phone rule: two rows at most, icons only. The badge becomes the avatar, and Day's title is read from its date. The Day 1·2·3 span tabs are iPad only.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MONEY ═══ -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Money</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">72px, one row, 54px buttons (approved size, BUILD-SPEC) · My money, Money school, All my Sundays, By month</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+          <div style="height:72px;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+            <span style="width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-size:18px">◀</span>
+            <span style="font-family:var(--head);font-size:calc(32px * var(--hs));font-weight:700;line-height:1">My money</span>
+            <div style="display:flex;gap:8px;margin-left:8px">
+              <span style="min-height:54px;display:flex;align-items:center;padding:0 20px;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:18px;font-weight:600">💰 My money</span>
+              <span style="min-height:54px;display:flex;align-items:center;padding:0 20px;background:#fff;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:18px">🎓 Money school</span>
+            </div>
+            <span style="flex:1"></span>
+            <span style="min-height:54px;display:flex;align-items:center;gap:8px;padding:0 18px;background:#fff;border:2px solid #1c2240;border-radius:14px;box-shadow:var(--sh);font-family:var(--body);font-size:18px">? How this page works</span>
+            <span style="font-family:var(--body);font-size:19px;color:var(--sub)">Tue 6 Oct</span>
+            <span style="width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:26px">🐥</span>
+          </div>
+          <div style="height:56px"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:64px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:15px">◀</span>
+              <span style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:12px;font-size:21px">💰</span>
+              <span style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:21px">🎓</span>
+              <span style="flex:1"></span>
+              <span style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:20px;font-weight:600">?</span>
+              <span style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2px solid #1c2240;border-radius:50%;font-size:24px">🐥</span>
+            </div>
+            <div style="height:56px"></div>
+          </div>
+          <div style="width:390px;font:400 14px/1.45 'Lexend',sans-serif;color:#3a4160;text-wrap:pretty">Badge added (D4). The date and the title hide at ≤699px, because the selected tab already names the page. The tabs become icons and keep their names for screen readers.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MEETING ═══ -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Family meeting</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">two rows, 106px, no bottom bar (approved) · every meeting and Sunday step</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+          <div style="height:58px;display:flex;align-items:center;gap:12px;padding:0 18px;background:#fff;border-bottom:1.5px dashed var(--grid)">
+            <div style="display:flex;gap:6px">
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2.5px solid #1c2240;border-radius:50%;font-size:22px;box-shadow:0 0 0 3px #ff5c8a">🐥</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:50%;font-size:22px">🦊</span>
+            </div>
+            <span style="font-family:var(--head);font-size:calc(28px * var(--hs));font-weight:700;line-height:1">Family meeting</span>
+            <div style="flex:1;display:flex;justify-content:center;gap:6px">
+              <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px">✓ 1 · The week</span>
+              <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px;font-weight:600">2 · The money</span>
+              <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px">3 · Close</span>
+            </div>
+            <span style="font-family:var(--body);font-size:18px;color:var(--sub)">Week of Oct 5 – 11</span>
+          </div>
+          <div style="height:48px;display:flex;align-items:center;gap:8px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+            <span style="font-family:var(--body);font-size:16px;color:var(--sub);margin-right:4px">Jenn's Sunday</span>
+            <span style="font-family:var(--body);font-size:16px;color:var(--sub)">✓ Guess</span><span style="color:var(--sub)">›</span>
+            <span style="min-height:36px;display:flex;align-items:center;padding:0 14px;background:var(--main);color:var(--mainInk);border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px;font-weight:600">Payday</span><span style="color:var(--sub)">›</span>
+            <span style="font-family:var(--body);font-size:16px">I choose</span><span style="color:var(--sub)">›</span>
+            <span style="font-family:var(--body);font-size:16px">Signed</span>
+            <span style="flex:1"></span>
+            <span style="min-height:40px;display:flex;align-items:center;gap:6px;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:16px">🗣️ Parent's card</span>
+          </div>
+          <div style="height:40px"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:56px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:1.5px dashed var(--grid)">
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border:2.5px solid #1c2240;border-radius:50%;font-size:21px;box-shadow:0 0 0 3px #ff5c8a">🐥</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:50%;font-size:21px">🦊</span>
+              <span style="flex:1"></span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:50%;font-family:var(--body);font-size:16px">✓</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:50%;font-family:var(--body);font-size:17px;font-weight:600">2</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:50%;font-family:var(--body);font-size:17px">3</span>
+              <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:19px">🗣️</span>
+            </div>
+            <div style="height:44px;display:flex;align-items:center;gap:6px;padding:0 12px;background:#fff;border-bottom:2.5px solid #1c2240;font-family:var(--body);font-size:15px">
+              <span style="color:var(--sub)">✓ Guess ›</span>
+              <span style="padding:2px 10px;background:var(--main);color:var(--mainInk);border:2px solid #1c2240;border-radius:999px;font-weight:600">Payday</span>
+              <span style="color:var(--sub)">› I choose › Signed</span>
+            </div>
+            <div style="height:40px"></div>
+          </div>
+          <div style="width:390px;font:400 14px/1.45 'Lexend',sans-serif;color:#3a4160;text-wrap:pretty">The title and the week drop on the phone; the girls, the steps and Parent's card stay. The Sunday steps keep their own row.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PARENT ═══ -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 22px 'Lexend',sans-serif">Parent</span><span style="font:400 15px 'Lexend',sans-serif;color:#5a6380">same bar, purple · portal destinations, and a parent viewing a kid screen (no second purple strip)</span></div>
+      <div style="display:flex;gap:28px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:64px;display:flex;align-items:center;gap:10px;padding:0 18px;background:var(--purple);border-bottom:2.5px solid #1c2240">
+              <span style="min-height:44px;display:flex;align-items:center;gap:6px;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:17px;font-weight:600">🔒 Parent ▾</span>
+              <div style="display:flex;gap:6px;margin-left:6px">
+                <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:16px;font-weight:600">📥 Now</span>
+                <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:16px">🧑‍🧑‍🧒 Meeting</span>
+                <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:16px">📊 History</span>
+                <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:16px">💰 Money</span>
+                <span style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;font-family:var(--body);font-size:16px">📋 Setup</span>
+                <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;font-size:18px">⚙️</span>
+              </div>
+              <span style="flex:1;text-align:center;font-family:var(--body);font-size:18px">Tue 6 Oct</span>
+              <div style="display:flex;border:2px solid #1c2240;border-radius:999px;overflow:hidden;background:#fff">
+                <span style="min-height:40px;display:flex;align-items:center;padding:0 14px;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:16px;font-weight:600">Both</span>
+                <span style="min-height:40px;display:flex;align-items:center;gap:4px;padding:0 12px;border-left:2px solid #1c2240;font-family:var(--body);font-size:16px">🐥 Jenn</span>
+                <span style="min-height:40px;display:flex;align-items:center;gap:4px;padding:0 12px;border-left:2px solid #1c2240;font-family:var(--body);font-size:16px">🦊 Jess</span>
+              </div>
+            </div>
+            <div style="height:56px"></div>
+          </div>
+          <div style="width:1194px;border:2px solid #1c2240;border-radius:16px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:64px;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--purple);border-bottom:2.5px solid #1c2240">
+              <span style="min-height:44px;display:flex;align-items:center;gap:6px;padding:0 14px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:17px">◀ Now</span>
+              <span style="font-family:var(--head);font-size:calc(30px * var(--hs));font-weight:700;line-height:1">Jenn's week</span>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+                <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px">◀</span>
+                <span style="min-width:190px;text-align:center;font-family:var(--body);font-size:20px;font-weight:600">Oct 5 – Oct 11</span>
+                <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-size:16px">▶</span>
+              </div>
+              <span style="min-height:44px;display:flex;align-items:center;gap:8px;padding:0 14px 0 6px;background:#fff;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:17px"><span style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#ffe4ec;border-radius:50%;font-size:20px">🐥</span>Parent (Jenn)</span>
+            </div>
+            <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 18px;background:#fff;border-bottom:2.5px solid #1c2240">
+              <span style="min-height:40px;display:flex;align-items:center;padding:0 16px;background:var(--sel);color:var(--selInk);border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px;font-weight:600">📋 Full</span>
+              <span style="min-height:40px;display:flex;align-items:center;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:999px;font-family:var(--body);font-size:16px">🖨 Print preview</span>
+              <span style="flex:1"></span>
+              <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:16px">Mark reviewed</span>
+              <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;background:var(--main);color:var(--mainInk);border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:16px;font-weight:600">✓ Confirm all</span>
+            </div>
+            <div style="height:40px"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="width:390px;border:2px solid #1c2240;border-radius:22px;overflow:hidden;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:26px 26px">
+            <div style="height:56px;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--purple);border-bottom:2.5px solid #1c2240">
+              <span style="min-height:44px;display:flex;align-items:center;padding:0 12px;background:#fff;border:2px solid #1c2240;border-radius:12px;box-shadow:var(--sh);font-family:var(--body);font-size:16px;font-weight:600">🔒 ▾</span>
+              <span style="flex:1;font-family:var(--head);font-size:calc(24px * var(--hs));font-weight:700;line-height:1">Now</span>
+              <div style="display:flex;border:2px solid #1c2240;border-radius:999px;overflow:hidden;background:#fff">
+                <span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--sel);color:var(--selInk);font-family:var(--body);font-size:14px;font-weight:600">All</span>
+                <span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-size:19px">🐥</span>
+                <span style="width:44px;height:40px;display:flex;align-items:center;justify-content:center;border-left:2px solid #1c2240;font-size:19px">🦊</span>
+              </div>
+            </div>
+            <div style="height:56px"></div>
+          </div>
+          <div style="width:390px;font:400 14px/1.45 'Lexend',sans-serif;color:#3a4160;text-wrap:pretty">On the phone the destinations sit in the bottom bar (as today). The bar keeps the menu, the screen name and the child switch. Confirm all and Mark reviewed stay in the second row on every size.</div>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ showRules }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;width:1612px">
+        <div style="padding:18px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">Removed</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">Dashed rule · second purple strip · the Chores double band · badge on the left (Week) · ◀ on Sister Sync · emoji in titles · the hidden meeting title</span></div>
+        <div style="padding:18px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">Back</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">Only on screens without the bottom nav. It goes back to where she came from (one return stack); its label names the place ("Back to Week").</span></div>
+        <div style="padding:18px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">Context slot</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">Either a plain date or a ◀ period ▶ stepper, centred. One date helper: "Tue 6 Oct" short, "Tuesday 6 October" long.</span></div>
+        <div style="padding:18px;background:#fff;border:2px solid #1c2240;border-radius:14px;display:flex;flex-direction:column;gap:6px"><b style="font:700 16px 'Lexend',sans-serif">Sizes</b><span style="font:400 14px/1.5 'Lexend',sans-serif;color:#3a4160">Standard and parent: 64 / 56px. Money: 72px. Meeting: 106px. Second row: 48–52px. Buttons 44px minimum (money 54px); text 15px minimum.</span></div>
+      </div>
+    </sc-if>
+  </div>
+  </sc-for>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showRules&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const pop = { name: 'Pop', note: 'cream graph paper · Gochi Hand titles, Patrick Hand text at 1.1× · yellow selected',
+      bg: '#fff6e3', grid: '#f1e5c8', sub: '#4d5575', head: "'Gochi Hand', cursive", body: "'Patrick Hand', sans-serif", hs: '1.1',
+      main: '#ffc83d', mainInk: '#1c2240', sel: '#ffc83d', selInk: '#1c2240', purple: '#c3aed6', sh: '3px 3px 0 #1c2240' };
+    const calm = { name: 'Calm', note: 'blue-grey graph paper · Baloo 2 titles, Lexend text · navy selected, purple main button',
+      bg: '#eef2f9', grid: '#dde3ee', sub: '#5a6380', head: "'Baloo 2', sans-serif", body: "'Lexend', sans-serif", hs: '1',
+      main: '#5b4fd6', mainInk: '#ffffff', sel: '#1c2240', selInk: '#ffffff', purple: '#dedaf8', sh: '2px 2px 0 #1c2240' };
+    return {
+      showRules: this.props.showRules ?? true,
+      looks2: [{ ...pop, id: '2a' }, { ...calm, id: '2b' }],
+      looks: [
+        { id: '1a', name: 'Pop', note: 'cream graph paper · Gochi Hand titles, Patrick Hand text at 1.1× · yellow selected',
+          bg: '#fff6e3', grid: '#f1e5c8', sub: '#4d5575', head: "'Gochi Hand', cursive", body: "'Patrick Hand', sans-serif", hs: '1.1',
+          main: '#ffc83d', mainInk: '#1c2240', sel: '#ffc83d', selInk: '#1c2240', purple: '#c3aed6', sh: '3px 3px 0 #1c2240' },
+        { id: '1b', name: 'Calm', note: 'blue-grey graph paper · Baloo 2 titles, Lexend text · navy selected, purple main button',
+          bg: '#eef2f9', grid: '#dde3ee', sub: '#5a6380', head: "'Baloo 2', sans-serif", body: "'Lexend', sans-serif", hs: '1',
+          main: '#5b4fd6', mainInk: '#ffffff', sel: '#1c2240', selInk: '#ffffff', purple: '#dedaf8', sh: '2px 2px 0 #1c2240' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

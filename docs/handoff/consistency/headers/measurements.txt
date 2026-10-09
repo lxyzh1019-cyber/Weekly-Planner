@@ -1,587 +1,90 @@
-## standard phone (390px) pop
-[
- {
-  "name": "standard-today",
-  "height": 56,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x56"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "92.8x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "25.52px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- },
- {
-  "name": "standard-day",
-  "height": 56,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x56"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "92.8x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "25.52px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+Header heights measured in headless Chrome from the owner's design (source/header-system.dc.html), css px.
+Header height = all bar rows (content + bottom rule, as drawn at 1x); the cream area under the bar is filler page, not counted.
 
-## standard phone (390px) calm
-[
- {
-  "name": "standard-today",
-  "height": 56,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x56"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "103.9x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "23.2px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- },
- {
-  "name": "standard-day",
-  "height": 56,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x56"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "103.9x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "23.2px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+## standard-ipad-pop  (picture 1210x627 css px, saved at 2x)
+- Today · now ≈62px → v2 64px · 3 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Full · now one row ≈62px → v1 116px ✗ → v2 64px · 4 things (no Print here)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Preview selected · Print appears only here · 5 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Day · now ≈62px → v2 64px · 5 things (the date is the title)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
 
-## standard ipad (1024px) pop
-[
- {
-  "name": "standard-today",
-  "height": 64,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x64"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "92.8x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "30.8px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- },
- {
-  "name": "standard-day",
-  "height": 64,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x64"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "92.8x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "30.8px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## standard-phone-pop  (picture 406x556 css px, saved at 2x)
+- Today · phone 60px · 3 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Week · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Day · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
 
-## standard ipad (1024px) calm
-[
- {
-  "name": "standard-today",
-  "height": 64,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x64"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "103.9x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "28px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- },
- {
-  "name": "standard-day",
-  "height": 64,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x64"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "103.9x44"
-  ],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "28px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## money-ipad-pop  (picture 1210x160 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 74px; rows (content+rule) 72+2
 
-## money phone (390px) pop
-[
- {
-  "name": "money",
-  "height": 72,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x72"
-  ],
-  "buttons": [
-   "54x54",
-   "54x54",
-   "54x54"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "25.52px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+## money-phone-pop  (picture 406x199 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 66px; rows (content+rule) 64+2
 
-## money phone (390px) calm
-[
- {
-  "name": "money",
-  "height": 72,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x72"
-  ],
-  "buttons": [
-   "54x54",
-   "54x54",
-   "54x54"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "23.2px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+## meeting-ipad-pop  (picture 1210x187 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 109px; rows (content+rule) 62+1 , 44+2
 
-## money ipad (1024px) pop
-[
- {
-  "name": "money",
-  "height": 72,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x72"
-  ],
-  "buttons": [
-   "54x54",
-   "54x54",
-   "54x54"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "30.8px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## meeting-phone-pop  (picture 406x185 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 107px; rows (content+rule) 60+1 , 44+2
 
-## money ipad (1024px) calm
-[
- {
-  "name": "money",
-  "height": 72,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x72"
-  ],
-  "buttons": [
-   "54x54",
-   "54x54",
-   "54x54"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "28px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## parent-ipad-pop  (picture 1210x347 css px, saved at 2x)
+- Portal · now ≈58px → v2 64px · 3 groups
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Parent viewing Jenn's week · now ≈102px (strip + bar) → v2 108px · row 1 = the kid's Week 
+    panel width 1198px; header height 111px; rows (content+rule) 64+1 , 44+2
 
-## meeting phone (390px) pop
-[
- {
-  "name": "meeting",
-  "height": 106,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x54",
-   "390x52"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "25.52px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+## parent-phone-pop  (picture 406x148 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 62px; rows (content+rule) 60+2
 
-## meeting phone (390px) calm
-[
- {
-  "name": "meeting",
-  "height": 106,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "390x54",
-   "390x52"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "23.2px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+## standard-ipad-calm  (picture 1210x627 css px, saved at 2x)
+- Today · now ≈62px → v2 64px · 3 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Full · now one row ≈62px → v1 116px ✗ → v2 64px · 4 things (no Print here)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Preview selected · Print appears only here · 5 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Day · now ≈62px → v2 64px · 5 things (the date is the title)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
 
-## meeting ipad (1024px) pop
-[
- {
-  "name": "meeting",
-  "height": 106,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x54",
-   "1024x52"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "30.8px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## standard-phone-calm  (picture 406x556 css px, saved at 2x)
+- Today · phone 60px · 3 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Week · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Day · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
 
-## meeting ipad (1024px) calm
-[
- {
-  "name": "meeting",
-  "height": 106,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(255, 255, 255)",
-  "rows": [
-   "1024x54",
-   "1024x52"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44",
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [
-   "44x44"
-  ],
-  "badge": [],
-  "pills": [],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "28px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## money-ipad-calm  (picture 1210x160 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 74px; rows (content+rule) 72+2
 
-## parent phone (390px) pop
-[
- {
-  "name": "parent",
-  "height": 104,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(195, 174, 214)",
-  "rows": [
-   "390x56",
-   "390x48"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "99.6x44"
-  ],
-  "pills": [
-   "70.7x44",
-   "89.5x44",
-   "0x0",
-   "44x44"
-  ],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "25.52px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+## money-phone-calm  (picture 406x199 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 66px; rows (content+rule) 64+2
 
-## parent phone (390px) calm
-[
- {
-  "name": "parent",
-  "height": 104,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(222, 218, 248)",
-  "rows": [
-   "390x56",
-   "390x48"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "110.3x44"
-  ],
-  "pills": [
-   "79.7x44",
-   "108.5x44",
-   "0x0",
-   "42x44"
-  ],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "23.2px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": false
- }
-]
+## meeting-ipad-calm  (picture 1210x187 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 109px; rows (content+rule) 62+1 , 44+2
 
-## parent ipad (1024px) pop
-[
- {
-  "name": "parent",
-  "height": 112,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(195, 174, 214)",
-  "rows": [
-   "1024x64",
-   "1024x48"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "99.6x44"
-  ],
-  "pills": [
-   "78.7x44",
-   "97.5x44",
-   "116.8x44",
-   "0x0"
-  ],
-  "titleFont": "\"Gochi Hand\"",
-  "titleSize": "30.8px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## meeting-phone-calm  (picture 406x185 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 107px; rows (content+rule) 60+1 , 44+2
 
-## parent ipad (1024px) calm
-[
- {
-  "name": "parent",
-  "height": 112,
-  "rule": "2.5px",
-  "position": "sticky",
-  "bg": "rgb(222, 218, 248)",
-  "rows": [
-   "1024x64",
-   "1024x48"
-  ],
-  "buttons": [
-   "44x44",
-   "44x44"
-  ],
-  "avatar": [],
-  "badge": [
-   "110.3x44"
-  ],
-  "pills": [
-   "87.7x44",
-   "116.5x44",
-   "144.3x44",
-   "0x0"
-  ],
-  "titleFont": "\"Baloo 2\"",
-  "titleSize": "28px",
-  "fontLoaded": true,
-  "overflowX": false,
-  "contextShown": true
- }
-]
+## parent-ipad-calm  (picture 1210x347 css px, saved at 2x)
+- Portal · now ≈58px → v2 64px · 3 groups
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Parent viewing Jenn's week · now ≈102px (strip + bar) → v2 108px · row 1 = the kid's Week 
+    panel width 1198px; header height 111px; rows (content+rule) 64+1 , 44+2
+
+## parent-phone-calm  (picture 406x148 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 62px; rows (content+rule) 60+2
