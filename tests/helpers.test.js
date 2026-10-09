@@ -111,6 +111,18 @@ check('four variants', JSON.stringify(PH_VARIANTS) === '["standard","money","mee
   }
   check(`every slot combination renders in every variant (${rendered} headers)`, bad.length ? bad.slice(0, 8) : true);
 }
+// The money and meeting headers' slots (PR 4 part 3): lead before the title,
+// an action's aria-pressed, and the header as a money root.
+{
+  const html = pageHeader({ variant: 'meeting', lead: '<i>G</i>', title: 'Family meeting', moneySurface: true,
+    actions: [{ label: '🔊', aria: 'Sound on', pressed: true }, { label: '🗣️', aria: "Parent's card" }] });
+  const lead = html.indexOf('<div class="ph-lead"><i>G</i></div>');
+  check('lead sits before the title; pressed writes aria-pressed; moneySurface marks the header a money root',
+    lead > 0 && lead < html.indexOf('ph-title')
+    && html.startsWith('<header class="ph ph--meeting" data-money-surface>')
+    && count(html, /aria-pressed="true"/g) === 1 && count(html, /aria-pressed/g) === 1
+    && !pageHeader({ title: 'x' }).includes('data-money-surface') && !pageHeader({ title: 'x' }).includes('ph-lead') || html);
+}
 check('an unknown or missing variant is standard',
   pageHeader({ variant: 'nope', title: 'X' }).startsWith('<header class="ph ph--standard">')
   && pageHeader().startsWith('<header class="ph ph--standard">') || pageHeader({ variant: 'nope' }));

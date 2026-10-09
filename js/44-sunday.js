@@ -295,33 +295,39 @@ function sdRenderMoneyStep(wk) {
       ${newRow}
     </div>`;
 }
-/* ── The family meeting's head on the money step (Plan v17 §0, Stage 6h) ──
-   Two rows, drawn by the meeting (`renderMeetingMode`, js/15) around these
-   two pieces. Row 1 starts with the girls as round pictures: a tap switches
-   whose money is on screen, a signed girl wears a green ✓. Row 2 says whose
-   money it is, the four Sunday steps (done mint, current accent), and on the
-   right 🔊 Sound and 🗣️ Parent's card. No bottom bar: each step's own
+/* ── The family meeting's header on the money step (PR 4, the owner's
+   meeting picture) ──
+   Drawn by the meeting (`mmHead`, js/15) from these three pieces. Row 1 starts
+   with the girls as round pictures: a tap switches whose money is on screen,
+   a signed girl wears a green ✓; it ends with 🔊 Sound and 🗣️ Parent's card.
+   Row 2 is the four Sunday steps, done ✓, the current one in a pill, whose
+   money it is said to a screen reader. No bottom bar: each step's own
    ◀ / → buttons move between steps. */
 function sdMeetingAvatars(wk) {
   const cur = mnyMeetingKid();
   return `<span class="sd-avs" role="group" aria-label="Whose Sunday">${['jenn', 'jess'].map(k => {
     const signed = mnyIsCommitted(wk, k);
     return `<button type="button" class="sd-av${k === cur ? ' on' : ''}" data-mny-action="sd-kid" data-sd-kid="${k}" aria-pressed="${k === cur}" aria-label="${escapeAttr(mnyKidName(k) + (signed ? ' ✓ signed' : ''))}">
-        <span class="sd-av-pic" aria-hidden="true">${CT_PROFILE_ICON[k]}</span><span class="sd-av-name ph-word">${escapeHtml(mnyKidName(k))}</span>${signed ? '<span class="sd-av-ok" aria-hidden="true">✓</span>' : ''}</button>`;
+        <span class="sd-av-pic" aria-hidden="true">${CT_PROFILE_ICON[k]}</span>${signed ? '<span class="sd-av-ok" aria-hidden="true">✓</span>' : ''}</button>`;
   }).join('')}</span>`;
 }
-function sdMeetingStepRow(wk) {
+function sdMeetingSteps(wk) {
   const kid = mnyMeetingKid();
   const d = sdDraftFor(kid, wk);
   const step = mnyIsCommitted(wk, kid) ? 3 : d.step;
-  // On the phone a step is its number, the words hidden (Plan v18 C).
-  const steps = SD_STEP_LABELS.map((l, i) => `<span class="sd-stepchip${i === step ? ' on' : i < step ? ' done' : ''}"${i === step ? ' aria-current="step"' : ''}>${escapeHtml(l.split(' · ')[0])}<span class="ph-word"> · ${escapeHtml(l.split(' · ')[1] || '')}</span></span>`).join('');
-  return `<span class="sd-for ph-word">2 · The money for ${escapeHtml(mnyKidName(kid))}:</span>
-      <span class="sd-steps" aria-label="Sunday steps">${steps}</span>
-      <span class="sd-headbtns">
-        <button type="button" class="sd-btn" data-mny-action="sd-sound" aria-pressed="${sdSoundOn()}" aria-label="${sdSoundOn() ? 'Sound on' : 'Sound off'}">${sdSoundOn() ? '🔊' : '🔇'}<span class="ph-word">${sdSoundOn() ? ' Sound on' : ' Sound off'}</span></button>
-        <button type="button" class="sd-btn sd-btn--dad" data-mny-action="sd-dad" aria-label="Parent's card">🗣️<span class="ph-word"> Parent's card</span></button>
-      </span>`;
+  const steps = SD_STEP_LABELS.map((l, i) => {
+    const word = l.split(' · ')[1] || l;
+    return `${i ? '<span class="sd-stepsep" aria-hidden="true">›</span>' : ''}<span class="sd-stepchip${i === step ? ' on' : i < step ? ' done' : ''}"${i === step ? ' aria-current="step"' : ''}>${i < step ? '✓ ' : ''}${escapeHtml(word)}</span>`;
+  }).join('');
+  return `<span class="visually-hidden">The money for ${escapeHtml(mnyKidName(kid))}:</span>
+      <span class="sd-steps" role="group" aria-label="Sunday steps">${steps}</span>`;
+}
+function sdMeetingActions() {
+  const on = sdSoundOn();
+  return [
+    { label: on ? '🔊' : '🔇', aria: on ? 'Sound on' : 'Sound off', pressed: on, data: { 'mny-action': 'sd-sound' } },
+    { label: '🗣️', aria: "Parent's card", data: { 'mny-action': 'sd-dad' } },
+  ];
 }
 
 /* ── Step 1 · Guess ── */

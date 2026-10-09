@@ -41,6 +41,7 @@ function mnyKidName(kid) { return kid === 'jenn' ? 'Jenn' : 'Jess'; }
 function mnyOpenMyMoney(kid) {
   ctPrepareRead();
   if (isParent() && (kid === 'jenn' || kid === 'jess')) mnyKid = kid;
+  navReturnPush('mymoney');
   showScreen('mymoney');
   mnyRenderMyMoney();
 }
@@ -143,7 +144,7 @@ function mnyRenderMyMoney() {
   mnySimCatchUp(kid);
 
   wrap.innerHTML =
-      `${mnyMoneyHead('backtoday')}
+      `${mnyHead('My money', 'money', 'mymoney', 'today')}
        <div class="mv2" data-money-surface>
          <div class="mv2-main">
            ${mnyCountdownCard(kid)}
@@ -166,45 +167,37 @@ function mnyRenderMyMoney() {
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
 
-/* My money's head, which the passbook's two pages wear too (decision 14):
-   ◀, 💰 My money, the two tabs, ? and the date. `back` is where ◀ goes —
-   Today from My money, My money from the two pages. */
-function mnyMoneyHead(back) {
-  return mnyPageHead('💰 My money', '', [
-      { action: 'tourkid',  icon: '?', word: 'How this page works' },
-    ], { kidSwitch: true, tabs: 'money', date: true, back: back, big: true });
+/* The money pages' header (PR 4, the owner's money picture): the money
+   variant of pageHeader — ◀ back where she came from (the one back stack,
+   navReturn in js/05), the title, the day, her two tabs, ? and her avatar.
+   My money wears it, and so do the passbook's two pages (decision 14, My
+   money the current tab) and Money school. A phone drops the date (D26) and
+   the title, because the current tab already names the page. A grown-up's
+   five tabs and the kid switch go in the sub-bar under the row: they would
+   not fit beside it. `fallback` is where ◀ goes with nothing on the stack. */
+function mnyHead(title, tab, screen, fallback) {
+  const kid = mnyViewKid();
+  const parent = isParent();
+  const kids = parent
+    ? `<div class="ui-kids" role="group" aria-label="Whose money">${['jenn', 'jess'].map(k =>
+        `<button type="button" data-mny-action="kid" data-mny-kid="${k}" aria-pressed="${k === kid}" aria-label="${escapeAttr(mnyKidName(k))}">${CT_PROFILE_ICON[k]}<span class="ph-tab-word"> ${escapeHtml(mnyKidName(k))}</span></button>`).join('')}</div>`
+    : '';
+  return pageHeader({
+    variant: 'money',
+    moneySurface: true,
+    back: { to: navReturnTo(fallback), data: { 'ph-action': 'back', 'ph-fallback': fallback } },
+    title,
+    context: mnyTodayLine(),
+    tools: parent ? '' : mnyTabBar(tab),
+    actions: [{ label: '?', aria: 'How this page works', data: { 'mny-action': 'tourkid' } }],
+    badge: kidHeadBadge(screen + 'ProfileBadge', kid, parent),
+    sub: parent ? mnyTabBar(tab) + kids : '',
+  });
 }
 
-/* "Wed 7 Oct" — the day, in the head's right corner (the mockup's date). */
+/* "Wed 7 Oct" — the day, after the title. */
 function mnyTodayLine() {
   return mnyDayName(todayKey());
-}
-
-/* Every money page wears the same head: a way back, the title, a line of
-   context, and the buttons that belong to this page rather than to the system.
-   It replaces the app's topbar on these screens rather than sitting under it.
-   `opts.tabs` puts the page's tab bar into the same row and `opts.date` the
-   day at its right; `opts.big` is My money's 72px row with 54px buttons
-   (Plan v17 §1). A button with `aria` is an icon button named for a screen
-   reader. */
-function mnyPageHead(title, strap, buttons, opts) {
-  const o = opts || {};
-  const kidSwitch = (o.kidSwitch && isParent())
-    ? `<span class="mny-head-kids">${['jenn', 'jess'].map(k =>
-        `<button type="button" class="mny-chip ${k === mnyViewKid() ? 'on' : ''}" data-mny-action="kid" data-mny-kid="${k}">${CT_PROFILE_ICON[k]} ${mnyKidName(k)}</button>`).join('')}</span>`
-    : '';
-  return `<div class="mny-head${o.tabs ? ' mny-head--one' : ''}${o.big ? ' mny-head--big' : ''}"${o.big ? ' data-money-surface' : ''}>
-      ${o.back === false ? '' : `<button type="button" class="mny-back" data-mny-action="${escapeAttr(o.back || 'backplanner')}" aria-label="Back">◀</button>`}
-      <h2 class="mny-head-title">${escapeHtml(title)}</h2>
-      ${strap ? `<span class="mny-head-strap">${escapeHtml(strap)}</span>` : ''}
-      ${o.tabs ? mnyTabBar(o.tabs) : ''}
-      ${kidSwitch}
-      <span class="mny-head-btns">${(buttons || []).map(b => b.word
-        // An icon and its words: on the phone only the icon shows (Plan v18 C); the name stays in aria-label.
-        ? `<button type="button" class="mny-btn" data-mny-action="${escapeAttr(b.action)}" aria-label="${escapeAttr(b.word)}">${escapeHtml(b.icon)}<span class="ph-word"> ${escapeHtml(b.word)}</span></button>`
-        : `<button type="button" class="mny-btn${b.aria ? ' mny-btn--icon' : ''}" data-mny-action="${escapeAttr(b.action)}"${b.aria ? ` aria-label="${escapeAttr(b.aria)}" title="${escapeAttr(b.aria)}"` : ''}>${escapeHtml(b.label)}</button>`).join('')}</span>
-      ${o.date ? `<span class="mny-head-date">${escapeHtml(mnyTodayLine())}</span>` : ''}
-    </div>`;
 }
 
 /* "$3" for whole dollars, "$2.50" otherwise — the prototype's money on a
@@ -995,8 +988,8 @@ function mnyIdeaBody(c, kid) {
      📊 By month — the Flow (js/42-flow.js), the same frozen rows added up
         by the month their Sunday falls in (build 2026-10-06c).
    ════════════════════════════════════════════════════════════════ */
-function mnyOpenSundays() { mnyHistPage = 'sundays'; showScreen('moneystory'); mnyRenderHistory(); }
-function mnyOpenByMonth() { mnyHistPage = 'month'; showScreen('moneystory'); mnyRenderHistory(); }
+function mnyOpenSundays() { mnyHistPage = 'sundays'; navReturnPush('moneystory'); showScreen('moneystory'); mnyRenderHistory(); }
+function mnyOpenByMonth() { mnyHistPage = 'month'; navReturnPush('moneystory'); showScreen('moneystory'); mnyRenderHistory(); }
 
 function mnyLedgerRows(kid) {
   ctEnsureShared();
@@ -1010,7 +1003,7 @@ function mnyRenderHistory() {
   const wrap = document.getElementById('mnyStoryWrap');
   if (!wrap) return;
   const kid = mnyViewKid();
-  wrap.innerHTML = `${mnyMoneyHead('backmoney')}
+  wrap.innerHTML = `${mnyHead('My money', 'money', 'moneystory', 'mymoney')}
     ${mnyHistPage === 'month' ? flRenderFlow(kid) : mnySundaysPage(kid)}`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
@@ -1193,10 +1186,6 @@ function mnyHandleClick(ev) {
   if (a === 'bymonth') { mnyOpenByMonth(); return; }
   if (a === 'tab')     { mnyGoTab(el.getAttribute('data-mny-tab')); return; }
   if (a === 'tourkid') { mnyOpenTour('kid'); return; }
-  if (a === 'backmoney')   { mnyOpenMyMoney(mnyViewKid()); return; }
-  if (a === 'backschool')  { mnySchoolBack(); return; }
-  if (a === 'backplanner') { goWeek(); return; }
-  if (a === 'backtoday')   { goToday(); return; }
   if (a === 'tourpar') { mnyOpenTour('parent'); return; }
   if (a === 'ask')     { mnyShowConcept(el.getAttribute('data-mny-concept')); return; }
   // 💡 A Money school idea opens in the idea sheet (one explainer table, MNY_CONCEPTS).
@@ -1238,7 +1227,7 @@ function mnyHandleInput(ev) {
    What / Why / Watch and the Chinese line, read from MNY_CONCEPTS through
    `mnyConceptCard` (the one statement of each idea, the same Money school
    shows), plus "📚 Take me to Money school", which opens Money school at that
-   idea and remembers where to come back to (`mnySchoolReturn`, device-local).
+   idea and remembers where to come back to (navReturn, device-local).
    An idea not open for her yet still explains itself — the prototype has no
    locks here — and says when it opens. */
 function mnyShowConcept(id, opts) {

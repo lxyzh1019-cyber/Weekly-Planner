@@ -10887,25 +10887,25 @@ function findChromium() {
     const bar = (id) => {
       const el = document.getElementById(id);
       if (!el) return null;
-      const tabs = el.querySelectorAll('.mny-tab');
-      // A grown-up's head carries the whole rail; no numbers (decision 14).
-      return tabs.length === mnyTabsFor().length && tabs.length === 5 && el.querySelector('.mny-tab.on')
-        && !el.querySelector('.mny-tab-num') ? tabs : null;
+      const tabs = el.querySelectorAll('.ph-tab');
+      // A grown-up's header carries the whole rail; no numbers (decision 14).
+      return tabs.length === mnyTabsFor().length && tabs.length === 5 && el.querySelector('.ph-tab[aria-current="page"]')
+        && ![...tabs].some(t => /\d/.test(t.textContent)) ? tabs : null;
     };
     mnyOpenMyMoney('jess');
     const onMoney = !!bar('mnyPage1Wrap');
     // The passbook's two pages wear My money's head, My money the current tab.
     mnyOpenSundays();
-    const onStory = !!bar('mnyStoryWrap') && !!document.querySelector('#mnyStoryWrap .mny-tab.on[data-mny-tab="money"]');
+    const onStory = !!bar('mnyStoryWrap') && !!document.querySelector('#mnyStoryWrap .ph-tab[aria-current="page"][data-mny-tab="money"]');
     mnyOpenByMonth();
-    const onMonth = !!bar('mnyStoryWrap') && !!document.querySelector('#mnyStoryWrap .mny-tab.on[data-mny-tab="money"]');
+    const onMonth = !!bar('mnyStoryWrap') && !!document.querySelector('#mnyStoryWrap .ph-tab[aria-current="page"][data-mny-tab="money"]');
     mnyOpenSchool('jess');
     const onSchool = !!bar('mnySchoolWrap');
     // The parent's money page (Grown-ups) carries its own tab bar instead —
     // six tabs, no 📖 More (Stage 4b) — and ⚙️ Rules says when a change starts.
     showScreen('parent'); setParentTab('money'); mnyParentSection = 'rules'; mnyRenderRulesTab();
     const rulesWrap = document.getElementById('mnyRulesWrap');
-    const onRules = !rulesWrap.querySelector('.mny-tab')
+    const onRules = !rulesWrap.querySelector('.ph-tab')
       && rulesWrap.querySelectorAll('.gu-tab').length === GU_TABS.length && GU_TABS.length === 5   // ✅ Approve moved to Parent › Now (Plan v9 §N)
       && !rulesWrap.querySelector('.gu-more-chip')
       && /Save · starts next Sunday/.test(rulesWrap.textContent);
@@ -10914,12 +10914,12 @@ function findChromium() {
        through either legacy door (3 or 4). */
     openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
     const body = document.getElementById('familyMeetingBody');
-    // Plan v17 §0: the head's second row carries the four steps and 🗣️ Parent's card.
-    const sundayHead = () => !!body.querySelector('.mm-head--two .mm-head-r2') && body.querySelectorAll('.mm-head-r2 .sd-stepchip').length === 4
-      && !!body.querySelector('[data-mny-action="sd-dad"]');
-    const onEarned = sundayHead() && body.querySelectorAll('.mny-tab').length === 0;
+    // PR 4: the header's second row carries the four steps, its first 🗣️ Parent's card.
+    const sundayHead = () => !!body.querySelector('.ph--meeting .ph-r2') && body.querySelectorAll('.ph-r2 .sd-stepchip').length === 4
+      && !!body.querySelector('.ph--meeting .ph-main [data-mny-action="sd-dad"]');
+    const onEarned = sundayHead() && body.querySelectorAll('.ph-tab').length === 0;
     mmGoStep(4);
-    const onDecide = sundayHead() && body.querySelectorAll('.mny-tab').length === 0;
+    const onDecide = sundayHead() && body.querySelectorAll('.ph-tab').length === 0;
     mmHide();
 
     // And it navigates: tapping 5 from page 1 lands on Money school.
@@ -11585,6 +11585,10 @@ function findChromium() {
         ['the week',    'weekProfileBadge',  () => { goWeek(); renderWeek(); }],
         ['the day',     'dayProfileBadge',   () => openDay(getDayKeys(weekOffset)[0], 0)],
         ['Sister Sync', 'syncProfileBadge',  () => openSisterSync()],
+        // PR 4 part 3: the money pages' headers carry the avatar too (D4, D25).
+        ['My money',    'mymoneyProfileBadge',     () => mnyOpenMyMoney('jenn')],
+        ['Money school', 'moneyschoolProfileBadge', () => mnyOpenSchool('jenn')],
+        ['All my Sundays', 'moneystoryProfileBadge', () => mnyOpenSundays()],
       ];
       for (const [label, id, nav] of screens) {
         profile = 'jenn';
@@ -14951,7 +14955,7 @@ function findChromium() {
        the passbook's two doors — 📖 All my Sundays and 📊 By month — reach
        the history instead. */
     mnyOpenMyMoney('jenn');
-    if (document.querySelector('#mnyPage1Wrap .mny-head [data-mny-action="story"]')) problems.push("My money's head still has the retired 📖 My money story button");
+    if (document.querySelector('#mnyPage1Wrap > .ph [data-mny-action="story"]')) problems.push("My money's header still has the retired 📖 My money story button");
     const all = document.querySelector('#mnyPage1Wrap .mv2-book [data-mny-action="sundays"]');
     if (!all) problems.push('the passbook has no 📖 All my Sundays');
     else { all.click(); if (activeId() !== 'screen-moneystory') problems.push(`📖 All my Sundays lands on ${activeId()}`); }
@@ -17398,7 +17402,7 @@ function findChromium() {
       take('Week', ['#weeklyFullGrid .wf-card', '#screen-week > .ph .ui-tabs > [aria-selected="true"]', '#screen-week > .ph .ui-tabs > [aria-selected="false"]', '.weekly-full']);
       setDayBlocks(k, had, 'jenn');
       mnyOpenMyMoney('jenn');
-      take('My money', ['#screen-mymoney .mv2-card', '#screen-mymoney .mny-tab.on', '#screen-mymoney .mny-btn', '#screen-mymoney .mv2-act']);
+      take('My money', ['#screen-mymoney .mv2-card', '#screen-mymoney .ph-tab[aria-current="page"]', '#screen-mymoney > * > .ph .ph-btn', '#screen-mymoney .mv2-act']);
       goToday(); tdOpenMore(); await wait(350);
       take('More', ['#tdMoreOverlay .sheet', '#tdMoreOverlay .td-more-tile']);
       closeSheet('tdMoreOverlay');
@@ -17426,7 +17430,7 @@ function findChromium() {
       setParentDest('meeting');
       take('Parent › Meeting', ['#screen-parent .review-day', '#screen-parent .hub-status']);
       openFamilyMeeting(); await wait(350);
-      take('Family meeting', ['#screen-meeting .mm-step:not(.mm-step-cur)', '#screen-meeting .mm-step-cur',
+      take('Family meeting', ['#screen-meeting .ph-seg-btn:not([aria-current])', '#screen-meeting .ph-seg-btn[aria-current]',
         '#screen-meeting .mm-drow', '#screen-meeting .mm-nav']);
       showScreen('profile');
       take('Profile picker', ['#screen-profile .profile-card', '#screen-profile .profile-card.parent']);
@@ -25153,8 +25157,8 @@ function findChromium() {
         if (!/earned/.test(key) || !/given/.test(key) || !/made/.test(key) || !/went to/.test(key)) bad.push('the passbook key lacks the groups: ' + key);
         const row = wrap.querySelector('.mv2-bookrow[data-mny-week]');
         if (!row || !row.querySelector('.mv2-bookbar--in') || !row.querySelector('.mv2-bookbar--out')) bad.push('a Sunday does not show money in above where it went');
-        // One row of head: the tabs inside the head.
-        if (!wrap.querySelector('.mny-head.mny-head--one .mny-tabs')) bad.push('the My money tabs are not in the head row');
+        // The tabs inside the header (a grown-up's in its sub-bar).
+        if (!wrap.querySelector(':scope > .ph.ph--money .ph-tabs')) bad.push('the My money tabs are not in the header');
         // Plan v17 §1: the four buttons in a row and the ⏳ Asked parents strip.
         if (wrap.querySelectorAll('.mv2-actions .mv2-act').length !== 4 || !/Asked parents/.test((wrap.querySelector('.mv2-asked') || {}).textContent || '')) bad.push('the four buttons or ⏳ Asked parents are missing');
         if (/Ask Dad|Asked Dad/.test(wrap.textContent)) bad.push('My money still says Dad');
@@ -25354,21 +25358,24 @@ function findChromium() {
         const kid = 'jenn';
         const seeded = mv2Seed(kid); if (seeded) bad.push(seeded);
         profile = kid;
+        goToday(); navReturnStack = [];
         mnyOpenMyMoney(kid);
         tdRenderNav();
         const wrap = document.getElementById('mnyPage1Wrap');
-        const head = wrap.querySelector('.mny-head.mny-head--big');
-        if (!head) bad.push('no one-row 72px head');
+        const head = wrap.querySelector(':scope > .ph.ph--money');
+        if (!head) bad.push('no one-row 72px money header');
         else {
-          if (!head.querySelector('[data-mny-action="backtoday"]')) bad.push('◀ does not go back to Today');
-          if (!head.querySelector('.mny-tabs')) bad.push('the tabs are not in the head row');
+          const back = head.querySelector('.ph-back[data-ph-action="back"]');
+          if (!back || back.getAttribute('aria-label') !== 'Back to Today') bad.push('◀ does not go back to Today: ' + (back && back.getAttribute('aria-label')));
+          if (!head.querySelector('.ph-main .ph-tabs')) bad.push('the tabs are not in the header row');
           // Decision 14: the head's 📖 My money story button is retired.
-          if (/My money story/.test(head.textContent) || !/How this page works/.test(head.textContent)) bad.push('the head still carries 📖 My money story, or lacks ? How this page works');
-          if (!head.querySelector('.mny-head-date')) bad.push('the head lacks the date');
-          const h = head.getBoundingClientRect().height;
-          if (h < 66 || h > 80) bad.push('the head is ' + Math.round(h) + 'px tall, not 72');
+          if (/My money story/.test(head.textContent) || !head.querySelector('[aria-label="How this page works"]')) bad.push('the header still carries 📖 My money story, or lacks ? How this page works');
+          if (!head.querySelector('.ph-context')) bad.push('the header lacks the date');
+          const h = head.querySelector('.ph-main').getBoundingClientRect().height;
+          if (Math.abs(h - 72) > 0.5) bad.push('the header row is ' + Math.round(h) + 'px tall, not 72');
+          if (back) { back.click(); if (!document.getElementById('screen-today').classList.contains('active')) bad.push('◀ did not go back to Today'); mnyOpenMyMoney(kid); }
         }
-        if (wrap.querySelectorAll('.mny-tabs').length !== 1) bad.push('a second tab row is on the page');
+        if (wrap.querySelectorAll('.ph-tabs').length !== 1) bad.push('a second tab row is on the page');
         const nav = document.getElementById('kidNav');
         if (nav && !nav.hidden) bad.push('the kid bottom bar shows on My money');
         ['.mv2-sun', '.mv2-asked', '.mv2-wall', '.mv2-have', '.mv2-goals', '.mv2-actions', '.mv2-book', '.mv2-coming', '.mv2-stickers']
@@ -25562,27 +25569,28 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  /* The family meeting's head on the money step (Plan v17 §0): two rows —
-     the girls as pictures that switch (✓ when signed), "Family meeting", the
-     1·2·3 pills and the week; then whose money, the four steps, Sound and
-     Parent's card — and no bottom bar on the money step. */
+  /* The family meeting's header on the money step (PR 4, the owner's
+     meeting picture): two rows — the girls as pictures that switch (✓ when
+     signed), "Family meeting", the three steps, Sound and Parent's card;
+     then whose money, the four Sunday steps and the week — and no bottom bar
+     on the money step. */
   if (want('meetingHeaderTwoRowsNoBottomBar')) checks.meetingHeaderTwoRowsNoBottomBar = await page.evaluate(() => {
     const snap = sdSnap(), unpin = sdPin(6);
     const bad = [];
     try {
       const wk = sdSeedWeek('jenn');
       const host = sdBody();
-      const head = host.querySelector('.mm-head.mm-head--two');
-      if (!head) bad.push('no two-row head');
+      const head = host.querySelector(':scope > .ph.ph--meeting');
+      if (!head) bad.push('no two-row meeting header');
       else {
-        const r1 = head.querySelector('.mm-head-r1'), r2 = head.querySelector('.mm-head-r2');
-        if (!r1 || !r2) bad.push('the head is not two rows');
+        const r1 = head.querySelector('.ph-main'), r2 = head.querySelector('.ph-r2');
+        if (!r1 || !r2) bad.push('the header is not two rows');
         else {
           if (r1.querySelectorAll('.sd-av').length !== 2) bad.push('row 1 lacks the two girls as pictures');
-          if (r1.querySelectorAll('.mm-step').length !== 3) bad.push('row 1 lacks the 1·2·3 pills');
-          if (!/Week of/.test(r1.textContent)) bad.push('row 1 lacks the week');
+          if (r1.querySelectorAll('.ph-seg-btn').length !== 3) bad.push('row 1 lacks the three steps');
+          if (!r1.querySelector('[data-mny-action="sd-sound"][aria-pressed]') || !r1.querySelector('[data-mny-action="sd-dad"]')) bad.push('row 1 lacks Sound or Parent\'s card');
+          if (!/Week of/.test(r2.textContent)) bad.push('row 2 lacks the week');
           if (r2.querySelectorAll('.sd-stepchip').length !== 4) bad.push('row 2 lacks the four steps');
-          if (!r2.querySelector('[data-mny-action="sd-sound"]') || !r2.querySelector('[data-mny-action="sd-dad"]')) bad.push('row 2 lacks Sound or Parent\'s card');
           if (!/The money for Jenn/.test(r2.textContent)) bad.push('row 2 does not say whose money');
         }
       }
@@ -25891,7 +25899,7 @@ function findChromium() {
           pinAt(2026, 9, day);
           const wk = ctThisWeekKey();
           const money = mmHead(wk, '', 'money'), other = mmHead(wk, '', 'reflect');
-          if (money.indexOf(want) < 0) bad.push(`Sun ${day} Oct: the money head does not read "${want}": ${(money.match(/mm-head-wk[^<]*<span[^>]*>[^<]*<\/span>([^<]*)/) || [])[1]}`);
+          if (money.indexOf(want) < 0) bad.push(`Sun ${day} Oct: the money head does not read "${want}": ${(money.match(/class="ph-week">([^<]*)/) || [])[1]}`);
           if (other.indexOf(mmWeekLabel(wk)) < 0) bad.push(`Sun ${day} Oct: a planner step lost its Mon–Sun week`);
         });
         // The clock stays at Sun 11 Oct (the last pin) and the planner on its
@@ -25899,7 +25907,7 @@ function findChromium() {
         weekOffset = 0;
         const kid = 'jenn', wk = sdSeedWeek(kid);
         if (wk !== '2026-10-05') bad.push('precondition: the seeded week is ' + wk + ', not the week of Mon 5 Oct');
-        const shown = (document.querySelector('.mm-head-wk') || {}).textContent || '';
+        const shown = (document.querySelector('#familyMeetingBody .ph-week') || {}).textContent || '';
         if (shown.indexOf(mrMoneyWeekLabel(mmWeekKey())) < 0 || shown.indexOf('Mon 5 – Sun 11 Oct') < 0) bad.push('the drawn money head does not read "Mon 5 – Sun 11 Oct": ' + shown);
         // The passbook's week card and Grown-ups › 📒 Weeks name it the same way.
         sdSignHer(kid, wk);
@@ -26178,11 +26186,11 @@ function findChromium() {
           tdRenderNav();
           const wrap = document.getElementById('mnySchoolWrap');
           const shown = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-          if (!wrap.querySelector('.mny-head.mny-head--one.mny-head--big')) bad.push('no one-row head');
-          const tabs = [...wrap.querySelectorAll('.mny-tabs .mny-tab')].filter(shown);
+          if (!wrap.querySelector(':scope > .ph.ph--money > .ph-main .ph-tabs')) bad.push('no one-row money header with the tabs in it');
+          const tabs = [...wrap.querySelectorAll('.ph-tabs .ph-tab')].filter(shown);
           const ids = tabs.map(t => t.getAttribute('data-mny-tab')).join(',');
           if (ids !== 'money,school') bad.push(`the head's tabs are "${ids}", not her two (money,school)`);
-          if (!wrap.querySelector('.mny-tab.on[data-mny-tab="school"]')) bad.push('🎓 is not the current tab');
+          if (!wrap.querySelector('.ph-tab[aria-current="page"][data-mny-tab="school"]')) bad.push('🎓 is not the current tab');
           if (tabs.some(t => /\d/.test(t.textContent)) || /five money pages/i.test(wrap.textContent)) bad.push('a numbered tab bar is drawn');
           const nav = document.getElementById('kidNav');
           if (nav && !nav.hidden && shown(nav)) bad.push('the kid bottom bar shows on Money school');
@@ -26318,13 +26326,13 @@ function findChromium() {
         const underMyMoney = (what) => {
           if (active() !== 'screen-moneystory') { bad.push(what + ' opened ' + active()); return; }
           tdRenderNav();
-          const head = wrap.querySelector('.mny-head.mny-head--big');
-          if (!head || !/💰 My money/.test((head.querySelector('.mny-head-title') || {}).textContent || '')) bad.push(what + ' is not under the My money head');
-          if (!wrap.querySelector('.mny-tab.on[data-mny-tab="money"]')) bad.push(what + ': 💰 My money is not the current tab');
+          const head = wrap.querySelector(':scope > .ph.ph--money');
+          if (!head || ((head.querySelector('.ph-title') || {}).textContent || '') !== 'My money') bad.push(what + ' is not under the My money header');
+          if (!wrap.querySelector('.ph-tab[aria-current="page"][data-mny-tab="money"]')) bad.push(what + ': 💰 My money is not the current tab');
           const nav = document.getElementById('kidNav');
           if (nav && !nav.hidden) bad.push(what + ': the kid bottom bar shows');
-          const back = wrap.querySelector('[data-mny-action="backmoney"]');
-          if (!back) bad.push(what + ' has no ◀');
+          const back = wrap.querySelector('.ph-back[data-ph-action="back"]');
+          if (!back || back.getAttribute('aria-label') !== 'Back to My money') bad.push(what + ' has no ◀ back to My money');
           else { back.click(); if (active() !== 'screen-mymoney') bad.push('◀ from ' + what + ' lands on ' + active()); }
         };
         const door = (act) => {
@@ -27015,10 +27023,11 @@ function findChromium() {
         card.querySelector('#mnyConceptMore').click();
         if (document.getElementById('mnyConceptCard')) bad.push('the explainer stayed open');
         if (!document.getElementById('screen-moneyschool').classList.contains('active') || mnySchoolConcept !== 'gic') bad.push('📚 did not open Money school at the idea');
-        if (!mnySchoolReturn || mnySchoolReturn.screen !== 'mymoney') bad.push('no way back was remembered');
-        if (JSON.stringify(state).includes('mnySchoolReturn')) bad.push('the way back went into state');
-        const back = document.querySelector('#mnySchoolWrap [data-mny-action="backschool"]');
-        if (!back) bad.push('Money school has no ◀');
+        const top = navReturnPeek();
+        if (!top || top.screen !== 'mymoney') bad.push('no way back was remembered');
+        if (JSON.stringify(state).includes('navReturn')) bad.push('the way back went into state');
+        const back = document.querySelector('#mnySchoolWrap > .ph .ph-back');
+        if (!back || back.getAttribute('aria-label') !== 'Back to My money') bad.push('Money school has no ◀ back to My money');
         else {
           back.click();
           if (!document.getElementById('screen-mymoney').classList.contains('active')) bad.push('◀ did not come back to My money');
@@ -27101,7 +27110,7 @@ function findChromium() {
     try {
       openFamilyMeeting(); mmGoStep(3);
       const sheet = document.querySelector('#screen-meeting .mm-screen');
-      const head = document.querySelector('#familyMeetingBody .mm-head');
+      const head = document.querySelector('#familyMeetingBody > .ph');
       const nav = document.querySelector('#familyMeetingBody .mm-nav');
       if (!head) bad.push('the week and step header is not its own band');
       // Plan v17 §0: the money step has no bottom bar — its own ◀ / → buttons move between its steps.
@@ -27623,6 +27632,142 @@ function findChromium() {
     checks.kidScreensHaveOneStandardHeader = problems.length ? problems : true;
   }
 
+  /* THE MONEY AND MEETING HEADERS (PR 4 part 3, the owner's money and meeting
+     pictures; D21, D25, D26). My money, Money school, All my Sundays and By
+     month each draw exactly one money pageHeader, and the family meeting one
+     meeting pageHeader — no old .mny-head / .mm-head / hidden .mm-title. At
+     the iPad and the phone size, in both looks: the money row is 72px / 64px,
+     the meeting's rows 62px / 60px and 44px with a dashed rule between; the
+     header spans the screen and nothing in a row is pushed out of it. The
+     money ◀ says "Back to <screen>"; the title has no emoji (D5); the date
+     shows on the iPad and hides on a phone, the only header that drops it
+     (D26), and so does the title where the tabs name the page; the badge is
+     the round avatar, far right, at least 52px; every header button is at
+     least 44px. */
+  if (want('moneyAndMeetingHeadersHoldTheirSizes')) {
+    const before = page.viewportSize();
+    const problems = [];
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+        await page.setViewportSize({ width: w, height: h });
+        problems.push(...await page.evaluate(([size]) => {
+          const out = [];
+          const wasProfile = profile, wasViewing = parentViewing;
+          const emoji = /\p{Extended_Pictographic}/u;
+          const phone = size === 'phone';
+          const off = (el) => !el || getComputedStyle(el).display === 'none';
+          const vw = document.documentElement.clientWidth;
+          const common = (label, screen, hdr) => {
+            const r = hdr.getBoundingClientRect();
+            if (Math.abs(r.left) > 0.5 || Math.abs(r.width - vw) > 0.5) out.push(`${size} ${label}: the header is ${Math.round(r.width)}px from ${Math.round(r.left)}, not the screen's ${vw}`);
+            for (const row of hdr.querySelectorAll('.ph-row')) {
+              if (row.scrollWidth > row.clientWidth + 1) out.push(`${size} ${label}: a row's things are ${row.scrollWidth}px in ${row.clientWidth}px`);
+            }
+            for (const b of hdr.querySelectorAll('button')) {
+              if (off(b) || !b.getBoundingClientRect().width) continue;
+              const q = b.getBoundingClientRect();
+              if (q.width < 44 || q.height < 44) out.push(`${size} ${label}: a header button "${b.getAttribute('aria-label') || b.textContent.trim()}" is ${Math.round(q.width)}×${Math.round(q.height)}, under 44px`);
+            }
+            const title = hdr.querySelector('.ph-title');
+            if (title && emoji.test(title.textContent)) out.push(`${size} ${label}: the title "${title.textContent}" carries an emoji (D5)`);
+            if (title && !off(title) && title.scrollWidth > title.clientWidth + 1) out.push(`${size} ${label}: the title is cut`);
+          };
+          try {
+            profile = 'jenn'; parentViewing = 'jenn';
+            const money = [
+              ['My money', 'screen-mymoney', 'mnyPage1Wrap', () => mnyOpenMyMoney('jenn'), 'My money', 'money', 'Back to Today'],
+              ['Money school', 'screen-moneyschool', 'mnySchoolWrap', () => { mnyOpenMyMoney('jenn'); mnyGoTab('school'); }, 'Money school', 'school', 'Back to My money'],
+              ['All my Sundays', 'screen-moneystory', 'mnyStoryWrap', () => { mnyOpenMyMoney('jenn'); mnyOpenSundays(); }, 'My money', 'money', 'Back to My money'],
+              ['By month', 'screen-moneystory', 'mnyStoryWrap', () => { mnyOpenMyMoney('jenn'); mnyOpenByMonth(); }, 'My money', 'money', 'Back to My money'],
+            ];
+            for (const [label, id, wrapId, open, title, tab, backLabel] of money) {
+              goToday(); navReturnStack = [];
+              open();
+              const screen = document.getElementById(id);
+              if (!screen.classList.contains('active')) { out.push(`${size} ${label}: the screen did not open`); continue; }
+              const heads = screen.querySelectorAll('header');
+              const ph = document.querySelectorAll(`#${wrapId} > header.ph.ph--money`);
+              if (heads.length !== 1 || ph.length !== 1) { out.push(`${size} ${label}: ${heads.length} headers, ${ph.length} money page headers — want exactly one`); continue; }
+              if (screen.querySelector('.mny-head, .mny-back')) out.push(`${size} ${label}: an old money head is still drawn`);
+              const hdr = ph[0];
+              if (!hdr.hasAttribute('data-money-surface')) out.push(`${size} ${label}: the header is not a money root (data-money-surface)`);
+              const row = hdr.querySelector('.ph-main');
+              const rowH = row.getBoundingClientRect().height;
+              if (Math.abs(rowH - (phone ? 64 : 72)) > 0.5) out.push(`${size} ${label}: the row is ${rowH}px, expected ${phone ? 64 : 72}px`);
+              if (hdr.querySelector('.ph-sub, .ph-r2')) out.push(`${size} ${label}: a kid's money header has a second row`);
+              common(label, screen, hdr);
+              const back = hdr.querySelector('.ph-back');
+              if (!back || back.getAttribute('aria-label') !== backLabel) out.push(`${size} ${label}: the ◀ is ${back ? JSON.stringify(back.getAttribute('aria-label')) : 'missing'}, expected "${backLabel}"`);
+              const t = hdr.querySelector('.ph-title');
+              if (!t || t.textContent !== title) out.push(`${size} ${label}: the title is ${t ? JSON.stringify(t.textContent) : 'missing'}, expected "${title}"`);
+              else if (off(t) !== phone) out.push(`${size} ${label}: the title is ${phone ? 'shown on a phone, where the tab names the page' : 'hidden on the iPad'}`);
+              const ctx = hdr.querySelector('.ph-context');
+              if (!ctx) out.push(`${size} ${label}: no date`);
+              else if (off(ctx) !== phone) out.push(`${size} ${label}: the date is ${phone ? 'shown on a phone (D26)' : 'hidden on the iPad'}`);
+              const cur = hdr.querySelector('.ph-main .ph-tabs .ph-tab[aria-current="page"]');
+              if (!cur || cur.getAttribute('data-mny-tab') !== tab) out.push(`${size} ${label}: the current tab is ${cur ? cur.getAttribute('data-mny-tab') : 'missing'}, expected ${tab}`);
+              const badge = hdr.querySelector('.ph-badge.ph-badge--avatar');
+              if (!badge) out.push(`${size} ${label}: no avatar badge (D25)`);
+              else {
+                const r = badge.getBoundingClientRect();
+                if (r.width < 52 || r.height < 52) out.push(`${size} ${label}: the badge is ${Math.round(r.width)}×${Math.round(r.height)}, under 52px`);
+                if (row.lastElementChild !== badge) out.push(`${size} ${label}: the badge is not far right`);
+              }
+            }
+            // A grown-up: her five tabs and the kid switch in the sub-bar.
+            profile = 'parent'; parentUnlockedThisSession = true;
+            mnyOpenMyMoney('jenn');
+            {
+              const hdr = document.querySelector('#mnyPage1Wrap > header.ph.ph--money');
+              const sub = hdr && hdr.querySelector('.ph-sub');
+              if (!sub || sub.querySelectorAll('.ph-tab').length !== 5 || sub.querySelectorAll('.ui-kids [data-mny-action="kid"]').length !== 2) out.push(`${size} My money (parent): the five tabs and the kid switch are not in the sub-bar`);
+              else {
+                if (Math.abs(sub.getBoundingClientRect().height - 44 - 1) > 1) out.push(`${size} My money (parent): the sub-bar is ${sub.getBoundingClientRect().height}px`);
+                common('My money (parent)', null, hdr);
+              }
+            }
+            // The meeting: one header, two rows, as drawn.
+            parentViewing = 'jenn';
+            openFamilyMeeting(); mmGoStep(3);
+            for (const step of ['money', 'week']) {
+              if (step === 'week') mmGoTo('week');
+              const label = `the meeting (${step})`;
+              const screen = document.getElementById('screen-meeting');
+              const ph = screen.querySelectorAll('#familyMeetingBody > header.ph.ph--meeting');
+              if (screen.querySelectorAll('header').length !== 1 || ph.length !== 1) { out.push(`${size} ${label}: want exactly one meeting page header`); continue; }
+              if (screen.querySelector('.mm-title, .mm-head')) out.push(`${size} ${label}: the old head or the hidden title is still drawn`);
+              const hdr = ph[0];
+              if (!hdr.hasAttribute('data-money-surface')) out.push(`${size} ${label}: the header is not a money root`);
+              const r1 = hdr.querySelector('.ph-main'), r2 = hdr.querySelector('.ph-r2');
+              const h1 = r1.getBoundingClientRect().height, h2 = r2 ? r2.getBoundingClientRect().height : 0;
+              if (Math.abs(h1 - (phone ? 60 : 62)) > 0.5) out.push(`${size} ${label}: row 1 is ${h1}px, expected ${phone ? 60 : 62}px`);
+              if (!r2 || Math.abs(h2 - 44 - parseFloat(getComputedStyle(r2).borderTopWidth)) > 0.5) out.push(`${size} ${label}: row 2 is ${h2}px, expected 44px and its rule`);
+              if (r2 && getComputedStyle(r2).borderTopStyle !== 'dashed') out.push(`${size} ${label}: the rule under row 1 is ${getComputedStyle(r2).borderTopStyle}, not dashed`);
+              const t = hdr.querySelector('.ph-title');
+              if (!t || t.textContent !== 'Family meeting') out.push(`${size} ${label}: the title is ${t ? JSON.stringify(t.textContent) : 'missing'}`);
+              else if (off(t) !== phone) out.push(`${size} ${label}: the title is ${phone ? 'shown on a phone' : 'hidden on the iPad'}`);
+              if (hdr.querySelectorAll('.ph-main .ph-seg-btn').length !== 3 || !hdr.querySelector('.ph-seg-btn[aria-current="step"]')) out.push(`${size} ${label}: row 1 lacks the three steps with the current one marked`);
+              if (off(hdr.querySelector('.ph-week')) !== phone) out.push(`${size} ${label}: the week is ${phone ? 'shown on a phone' : 'hidden on the iPad'}`);
+              if (hdr.querySelector('.ph-back, .ph-badge')) out.push(`${size} ${label}: the meeting header has a ◀ or a badge`);
+              common(label, screen, hdr);
+            }
+            mmHide();
+          } finally {
+            profile = wasProfile; parentViewing = wasViewing;
+            navReturnStack = [];
+            goToday();
+          }
+          return out;
+        }, [size]));
+      }
+      problems.forEach((p, i) => { if (!/^\[/.test(p)) problems[i] = `[${look}] ${p}`; });
+    }
+    await clearLooks();
+    await page.setViewportSize(before);
+    checks.moneyAndMeetingHeadersHoldTheirSizes = problems.length ? problems : true;
+  }
+
   /* ONE BACK STACK. Every header ◀ goes back through navReturn
      (js/05-helpers.js): the screen a page was opened from, by name in its
      aria-label, and there when pressed. The Day's ◀ said "◀ Week" and went to
@@ -27679,6 +27824,41 @@ function findChromium() {
           document.body.classList.remove('meeting-return-pending');
           document.querySelectorAll('.ph-badge').forEach(x => { x.hidden = false; });
         }
+      }
+      /* The money pages (PR 4 part 3): Today → My money → 🎓 tab → ◀ My money
+         → ◀ Today; a tab back to My money takes the step off rather than
+         leading ◀ to the page itself; the meeting's '?' → Money school → ◀
+         the meeting. */
+      navReturnStack = [];
+      {
+        const mback = (wrapId) => document.querySelector('#' + wrapId + ' > .ph .ph-back');
+        goToday(); mnyOpenMyMoney('jenn');
+        b = mback('mnyPage1Wrap');
+        if (!b || b.getAttribute('aria-label') !== 'Back to Today') bad.push(`from Today, My money's ◀ is ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}`);
+        mnyGoTab('school');
+        b = mback('mnySchoolWrap');
+        if (!b || b.getAttribute('aria-label') !== 'Back to My money') bad.push(`from My money, Money school's ◀ is ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}`);
+        mnyGoTab('money');
+        b = mback('mnyPage1Wrap');
+        if (!b || b.getAttribute('aria-label') !== 'Back to Today') bad.push(`My money's tab from Money school left its ◀ at ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}`);
+        mnyOpenSundays();
+        b = mback('mnyStoryWrap');
+        if (b) b.click();
+        if (active() !== 'screen-mymoney') bad.push(`All my Sundays' ◀ went to ${active()}`);
+        b = mback('mnyPage1Wrap');
+        if (b) b.click();
+        if (active() !== 'screen-today') bad.push(`My money's ◀ went to ${active()}, not Today`);
+        const wasViewing = parentViewing;
+        try {
+          profile = 'parent'; parentViewing = 'jenn';
+          openFamilyMeeting(); mmGoStep(3);
+          mnyOpenSchool('jenn', 'debt', { from: 'meeting' });
+          b = mback('mnySchoolWrap');
+          if (!b || b.getAttribute('aria-label') !== 'Back to the meeting') bad.push(`from the meeting, Money school's ◀ is ${b ? JSON.stringify(b.getAttribute('aria-label')) : 'missing'}`);
+          if (b) b.click();
+          if (active() !== 'screen-meeting') bad.push(`Money school's ◀ went to ${active()}, not the meeting`);
+          mmHide();
+        } finally { parentViewing = wasViewing; profile = 'jenn'; }
       }
       // An empty stack falls back to the week.
       navReturnStack = [];
@@ -27830,7 +28010,7 @@ function findChromium() {
       mnyPending = []; mnyPendingFrom = null; mnyPendingReason = MR_DEFAULT_REASON;
       guSheet = null; guOvOpen = {}; guWeekOpen = null; guWeeksKid = 'jenn'; guRuleReason = 'grownups';
       flPeriod = 'month'; flMonth = null;
-      mnySundaysMode = 'week'; mnySundaysMonth = null; mnyHistPage = 'sundays'; mnySchoolConcept = 'debt'; mnySchoolReturn = null;
+      mnySundaysMode = 'week'; mnySundaysMonth = null; mnyHistPage = 'sundays'; mnySchoolConcept = 'debt'; navReturnStack = [];
       // The meeting's money drafts, as mnySetMeetKid('jenn') would leave them —
       // set here rather than by calling it, which would draw the meeting a
       // third time per click and put this sweep past its budget.

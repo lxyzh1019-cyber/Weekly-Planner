@@ -2508,8 +2508,9 @@ actually happened. It is withdrawn once money moves after the commit — see
 was celebrated as zero, and it showed the preliminary money figure as though it
 had been recorded. (text only)
 
-**One scroller, both ends pinned.** `.mm-head` sticks to the top of the sheet and
-`.mm-nav` to the bottom, inside the sheet's own scroll area — nesting a second
+**One scroller, both ends pinned.** The meeting's header (`mmHead`, a meeting
+`pageHeader`) is a band at the top of the sheet and `.mm-nav` one at the
+bottom, around the sheet's own scroll area — nesting a second
 scroller would mean a flick on an iPad moves the wrong one. (text only)
 
 ## Buffer defaults: you go to some things
@@ -4164,10 +4165,10 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   same boxes and the 13px floor holds. Two widths are look tokens too
   (`--sd-legend-w`, `--sd-own-name-w`). A new tight label on these screens
   takes the same form. (text only)
-- **Phone heads are two rows; a describing word is `.ph-word`.** Under 768px
-  it hides and the icon, number or picture stays; the control carries its
-  full name in `aria-label`. My money's head breaks into rows with an
-  `::after` row break and `order`. (text only)
+- **Phone headers drop describing words.** The money pages' and the
+  meeting's headers are `pageHeader`'s (PR 4): on a phone the money tabs show
+  the current one's name and the other's icon, the meeting's steps their
+  numbers; every control carries its full name in `aria-label`. (text only)
 - **A floored fine says so.** Fines can zero a day, never create debt, so a
   fine listed at its cost (−$1.00) can take nothing; the row keeps the minus
   and adds `sdFineFloorNote` ("nothing taken — the day was $0"), read through
@@ -4269,7 +4270,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   money and 🎓 Money school (`mnyTabBar`, icons and names, no numbers; a
   grown-up still gets the whole tagged rail from `mnyTabsFor`). The money story
   page and its head button are gone. 📒 My passbook has two doors, each a full
-  page under My money's head (`mnyMoneyHead`, ◀ back to My money) on
+  page under My money's header (`mnyHead`, ◀ back to My money) on
   `#screen-moneystory`: the 📖 icon (`sundays`) opens **📖 All my Sundays**
   (`mnySundaysPage` — every settled Sunday from the frozen ledger row through
   `sdHistGroups`, labelled with `mrMoneyWeekLabel`) and **📊 By month ▸**

@@ -26,37 +26,19 @@
    ════════════════════════════════════════════════════════════════ */
 
 let mnySchoolConcept = 'debt';
-/* Where Money school's ◀ goes back to (Plan v5 §L M10: "📚 Take me to Money
-   school" and back to the same page). Module state on this device only —
-   never in `state`, which every write uploads whole. `{ screen, scrollY }`;
-   null means the default, My money. */
-let mnySchoolReturn = null;
-
+/* Money school's ◀ goes back where it was opened from (Plan v5 §L M10: "📚
+   Take me to Money school" and back to the same page) through the one back
+   stack (navReturn, js/05): `opts.from` names that screen when the caller
+   knows it — My money at the same place on the page (`opts.scrollY`), or the
+   Sunday step it was asked from; otherwise the screen on show. With nothing
+   remembered, ◀ goes to My money. */
 function mnyOpenSchool(kid, conceptId, opts) {
   if (isParent() && (kid === 'jenn' || kid === 'jess')) mnyKid = kid;
   if (conceptId) mnySchoolConcept = conceptId;
   const from = opts && opts.from;
-  mnySchoolReturn = from ? { screen: String(from), scrollY: Number(opts.scrollY) || 0 } : null;
+  navReturnPush('moneyschool', from ? String(from) : '', from ? Number(opts.scrollY) || 0 : 0);
   showScreen('moneyschool');
   mnyRenderSchool();
-}
-/* ◀ from Money school: back where the explainer was opened — My money at the
-   same place on the page, or the Sunday step it was asked from. Anything
-   else, and the default, is My money. */
-function mnySchoolBack() {
-  const back = mnySchoolReturn;
-  mnySchoolReturn = null;
-  /* From Sunday's '?' (the meeting is a screen): back to the same girl and
-     the same Sunday step — the step lives in her device-local draft. */
-  if (back && back.screen === 'meeting') {
-    showScreen('meeting');
-    renderMeetingMode();
-    return;
-  }
-  mnyOpenMyMoney(mnyViewKid());
-  if (back && back.screen === 'mymoney' && back.scrollY > 0) {
-    try { window.scrollTo(0, back.scrollY); } catch (e) {}
-  }
 }
 
 function mnyRenderSchool() {
@@ -68,15 +50,13 @@ function mnyRenderSchool() {
 
   if (!mnyConceptById(mnySchoolConcept)) mnySchoolConcept = 'debt';
 
-  /* The same head as My money (decision 14): ◀, the title, the two tabs,
-     ? and the date; no bottom bar. Three columns of `.mv2` cards on the
+  /* The same header as My money (decision 14): ◀, the title, the date, the
+     two tabs, ? and her avatar; no bottom bar. Three columns of `.mv2` cards on the
      iPad, filling the screen, as the stage 8 drawing places them: the ladder
      over the Companies chart, the ideas, then "Just part of being here" over
      what money buys. One column on the phone. */
   wrap.innerHTML =
-      `${mnyPageHead('🎓 Money school', '', [
-          { action: 'tourkid', icon: '?', word: 'How this page works' },
-        ], { kidSwitch: true, tabs: 'school', date: true, back: 'backschool', big: true })}
+      `${mnyHead('Money school', 'school', 'moneyschool', 'mymoney')}
        <div class="mv2-school" data-money-surface>
          <div class="mv2-col">${mnyLadderCard(kid, pct, idx)}${mnyStockChart()}</div>
          <div class="mv2-col">${mnyIdeasCard(kid)}</div>

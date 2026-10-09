@@ -1,12 +1,13 @@
 /* ════════════════════════════════════════════════════════════════
    THE PAGE HEADER — one header for every screen (Consistency PR 3)
 
-   pageHeader({variant, back, title, context, actions, badge, sub}) returns the
-   header's markup: `[◀ back?] [Title] [context] [actions ≤2] [profile badge]`
+   pageHeader({variant, back, lead, title, context, tools, actions, badge, sub})
+   returns the header's markup: `[◀ back?] [lead] [Title] [context] [tools]
+   [actions ≤2] [profile badge]`
    in one row, and an optional sub-bar under it for tabs, a stepper or the kid
    switch. PR 4 moves the kid screens onto it — Today, Week, Day, Sister Sync
-   and Print first (phMount below), then mnyPageHead and .mm-head--two — and
-   PR 5 the parent portal's .parent-bar. Its sizes are the --hdr-* tokens and
+   and Print (phMount below), the money pages (mnyHead, js/22) and the
+   family meeting (mmHead, js/15) — and PR 5 the parent portal's .parent-bar. Its sizes are the --hdr-* tokens and
    its classes the .ph-* rules in css/app.css.
 
    Variants, row heights as the owner's header pictures draw them
@@ -18,14 +19,17 @@
                rule; parent buttons stay 44px)
      money     --hdr-money-h: 72px / 64px, one row; 54px buttons, 52px on a phone
      meeting   two rows, --hdr-meeting-h 62px / 60px + 44px; `sub` fills the
-               second row (the step, its dots and the step buttons) instead
-               of a sub-bar. The meeting screen's missing bottom bar is the
-               screen's, not this.
+               second row (the Sunday steps or where the family left off, and
+               the week) instead of a sub-bar, under a 1.5px dashed rule in
+               the page's grid colour. The meeting screen's missing bottom
+               bar is the screen's, not this.
      parent    standard height on the portal's purple (--accent-purple)
 
    Slots, every text escaped here (ARCHITECTURE.md, Escaping):
      back     { to, data, named }    ◀ with aria-label "Back to <to>"; `named`
               also writes <to> beside the ◀ (Day's "◀ Week")
+     lead     markup the caller built and escaped, before the title (the
+              meeting's girls as round pictures)
      title    text                   the screen's name, no emoji (D5)
      step     { prev, next, titleAction }  ◀ ▶ either side of the title,
               each { aria, data } (Day: the date is the title); titleAction
@@ -36,7 +40,9 @@
               money header only (D26)
      tools    markup the caller built and escaped, in the row after the
               title (Week's stepper and view tabs, Day's 1 2 3)
-     actions  [{ label, aria, data }] at most two; a third is not drawn
+     actions  [{ label, aria, data, pressed }] at most two; a third is not
+              drawn; `pressed` (true/false) writes aria-pressed (the
+              meeting's 🔊 Sound)
      badge    { text, icon, avatar, aria, data, id }  always far right;
               `avatar` draws only the icon in a circle, its words in the
               aria-label (every kid header, D25); otherwise the icon, then
@@ -44,6 +50,8 @@
      sub      markup the caller built and escaped (.ui-tabs, .ui-stepper,
               .ui-kids); drawn as the 44px sub-bar (--hdr-sub-h)
      noPrint  true: the header is not printed (Print's own header)
+     moneySurface  true: the header is a money root (data-money-surface,
+              ARCHITECTURE.md) — the money pages' and the meeting's
    `data` is { 'mny-action': 'x', … } and becomes data-mny-action="x": the
    header wires no handler of its own; the screen's delegated listener reads
    the button the way it reads its own (ARCHITECTURE.md prefers data
@@ -68,10 +76,11 @@ function phDataAttrs(data) {
     .join('');
 }
 
-function phButton(cls, aria, data, contentHtml, id) {
+function phButton(cls, aria, data, contentHtml, id, pressed) {
   const ariaAttr = aria ? ` aria-label="${escapeAttr(aria)}" title="${escapeAttr(aria)}"` : '';
   const idAttr = id ? ` id="${escapeAttr(id)}"` : '';
-  return `<button type="button" class="${cls}"${ariaAttr}${phDataAttrs(data)}${idAttr}>${contentHtml}</button>`;
+  const pressedAttr = typeof pressed === 'boolean' ? ` aria-pressed="${pressed}"` : '';
+  return `<button type="button" class="${cls}"${ariaAttr}${pressedAttr}${phDataAttrs(data)}${idAttr}>${contentHtml}</button>`;
 }
 
 /* The text badge keeps the icon and the text as two spans with a space
@@ -102,30 +111,34 @@ function pageHeader(o) {
   const titleHtml = o.step
     ? `<div class="ph-step">${phStepButton(o.step.prev, '◀')}${bareTitleHtml}${phStepButton(o.step.next, '▶')}</div>`
     : bareTitleHtml;
+  const leadHtml = o.lead ? `<div class="ph-lead">${o.lead}</div>` : '';
   const contextHtml = o.context ? `<div class="ph-context">${escapeHtml(o.context)}</div>` : '';
   const toolsHtml = o.tools ? `<div class="ph-tools">${o.tools}</div>` : '';
   const actionsHtml = (o.actions || []).slice(0, PH_MAX_ACTIONS)
-    .map(a => phButton('ph-btn', a.aria, a.data, escapeHtml(a.label || '')))
+    .map(a => phButton('ph-btn', a.aria, a.data, escapeHtml(a.label || ''), null, a.pressed))
     .join('');
   const actionsWrapHtml = actionsHtml ? `<div class="ph-actions">${actionsHtml}</div>` : '';
   const badgeHtml = o.badge ? phBadgeHtml(o.badge) : '';
   const subHtml = o.sub || '';
-  const mainRowHtml = `<div class="ph-row ph-main">${backHtml}${titleHtml}${contextHtml}${toolsHtml}${actionsWrapHtml}${badgeHtml}</div>`;
+  const mainRowHtml = `<div class="ph-row ph-main">${backHtml}${leadHtml}${titleHtml}${contextHtml}${toolsHtml}${actionsWrapHtml}${badgeHtml}</div>`;
   const lowerHtml = !subHtml ? ''
     : variant === 'meeting' ? `<div class="ph-row ph-r2">${subHtml}</div>`
     : `<div class="ph-row ph-sub">${subHtml}</div>`;
   const printCls = o.noPrint ? ' no-print' : '';
-  return `<header class="ph ${PH_VARIANT_CLASS[variant]}${printCls}">${mainRowHtml}${lowerHtml}</header>`;
+  const surfaceAttr = o.moneySurface ? ' data-money-surface' : '';
+  return `<header class="ph ${PH_VARIANT_CLASS[variant]}${printCls}"${surfaceAttr}>${mainRowHtml}${lowerHtml}</header>`;
 }
 
-/* ── The kid screens' standard headers (PR 4) ──
+/* ── The kid screens' headers (PR 4) ──
    Today, Week, Day, Sister Sync and Print each keep one <header class="ph …">
    as a direct child of their screen; phMount swaps it for a fresh pageHeader
    on every render of that screen, so the header always says what the screen
-   under it says. Their buttons carry data-ph-action, answered by kidHeadClick
-   below — bound once per screen in js/99-main.js (KID_HEAD_SCREENS),
-   delegated like every rebuilt surface here. */
-const KID_HEAD_SCREENS = ['screen-today', 'screen-week', 'screen-day', 'screen-sync', 'screen-print'];
+   under it says. The money pages draw theirs at the top of their wrap
+   (mnyHead, js/22). Their buttons carry data-ph-action, answered by
+   kidHeadClick below — bound once per screen in js/99-main.js
+   (KID_HEAD_SCREENS), delegated like every rebuilt surface here. */
+const KID_HEAD_SCREENS = ['screen-today', 'screen-week', 'screen-day', 'screen-sync', 'screen-print',
+  'screen-mymoney', 'screen-moneyschool', 'screen-moneystory'];
 
 function phMount(screenId, o) {
   const old = document.querySelector('#' + screenId + ' > header.ph');
