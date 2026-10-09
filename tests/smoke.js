@@ -27679,7 +27679,9 @@ function findChromium() {
           selWeight: (opt(r.sw, 'selected (\\d{3})') || opt(r.sw, 'body \\d+px (\\d{3}) nowrap') || [null])[0], selBg: sel ? sel[2] : null, selFg: sel ? sel[3] : null,
           pills: opt(r.sw, 'pills min-height (\\d+), pad 0 (\\d+), gap (\\d+), r999, (\\d+)px'), pillFont: opt(r.sw, '= ([\\d.]+)px (\\d{3});'),
           tabsGap: opt(r.sw, 'tabs gap (\\d+)'), joined: opt(r.sw, 'selected cell flex 1, h(\\d+), gap (\\d+), body (\\d+)px (\\d{3})'),
-          otherIcon: opt(r.sw, '🎓 (\\d+)px'), span: /^span:/.test(r.sw) };
+          otherIcon: opt(r.sw, '🎓 (\\d+)px'), span: /^span:/.test(r.sw),
+          // Where the picture's size does not fit the longer name (table note 7): "; Money school <px>px at ≤<width>".
+          schoolNarrow: opt(r.sw, '; Money school ([\\d.]+)px at ≤(\\d+)') };
         if (!w.sw.selBg) problems.push(`${tag}: the table's Switch cell names no selected colour: ${JSON.stringify(r.sw)}`);
       }
       if (/^girls:/.test(r.badge)) {
@@ -28004,7 +28006,8 @@ function findChromium() {
                     switchFrame(tabs, 'the tab switch');
                     near(cur.getBoundingClientRect().height, +want.sw.joined[0], 0.5, 'the current tab height');
                     near(px(getComputedStyle(cur).columnGap), +want.sw.joined[1], 0.01, "the current tab's gap");
-                    font(cur, +want.sw.joined[2], want.sw.joined[3], null, bodyFont, 'the current tab');
+                    const sn = want.sw.schoolNarrow, tabNarrow = sn && open === 'school' && window.innerWidth <= +sn[1];
+                    font(cur, tabNarrow ? +sn[0] : +want.sw.joined[2], want.sw.joined[3], null, bodyFont, 'the current tab');
                     cellSize(other, +want.sw.cell[0], +want.sw.cell[1], 'the other tab');
                     near(px(getComputedStyle(tabs.querySelectorAll('.hdr-tab')[1]).borderLeftWidth), want.sw.divider, 0.01, 'the tab divider');
                     near(px(getComputedStyle(other).fontSize), +want.sw.otherIcon[0], 0.05, "the other tab's icon");

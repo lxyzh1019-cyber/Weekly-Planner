@@ -7232,6 +7232,7 @@
   }
   .hdr-tab + .hdr-tab { border-left: var(--bw-chip) solid var(--ink); }
   .hdr-tab[aria-current="page"] { flex: 1 1 auto; width: auto; gap: 6px; font-size: var(--hdr-word-size); font-weight: 600; }
+  .hdr-tab[aria-current="page"][data-mny-tab="school"] { font-size: var(--hdr-school-tab-size, var(--hdr-word-size)); }
   .hdr-tab:not([aria-current]) .hdr-tab-word, .hdr-tab-tag, .hdr-tabs--many .hdr-tab-word, .hdr-sub .ui-kids .hdr-tab-word { display: none; }
   .hdr-sub .hdr-tabs { flex: none; gap: var(--space-1); border: 0; border-radius: 0; overflow: visible; background: none; }
   .hdr-sub .hdr-tab { box-sizing: border-box; width: auto; height: 44px; min-width: 44px; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); }
@@ -7264,6 +7265,18 @@
 }
 @media (max-width: 361px) {
   :root[data-look="pop"] { --hdr-two-month-size: 19.5px; }
+}
+
+/* Money school's selected tab on a phone: 18px where "🎓 Money school" fits
+   the joined switch, else the largest half-pixel size that fits at 360 wide,
+   only on the widths where 18px does not fit (measured 2026-10-09, note 7 in
+   docs/handoff/header-exact-values.md). The switch has 170px at 360, 200 at
+   390; Calm's Lexend name needs 18px from 401 wide, Pop's from 375. */
+@media (max-width: 401px) {
+  :root[data-look="calm"] { --hdr-school-tab-size: 13px; }
+}
+@media (max-width: 374px) {
+  :root[data-look="pop"] { --hdr-school-tab-size: 17px; }
 }
 
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */
