@@ -24521,8 +24521,8 @@ function findChromium() {
   /* PR 1 money re-check, fix 5: the Rules index keeps its 300px at two-column
      widths, so the search box's placeholder "Find a price or rule…" is not cut
      in either look (at 240px Calm's Lexend cut it). Measured, not looked at:
-     the placeholder's width in the input's own font, plus its horizontal
-     padding, must fit the input's width. */
+     the placeholder text, laid out as the input's value, must not overflow
+     the input (scrollWidth <= clientWidth). */
   if (want('rulesSearchPlaceholderFitsTheIndex')) {
     await guSetup();
     const wasView = page.viewportSize();
@@ -24541,13 +24541,13 @@ function findChromium() {
             guRuleSearch = '';
             const box = guOpen('rules').querySelector('#guRuleSearch');
             if (!box) return 'no #guRuleSearch on ⚙️ Rules';
-            const cs = getComputedStyle(box);
-            const ctx = document.createElement('canvas').getContext('2d');
-            ctx.font = cs.font || `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-            const need = ctx.measureText(box.getAttribute('placeholder') || '').width
-              + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-            const have = box.clientWidth;
-            return need <= have ? true : `placeholder needs ${need.toFixed(1)}px but the box is ${have}px wide`;
+            // Real layout: put the placeholder text in as the value (no input
+            // event fires) and see whether it overflows; type="search" keeps
+            // space for its invisible clear button, which a canvas sum misses.
+            box.value = box.getAttribute('placeholder') || '';
+            const sw = box.scrollWidth, cw = box.clientWidth;
+            box.value = '';
+            return sw <= cw ? true : `placeholder text is ${sw}px wide but the box shows ${cw}px`;
           });
           if (r !== true) bad.push(`[${look}, Reading size ${scale}] ${r}`);
         }
