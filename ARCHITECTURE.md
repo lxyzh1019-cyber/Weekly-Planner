@@ -62,8 +62,9 @@ npm run test:fast   # the short loop: npm run check + every unit suite
 **Before a push:** the short loop — `npm run test:fast` plus the tests the test
 map in `FEATURES.md` (`## References`, `Tests:` lines) names for the files
 changed, under 3 minutes on the owner's PC. The `SMOKE_ONLY=<checks>` lists the
-map gives for a screen (below) are optional: each pays a few minutes of setup on
-a laptop, so they are outside the 3-minute target. (text only)
+map gives for a screen (below) are optional and outside the 3-minute target:
+about half a minute when every check named is declared in `SETUP_NEEDS`, about
+two and a half minutes otherwise. (text only)
 
 **Before a pull request opens:** the full suite green on GitHub — the `checks`
 job, the browser job (with the cleanup-tool tests) and one smoke job per date on
@@ -188,7 +189,9 @@ places in the same order.
 **Iterating on a few smoke checks:** `SMOKE_ONLY=checkA,checkB npm run test:smoke`
 runs just those (plus `noConsoleErrors`, which has no guard) in a fraction of the
 full run's time. Each check statement is prefixed `if (want('name'))`, so the setup
-between checks still runs — but a skipped check's own body does not, and the
+between checks still runs, except the steps `SETUP_NEEDS` in `tests/smoke.js`
+lets a subset skip (the house-rules walks: a step runs when a chosen check needs
+it or is not declared there; a full run runs every step) — but a skipped check's own body does not, and the
 checks share one page, so a subset result is a hint, not a verdict. It is for
 iteration only and cannot stand in for the gate: an unknown name exits 1, the
 last line reads `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the
