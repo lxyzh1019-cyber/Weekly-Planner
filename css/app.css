@@ -8142,6 +8142,10 @@
   background: var(--mny-v15-paper); border: var(--bw-card) solid var(--mny-v15-ink); border-radius: var(--radius-md); box-shadow: var(--mny-shadow-card);
 }
 .gu-search-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* type="search" keeps room for its clear button on the right, so the right
+   padding is trimmed: Calm's Lexend at the Largest Reading size had 0px to
+   spare (3px short on CI). The text still starts 14px in. */
+#guRuleSearch { padding-right: 4px; }
 .gu-idx {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-height: 44px; padding: 4px 10px; text-align: left;
   border: var(--bw-chip) solid transparent; border-radius: var(--radius-btn); background: transparent; color: var(--mny-v15-ink); font: inherit; cursor: pointer;
