@@ -24518,6 +24518,50 @@ function findChromium() {
     await guTeardown();
   }
 
+  /* PR 1 money re-check, fix 5: the Rules index keeps its 300px at two-column
+     widths, so the search box's placeholder "Find a price or rule…" is not cut
+     in either look (at 240px Calm's Lexend cut it). Measured, not looked at:
+     the placeholder's width in the input's own font, plus its horizontal
+     padding, must fit the input's width. */
+  if (want('rulesSearchPlaceholderFitsTheIndex')) {
+    await guSetup();
+    const wasView = page.viewportSize();
+    const wasScale = await page.evaluate(() => paTextScale());
+    const bad = [];
+    try {
+      await page.setViewportSize({ width: 900, height: 834 });
+      for (const look of ['pop', 'calm']) {
+        await setLook(look);
+        // Standard and the parent's Largest Reading size (Calm's Lexend at
+        // Larger or Largest is what a 240px column cut).
+        for (const scale of ['1', '1.3']) {
+          await page.evaluate((v) => { try { localStorage.setItem(PA_SCALE_KEY, v); } catch (e) {} paApplyTextScale(); }, scale);
+          await page.waitForTimeout(150);
+          const r = await page.evaluate(() => {
+            guRuleSearch = '';
+            const box = guOpen('rules').querySelector('#guRuleSearch');
+            if (!box) return 'no #guRuleSearch on ⚙️ Rules';
+            const cs = getComputedStyle(box);
+            const ctx = document.createElement('canvas').getContext('2d');
+            ctx.font = cs.font || `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+            const need = ctx.measureText(box.getAttribute('placeholder') || '').width
+              + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+            const have = box.clientWidth;
+            return need <= have ? true : `placeholder needs ${need.toFixed(1)}px but the box is ${have}px wide`;
+          });
+          if (r !== true) bad.push(`[${look}, Reading size ${scale}] ${r}`);
+        }
+      }
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally {
+      try { await page.evaluate((v) => { try { localStorage.setItem(PA_SCALE_KEY, v); } catch (e) {} paApplyTextScale(); }, wasScale); } catch (e) { bad.push('could not put the Reading size back: ' + e.message); }
+      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
+      if (wasView) await page.setViewportSize(wasView);
+    }
+    checks.rulesSearchPlaceholderFitsTheIndex = bad.length ? bad : true;
+    await guTeardown();
+  }
+
   if (want('grownupsExpectedMoneyMoves')) {
     await guSetup();
     checks.grownupsExpectedMoneyMoves = await page.evaluate(() => {

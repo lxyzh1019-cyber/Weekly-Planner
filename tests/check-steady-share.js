@@ -27,10 +27,24 @@ function blankComments(src) {
     .replace(/(^|[^:\\])\/\/[^\n]*/g, (m, pre) => pre + ' '.repeat(m.length - pre.length));
 }
 
-// A division whose divisor starts with a name ending in "steady" (any case),
-// optionally behind brackets or an object path: `/ steady`, `/ (steady + r)`,
-// `/ guSteady(kid)`, `/ P.steady`.
-const DIVIDE_BY_STEADY = /\/\s*\(*\s*(?:[\w$]+\.)*[\w$]*steady\b/i;
+// A division whose divisor reaches a name ending in "steady" (any case),
+// possibly behind brackets, an object path or calls wrapped round it:
+// `/ steady`, `/ (steady + r)`, `/ guSteady(kid)`, `/ P.steady`,
+// `/ money2(steady)`, `/ Number(steady)`, `/ Math.max(1, steady)`.
+const DIVIDE_BY_STEADY = /\/\s*[\w$.(\s,]*?steady\b/i;
+
+// Self-test: the pattern must keep catching the wrapped forms and must not
+// flag a plain division (or a comment, once blanked).
+[
+  ['x / steady', true], ['x / money2(steady)', true], ['x / Number(steady)', true],
+  ['x / Math.max(1, steady)', true], ['x / (a.steady + 1)', true],
+  ['x / total', false], ['x / Math.max(1, total) // steady money', false],
+].forEach(([src, flagged]) => {
+  if (DIVIDE_BY_STEADY.test(blankComments(src)) !== flagged) {
+    console.error(`check-steady-share: self-test failed — ${JSON.stringify(src)} should ${flagged ? '' : 'not '}be flagged`);
+    process.exit(1);
+  }
+});
 
 const problems = [];
 for (const f of fs.readdirSync(JS).filter(n => n.endsWith('.js')).sort()) {

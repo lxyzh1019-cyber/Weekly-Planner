@@ -231,7 +231,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 - On screen the Grandma rule is the Grandfather rule everywhere; stored keys are unchanged — Proof: theGrandfatherRuleReadsAsItselfEverywhere
 - Fix this row has What it bought, Each month, Bonus for paying early and Add another loan; Rules has Find a price — Proof: rulesFindAPriceAndListRuleChangesOnly
 - Rules is one screen: an index with find a price, the open group in the middle, What this changes on the right and a save strip along the bottom — Proof: rulesAndWeeksAreOneScreenEach
-- The Rules index keeps 300px at every two-column width, so the search box's placeholder Find a price or rule… is not cut in either look — Proof: none found
+- The Rules index keeps 300px at every two-column width, so the search box's placeholder Find a price or rule… is not cut in either look — Proof: rulesSearchPlaceholderFitsTheIndex
 - Weeks: a summary per girl (earned this year, loan left, typical week, loan payments, saving line), every Sunday with both girls side by side, and a tap opens the whole record of that Sunday — Proof: rulesAndWeeksAreOneScreenEach
 - A commitment under $5 a week of steady money, or over 50% of it, is saved only with the parent's I checked this with her tick; the 10% down payment comes from Savings only above the safety line — Proof: aBigCommitmentNeedsAParentTick
 - Grown-ups Rules looks as in the reference picture, parent iPad Pop — Proof: picture tests/reference/grownups-rules-parent-ipad-pop.png
