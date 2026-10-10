@@ -78,11 +78,15 @@ async function shot(page, look, w, h, open) {
     pair('Owner', noRef, 'Build: App › Preferences (iPad Pop, default)', ip('prefs')));
   body += d(8, 'The portal\'s tabs as the picture', 'The current destination shows its icon, the others their word alone; ⚙️ App its icon; no date in the bar.',
     pair('Owner: iPad Pop', img(owner('parent-ipad-pop.png'), 'owner'), 'Build: Setup (iPad Pop)', ip('portal-setup')));
+  body += d(9, 'Two ways back on a parent\'s Day and Week', 'Row 1 has "◀ Hub" and the sub-bar has "◀ Hub" too (the old banner also had two). Question: keep only the one in row 1?',
+    pair('Owner', noRef, 'Build: Day (iPad Pop)', ip('view-day')));
+  body += d(10, 'The old banner hint is gone', 'The old Parent Mode banner said "Pin activities with long-tap"; the new sub-bar shows "Reviewing Jenn\'s day" instead. Question: bring the hint back (e.g. in the sub-bar or a tooltip) or leave it out?',
+    pair('Owner', noRef, 'Build: Day (iPad Pop)', ip('view-day')));
   const html = `<!doctype html><html lang="en"><meta charset="utf-8"><title>PR 5 parent headers — owner picture beside the build</title>
 <style>body{font:15px/1.4 system-ui,sans-serif;margin:24px;color:#1c2240}h2{margin-top:32px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}figure{margin:0;border:1px solid #ccc;padding:8px}figcaption{font-weight:600;margin-bottom:6px}img{max-width:100%;display:block;margin-bottom:6px;border:1px solid #eee}.noref{padding:40px;text-align:center;background:#f4f4f4;color:#666}.diff{border-top:2px solid #1c2240;margin-top:28px}</style>
 <h1>PR 5 — parent headers: the owner's picture beside the build</h1>
 <p>Stage 30. Source: docs/handoff/consistency/headers/parent-*.png (PARENT v2, SRC 258-329). Build: this branch, captured by tools/pr5-compare-page.js. Values: docs/handoff/header-exact-values.md, Parent rows.</p>
-<p><b>Proof: pictures 33 screens × 2 sizes (iPad 1194×834, phone 390×844) × 2 looks, 132 changed (all planned) · figures: parent header rows measured by everyHeaderMeasuresToTheExactValues (portal, Week, Day, Monthly × 2 sizes × 2 looks) · tests: 21/21 header and parent checks on this PC; GitHub smoke 12/12 jobs green (run 38092283483)</b></p>
+<p><b>Proof: pictures 33 screens × 2 sizes (iPad 1194×834, phone 390×844) × 2 looks, 132 changed (all planned) · figures: parent header rows measured by everyHeaderMeasuresToTheExactValues (portal, Week, Day, Monthly × 2 sizes × 2 looks) · tests: 21/21 header and parent checks on this PC; GitHub run 38093037239 on 45ad22b: 15/15 jobs green, pictures included; references refreshed from run 38092283483</b></p>
 ${body}</html>`;
   fs.writeFileSync(OUT, html);
   console.log('wrote', path.relative(ROOT, OUT), Math.round(html.length / 1024) + ' KB');
