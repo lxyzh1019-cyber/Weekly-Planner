@@ -11394,7 +11394,7 @@ function findChromium() {
         for (const [label, id, nav] of screens.filter(([l]) => l !== 'Sister Sync')) {
           profile = 'parent'; parentViewing = kid; ctParentKid = kid;
           nav();
-          expect(`a parent viewing ${names[kid]}`, label, id, `👨‍👩‍👧‍👦 Parent (${names[kid]})`);
+          expect(`a parent viewing ${names[kid]}`, label, id, `${icons[kid]} Viewing ${names[kid]}`);
         }
         // The child herself, on all four.
         for (const [label, id, nav] of screens) {
@@ -27501,6 +27501,46 @@ function findChromium() {
             return out;
           }, [tag, open, want, size === 'phone', authoredRuleNum]));
         }
+        /* A parent viewing a girl wears HER avatar (owner 2026-10-10): the girl's
+           own icon in the 52px pink circle (the table's Badge cell), "Viewing
+           <Name>, switch profile"; on the Day row 1's way back reads "◀ Week" and
+           the sub-bar's "◀ Hub". Jenn and Jess, Week and Day. */
+        const pinkRow = rows.find(r => r.screen === 'Day' && r.size === size && r.look === lookName);
+        const pinkBadge = pinkRow && /^(\d+)×(\d+) (#[0-9a-f]{6})/.exec(pinkRow.badge || '');
+        if (!pinkBadge) problems.push(`[${look}] ${size}: the Day row's Badge cell has no size and pink fill`);
+        else problems.push(...await page.evaluate(([look, size, bw, bh, bg]) => {
+          const out = [];
+          const wasProfile = profile, wasViewing = parentViewing, wasUnlocked = parentUnlockedThisSession, wasReturn = mmReturn;
+          const rgb = (hex) => `rgb(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)})`;
+          try {
+            for (const [kid, name, icon] of [['jenn', 'Jenn', '🐥'], ['jess', 'Jess', '🦊']]) {
+              for (const where of ['Week', 'Day']) {
+                const tag = `[${look}] ${size} parent viewing ${name}: ${where}`;
+                profile = 'parent'; parentUnlockedThisSession = true; parentViewing = kid; mmReturn = null; navReturnStack = [];
+                goWeek(); setWeekView('full');
+                if (where === 'Day') openDay(getDayKeys(weekOffset)[0], 0);
+                const hdr = document.querySelector(`#screen-${where.toLowerCase()} > header.hdr`);
+                const badge = hdr && hdr.querySelector('.hdr-badge');
+                if (!badge) { out.push(`${tag}: no avatar`); continue; }
+                const cs = getComputedStyle(badge), r = badge.getBoundingClientRect();
+                if (badge.textContent.trim() !== icon) out.push(`${tag}: the avatar draws ${JSON.stringify(badge.textContent.trim())}, expected the girl's ${icon}`);
+                if (Math.abs(r.width - +bw) > 0.5 || Math.abs(r.height - +bh) > 0.5) out.push(`${tag}: the avatar is ${r.width}×${r.height}, the table's ${bw}×${bh}`);
+                if (cs.backgroundColor !== rgb(bg)) out.push(`${tag}: the avatar is ${cs.backgroundColor}, the table's ${bg}`);
+                if (badge.getAttribute('aria-label') !== `Viewing ${name}, switch profile`) out.push(`${tag}: the avatar is labelled ${JSON.stringify(badge.getAttribute('aria-label'))}, expected "Viewing ${name}, switch profile"`);
+                if (where === 'Day') {
+                  const back = hdr.querySelector('.hdr-row .hdr-back'), sub = hdr.querySelector(':scope > .hdr-sub .pb-back-btn');
+                  const words = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
+                  if (words(back) !== '◀ Week') out.push(`${tag}: row 1's way back reads ${JSON.stringify(words(back))}, expected "◀ Week"`);
+                  if (words(sub) !== '◀ Hub') out.push(`${tag}: the sub-bar's way back reads ${JSON.stringify(words(sub))}, expected "◀ Hub"`);
+                }
+              }
+            }
+          } finally {
+            profile = wasProfile; parentViewing = wasViewing; parentUnlockedThisSession = wasUnlocked; mmReturn = wasReturn; navReturnStack = [];
+            setWeekView('full'); goToday();
+          }
+          return out;
+        }, [look, size, pinkBadge[1], pinkBadge[2], pinkBadge[3]]));
         if (size === 'phone' && w !== 390) continue;
         // A grown-up's money header: her five tabs and the kid switch in the
         // sub-bar under the row (difference 6, kept), nothing pushed out.

@@ -1066,9 +1066,9 @@ const KID_LABEL = {
 function kidLabel(p) { return KID_LABEL[p] || { icon: '👤', name: String(p || '') }; }
 
 /* The one wording of every profile badge (Today, week, day, chores, Sister
-   Sync): `👨‍👩‍👧‍👦 Parent (Jenn)` for a grown-up viewing her, `🐥 Jenn` for the
-   child herself. The five screens each wrote this by hand and had drifted
-   (`🐥 Jenn (P)`, `🐥 (P)`). `kid` is whoever the screen is about. Anything
+   Sync): `🐥 Viewing Jenn` for a grown-up viewing her (her own avatar, owner
+   2026-10-10), `🐥 Jenn` for the child herself. The five screens each wrote
+   this by hand and had drifted (`🐥 Jenn (P)`, `🐥 (P)`). `kid` is whoever the screen is about. Anything
    but 'jenn' or 'jess' gives '' — a profile not picked yet, which is what
    Today already showed; a parent's viewed child is always one of the two. */
 function profileBadgeText(kid, asParent) {
@@ -1080,7 +1080,7 @@ function profileBadgeText(kid, asParent) {
 function profileBadgeParts(kid, asParent) {
   const k = KID_LABEL[kid];
   if (!k) return { icon: '', name: '' };
-  return asParent ? { icon: '👨‍👩‍👧‍👦', name: `Parent (${k.name})` } : { icon: k.icon, name: k.name };
+  return { icon: k.icon, name: asParent ? `Viewing ${k.name}` : k.name };
 }
 
 /* ── The school year ──────────────────────────────────────────────────────────

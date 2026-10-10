@@ -59,16 +59,22 @@ async function shot(page, look, w, h, open) {
       : `${b('portal-setup')}<p>Portal (Setup)</p>`;
     body += `<h3>${esc(szName)} · ${esc(lkName)}</h3>` + pair('Owner picture (PARENT v2)', img(owner(`parent-${sz}-${lk}.png`), 'owner'), 'Build', right);
   }
-  const d = (n, title, text, pairHtml) => `<section class="diff"><h2>${n}. ${esc(title)}</h2><p>${esc(text)}</p>${pairHtml}</section>`;
+  // The owner's decisions (2026-10-10): 4 and 9 keep both backs on the Day; the rest are accepted as built.
+  const mark = (n) => (n === 4 || n === 9) ? 'owner: keep both on Day' : 'accepted as built';
+  const d = (n, title, text, pairHtml) => `<section class="diff"><h2>${n}. ${esc(title)} <small>— ${mark(n)}</small></h2><p>${esc(text)}</p>${pairHtml}</section>`;
+  // The two pictures of the owner's avatar and Day-back answers, kept as files.
+  const png = (src) => Buffer.from(src.replace(/^data:image\/png;base64,/, ''), 'base64');
+  fs.writeFileSync(path.join(ROOT, 'docs', 'handoff', 'consistency', 'pr5-week-parent-ipad-pop.png'), png(build['ipad-pop-view-week']));
+  fs.writeFileSync(path.join(ROOT, 'docs', 'handoff', 'consistency', 'pr5-day-parent-ipad-pop.png'), png(build['ipad-pop-view-day']));
   const ip = (o) => img(build[`ipad-pop-${o}`], o), ph = (o) => img(build[`phone-pop-${o}`], o);
   body += '<h2>Numbered differences (header-exact-values.md, "The parent header"); the owner decides each at Stage 31</h2>';
   body += d(1, 'The girl switch hides on Now', 'The picture draws Both · Jenn · Jess on Now (All · 🐥 · 🦊 on the phone). Now has its own girl switch, so the portal\'s stays hidden there, as today; it shows on every other destination.',
     pair('Owner: iPad Pop', img(owner('parent-ipad-pop.png'), 'owner'), 'Build: Now, iPad then phone (Pop)', ip('portal-now') + ph('portal-now')));
-  body += d(2, 'Viewing a girl keeps the kid\'s row; 44px buttons and switch cells', 'Row 1 keeps the kid\'s 52px buttons and 52px pink avatar (picture 44); the sub-bar buttons are 44px (picture 36) and the girl switch\'s cells 44px high (picture 42), the grown-ups\' tap floor.',
+  body += d(2, 'Viewing a girl keeps the kid\'s row; 44px buttons and switch cells', 'Row 1 keeps the kid\'s 52px buttons and 52px pink avatar, now the girl\'s own icon (picture 44); the sub-bar buttons are 44px (picture 36) and the girl switch\'s cells 44px high (picture 42), the grown-ups\' tap floor.',
     pair('Owner: iPad Pop', img(owner('parent-ipad-pop.png'), 'owner'), 'Build: Week, then Day (iPad Pop)', ip('view-week') + ip('view-day')));
   body += d(3, 'Parent Monthly has no picture', '◀ Parent, "Monthly", ◀ month ▶ in the middle (between the arrows on a phone, "Oct 2026") and the Jenn / Jess switch; no badge.',
     pair('Owner', noRef, 'Build: iPad Pop, phone Pop, iPad Calm', ip('monthly') + ph('monthly') + img(build['ipad-calm-monthly'], 'monthly calm')));
-  body += d(4, 'The way back is in the sub-bar', 'The picture puts "◀ Now" at row 1\'s left; the build keeps the kid\'s row and puts "◀ Hub" ("◀ Back to weekly meeting" while a meeting waits) first in the sub-bar.',
+  body += d(4, 'The way back is in the sub-bar', 'The picture puts "◀ Now" at row 1\'s left; the build keeps the kid\'s row and puts "◀ Hub" ("◀ Back to weekly meeting" while a meeting waits) first in the sub-bar. On the Day, row 1 also has the kid\'s "◀ Week".',
     pair('Owner: iPad Pop', img(owner('parent-ipad-pop.png'), 'owner'), 'Build: Week (iPad Pop)', ip('view-week')));
   body += d(5, 'The Week\'s sub-bar has Switch; Confirm all and Mark reviewed are on the Day\'s', 'Confirming and reviewing are per day, with the child\'s name in the words.',
     pair('Build: Week', ip('view-week'), 'Build: Day', ip('view-day')));
@@ -78,7 +84,7 @@ async function shot(page, look, w, h, open) {
     pair('Owner', noRef, 'Build: App › Preferences (iPad Pop, default)', ip('prefs')));
   body += d(8, 'The portal\'s tabs as the picture', 'The current destination shows its icon, the others their word alone; ⚙️ App its icon; no date in the bar.',
     pair('Owner: iPad Pop', img(owner('parent-ipad-pop.png'), 'owner'), 'Build: Setup (iPad Pop)', ip('portal-setup')));
-  body += d(9, 'Two ways back on a parent\'s Day and Week', 'Row 1 has "◀ Hub" and the sub-bar has "◀ Hub" too (the old banner also had two). Question: keep only the one in row 1?',
+  body += d(9, 'Two ways back on a parent\'s Day and Week', 'The Day has "◀ Week" in row 1 (the kid\'s way back) and "◀ Hub" in the sub-bar. Owner 2026-10-10: keep both on the Day; the Week has only the sub-bar\'s "◀ Hub".',
     pair('Owner', noRef, 'Build: Day (iPad Pop)', ip('view-day')));
   body += d(10, 'The old banner hint is gone', 'The old Parent Mode banner said "Pin activities with long-tap"; the new sub-bar shows "Reviewing Jenn\'s day" instead. Question: bring the hint back (e.g. in the sub-bar or a tooltip) or leave it out?',
     pair('Owner', noRef, 'Build: Day (iPad Pop)', ip('view-day')));

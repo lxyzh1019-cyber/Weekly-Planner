@@ -166,7 +166,7 @@ function hdrMount(screenId, o) {
    width, as the owner's pictures draw it (D25), far right, opening the
    switcher. Its words are the one wording (profileBadgeParts, the two parts
    of profileBadgeText) in the aria-label: "Jenn, switch profile",
-   "Parent (Jenn), switch profile". `id` is the screen's own badge id —
+   "Viewing Jenn, switch profile" (a parent sees the girl's own avatar). `id` is the screen's own badge id —
    applyMeetingLock hides the week's and the day's by id, so a header is
    mounted before the lock is applied. */
 function kidHeadBadge(id, kid, asParent) {
@@ -181,6 +181,8 @@ function kidHeadClick(e) {
   switch (el.dataset.hdrAction) {
     case 'profile': openProfileSwitcher(); break;
     case 'back': navReturnBack(el.dataset.hdrFallback || 'week'); break;
+    // A parent's Day: the kid's way back, the girl's Week (owner 2026-10-10).
+    case 'back-week': { const top = navReturnPeek(); if (top && top.screen === 'week') navReturnStack.pop(); goWeek(); break; }
     case 'week-prev': changeWeek(-1); break;
     case 'week-next': changeWeek(1); break;
     case 'view-full': setWeekView('full'); break;

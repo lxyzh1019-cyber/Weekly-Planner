@@ -150,8 +150,13 @@ function renderDayHeading() {
    past day is reflected on from its 📑 sheet. */
 function dayRenderHeader() {
   const title = dayHeadingText();
+  /* A parent viewing a girl: row 1's ◀ is the kid's way back, her Week; the
+     sub-bar keeps ◀ Hub. Mid-meeting the Day was opened from the sitting, so
+     row 1 keeps the one back stack's way out (the meeting). */
+  const parentWeekBack = isParent() && !(typeof mmHasReturn === 'function' && mmHasReturn());
   hdrMount('screen-day', {
-    back: { to: navReturnTo('week'), named: true, data: { 'hdr-action': 'back', 'hdr-fallback': 'week' } },
+    back: parentWeekBack ? { to: 'Week', named: true, data: { 'hdr-action': 'back-week' } }
+      : { to: navReturnTo('week'), named: true, data: { 'hdr-action': 'back', 'hdr-fallback': 'week' } },
     title,
     step: { prev: { aria: 'Previous day', data: { 'hdr-action': 'day-prev' } },
             next: { aria: 'Next day', data: { 'hdr-action': 'day-next' } },
