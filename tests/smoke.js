@@ -8,6 +8,10 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 const { chromium } = require('playwright-core');
+const { PARTS, smokeCheckNames, partProblems } = require('./smoke-parts/parts');
+const houseRulesWalks = require('./smoke-parts/house-rules-walks');
+const moneyScreens = require('./smoke-parts/money-screens');
+const looksWalks = require('./smoke-parts/looks');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -99,6 +103,21 @@ function findChromium() {
      selectable the moment it is written. noConsoleErrors has no guard: an error
      raised by the checks being worked on is exactly what a subset must show. */
   const ONLY = (process.env.SMOKE_ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
+  /* SMOKE_PART=1|2|3 — one of three fixed parts (tests/smoke-parts/parts.js),
+     so CI can run a date's suite as three jobs side by side. Unlike SMOKE_ONLY
+     it is allowed under CI: the three lists together hold every check, which
+     npm run check proves. Only the part's checks (and noConsoleErrors) run;
+     the setup between checks still runs, except a setup step no check of the
+     part declares in SETUP_NEEDS. No SMOKE_PART: the full run, unchanged. */
+  const PART = process.env.SMOKE_PART || '';
+  if (PART && !Object.prototype.hasOwnProperty.call(PARTS, PART)) {
+    console.error(`SMOKE_PART must be one of ${Object.keys(PARTS).join(', ')}, got "${PART}"`);
+    process.exit(1);
+  }
+  if (PART && ONLY.length) {
+    console.error('SMOKE_PART and SMOKE_ONLY are both set; use one.');
+    process.exit(1);
+  }
   // Every run times each check: want() starts the clock and the check's first
   // assignment to `checks` stops it. The setup that runs between checks is
   // timed too (setupMs[name] = the setup just before that check). The times
@@ -110,7 +129,7 @@ function findChromium() {
     const now = Date.now();
     setupMs[name] = now - setupFrom;
     setupFrom = now;
-    const yes = ONLY.length === 0 || ONLY.includes(name);
+    const yes = PART ? PARTS[PART].includes(name) : ONLY.length === 0 || ONLY.includes(name);
     if (yes) timing = { name, t0: now };
     return yes;
   };
@@ -125,7 +144,8 @@ function findChromium() {
        parentScreensAudit — the same walk of the parent portal and the profile
                             picker, both looks, two sizes (about 30 s)
      The walks put back what they seed, and the reset after them (Jenn on
-     Today at 900×1100) runs either way, so the checks after them start alike. */
+     Today at 900×1100) runs either way, so the checks after them start alike.
+     A SMOKE_PART run runs a step only when a check of its part declares it. */
   const SETUP_STEPS = ['kidScreensAudit', 'parentScreensAudit'];
   const SETUP_NEEDS = {
     kidScreensMeetTheHouseRules: ['kidScreensAudit'],
@@ -136,18 +156,27 @@ function findChromium() {
     oneBackStackGoesWhereYouCameFrom: [],
   };
   const setupNeeded = (step) => {
-    const yes = ONLY.length === 0 || ONLY.some(n => !Object.prototype.hasOwnProperty.call(SETUP_NEEDS, n)
-      || SETUP_NEEDS[n].includes(step));
-    if (!yes) console.log(`SMOKE_ONLY: setup step ${step} skipped (no chosen check needs it)`);
+    const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
+      : ONLY.length === 0 || ONLY.some(n => !Object.prototype.hasOwnProperty.call(SETUP_NEEDS, n)
+        || SETUP_NEEDS[n].includes(step));
+    if (!yes) console.log(`${PART ? 'SMOKE_PART' : 'SMOKE_ONLY'}: setup step ${step} skipped (no chosen check needs it)`);
     return yes;
   };
-  // A Set: a check may assign its own result twice (everyMoneyControlClicksClean
+  // Read from this file and the group files in tests/smoke-parts/. A Set: a
+  // check may assign its own result twice (everyMoneyControlClicksClean
   // appends the errors caught outside the page), and that is still one check.
-  const ALL_CHECKS = [...new Set([...fs.readFileSync(__filename, 'utf8')
-    .matchAll(/^\s*(?:if \(want\('[^']*'\)\) )?checks\.([A-Za-z0-9_$]+)\s*=(?!=)/gm)].map(m => m[1]))];
-  if (ONLY.length) {
-    if (process.env.CI) {
-      console.error('SMOKE_ONLY is set under CI. A subset is for iterating locally; the full suite is the only thing CI may run, so this run is refused.');
+  const ALL_CHECKS = smokeCheckNames();
+  if (PART) {
+    // The lists must hold every check once; npm run check says the same before a push.
+    const wrong = partProblems(ALL_CHECKS);
+    if (wrong.length) {
+      console.error(`SMOKE_PART lists in tests/smoke-parts/parts.js are wrong:\n  ${wrong.join('\n  ')}`);
+      process.exit(1);
+    }
+  }
+  if (ONLY.length || PART) {
+    if (ONLY.length && process.env.CI) {
+      console.error('SMOKE_ONLY is set under CI. A subset is for iterating locally; CI may run only the full suite or one SMOKE_PART, so this run is refused.');
       process.exit(1);
     }
     const unknown = ONLY.filter(n => !ALL_CHECKS.includes(n));
@@ -5767,430 +5796,10 @@ function findChromium() {
   await page.addInitScript(SD_HELPERS_SRC);
   await page.evaluate(SD_HELPERS_SRC);
 
-  /* In both looks (Looks stage 3). Calm's fonts are wider than Pop's
-     handwriting at a smaller scale, so every width that fits in one has to be
-     measured in the other; and at 1194×834, the iPad this app lives on. */
-  const kidFindings = [];
-  if (setupNeeded('kidScreensAudit')) {
-    for (const look of ['pop', 'calm']) {
-      try { await setLook(look); } catch (e) { kidFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
-      for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1194, 834], [1440, 900], [900, 1100]]) {
-        await page.setViewportSize({ width: w, height: h });
-        for (const [id, nav, label] of [...KID_SCREENS, ...KID_SHEETS]) {
-          // The request sheets and Sunday's steps are measured at the phone and the iPad only.
-          const isSheet = /^(sheet|sunday)\//.test(String(label || ''));
-          if (isSheet && w !== 390 && w !== 1194) continue;
-          // A sheet left open by the row before would cover the next screen; a
-          // seeded row's state is put back before the next one draws.
-          await page.evaluate(() => {
-            const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
-            const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
-            if (window.__mv2Snap) { const sn = JSON.parse(window.__mv2Snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); window.__mv2Snap = null; saveLocal(); }
-            if (window.__sdSweepSnap) { sdRestore(window.__sdSweepSnap); window.__sdSweepSnap = null; if (mmIsOpen()) mmHide(); profile = window.__sdSweepProfile; window.__sdSweepProfile = null; }
-            const sdo = document.getElementById('sundayOverlay'); if (sdo && sdo.classList.contains('open')) closeSheet('sundayOverlay');
-          });
-          // A row's seed may return a sentence saying what it failed to put on screen.
-          const seeded = await page.evaluate(`(${nav.toString()})()`);
-          await page.waitForTimeout(200);
-          const r = await kidStandards(id);
-          const problems = [];
-          if (typeof seeded === 'string') problems.push(seeded);
-          if (r.error) problems.push(r.error);
-          /* A screen that did not open measures as clean: every control on it is
-             display:none, so none is "too small". openSisterSync refuses a parent,
-             for one — so each row must prove its screen was on show. */
-          if (!(await page.evaluate((sid) => { const el = document.getElementById(sid);
-              return !!el && (el.classList.contains('active') || (el.classList.contains('overlay') && el.classList.contains('open'))
-                || el.classList.contains('mny-concept-scrim')); }, id))) {
-            problems.push('the screen was not on show, so nothing on it was measured');
-          }
-          // Sideways scroll is the failure a screenshot needs a human to notice and
-          // an assertion catches by itself: content pushed off the edge of a tablet
-          // is simply unreachable, and nothing else here would report it.
-          const overflow = await page.evaluate((sid) => {
-            const scr = document.getElementById(sid);
-            const worst = [...scr.querySelectorAll('*')].reduce((acc, el) => {
-              if (el.closest('[style*="overflow"], .ck-gridwrap, .weekly-full-wrap, .tg-wrap')) return acc;
-              const r = el.getBoundingClientRect();
-              return (r.width && r.right > acc.right) ? { right: r.right, cls: String(el.className).slice(0, 24) } : acc;
-            }, { right: 0, cls: '' });
-            return { body: document.body.scrollWidth, worst };
-          }, id);
-          if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
-          if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
-          if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
-          if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
-          if (problems.length) kidFindings.push(`[${look}] ${label || id}@${w}: ${problems.join(' | ')}`);
-        }
-      }
-    }
-    await page.evaluate(() => {
-      const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
-      const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
-      if (window.__mv2Snap) { const sn = JSON.parse(window.__mv2Snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); window.__mv2Snap = null; saveLocal(); }
-      if (window.__sdSweepSnap) { sdRestore(window.__sdSweepSnap); window.__sdSweepSnap = null; if (mmIsOpen()) mmHide(); profile = window.__sdSweepProfile; window.__sdSweepProfile = null; }
-    });
-    await clearLooks();
-  }
-  if (want('kidScreensMeetTheHouseRules')) checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
-
-  /* Looks stage 4 — the parent portal's five destinations and the profile
-     picker, in both looks, at the phone and the iPad. The parent's Reading
-     size is left at its default (it multiplies on top of the look).
-
-     - 44px targets everywhere: a house rule on every screen (CLAUDE.md →
-       ARCHITECTURE.md, UI rules), probed with kidStandards' hit test. The five
-       destination tabs were 41px in Pop and 38px in Calm until this check.
-     - Text: the picker is a child's screen, so nothing on it under 13px in
-       either look. The portal's small print predates the looks — History's
-       chart axes and tile captions, the meeting's day counts — and the kid
-       floor was never applied there (ARCHITECTURE.md, UI rules); raising it
-       would change Pop, which this stage keeps. So on the portal a look may not
-       PUSH text under 13px: a Calm label under 13px fails unless the same
-       label (screen, width, class, text) is under 13px in Pop too. Those that
-       are under in both are listed in the log, not failed.
-     - Nothing runs past the side of the screen. */
-  const parentFindings = [], parentSmallPrint = new Set();
-  {
-    if (setupNeeded('parentScreensAudit')) {
-      const popSize = {};
-      /* Grown-ups' five tabs (Sunday v15 Stage 2) are rows too, drawn over real
-         questions, fines, commitments and expected money so every card kind is on
-         screen while it is measured — seeded once here, put back after. */
-      await page.evaluate(() => {
-        window.__guAuditSnap = JSON.stringify(state);
-        const wasProfile = profile;
-        const wk = ctThisWeekKey(), days = mrWeekDayKeys(wk);
-        profile = 'parent';
-        mrAddFine('jess', 'tone', days[1], { who: 'Mom' });
-        mrAddFine('jess', 'box_repeat', days[2], { who: 'Dad' });
-        const fine = mrFines('jess')[mrFines('jess').length - 1];
-        mnyAddExpected('jenn', { month: String(todayKey()).slice(0, 7), label: '🎄 Christmas', amount: 20 });
-        setDayBlocks(days[3], [...(getDayBlocks(days[3], 'jess') || []), { id: 'gu-aud-aj', actId: 'assistant_job', startMin: 17 * 60, durationMin: 90 }], 'jess');
-        profile = 'jess';
-        mnyAddRequest('jess', { kind: 'comp', sport: 'swim', name: 'Swim time trial', custom: true, dayKey: days[2],
-          races: [{ ev: '50 Free', time: '0:41.8', pts: 6 }, { ev: '50 Back', time: '0:49.2', pts: 4 }] });
-        mnyAddRequest('jess', { kind: 'dispute', fineId: fine.id, why: 'the bag was not mine' });
-        mnyAddRequest('jess', { kind: 'skip', blockId: 'gu-aud-aj', dayKey: days[3], why: '🤒 Sick' });
-        const adv = mnyAddRequest('jess', { kind: 'adv', amount: 2, why: 'School book fair', text: 'Draw $2 in advance · School book fair' });
-        profile = 'jenn';
-        mnyAddRequest('jenn', { kind: 'gift', amount: 20, giver: 'Uncle Mike', text: 'Uncle Mike · $20 birthday money' });
-        mnyAddRequest('jenn', { kind: 'goal', name: 'New skate guards', icon: '🛼', target: 35 });
-        profile = 'parent';
-        if (adv) mnyAnswerRequest('jess', adv.id, 'yes');
-        profile = wasProfile;
-      });
-      const parentDests = ['picker', 'now', 'meeting', 'history', 'setup', 'app',
-        'gu:approve', 'gu:commit', 'gu:fines', 'gu:expect', 'gu:rules', 'gu:weeks'];
-      for (const look of ['pop', 'calm']) {
-        try { await setLook(look); } catch (e) { parentFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
-        for (const [w, h] of [[390, 844], [1194, 834]]) {
-          await page.setViewportSize({ width: w, height: h });
-          for (const dest of parentDests) {
-            const sid = dest === 'picker' ? 'screen-profile' : 'screen-parent';
-            const where = `[${look}] ${dest === 'picker' ? 'profile picker' : dest.indexOf('gu:') === 0 ? 'Parent › Grown-ups › ' + dest.slice(3) : 'Parent › ' + dest}@${w}`;
-            await page.evaluate((d) => {
-              if (d === 'picker') { showScreen('profile'); return; }
-              profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
-              showScreen('parent'); renderParentHome();
-              if (d.indexOf('gu:') === 0) { setParentTab('money'); mnyParentSection = d.slice(3); mnyRenderRulesTab(); return; }
-              setParentDest(d);
-            }, dest);
-            await page.waitForTimeout(250);
-            if (!(await page.evaluate((s) => document.getElementById(s).classList.contains('active'), sid))) {
-              parentFindings.push(`${where}: the screen was not on show, so nothing on it was measured`);
-              continue;
-            }
-            const r = await kidStandards(sid);
-            const problems = [];
-            if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
-            const m = await page.evaluate((s) => {
-              const texts = {};
-              document.getElementById(s).querySelectorAll('*').forEach(el => {
-                const cs = getComputedStyle(el);
-                if (cs.display === 'none' || cs.visibility === 'hidden') return;
-                const box = el.getBoundingClientRect();
-                if (!box.width || !box.height) return;
-                const text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
-                if (!text) return;
-                const key = `.${(el.getAttribute('class') || el.tagName).trim().split(/\s+/)[0]} "${text.slice(0, 20)}"`;
-                const px = parseFloat(cs.fontSize);
-                if (!(key in texts) || px < texts[key]) texts[key] = px;
-              });
-              return { texts, body: document.body.scrollWidth };
-            }, sid);
-            if (m.body > w + 1) problems.push(`page scrolls sideways (${m.body} > ${w})`);
-            const under = [];
-            for (const [key, px] of Object.entries(m.texts)) {
-              const id = `${dest}@${w} ${key}`;
-              if (look === 'pop') popSize[id] = px;
-              if (px >= 13) continue;
-              const inPopToo = dest !== 'picker' && (look === 'pop' || (id in popSize && popSize[id] < 13));
-              if (inPopToo) parentSmallPrint.add(`${dest}@${w} ${key}`);
-              else under.push(`${key} ${Math.round(px * 100) / 100}px${look === 'calm' && id in popSize ? ` (${Math.round(popSize[id] * 100) / 100}px in Pop)` : ''}`);
-            }
-            if (under.length) problems.push(`${under.length} text(s) under 13px: ${under.slice(0, 6).join(', ')}`);
-            if (problems.length) parentFindings.push(`${where}: ${problems.join(' | ')}`);
-          }
-        }
-      }
-      await clearLooks();
-      await page.evaluate(() => {
-        const s = JSON.parse(window.__guAuditSnap);
-        Object.keys(state).forEach(k => { delete state[k]; });
-        Object.assign(state, s);
-        window.__guAuditSnap = null;
-        mnyParentSection = 'approve';
-        saveLocal();
-      });
-    }
-    await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
-    await page.setViewportSize({ width: 900, height: 1100 });
-    if (parentSmallPrint.size) console.log(`Parent portal small print under 13px in both looks (predates the looks; listed, not failed): ${parentSmallPrint.size}\n  ${[...parentSmallPrint].slice(0, 40).join('\n  ')}`);
-  }
-  if (want('parentScreensMeetTheHouseRules')) checks.parentScreensMeetTheHouseRules = parentFindings.length === 0 || parentFindings;
-  /* ✂️ The money fit check (Plan v6 §M 5a, grown by Money fit and logic PR 5).
-     Every money screen and sheet — My money, Money school, All my Sundays, By
-     month, her request and info sheets (the Sunday sheet among them), the '?'
-     card, Sunday's four steps and Grown-ups' six tabs — in both looks, at the
-     phone (390×844) and the iPad (1194×834), after the look's fonts load; then
-     again seeded with long names (12+ letters) and 4-digit amounts
-     (window.__fitLong). Three rules for every visible text:
-       clip    — its box is no narrower than its text (scrollWidth ≤ clientWidth+1,
-                 with or without "…");
-       spill   — it stays inside its nearest bordered box (1px allowed), and
-                 nothing runs past the screen's left or right edge;
-       overlap — no two texts sit on each other (1px allowed).
-     A scroll container (Calm's .mm-body, a sheet) may scroll: text scrolled
-     out of its view is not measured, and its own overflow is not a clip. */
-  if (want('noLabelIsCutOnTheMoneyScreens')) {
-    const fitFindings = [];
-    const fitMeasure = (rootId) => {
-      const host = document.getElementById(rootId);
-      if (!host) return ['no element #' + rootId];
-      /* The money roots are found by their attribute, not a list (PR 1 money
-         re-check): the row's element when it is one, else every outermost
-         [data-money-surface] on show inside it — My money and its head, Money
-         school, All my Sundays, By month, the meeting's head and Sunday step,
-         Grown-ups, Parent › Now and the money sheets. A screen with none fails.
-         The '?' explainer is not a money surface; it is measured as itself. */
-      const SURFACE = '[data-money-surface]';
-      const roots = host.matches(SURFACE) ? [host]
-        : [...host.querySelectorAll(SURFACE)].filter(el => el.getClientRects().length && !el.parentElement.closest(SURFACE));
-      if (!roots.length && rootId !== 'mnyConceptCard') return ['no money surface ([data-money-surface]) on show in #' + rootId];
-      if (!roots.length) roots.push(host);
-      const vw = document.documentElement.clientWidth;
-      const out = new Set();
-      const css = new Map();
-      const cs = (el) => { let c = css.get(el); if (!c) { c = getComputedStyle(el); css.set(el, c); } return c; };
-      const name = (el) => el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map(c => '.' + c).join('');
-      const scrolls = (el) => /auto|scroll/.test(cs(el).overflowX + ' ' + cs(el).overflowY);
-      const borders = (c) => ['Top', 'Right', 'Bottom', 'Left'].map(s => (c['border' + s + 'Style'] === 'none' ? 0 : parseFloat(c['border' + s + 'Width']) || 0));
-      // A box has a border on all four sides; a single rule (a dashed line, a head's underline) is not one.
-      const boxed = (c) => borders(c).every(v => v > 0);
-      /* Lines from every root on show are compared with each other: a screen's
-         head and its body are separate money roots, and a head drawn over the
-         body is still an overlap. */
-      const lines = [];
-      for (const root of roots) {
-        const shown = (el) => {
-          for (let e = el; e; e = e.parentElement) {
-            const c = cs(e);
-            if (c.display === 'none' || c.visibility === 'hidden' || c.opacity === '0') return false;
-            if (e === root) break;
-          }
-          return true;
-        };
-        const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        for (let n; (n = tw.nextNode());) {
-          const text = n.textContent.replace(/\s+/g, ' ').trim();
-          if (!text) continue;
-          const el = n.parentElement;
-          if (!el || el.closest('svg, script, style, noscript, template') || !shown(el)) continue;
-          if (cs(el).position === 'absolute' && el.getBoundingClientRect().width <= 1) continue;   // screen-reader only
-          const range = document.createRange(); range.selectNodeContents(n);
-          /* A text's box is its line, not the font's whole ascent and descent:
-             Pop's handwriting fonts reach well past a tight line-height, which
-             draws nothing over the line above. */
-          const ec = cs(el), lh = parseFloat(ec.lineHeight) || parseFloat(ec.fontSize) * 1.2;
-          let rects = [...range.getClientRects()].filter(r => r.width > 0.5 && r.height > 0.5).map(r => {
-            const trim = Math.max(0, (r.height - lh) / 2);
-            return { left: r.left, right: r.right, top: r.top + trim, bottom: r.bottom - trim };
-          });
-          if (!rects.length) continue;
-          let block = null, bordered = null, scroller = null;
-          const ruled = [];
-          for (let e = el; e; e = e.parentElement) {
-            const c = cs(e);
-            if (!bordered && !scroller && borders(c).some(v => v > 0)) ruled.push(e);
-            if (!block && c.display !== 'inline' && c.display !== 'contents') block = e;
-            if (!bordered && !scroller && boxed(c)) bordered = e;
-            if (!scroller && scrolls(e) && e !== document.documentElement && e !== document.body) scroller = e;
-            if (e === root || (bordered && scroller)) break;
-          }
-          /* Text a scroll container has scrolled out of view is still measured
-             against its own boxes; it is only not compared with text outside
-             that container, which it passes under as it scrolls. */
-          const view = scroller && scroller.getBoundingClientRect();
-          const inView = (r) => !view || (r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom);
-          const tag = `${name(el)} "${text.slice(0, 32)}"`;
-          // Cut: the box is narrower than its text, and it is this text that runs past it.
-          const bx = block && block.getBoundingClientRect();
-          if (block && !scrolls(block) && block.clientWidth > 0 && block.scrollWidth > block.clientWidth + 1
-              && rects.some(r => r.right > bx.left + block.clientLeft + block.clientWidth + 1 || r.left < bx.left + block.clientLeft - 1)) {
-            out.add(`clip · ${block === el ? tag : name(block) + ' › ' + tag} (${block.scrollWidth} > ${block.clientWidth})`);
-          }
-          if (bordered) {
-            const b = bordered.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(bordered));
-            const inner = { left: b.left + bl, right: b.right - br, top: b.top + bt, bottom: b.bottom - bb };
-            if (rects.some(r => r.left < inner.left - 1 || r.right > inner.right + 1 || r.top < inner.top - 1 || r.bottom > inner.bottom + 1)) {
-              out.add(`spill · ${tag} out of ${name(bordered)}`);
-            }
-          }
-          // Nor may it sit on a line drawn by a box or rule around it.
-          ruled.forEach(e => {
-            const b = e.getBoundingClientRect(), [bt, br, bb, bl] = borders(cs(e));
-            const strips = [bt && { left: b.left, right: b.right, top: b.top, bottom: b.top + bt }, br && { left: b.right - br, right: b.right, top: b.top, bottom: b.bottom },
-              bb && { left: b.left, right: b.right, top: b.bottom - bb, bottom: b.bottom }, bl && { left: b.left, right: b.left + bl, top: b.top, bottom: b.bottom }].filter(Boolean);
-            if (rects.some(r => strips.some(t => Math.min(r.right, t.right) - Math.max(r.left, t.left) > 1 && Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top) > 1))) {
-              out.add(`spill · ${tag} on the border of ${name(e)}`);
-            }
-          });
-          // Past the screen's side: only the part a scroll container shows counts.
-          const shownPart = (r) => (view ? { left: Math.max(r.left, view.left), right: Math.min(r.right, view.right) } : r);
-          if (rects.some(r => inView(r) && (shownPart(r).right > vw + 1 || shownPart(r).left < -1))) out.add(`spill · ${tag} past the screen edge`);
-          rects.forEach(r => lines.push({ r, tag, n, scroller, seen: inView(r) }));
-        }
-        // A bordered box past the screen's side (a card edge peeking in or out).
-        root.querySelectorAll('*').forEach(el => {
-          if (!shown(el) || !boxed(cs(el))) return;
-          const r = el.getBoundingClientRect();
-          if (!r.width || !r.height) return;
-          for (let e = el.parentElement; e && e !== root; e = e.parentElement) if (/auto|scroll|hidden|clip/.test(cs(e).overflowX)) return;
-          if (r.right > vw + 1 || r.left < -1) out.add(`spill · ${name(el)} box past the screen edge (${Math.round(r.left)} to ${Math.round(r.right)})`);
-          /* A box laid out in the flow stays inside the box around it (a sticker
-             placed on purpose is position:absolute and is not held to this). */
-          if (/absolute|fixed/.test(cs(el).position)) return;
-          for (let e = el.parentElement; e && root.contains(e); e = e.parentElement) {
-            if (boxed(cs(e))) {
-              const p = e.getBoundingClientRect(), [pt, pr, pb, pl] = borders(cs(e));
-              if (r.left < p.left + pl - 1 || r.right > p.right - pr + 1) out.add(`spill · ${name(el)} box in ${name(el.parentElement)} "${el.textContent.trim().slice(0, 20)}" out of ${name(e)} (${Math.round(r.left)} to ${Math.round(r.right)} past ${Math.round(p.right - pr)})`);
-              break;
-            }
-            if (scrolls(e)) break;
-          }
-        });
-      }
-      for (let i = 0; i < lines.length; i++) {
-        for (let j = i + 1; j < lines.length; j++) {
-          const a = lines[i], b = lines[j];
-          if (a.n === b.n || (a.scroller !== b.scroller && !(a.seen && b.seen))) continue;
-          const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
-          const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
-          if (ix > 1 && iy > 1) out.add(`overlap · ${a.tag} × ${b.tag}`);
-        }
-      }
-      return [...out];
-    };
-    const fitReset = () => page.evaluate(() => {
-      const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
-      const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
-      if (window.__mv2Snap) { const sn = JSON.parse(window.__mv2Snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); window.__mv2Snap = null; saveLocal(); }
-      if (window.__sdSweepSnap) { sdRestore(window.__sdSweepSnap); window.__sdSweepSnap = null; if (mmIsOpen()) mmHide(); profile = window.__sdSweepProfile; window.__sdSweepProfile = null; }
-      const sdo = document.getElementById('sundayOverlay'); if (sdo && sdo.classList.contains('open')) closeSheet('sundayOverlay');
-      profile = 'jenn';   // her screens, as she sees them (Grown-ups' rows leave the parent signed in)
-    });
-    const MV2_HOLD = `${MV2_SEED_SRC}
-      window.__mv2Snap = window.__mv2Snap || JSON.stringify(state);
-      const said = window.mv2Seed('jenn');`;
-    const FIT_KID_ROWS = [
-      ...KID_SCREENS.filter(r => /^screen-(mymoney\/seeded|moneyschool\/seeded|moneystory\/(sundays|bymonth))$/.test(String(r[2] || ''))),
-      ...KID_SHEETS,
-      // A grown-up's My money: the head carries the whole rail.
-      ['screen-mymoney', `() => { profile = 'parent'; parentUnlockedThisSession = true; mnyOpenMyMoney('jenn'); }`, 'screen-mymoney/parent'],
-      // Her info sheets over My money, the 📒 Sunday sheet among them.
-      ...['week', 'loans', 'waiting', 'goals', 'month', 'sunday'].map(kind => ['requestOverlay', `() => {
-        ${MV2_HOLD}
-        const row = mnyLedgerRows('jenn')[0];
-        mnyOpenInfoSheet('${kind}', '${kind}' === 'sunday' ? { id: row && row.weekKey } : {});
-        if (!document.getElementById('requestOverlay').classList.contains('open')) return 'the ${kind} info sheet did not open';
-        return said;
-      }`, 'info/' + kind]),
-    ];
-    const GU_TABS = ['approve', 'commit', 'fines', 'expect', 'rules', 'weeks'];
-    for (const long of [false, true]) {
-      await page.evaluate((l) => { window.__fitLong = l; }, long);
-      const pass = long ? 'long' : 'short';
-      for (const look of ['pop', 'calm']) {
-        try { await setLook(look); } catch (e) { fitFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
-        for (const [w, h] of [[390, 844], [1194, 834]]) {
-          await page.setViewportSize({ width: w, height: h });
-          for (const [id, nav, label] of FIT_KID_ROWS) {
-            await fitReset();
-            // Her request sheets over a My money with long names in the long pass.
-            if (long && /^sheet\//.test(String(label))) await page.evaluate(`(() => { ${MV2_HOLD} return said; })()`);
-            const said = await page.evaluate(`(${nav.toString()})()`);
-            await page.waitForTimeout(200);
-            const where = `${label || id} · ${look} · ${w} · ${pass}`;
-            if (typeof said === 'string') { fitFindings.push(`${where} · ${said}`); continue; }
-            const on = await page.evaluate((sid) => { const el = document.getElementById(sid);
-              return !!el && (el.classList.contains('active') || el.classList.contains('open') || el.classList.contains('mny-concept-scrim')); }, id);
-            if (!on) { fitFindings.push(`${where} · the screen was not on show`); continue; }
-            (await page.evaluate(fitMeasure, id)).forEach(f => fitFindings.push(`${where} · ${f}`));
-          }
-          await fitReset();
-          // Grown-ups' six tabs over a seeded week: questions, fines, a loan, money expected.
-          await page.evaluate((L) => {
-            window.__fitGuSnap = JSON.stringify(state);
-            const was = profile, wasToast = window.showToast; window.showToast = () => {};
-            try {
-              const wk = ctThisWeekKey(), days = mrWeekDayKeys(wk);
-              profile = 'parent';
-              if (L) Object.assign(mnyEnsureDebts('jenn')[0], { name: 'Winter skating camp', principal: 1454.56, paid: 220 });
-              mrAddFine('jess', 'tone', days[1], { who: 'Mom' });
-              mrAddFine('jess', 'box_repeat', days[2], { who: 'Dad' });
-              const fine = mrFines('jess')[mrFines('jess').length - 1];
-              mnyAddExpected('jenn', { month: String(todayKey()).slice(0, 7), label: L ? '🎄 Grandma Rosalind' : '🎄 Christmas', amount: L ? 1050 : 20 });
-              profile = 'jess';
-              mnyAddRequest('jess', { kind: 'comp', sport: 'swim', name: L ? 'Championship entries' : 'Swim time trial', custom: true, dayKey: days[2],
-                races: [{ ev: '50 Free', time: '0:41.8', pts: 6 }] });
-              mnyAddRequest('jess', { kind: 'dispute', fineId: fine.id, why: 'the bag was not mine' });
-              profile = 'jenn';
-              mnyAddRequest('jenn', { kind: 'gift', amount: L ? 1050 : 20, giver: L ? 'Grandma Rosalind' : 'Uncle Mike' });
-              mnyAddRequest('jenn', { kind: 'goal', name: L ? 'Winter skating camp' : 'New skate guards', icon: '🛼', target: L ? 1050 : 35 });
-            } finally { profile = was; window.showToast = wasToast; }
-          }, long);
-          for (const tab of GU_TABS) {
-            await page.evaluate((t) => {
-              profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
-              showScreen('parent'); renderParentHome(); setParentTab('money'); mnyParentSection = t; mnyRenderRulesTab();
-            }, tab);
-            await page.waitForTimeout(200);
-            const where = `Grown-ups › ${tab} · ${look} · ${w} · ${pass}`;
-            (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`${where} · ${f}`));
-          }
-          // Parent › Now over the same seeded week: its money cards are a money surface too.
-          await page.evaluate(() => {
-            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
-            showScreen('parent'); renderParentHome(); setParentTab('now');
-          });
-          await page.waitForTimeout(200);
-          (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`Parent › Now · ${look} · ${w} · ${pass} · ${f}`));
-          await page.evaluate(() => {
-            const s = JSON.parse(window.__fitGuSnap); window.__fitGuSnap = null;
-            Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s);
-            mnyParentSection = 'approve'; saveLocal();
-          });
-        }
-      }
-    }
-    await page.evaluate(() => { window.__fitLong = false; });
-    await clearLooks();
-    await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
-    await page.setViewportSize({ width: 900, height: 1100 });
-    if (fitFindings.length) console.log(`Money fit findings (${fitFindings.length}):\n  ${fitFindings.join('\n  ')}`);
-    checks.noLabelIsCutOnTheMoneyScreens = fitFindings.length === 0 || fitFindings;
-  }
+  // The kid and parent house-rules walks: tests/smoke-parts/house-rules-walks.js.
+  await houseRulesWalks({ page, want, checks, setupNeeded, setLook, clearLooks, kidStandards, KID_SCREENS, KID_SHEETS });
+  // The money fit check: tests/smoke-parts/money-screens.js.
+  await moneyScreens.moneyFit({ page, want, checks, setLook, clearLooks, MV2_SEED_SRC, KID_SCREENS, KID_SHEETS });
 
   // Artifacts at the sizes this app is actually used at — phone, iPad both ways,
   // laptop. The assertions above are the gate; these are for a human deciding
@@ -16570,357 +16179,8 @@ function findChromium() {
   });
   await page.emulateMedia({ colorScheme: 'light' });
 
-  /* Looks stage 2 — the Pop look, read in light mode, everywhere a child (or a
-     grown-up) reads it. Pop fills the Now card with its block's colour, fills
-     block rows with their wash, turns the main buttons yellow and the today
-     markers navy, and makes the text 10% bigger; any of those can put text on
-     a colour it does not read on. So every KID_SCREENS row at the phone and the
-     iPad sizes, the five parent destinations, the ⋯ More sheet and the block
-     edit sheet are measured with darkContrastFindings' method (background
-     layers composited, opacity included; no dark emulation here): at least
-     4.5:1, and never white text on a pastel. Sheets are measured after their
-     slide-in, because mid-animation every word reads 1:1.
-
-     Looks stage 3 made it take the look: the same walk runs in Calm (purple
-     buttons with white text, navy selected pills, tinted week blocks, new
-     fonts). Looks stage 4 put Calm on the parent portal, so the five
-     destinations (with the phone's bottom bar where it shows) and the profile
-     picker fail in both looks now, where Stage 3 only reported them. Each kid
-     screen, parent destination, the picker, ⋯ More and the edit sheet are
-     saved as look-<look>-<screen>-<width>.png, the CI artifact a person
-     compares the two looks in. */
-  const lookReadsEverywhere = async (look) => {
-    const bad = [];
-    const was = page.viewportSize();
-    const ev = async (label, fn, arg) => {
-      try { return await page.evaluate(fn, arg); } catch (e) { bad.push(`${label}: threw ${e.message}`); return undefined; }
-    };
-    const snap = async (name, w) => {
-      await page.evaluate(() => window.scrollTo(0, 0));
-      await page.screenshot({ path: shot(`look-${look}-${name}-${w}`) });
-    };
-    await defineAuditSeeds();   // a page reload above dropped them
-    try {
-      if (look === 'pop') await clearLooks(); else await setLook(look);
-    } catch (e) { bad.push(`the ${look} look could not be applied: ${e.message}`); return { bad }; }
-    const on = await page.evaluate(() => document.documentElement.getAttribute('data-look'));
-    if (on !== look) bad.push(`<html data-look> is "${on}", not "${look}" — the ${look} look was not what was measured`);
-    try {
-      for (const [w, h] of [[390, 844], [1194, 834]]) {
-        await page.setViewportSize({ width: w, height: h });
-        const names = new Set();
-        let clashNotes = 0;
-        for (const [id, nav, label] of KID_SCREENS) {
-          /* Today is seeded under a clock pinned to 9:30 (seedTodayAudit), but its
-             undo puts the real clock back before anything is measured. Later in
-             the day the next redraw then finds a different "now" and draws Today
-             again from the restored blocks, and the seeded clash note is gone
-             before its ink is read. So the same 9:30 stays pinned here until
-             Today has been measured and shot, whatever the hour of the run. */
-          if (id === 'screen-today') await ev('pin Today', () => {
-            const RealDate = Date;
-            const when = new RealDate(); when.setHours(9, 30, 0, 0);
-            Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
-            Date.prototype = RealDate.prototype;
-            Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
-            window.__lookTodayUnpin = () => { Date = RealDate; };
-          });
-          const seeded = await ev(label || id, `(${nav.toString()})()`);
-          if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
-          await page.waitForTimeout(250);
-          const found = await ev(label || id, ([sid, lab]) => {
-            const scr = document.getElementById(sid);
-            if (!scr || !scr.classList.contains('active')) return [`${lab}: the screen was not on show, so nothing on it was measured`];
-            return darkContrastFindings(scr, lab, '.print-sheet');
-          }, [id, `${label || id}@${w}`]);
-          if (found) bad.push(...found);
-          if (id === 'screen-today') clashNotes += await ev('clash notes', () => document.querySelectorAll('#screen-today .quest-conflict-note').length) || 0;
-          let name = (label || id).replace(/^screen-/, '').replace(/[^a-z0-9]+/gi, '-');
-          while (names.has(name)) name += '-2';
-          names.add(name);
-          await snap(name, w);
-          if (id === 'screen-today') await ev('unpin Today', () => { window.__lookTodayUnpin(); window.__lookTodayUnpin = null; });
-        }
-        // The seeded Today always carries an overlap; a run that measured no clash note measured nothing of it.
-        if (clashNotes < 1) bad.push(`screen-today@${w}: no .quest-conflict-note was on show, so its ink was not measured`);
-        /* R12 (2026-09-27): Today with a missed day this week — 🕓 Catch up open
-           under ✏️ Modify my plan, "＋ Add to an earlier day" after it. Measured
-           for contrast, 44px controls, 13px words, no sideways scroll and its
-           place, in this look at this width. */
-        const cu = await ev(`Today catch-up@${w}`, (lab) => {
-          window.__lookCu = { unpin: c1.pin(3), k: c1.keep('jenn') };
-          profile = 'jenn'; parentViewing = 'jenn';
-          ctPrepareRead();
-          window.__lookCu.k.clear();
-          const keys = mrWeekDayKeys(ctThisWeekKey());
-          setDayBlocks(keys[1], [{ id: 'lk-cu', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['mop', 'dishes'] },
-                                 { id: 'lk-cu-r', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 }], 'jenn');
-          setDayBlocks(keys[3], [{ id: 'lk-cu-t', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], 'jenn');
-          goToday();
-          const day = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
-          if (!day) return [`${lab}: no catch-up day to measure`];
-          day.click();
-          const card = document.querySelector('#tdWrap .td-catchup');
-          const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
-          const out = [...catchUpPlacementFindings().map(f => `${lab}: ${f}`), ...darkContrastFindings(card, lab)];
-          if (!card.querySelector('.td-catchup-panel')) out.push(`${lab}: the day did not open`);
-          if (row) out.push(...darkContrastFindings(row, `${lab} earlier-day row`));
-          const btns = [...card.querySelectorAll('button'), ...(row ? [row] : [])];
-          const small = btns.filter(b => { const r = b.getBoundingClientRect(); return r.height < 44 || r.width < 44; });
-          if (small.length) out.push(`${lab}: ${small.length} control(s) under 44px: ${small[0].className} ${Math.round(small[0].getBoundingClientRect().height)}px`);
-          const tiny = [card, ...(row ? [row] : [])].flatMap(el => [el, ...el.querySelectorAll('*')]).filter(el =>
-            [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
-          if (tiny.length) out.push(`${lab}: text under 13px: .${tiny[0].className} ${getComputedStyle(tiny[0]).fontSize}`);
-          if (document.body.scrollWidth > window.innerWidth + 1) out.push(`${lab}: the page scrolls sideways`);
-          // The picture: the day folded again, ✏️ Modify my plan near the top, the group under it.
-          const again = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
-          if (again) again.click();
-          const plan = document.querySelector('#tdWrap .td-col--day .td-plan');
-          if (plan) window.scrollTo(0, Math.max(0, plan.getBoundingClientRect().top + window.scrollY - 140));
-          return out;
-        }, `Today catch-up@${w}`);
-        if (cu) bad.push(...cu);
-        await page.waitForTimeout(250);
-        await page.screenshot({ path: shot(`look-${look}-today-catchup-${w}`) });
-        await ev('Today catch-up restore', () => {
-          if (!window.__lookCu) return;
-          window.__lookCu.unpin(); window.__lookCu.k.restore(); window.__lookCu = null; goToday();
-        });
-        for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
-          await ev(`parent ${dest}`, (d) => {
-            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
-            showScreen('parent'); renderParentHome(); setParentDest(d); window.scrollTo(0, 0);
-          }, dest);
-          await page.waitForTimeout(250);
-          const found = await ev(`parent ${dest}`, (lab) => {
-            if (!document.getElementById('screen-parent').classList.contains('active')) return [`${lab}: the portal was not on show, so nothing on it was measured`];
-            const nav = document.getElementById('parentNav');
-            return [...darkContrastFindings(document.getElementById('screen-parent'), lab),
-              ...(nav && !nav.hidden ? darkContrastFindings(nav, `${lab} bottom bar`) : [])];
-          }, `Parent › ${dest}@${w}`);
-          if (found) bad.push(...found);
-          await snap(`parent-${dest}`, w);
-        }
-        // The profile picker: the first thing anyone sees, in the device's last look.
-        await ev('picker', () => { showScreen('profile'); window.scrollTo(0, 0); });
-        await page.waitForTimeout(250);
-        const picker = await ev('picker', (lab) => {
-          const scr = document.getElementById('screen-profile');
-          if (!scr.classList.contains('active')) return [`${lab}: the picker was not on show, so nothing on it was measured`];
-          return darkContrastFindings(scr, lab);
-        }, `profile picker@${w}`);
-        if (picker) bad.push(...picker);
-        await snap('picker', w);
-        await ev('More', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); tdOpenMore(); });
-        await page.waitForTimeout(450);
-        const more = await ev('More', (lab) => darkContrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
-        if (more) bad.push(...more);
-        await page.screenshot({ path: shot(`look-${look}-more-${w}`) });
-        await ev('More close', () => { const ov = document.getElementById('tdMoreOverlay'); if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay'); });
-        await ev('edit', () => {
-          profile = 'jenn'; parentViewing = 'jenn';
-          const k = todayKey();
-          window.__popHad = getDayBlocks(k, 'jenn');
-          setDayBlocks(k, [...window.__popHad.filter(b => b.id !== 'pop-edit'),
-            { id: 'pop-edit', actId: 'piano', startMin: 16 * 60, durationMin: 60, checklistState: {} }], 'jenn');
-          openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('pop-edit');
-        });
-        await page.waitForTimeout(450);
-        const edit = await ev('edit', (lab) => darkContrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
-        if (edit) bad.push(...edit);
-        await page.screenshot({ path: shot(`look-${look}-edit-sheet-${w}`) });
-        await ev('edit close', () => { closeSheet('editOverlay'); setDayBlocks(todayKey(), window.__popHad, 'jenn'); });
-      }
-    } finally {
-      /* Backstop: a throw between pinning Today and its unpin above would leave
-         the 9:30 clock pinned for every later check. */
-      await ev('unpin Today (backstop)', () => { if (window.__lookTodayUnpin) { window.__lookTodayUnpin(); window.__lookTodayUnpin = null; } });
-      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
-      await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
-      if (was) await page.setViewportSize(was);
-      await page.waitForTimeout(200);
-    }
-    return { bad };
-  };
-  if (want('thePopLookReadsEverywhere')) {
-    const r = await lookReadsEverywhere('pop');
-    checks.thePopLookReadsEverywhere = r.bad.length ? r.bad : true;
-  }
-  if (want('theCalmLookReadsEverywhere')) {
-    const r = await lookReadsEverywhere('calm');
-    checks.theCalmLookReadsEverywhere = r.bad.length ? r.bad : true;
-  }
-
-  /* Looks stage 4C — one font everywhere (owner, 2026-09-27: "different font
-     ... PIN, CALM, Exit button on the parent portal"). No base rule gave
-     button / input / select / textarea the page font, so every control without
-     its own font-family drew in the browser's system font, in both looks.
-
-     Every visible text — an element's own text node, an input's value or
-     placeholder, a select's option, an SVG label, a ::before/::after string —
-     must draw in one of the look's own font stacks: the first family of its
-     computed font-family is the first family of one of the look block's
-     --font-* tokens. The tokens are read from the live page (the computed
-     style of <html> in that look), not listed here, so a look that changes
-     its fonts moves the check with it. Walked on every KID_SCREENS row, the five parent destinations,
-     the profile picker and the ⋯ More, block edit, 📋 Copy a day and 🌙
-     reflect sheets, at the phone and the iPad, in both looks.
-
-     Named exemptions, each for a reason:
-     - .print-sheet (the print sheet and the week's print preview) draws in
-       --print-font-*, because print ignores the look (printIgnoresTheLook).
-     - Emoji-only text whose computed stack starts with an emoji font: the
-       glyphs come from the emoji font whatever the stack says. None is set
-       today; the exemption is counted in the log so a new one is seen. */
-  const everyTextUsesTheLooksFonts = async () => {
-    const bad = [];
-    const was = page.viewportSize();
-    let exempted = 0;
-    const ev = async (label, fn, arg) => {
-      try { return await page.evaluate(fn, arg); } catch (e) { bad.push(`${label}: threw ${e.message}`); return undefined; }
-    };
-    await defineAuditSeeds();
-    await page.evaluate(() => {
-      window.lookFontFindings = (root, lab) => {
-        const look = document.documentElement.getAttribute('data-look');
-        const first = (stack) => String(stack || '').split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
-        /* The page is a file:// document, so its style sheets' rules cannot be
-           read; the computed style of <html> lists every custom property and
-           resolves each to the active look's value. The --font-* names are the
-           look's fonts (css/app.css: the fonts are a look's, and
-           check-look-tokens holds both looks to the same names); --print-font-*
-           is print's own and does not match. */
-        const rootCs = getComputedStyle(document.documentElement);
-        const tokens = [...rootCs].filter(p => /^--font-/.test(p));
-        if (!tokens.length) return { found: [`no --font-* tokens on <html> in the ${look} look, so nothing could be checked`], exempt: 0 };
-        const allowed = new Set(tokens.map(t => first(rootCs.getPropertyValue(t))).filter(Boolean));
-        const EMOJI_FONT = /emoji/i;
-        const EMOJI_ONLY = /^[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u200d\ufe0f\u20e3\s]+$/u;
-        const found = new Map();
-        let exempt = 0;
-        /* The look's figures too (Stage 3: Calm lines its figures up with
-           tabular-nums, Pop draws them as the font does), read from the live
-           --num-variant. Named exemption: the four figure columns that are
-           tabular in BOTH looks by their own rule (.mm-xp-n, .co-tier-n,
-           .pn-n, .pcw-day-n) — figures stacked in a column line up in Pop too. */
-        const numVariant = rootCs.getPropertyValue('--num-variant').trim() || 'normal';
-        const OWN_TABULAR = '.mm-xp-n, .co-tier-n, .pn-n, .pcw-day-n';
-        const label = (el, text, where) => {
-          const cls = (el.getAttribute('class') || '').trim().split(/\s+/)[0];
-          const name = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${cls ? '.' + cls : ''}${where}`;
-          return `${name} "${text.replace(/\s+/g, ' ').slice(0, 24)}"`;
-        };
-        const judge = (el, cs, text, where) => {
-          if (cs.fontVariantNumeric !== numVariant && !el.closest(OWN_TABULAR)) {
-            const key = label(el, text, where) + ' figures';
-            if (!found.has(key)) found.set(key, `${cs.fontVariantNumeric}, not the look's ${numVariant}`);
-          }
-          const fam = first(cs.fontFamily);
-          if (allowed.has(fam)) return;
-          if (EMOJI_ONLY.test(text) && EMOJI_FONT.test(fam)) { exempt++; return; }
-          const key = label(el, text, where);
-          if (!found.has(key)) found.set(key, cs.fontFamily.split(',')[0].trim());
-        };
-        root.querySelectorAll('*').forEach(el => {
-          if (el.closest('.print-sheet')) return;
-          const cs = getComputedStyle(el);
-          if (cs.display === 'none' || cs.visibility === 'hidden') return;
-          const box = el.getBoundingClientRect();
-          if (!box.width || !box.height) return;
-          const tag = el.tagName;
-          let text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
-          if (tag === 'INPUT' && !/^(checkbox|radio|range|color|hidden|file|image)$/i.test(el.type)) text = (el.value || el.placeholder || '').trim();
-          else if (tag === 'TEXTAREA') text = (el.value || el.placeholder || '').trim();
-          else if (tag === 'SELECT') text = (el.selectedOptions[0] ? el.selectedOptions[0].textContent : '').trim();
-          else if (tag === 'OPTION' || tag === 'STYLE' || tag === 'SCRIPT') text = '';
-          if (text) judge(el, cs, text, '');
-          for (const pseudo of ['::before', '::after']) {
-            const ps = getComputedStyle(el, pseudo);
-            const m = /^"(.*)"$/.exec(ps.content || '');
-            if (m && m[1].trim() && ps.display !== 'none') judge(el, ps, m[1].trim(), pseudo);
-          }
-        });
-        return { found: [...found].map(([k, f]) => `${k} in ${f}`), exempt };
-      };
-    });
-    const take = async (label, fn, arg) => {
-      const r = await ev(label, fn, arg);
-      if (!r) return;
-      exempted += r.exempt;
-      if (r.found.length) bad.push(`${label}: ${r.found.length} text(s) outside the look's fonts or figures: ${r.found.slice(0, 12).join(' · ')}${r.found.length > 12 ? ' …' : ''}`);
-    };
-    try {
-      for (const look of ['pop', 'calm']) {
-        try { if (look === 'pop') await clearLooks(); else await setLook(look); } catch (e) { bad.push(`the ${look} look could not be applied: ${e.message}`); continue; }
-        for (const [w, h] of [[390, 844], [1194, 834]]) {
-          await page.setViewportSize({ width: w, height: h });
-          const where = (s) => `[${look}] ${s}@${w}`;
-          for (const [id, nav, label] of KID_SCREENS) {
-            const seeded = await ev(where(label || id), `(${nav.toString()})()`);
-            if (typeof seeded === 'string') bad.push(`${where(label || id)}: ${seeded}`);
-            await page.waitForTimeout(200);
-            await take(where(label || id), ([sid, lab]) => {
-              const scr = document.getElementById(sid);
-              if (!scr || !scr.classList.contains('active')) return { found: [`the screen was not on show, so nothing on it was measured`], exempt: 0 };
-              return lookFontFindings(document.body, lab);
-            }, [id, where(label || id)]);
-          }
-          for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
-            await ev(where(`Parent › ${dest}`), (d) => {
-              profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
-              showScreen('parent'); renderParentHome(); setParentDest(d);
-            }, dest);
-            await page.waitForTimeout(250);
-            await take(where(`Parent › ${dest}`), (lab) => {
-              if (!document.getElementById('screen-parent').classList.contains('active')) return { found: ['the portal was not on show, so nothing on it was measured'], exempt: 0 };
-              return lookFontFindings(document.body, lab);
-            }, where(`Parent › ${dest}`));
-          }
-          await ev(where('profile picker'), () => { showScreen('profile'); });
-          await page.waitForTimeout(250);
-          await take(where('profile picker'), (lab) => document.getElementById('screen-profile').classList.contains('active')
-            ? lookFontFindings(document.body, lab) : { found: ['the picker was not on show, so nothing on it was measured'], exempt: 0 }, where('profile picker'));
-          /* The sheets: each opened on Jenn's Today, measured after its
-             slide-in, then closed (and its seed put back). */
-          const sheets = [
-            ['⋯ More', 'tdMoreOverlay', () => { tdOpenMore(); }],
-            ['block edit', 'editOverlay', () => {
-              const k = todayKey();
-              window.__fontHad = getDayBlocks(k, 'jenn');
-              setDayBlocks(k, [...window.__fontHad.filter(b => b.id !== 'font-edit'),
-                { id: 'font-edit', actId: 'piano', startMin: 16 * 60, durationMin: 60, checklistState: {} }], 'jenn');
-              openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('font-edit');
-            }],
-            ['📋 Copy a day', 'templateOverlay', () => { openDay(todayKey(), getDayKeys(0).indexOf(todayKey())); openTemplateSheet(); }],
-            ['🌙 reflect', 'reflectOverlay', () => { openReflectSheet(todayKey()); }],
-          ];
-          for (const [name, ov, open] of sheets) {
-            await ev(where(name), `(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); (${open.toString()})(); })()`);
-            await page.waitForTimeout(450);
-            await take(where(name), ([o, lab]) => {
-              const sheet = document.querySelector(`#${o}.open .sheet`);
-              return sheet ? lookFontFindings(sheet, lab) : { found: ['the sheet did not open, so nothing on it was measured'], exempt: 0 };
-            }, [ov, where(name)]);
-            await ev(`${where(name)} close`, (o) => {
-              if (document.getElementById(o).classList.contains('open')) closeSheet(o);
-              if (window.__fontHad) { setDayBlocks(todayKey(), window.__fontHad, 'jenn'); window.__fontHad = null; }
-            }, ov);
-          }
-        }
-      }
-    } finally {
-      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
-      await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
-      if (was) await page.setViewportSize(was);
-      await page.waitForTimeout(200);
-    }
-    if (exempted) console.log(`everyTextUsesTheLooksFonts: ${exempted} emoji-only text(s) exempted (drawn in an emoji font)`);
-    return bad;
-  };
-  if (want('everyTextUsesTheLooksFonts')) {
-    const bad = await everyTextUsesTheLooksFonts();
-    checks.everyTextUsesTheLooksFonts = bad.length ? bad : true;
-  }
+  // The looks walks (Pop, Calm, fonts): tests/smoke-parts/looks.js.
+  await looksWalks({ page, want, checks, shot, setLook, clearLooks, KID_SCREENS, defineAuditSeeds });
 
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code
@@ -28399,200 +27659,8 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
-  /* ── EVERY MONEY CONTROL CAN BE PRESSED ───────────────────────────
-     Two buttons on the parent's Money rules page were dead for as long as the
-     page existed, and a whole class of move could be filed and never answered.
-     Every check in this file drove the FUNCTIONS; none pressed the buttons, so a
-     button wired to nothing — or to something that throws — was invisible.
-
-     This presses every one. Each money surface is rendered as the person who
-     uses it (the three kid pages as a child; every Money rules section, the
-     meeting's money step and all five Record forms as a grown-up; the two
-     Record forms a child is offered, as a child). Every button and every
-     data-action control is clicked ONE AT A TIME, with `state`, the device's
-     view preferences and the surface's own module state put back from a
-     snapshot and the surface drawn afresh before each, so a click is measured
-     against the page a person would actually have in front of them — not
-     against the wreckage of the click before it.
-
-     The app's dialogs are stubbed to answer "no", so nothing a confirm guards
-     is ever committed. A failure is any exception, thrown during the click or
-     afterwards from a promise, named by surface and by the control's label.
-     No fixed sleeps: two macrotask turns after each click is what lets a
-     promise-chained handler finish, and nothing here waits on a clock.
-
-     Exceptions are caught HERE, from `pageerror`, not by a listener in the
-     page: over file:// Chrome mutes a script's errors to "Script error." and
-     does not fire `unhandledrejection` at all. Before each control the page
-     names it with a console.debug line; the protocol delivers console lines
-     and exceptions in the order the page produced them, so every error
-     arrives between two names and is filed under the right one. (A binding
-     the page awaited did the same at ~16ms a round trip — a fifth of the
-     budget, spent on bookkeeping.) */
-  const moneySweep = { at: null, found: [], started: Date.now() };
-  const MONEY_SWEEP_AT = 'money-sweep-at:';
-  const moneySweepConsole = (m) => {
-    const t = m.text();
-    if (t.indexOf(MONEY_SWEEP_AT) === 0) moneySweep.at = t.slice(MONEY_SWEEP_AT.length) || null;
-  };
-  const moneySweepError = (e) => {
-    if (moneySweep.at) moneySweep.found.push(moneySweep.at + ': threw ' + ((e && e.message) || e));
-  };
-  page.on('console', moneySweepConsole);
-  page.on('pageerror', moneySweepError);
-  if (want('everyMoneyControlClicksClean')) checks.everyMoneyControlClicksClean = await page.evaluate(async () => {
-    const problems = [];
-    const t0 = performance.now();
-    const at = (label) => { console.debug('money-sweep-at:' + (label || '')); };
-    const snapState = JSON.stringify(state);
-    const snapLS = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k !== LS_KEY) snapLS[k] = localStorage.getItem(k);
-    }
-    const was = {
-      profile, parentViewing, parentScope, ctParentKid, mnyKid, mnyParentSection, mnyMeetKid,
-      _appDialog: window._appDialog, showChoice: window.showChoice, open: window.open,
-    };
-    let current = 'before any click';
-    window._appDialog = (o) => Promise.resolve(o && o.kind === 'prompt' ? null : false);
-    window.showChoice = () => Promise.resolve(null);
-    window.open = () => null;
-
-    const restore = () => {
-      if (document.getElementById('mnyTour')) mnyCloseTour();
-      const card = document.getElementById('mnyConceptCard');
-      if (card) card.remove();
-      if (rcDraft) closeRecordSheet();
-      if (rqDraft) rqClose();
-      guCommitDraft = null; guFineDraft = null; guOneOffDraft = null;
-      document.querySelectorAll('.overlay.open').forEach(ov => closeSheet(ov.id));
-      if (mmIsOpen()) mmHide();
-      const s = JSON.parse(snapState);
-      Object.keys(state).forEach(k => { delete state[k]; });
-      Object.assign(state, s);
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k !== LS_KEY && !(k in snapLS)) localStorage.removeItem(k);
-      }
-      Object.entries(snapLS).forEach(([k, v]) => { if (localStorage.getItem(k) !== v) localStorage.setItem(k, v); });
-      mnyPending = []; mnyPendingFrom = null; mnyPendingReason = MR_DEFAULT_REASON;
-      guSheet = null; guOvOpen = {}; guWeekOpen = null; guWeeksKid = 'jenn'; guRuleReason = 'grownups';
-      flPeriod = 'month'; flMonth = null;
-      mnySundaysMode = 'week'; mnySundaysMonth = null; mnyHistPage = 'sundays'; mnySchoolConcept = 'debt'; navReturnStack = [];
-      // The meeting's money drafts, as mnySetMeetKid('jenn') would leave them —
-      // set here rather than by calling it, which would draw the meeting a
-      // third time per click and put this sweep past its budget.
-      mnyMeetKid = 'jenn'; mnyExpandRow = null;
-      // The Sunday ritual's drafts and timers (js/44), device-local.
-      // sdNudgeUntil too: the "place $X first" shake runs 1.4 s of real time, so a
-      // press of the sign on one drawing still showed on the next surface's first
-      // drawing on a fast runner and was gone by its second (CI, 2026-10-01 and -07).
-      clearInterval(sdCountTimer); sdDrafts = {}; sdOpened = {}; sdPress = null; sdSignHold = null; sdNudgeUntil = 0;
-    };
-    const as = (who) => {
-      profile = who; parentViewing = 'jenn'; ctParentKid = 'jenn'; mnyKid = 'jenn';
-      if (who === 'parent') parentScope = 'jenn';
-    };
-    /* Drawn afresh every time; the portal around it is only re-entered when a
-       click has left it, because re-entering it is most of what a click costs. */
-    const rules = () => {
-      const sp = document.getElementById('screen-parent');
-      if (!(sp && sp.classList.contains('active') && parentTab === 'money')) { showScreen('parent'); setParentTab('money'); }
-      mnyRenderRulesTab();
-    };
-    const surfaces = [
-      { name: 'My money (child)', as: 'jenn', host: 'mnyPage1Wrap', open: () => mnyOpenMyMoney('jenn') },
-      { name: 'All my Sundays (child)', as: 'jenn', host: 'mnyStoryWrap', open: () => mnyOpenSundays() },
-      { name: 'By month (child)', as: 'jenn', host: 'mnyStoryWrap', open: () => mnyOpenByMonth() },
-      { name: 'Money school (child)', as: 'jenn', host: 'mnySchoolWrap', open: () => mnyOpenSchool('jenn') },
-      { name: 'Meeting › the money', as: 'parent', host: 'screen-meeting',
-        open: () => { openFamilyMeeting(); mmGoStep(3); } },
-      // Sunday v15's four steps (js/44), each drawn from a seeded draft.
-      ...[1, 2, 3].map(step => ({ name: 'Meeting › Sunday step ' + (step + 1), as: 'parent', host: 'screen-meeting',
-        open: () => {
-          openFamilyMeeting(); mnyMeetKid = 'jenn'; mmGoTo('money');
-          const d = sdCur(); d.step = step; d.shown = 6; d.guess = 40;
-          if (step === 3) d.signed = null;
-          renderMeetingMode();
-        } })),
-      ...RC_KINDS.map(k => ({ name: 'Record › ' + k.label + ' (grown-up)', as: 'parent', host: 'recordOverlay',
-        open: () => openRecordSheet({ kind: k.id, kid: 'jenn' }) })),
-      ...RC_KINDS.filter(k => k.kid).map(k => ({ name: 'Record › ' + k.label + ' (child)', as: 'jenn', host: 'recordOverlay',
-        open: () => openRecordSheet({ kind: k.id, kid: 'jenn' }) })),
-      // Grown-ups' five tabs (js/46) and her request sheets (js/45).
-      ...GU_TABS.map(t => ({ name: 'Grown-ups › ' + t.label, as: 'parent', host: 'mnyRulesWrap',
-        open: () => { mnyParentSection = t.id; rules(); } })),
-      // The fix sheets (Stage 4b): a loan row, what she owns, every rule change.
-      { name: 'Grown-ups › ✏️ Fix this row', as: 'parent', host: 'grownupsOverlay',
-        open: () => { rules(); guOpenSheet('loan', 'jenn', (mnyEnsureDebts('jenn')[0] || {}).id); } },
-      { name: 'Grown-ups › ✏️ Fix what she owns', as: 'parent', host: 'grownupsOverlay',
-        open: () => { rules(); guOpenSheet('owns', 'jenn'); } },
-      { name: 'Grown-ups › 📝 Every rule change', as: 'parent', host: 'grownupsOverlay',
-        open: () => { rules(); guOpenSheet('log'); } },
-      ...['result', 'club', 'move', 'adv', 'goal', 'list'].map(kind => ({ name: 'Request sheet › ' + kind + ' (child)', as: 'jenn',
-        host: 'requestOverlay', open: () => mnyOpenRequestSheet(kind, { kid: 'jenn' }) })),
-    ];
-    const SEL = 'button, [data-mny-action], [data-mnyp-action], [data-rc-action]';
-    const text = (el) => (el.textContent || '').trim().replace(/\s+/g, ' ');
-    const sig = (el) => [el.tagName, el.getAttribute('data-mny-action'), el.getAttribute('data-mnyp-action'),
-      el.getAttribute('data-rc-action'), el.getAttribute('data-mnyp-id'), el.getAttribute('data-rc-id'),
-      el.getAttribute('data-mnyp-path'), el.getAttribute('data-mnyp-d'), el.getAttribute('onclick'),
-      text(el).slice(0, 60)].join('|');
-    const label = (el) => (el.getAttribute('aria-label') || text(el) || el.getAttribute('placeholder')
-      || el.getAttribute('data-mny-action') || el.getAttribute('data-mnyp-action')
-      || el.getAttribute('data-rc-action') || el.tagName).slice(0, 50);
-    const tick = () => new Promise(r => setTimeout(r, 0));
-    let clicked = 0;
-    try {
-      for (const s of surfaces) {
-        restore(); as(s.as);
-        current = s.name + ' (opening it)';
-        at(current);
-        try { s.open(); } catch (e) { problems.push(current + ': threw ' + e.message); continue; }
-        const host0 = document.getElementById(s.host);
-        const found = host0 ? [...host0.querySelectorAll(SEL)] : [];
-        const sigs = found.map(sig), labels = found.map(label);
-        if (!sigs.length) { problems.push(s.name + ': rendered no controls at all'); continue; }
-        for (let i = 0; i < sigs.length; i++) {
-          restore(); as(s.as);
-          current = s.name + ' › "' + labels[i] + '"';
-          at(current);
-          try { s.open(); } catch (e) { problems.push(s.name + ' (opening it): threw ' + e.message); break; }
-          const els = [...document.getElementById(s.host).querySelectorAll(SEL)];
-          let el = els[i];
-          if (!el || sig(el) !== sigs[i]) el = els.find(x => sig(x) === sigs[i]);
-          if (!el) { problems.push(s.name + ': a control was not there on a second drawing — ' + sigs[i]); continue; }
-          try { el.click(); } catch (e) { problems.push(current + ': threw ' + e.message); }
-          await tick(); await tick();
-          clicked++;
-        }
-      }
-      if (clicked < 100) problems.push('only ' + clicked + ' controls were pressed — the sweep is not reaching the surfaces');
-    } catch (e) {
-      problems.push(current + ': the sweep itself threw ' + e.message);
-    } finally {
-      current = 'after the sweep';
-      at(current);
-      restore();
-      at(null);
-      window._appDialog = was._appDialog; window.showChoice = was.showChoice; window.open = was.open;
-      profile = was.profile; parentViewing = was.parentViewing; parentScope = was.parentScope;
-      ctParentKid = was.ctParentKid; mnyKid = was.mnyKid; mnyParentSection = was.mnyParentSection;
-      mnyMeetKid = was.mnyMeetKid;
-      saveLocal();
-      window.__moneySweep = { clicked, ms: Math.round(performance.now() - t0) };
-    }
-    return problems.length ? problems : true;
-  });
-  page.off('pageerror', moneySweepError);
-  page.off('console', moneySweepConsole);
-  if (moneySweep.found.length) {
-    checks.everyMoneyControlClicksClean = (Array.isArray(checks.everyMoneyControlClicksClean)
-      ? checks.everyMoneyControlClicksClean : []).concat(moneySweep.found);
-  }
-  console.log('money click sweep: ' + JSON.stringify(await page.evaluate(() => window.__moneySweep))
-    + ', ' + (Date.now() - moneySweep.started) + 'ms wall');
+  // The money click sweep: tests/smoke-parts/money-screens.js.
+  await moneyScreens.moneyClicks({ page, want, checks });
 
   checks.noConsoleErrors = errors.length === 0;
 
@@ -28621,11 +27689,12 @@ function findChromium() {
   console.log('Longest setup between checks (ms, the setup just before the named check):');
   Object.entries(setupMs).sort((a, b) => b[1] - a[1]).slice(0, 15)
     .forEach(([name, ms]) => console.log(`  ${String(ms).padStart(7)}  before ${name}`));
-  const runLabel = ONLY.length ? 'only' : 'full';
+  const runLabel = PART ? `part ${PART}` : ONLY.length ? 'only' : 'full';
   console.log(`Smoke ${runLabel} run on ${SMOKE_DATE}: ${Math.round(wallMs / 1000)} s wall, `
     + `${Math.round(checkSum / 1000)} s in ${Object.keys(checkMs).length} timed checks, `
     + `${Math.round((wallMs - checkSum) / 1000)} s setup`);
-  fs.writeFileSync(path.join(outDir, `smoke-ran-${SMOKE_DATE}.json`), JSON.stringify({
+  // A part writes its own file, so two parts of one date never overwrite each other.
+  fs.writeFileSync(path.join(outDir, `smoke-ran-${SMOKE_DATE}${PART ? `-part${PART}` : ''}.json`), JSON.stringify({
     date: SMOKE_DATE,
     run: runLabel,
     wallMs,
@@ -28640,6 +27709,16 @@ function findChromium() {
     if (failed.length) console.log(`FAILED: ${failed.join(', ')}`);
     if (neverRan.length) console.log(`NEVER RAN: ${neverRan.join(', ')} (named in SMOKE_ONLY, no result recorded)`);
     console.log(`PARTIAL RUN (SMOKE_ONLY): ${Object.keys(checks).length} of ${ALL_CHECKS.length} checks — not a pass of the suite`);
+    await browser.close();
+    process.exit(failed.length || neverRan.length ? 1 : 0);
+  }
+  if (PART) {
+    // Every check of the part must record a result; one that did not is a failure.
+    const neverRan = PARTS[PART].filter(n => !(n in checks));
+    if (failed.length) console.log(`FAILED: ${failed.join(', ')}`);
+    if (neverRan.length) console.log(`NEVER RAN: ${neverRan.join(', ')} (in SMOKE_PART ${PART}, no result recorded)`);
+    console.log(`SMOKE PART ${PART} of ${Object.keys(PARTS).length}: ${Object.keys(checks).length} of ${ALL_CHECKS.length} checks `
+      + (failed.length || neverRan.length ? 'FAILED' : 'PASSED') + ' — the other parts run in their own jobs');
     await browser.close();
     process.exit(failed.length || neverRan.length ? 1 : 0);
   }

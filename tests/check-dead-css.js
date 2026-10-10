@@ -66,7 +66,8 @@ const BUILT_AT_RUNTIME = {
 const cssRules = css.replace(/\/\*[\s\S]*?\*\//g, '');
 
 let src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-for (const dir of ['js', 'tests']) {
+// tests/smoke-parts/ holds smoke groups moved out of tests/smoke.js (Stage 23); still smoke source.
+for (const dir of ['js', 'tests', path.join('tests', 'smoke-parts')]) {
   for (const f of fs.readdirSync(path.join(ROOT, dir))) {
     if (!f.endsWith('.js') || (dir === 'tests' && f === path.basename(__filename))) continue;
     src += fs.readFileSync(path.join(ROOT, dir, f), 'utf8');

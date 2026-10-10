@@ -5,7 +5,9 @@ const root = path.join(__dirname, '..');
 const jsDir = path.join(root, 'js');
 const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js')).map(f => path.join(jsDir, f));
 const withTests = process.argv.includes('--tests');
-const extra = [path.join(root, 'index.html')].concat(withTests ? [path.join(root, 'tests', 'smoke.js')] : []);
+const smokeParts = path.join(root, 'tests', 'smoke-parts');
+const extra = [path.join(root, 'index.html')].concat(withTests ? [path.join(root, 'tests', 'smoke.js'),
+  ...fs.readdirSync(smokeParts).filter(f => f.endsWith('.js')).map(f => path.join(smokeParts, f))] : []);
 
 // Comments out, strings kept (a name inside a template or an onclick string is a use).
 function stripComments(src) {

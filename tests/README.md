@@ -114,6 +114,40 @@ and writes `tests/out/smoke-ran-<date>.json`. To see where a CI run's time went:
 `gh run download <run-id> -p 'smoke-screenshots-*' -D <folder>`, then
 `node tools/smoke-times.js <folder>`.
 
+**Where the smoke time went** (CI run 38012172829 on `main`, 2026-10-10,
+`node tools/smoke-times.js <folder> 30`; seconds). A walk's time is booked as
+"setup before" its check, because it runs before the check's `want()`.
+
+| Date | Job | Test step | In checks | Setup | Kid house-rules walk (setup before) | Parent house-rules walk (setup before) | Money fit check | Money click sweep | Pop look walk | Calm look walk | Looks' fonts |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-01 | 420 | 388 | 283 | 104 | 59 | 19 | 77 | 34 | 19 | 19 | 35 |
+| 2026-10-07 | 472 | 444 | 328 | 115 | 65 | 21 | 84 | 42 | 21 | 21 | 38 |
+| 2026-10-11 | 384 | 354 | 256 | 98 | 57 | 18 | 71 | 31 | 18 | 18 | 33 |
+| 2026-10-15 | 477 | 448 | 332 | 117 | 65 | 22 | 85 | 43 | 21 | 21 | 38 |
+
+The three slowest groups, slowest date: the money screens
+(`noLabelIsCutOnTheMoneyScreens` + `everyMoneyControlClicksClean`, 128 s), the
+house-rules walks (kid + parent, 87 s) and the looks walks
+(`thePopLookReadsEverywhere` + `theCalmLookReadsEverywhere` +
+`everyTextUsesTheLooksFonts`, 81 s). Each lives in its own file in
+`tests/smoke-parts/` (`money-screens.js`, `house-rules-walks.js`, `looks.js`),
+called by `smoke.js` at its old place in the run. Nothing else is over 12 s; the
+next are `everyHeaderMeasuresToTheExactValues` (12 s), 8 s of setup before
+`aConflictIsAParentsToDecideNotTheClocks` and 5 s before `portalFitsAPhone`.
+About 34 s of setup (boot, seeds, screenshots) runs whatever is chosen.
+
+`SMOKE_PART=1|2|3 npm run test:smoke` runs one of three fixed parts, listed in
+`tests/smoke-parts/parts.js`; unlike `SMOKE_ONLY` it is allowed under `CI`.
+Part 1 holds the money screens, part 2 the house-rules walks, part 3 the looks
+walks; the other checks are cut in run order. Measured on the slowest date:
+part 1 about 146 s of checks, part 2 about 143 s, part 3 about 141 s, each plus
+the 34 s of setup. A part skips a walk none of its checks declares in
+`SETUP_NEEDS`, prints `SMOKE PART N of 3: … PASSED` or `FAILED`, fails on a
+check of its part that recorded nothing, and writes
+`smoke-ran-<date>-part<N>.json`. `noConsoleErrors` runs in every part. A new
+check goes in one part's list: `npm run check` (`tests/check-smoke-parts.js`)
+fails on a check in no part or in two.
+
 The suite runs on a fixed date, never the real calendar: `SMOKE_DATE=YYYY-MM-DD`
 (default `2026-10-07`) starts every page at noon Edmonton on that day and the
 clock runs on from there. CI runs the smoke job once per date in a matrix --
