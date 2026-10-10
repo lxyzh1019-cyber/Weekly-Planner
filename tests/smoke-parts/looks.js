@@ -1,5 +1,64 @@
-// Smoke group: the looks walks (thePopLookReadsEverywhere, theCalmLookReadsEverywhere, everyTextUsesTheLooksFonts). Moved out of tests/smoke.js unchanged (Stage 23) so one worker can edit this group alone; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names.
+// Smoke group: the looks walks (thePopLookReadsEverywhere, theCalmLookReadsEverywhere, everyTextUsesTheLooksFonts). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names. Since Stage 26 the group seeds the chore week it walks itself (seedLooksChoreWeek below), so it reads the same whether the checks before it ran or not (SMOKE_PART=3, SMOKE_ONLY).
 module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCREENS, defineAuditSeeds }) => {
+  /* Wait for a screen or sheet to settle: at least SETTLE_FLOOR ms (an 80 ms
+     timer, a re-render on the next frame), then until no finite animation or
+     transition is running (a sheet's 0.3 s slide-in, an overlay's fade), never
+     longer than `cap` — the fixed wait each step had before, so a step that
+     was measured mid-animation then is measured at the same moment now.
+     Endless animations (a conflict's pulse) are not waited for, as before. */
+  const SETTLE_FLOOR = 100;
+  const settle = async (cap) => {
+    const end = Date.now() + cap;
+    await page.waitForTimeout(SETTLE_FLOOR);
+    while (Date.now() < end) {
+      const busy = await page.evaluate(() => document.getAnimations().some(a => a.playState === 'running'
+        && a.effect && Number.isFinite(a.effect.getComputedTiming().endTime))).catch(() => false);
+      if (!busy) return;
+      await page.waitForTimeout(Math.min(25, Math.max(1, end - Date.now())));
+    }
+  };
+
+  /* The chore week the walks read: Jenn's week as the full run leaves it by
+     this point. The suite's setup claims Monday-indexed day 2's dishes for her
+     ("Something claimed and ungraded", before parentChoreTabRenders) and plans
+     a dishes block on today (the 'ckchore' row before it); in the full run
+     meetingWontCelebrateHalfDone (part 2) then wipes her claims and grades
+     Mon-Wed, and later part-2 checks drop Wednesday's grade and today's block.
+     So on 2026-10-07 the full run's Today shows "No jobs set up for this week
+     yet" and "✨ 5 answered", where a run without part 2 showed the claim as a
+     "with Mum" row. The walks measure what the full run shows: no claims,
+     dishes graded Monday and mop Tuesday, five grades she has not seen, nothing
+     on today; a grown-up looking at her (profile 'parent'), so the first render
+     does not mark the grades seen. Put back after the three checks: her week's
+     earnings and today's blocks; lastGradeSeen only if nothing stamped it
+     meanwhile (a walk that rendered her own Today stamps it, as in the full run). */
+  const seedLooksChoreWeek = () => page.evaluate(() => {
+    const kid = 'jenn', wk = ctThisWeekKey(), day = todayKey();
+    const p = getProfData(kid);
+    const e = mrEnsureEarnings(kid, wk);
+    window.__looksHad = { wk, day, e: JSON.stringify(e), today: JSON.stringify(getDayBlocks(day, kid) || []),
+      hasSeen: !!p.progress && 'lastGradeSeen' in p.progress, seen: p.progress && p.progress.lastGradeSeen,
+      who: [profile, parentViewing, parentUnlockedThisSession] };
+    const t = Date.now();
+    e.claims = {};
+    e.chores = { 0: { dishes: 3 }, 1: { mop: 3 } };
+    e.gradedAt = { 0: { dishes: t }, 1: { mop: t, dishes: t }, 2: { vacuum: t }, 3: { bins: t } };
+    if (p.progress) delete p.progress.lastGradeSeen;
+    setDayBlocks(day, [], kid);
+    profile = 'parent'; parentUnlockedThisSession = true; parentViewing = kid;
+  });
+  const unseedLooksChoreWeek = (walked) => page.evaluate((walked) => {
+    const h = window.__looksHad;
+    if (!h) return;
+    if (!walked) [profile, parentViewing, parentUnlockedThisSession] = h.who;
+    const kid = 'jenn', p = getProfData(kid);
+    p.earnings[h.wk] = JSON.parse(h.e);
+    setDayBlocks(h.day, JSON.parse(h.today), kid);
+    if (!p.progress || !('lastGradeSeen' in p.progress)) {
+      if (h.hasSeen) { if (!p.progress) p.progress = {}; p.progress.lastGradeSeen = h.seen; }
+    }
+    window.__looksHad = null;
+  }, walked);
   /* Looks stage 2 — the Pop look, read in light mode, everywhere a child (or a
      grown-up) reads it. Pop fills the Now card with its block's colour, fills
      block rows with their wash, turns the main buttons yellow and the today
@@ -57,7 +116,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           });
           const seeded = await ev(label || id, `(${nav.toString()})()`);
           if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
-          await page.waitForTimeout(250);
+          await settle(250);
           const found = await ev(label || id, ([sid, lab]) => {
             const scr = document.getElementById(sid);
             if (!scr || !scr.classList.contains('active')) return [`${lab}: the screen was not on show, so nothing on it was measured`];
@@ -110,7 +169,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           return out;
         }, `Today catch-up@${w}`);
         if (cu) bad.push(...cu);
-        await page.waitForTimeout(250);
+        await settle(250);
         await page.screenshot({ path: shot(`look-${look}-today-catchup-${w}`) });
         await ev('Today catch-up restore', () => {
           if (!window.__lookCu) return;
@@ -121,7 +180,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
             profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
             showScreen('parent'); renderParentHome(); setParentDest(d); window.scrollTo(0, 0);
           }, dest);
-          await page.waitForTimeout(250);
+          await settle(250);
           const found = await ev(`parent ${dest}`, (lab) => {
             if (!document.getElementById('screen-parent').classList.contains('active')) return [`${lab}: the portal was not on show, so nothing on it was measured`];
             const nav = document.getElementById('parentNav');
@@ -133,7 +192,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
         }
         // The profile picker: the first thing anyone sees, in the device's last look.
         await ev('picker', () => { showScreen('profile'); window.scrollTo(0, 0); });
-        await page.waitForTimeout(250);
+        await settle(250);
         const picker = await ev('picker', (lab) => {
           const scr = document.getElementById('screen-profile');
           if (!scr.classList.contains('active')) return [`${lab}: the picker was not on show, so nothing on it was measured`];
@@ -142,7 +201,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
         if (picker) bad.push(...picker);
         await snap('picker', w);
         await ev('More', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); tdOpenMore(); });
-        await page.waitForTimeout(450);
+        await settle(450);
         const more = await ev('More', (lab) => darkContrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
         if (more) bad.push(...more);
         await page.screenshot({ path: shot(`look-${look}-more-${w}`) });
@@ -155,7 +214,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
             { id: 'pop-edit', actId: 'piano', startMin: 16 * 60, durationMin: 60, checklistState: {} }], 'jenn');
           openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('pop-edit');
         });
-        await page.waitForTimeout(450);
+        await settle(450);
         const edit = await ev('edit', (lab) => darkContrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
         if (edit) bad.push(...edit);
         await page.screenshot({ path: shot(`look-${look}-edit-sheet-${w}`) });
@@ -172,11 +231,17 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
     }
     return { bad };
   };
+  /* Seeded before the first want() (a few ms of setup) and put back after the
+     last; a run that wants none of the three gets its profile back too. */
+  await seedLooksChoreWeek();
+  let walked = false;
   if (want('thePopLookReadsEverywhere')) {
+    walked = true;
     const r = await lookReadsEverywhere('pop');
     checks.thePopLookReadsEverywhere = r.bad.length ? r.bad : true;
   }
   if (want('theCalmLookReadsEverywhere')) {
+    walked = true;
     const r = await lookReadsEverywhere('calm');
     checks.theCalmLookReadsEverywhere = r.bad.length ? r.bad : true;
   }
@@ -288,7 +353,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           for (const [id, nav, label] of KID_SCREENS) {
             const seeded = await ev(where(label || id), `(${nav.toString()})()`);
             if (typeof seeded === 'string') bad.push(`${where(label || id)}: ${seeded}`);
-            await page.waitForTimeout(200);
+            await settle(200);
             await take(where(label || id), ([sid, lab]) => {
               const scr = document.getElementById(sid);
               if (!scr || !scr.classList.contains('active')) return { found: [`the screen was not on show, so nothing on it was measured`], exempt: 0 };
@@ -300,14 +365,14 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
               profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
               showScreen('parent'); renderParentHome(); setParentDest(d);
             }, dest);
-            await page.waitForTimeout(250);
+            await settle(250);
             await take(where(`Parent › ${dest}`), (lab) => {
               if (!document.getElementById('screen-parent').classList.contains('active')) return { found: ['the portal was not on show, so nothing on it was measured'], exempt: 0 };
               return lookFontFindings(document.body, lab);
             }, where(`Parent › ${dest}`));
           }
           await ev(where('profile picker'), () => { showScreen('profile'); });
-          await page.waitForTimeout(250);
+          await settle(250);
           await take(where('profile picker'), (lab) => document.getElementById('screen-profile').classList.contains('active')
             ? lookFontFindings(document.body, lab) : { found: ['the picker was not on show, so nothing on it was measured'], exempt: 0 }, where('profile picker'));
           /* The sheets: each opened on Jenn's Today, measured after its
@@ -326,7 +391,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           ];
           for (const [name, ov, open] of sheets) {
             await ev(where(name), `(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); (${open.toString()})(); })()`);
-            await page.waitForTimeout(450);
+            await settle(450);
             await take(where(name), ([o, lab]) => {
               const sheet = document.querySelector(`#${o}.open .sheet`);
               return sheet ? lookFontFindings(sheet, lab) : { found: ['the sheet did not open, so nothing on it was measured'], exempt: 0 };
@@ -348,7 +413,9 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
     return bad;
   };
   if (want('everyTextUsesTheLooksFonts')) {
+    walked = true;
     const bad = await everyTextUsesTheLooksFonts();
     checks.everyTextUsesTheLooksFonts = bad.length ? bad : true;
   }
+  await unseedLooksChoreWeek(walked);
 };
