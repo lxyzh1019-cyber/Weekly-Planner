@@ -154,6 +154,8 @@ function findChromium() {
     theComponentKitHoldsItsSizes: [],
     everyHeaderMeasuresToTheExactValues: [],
     oneBackStackGoesWhereYouCameFrom: [],
+    noLabelIsCutOnTheMoneyScreens: [],
+    everyMoneyControlClicksClean: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
@@ -17705,6 +17707,19 @@ function findChromium() {
     profile = 'parent';
     Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, 0));
     profile = 'jenn';
+    /* Its own state: a job planned on today (a dishes block added to her day)
+       and today's jobs unanswered. A claim turns its row into "with Mum",
+       which carries no price: the suite's setup claims day 2's dishes (before
+       parentChoreTabRenders) and only a check of another part cleared it, so
+       on a Wednesday this check saw no priced row when its part ran alone; on
+       a day with no job planned it priced nothing at all. Both are put back
+       at the end. */
+    const claims = mrEnsureEarnings('jenn', wk).claims;
+    const claimsHad = claims[String(d)];
+    delete claims[String(d)];
+    const blocksHad = JSON.stringify(getDayBlocks(todayKey(), 'jenn') || []);
+    setDayBlocks(todayKey(), [...JSON.parse(blocksHad), { id: 'wpjob', actId: 'chores',
+      startMin: 17 * 60, durationMin: 30, choreTags: ['Dishes & dishwasher'], checklistState: {} }], 'jenn');
 
     goToday();
     const pay = mrChoreWouldPay('jenn', wk, d);
@@ -17720,8 +17735,14 @@ function findChromium() {
     let flips = true;
     let sawCapReached = false;
     if (cap != null && hasRows) {
+      /* A graded job's row reads "done" and carries no price, so the first job
+         row still open keeps its grade off: the cap is spent by the others,
+         and that row is the one that must stop promising money. */
+      const open = tdJobsToday('jenn').rows.find(j => j.state === 'todo');
+      const keep = open ? open.row.id : null;
       profile = 'parent';
-      ['dishes', 'mop', 'vacuum', 'laundry'].forEach(id => mrSetChoreGrade('jenn', wk, d, id, 3));
+      ['dishes', 'mop', 'vacuum', 'laundry'].filter(id => id !== keep)
+        .forEach(id => mrSetChoreGrade('jenn', wk, d, id, 3));
       profile = 'jenn';
       goToday();
       sawCapReached = mrChoreWouldPay('jenn', wk, d).capReached;
@@ -17733,22 +17754,44 @@ function findChromium() {
       .forEach(id => mrSetChoreGrade('jenn', wk, d, id, 0));
     Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, restore[id]));
     profile = 'jenn';
+    if (claimsHad) claims[String(d)] = claimsHad;
+    setDayBlocks(todayKey(), JSON.parse(blocksHad), 'jenn');
     // The XP half must actually have been exercised, or this only ever proved
     // that a price renders.
     return showsPrice && flips && (!hasRows || cap == null || sawCapReached);
   });
 
   /* Today's money row is a reader. Every figure on it must equal the accessor
-     it came from, and the "still to earn" figure must equal the one My money
-     prints — that is the same class of agreement as the pool check above. */
+     it came from, and today's chore money behind its "still to earn" figure
+     must be what My money's day strip shows for today — the same class of
+     agreement as the pool check above. My money no longer prints a "still to
+     earn" figure (mnyTodayCard is gone), so matching that text anywhere on the
+     page passed only while it happened to read $0.00 like some other figure;
+     the day strip is where My money says what today has earned.
+     Its own state: today's grades set here (one-dollar grades on four jobs, so
+     today has earned something under the cap and the free-chore rule), put
+     back at the end. */
   if (want('todayMoneyRowMatchesMyMoney')) checks.todayMoneyRowMatchesMyMoney = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
-    const kid = 'jenn', wk = ctWeekKey;
+    const kid = 'jenn', wk = ctWeekKey, d = tdTodayIndex();
+    if (d == null) return 'today is outside the current week';
+    const restore = Object.assign({}, mrEnsureEarnings(kid, wk).chores[String(d)] || {});
+    profile = 'parent';
+    Object.keys(restore).forEach(id => mrSetChoreGrade(kid, wk, d, id, 0));
+    ['dishes', 'mop', 'vacuum', 'laundry'].forEach(id => mrSetChoreGrade(kid, wk, d, id, 1));
+    profile = 'jenn';
+    const putBack = () => {
+      profile = 'parent';
+      Object.keys(mrEnsureEarnings(kid, wk).chores[String(d)] || {})
+        .forEach(id => mrSetChoreGrade(kid, wk, d, id, 0));
+      Object.keys(restore).forEach(id => mrSetChoreGrade(kid, wk, d, id, restore[id]));
+      profile = 'jenn';
+    };
     goToday();
     const row = document.querySelector('#tdWrap .td-money');
-    if (!row) { bad.push('no money row on Today'); return bad; }
+    if (!row) { putBack(); bad.push('no money row on Today'); return bad; }
     const txt = row.textContent;
     /* The three tiles this used to check became a stacked bar plus its key —
        the same figures, drawn. Cash is now a key entry rather than a tile, and
@@ -17762,12 +17805,19 @@ function findChromium() {
     const earn = mnyEarnLeftToday(kid, wk);
     const want = earn.left == null ? earn.done : earn.left;
     if (!txt.includes(mnyMoney(want))) bad.push(`card does not show the earn figure ${mnyMoney(want)}`);
-    // …and My money must print the same figure from the same reader.
+    if (!(earn.done > 0)) bad.push('the grades set for today earned nothing, so the agreement below would compare nothing');
+    // …and My money's day strip must show today's chore money from the same week.
     mnyOpenMyMoney(kid);
-    if (!document.getElementById('mnyPage1Wrap').textContent.includes(mnyMoney(want))) {
-      bad.push('My money and Today disagree about what is still to earn');
+    const cell = document.querySelector('#mnyPage1Wrap .mv2-day.today');
+    if (cell) {
+      const shows = (/ · chores (.+)$/.exec(cell.getAttribute('aria-label') || '') || [])[1];
+      const expect = earn.done > 0 ? mnyMoney(earn.done) : 'nothing';
+      if (shows !== expect) bad.push(`My money shows today's chores as ${shows}; the reader behind Today's row has ${expect} earned`);
+    } else if (mrChoreDay(kid, todayKey()).wk === mnyCountdownData(kid).wk) {
+      bad.push("My money's day strip has no cell for today in the week that pays it");
     }
     goToday();
+    putBack();
     return bad.length === 0 || bad;
   });
 

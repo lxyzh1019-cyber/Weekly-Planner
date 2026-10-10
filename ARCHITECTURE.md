@@ -67,8 +67,8 @@ about half a minute when every check named is declared in `SETUP_NEEDS`, about
 two and a half minutes otherwise. (text only)
 
 **Before a pull request opens:** the full suite green on GitHub — the `checks`
-job, the browser job (with the cleanup-tool tests) and one smoke job per date on
-all four dates. A smoke job takes about 8 minutes; that is accepted until a
+job, the browser job (with the cleanup-tool tests) and the smoke jobs: all four
+dates, each in three parts. A smoke job takes about 8 minutes; that is accepted until a
 later stage brings every job under 5 minutes. Start a run on a branch with
 `gh workflow run ci.yml --ref <branch>`; a pull request starts one by itself. (text only)
 
@@ -199,17 +199,28 @@ suite`, and it refuses to run at all when `CI` is set. The full suite on GitHub
 gates every pull request. A new check gets the same prefix, with its own name in
 both places. (text only)
 
+**Every smoke check is in exactly one part.** CI runs each date's suite as three
+parts side by side (`SMOKE_PART=1|2|3`, the fixed lists in
+`tests/smoke-parts/parts.js`). A new smoke check must be added to one part's
+list there, or `npm run check` fails (`tests/check-smoke-parts.js` fails on a
+check in no part, in two parts, or listed but not in the suite);
+`noConsoleErrors` runs in every part and is in no list. (checked by
+tests/check-smoke-parts.js)
+
 Every smoke run times each check (from its `want()` to its result) and the
 setup just before each check, prints both slowest first, and writes
-`tests/out/smoke-ran-<date>.json`. `node tools/smoke-times.js <folder>` reads
-those files from a CI run's artifacts and lists the slowest checks and setup.
+`tests/out/smoke-ran-<date>.json` (`smoke-ran-<date>-part<N>.json` in a part).
+`node tools/smoke-times.js <folder>` reads those files from a CI run's
+artifacts, lists the slowest checks and setup, and checks that a date's parts
+together ran every smoke check exactly once.
 
 CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main`,
 plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and
 every unit suite), `browser` (installs Chromium and its system packages once,
-caches both, runs the cleanup-tool tests), then one smoke job per date, which
-installs the browser from those caches and uploads its screenshots as an
-artifact. The browser job exists because the system packages came from the
+caches both, runs the cleanup-tool tests), then the smoke jobs, each of the
+four dates in three parts (12 jobs, `Headless smoke test (<date>, part <n>)`),
+which install the browser from those caches and upload their screenshots as the
+artifact `smoke-screenshots-<date>-p<n>`. The browser job exists because the system packages came from the
 Ubuntu mirror in every smoke job, and a slow mirror made one job take 20 minutes
 (2026-10-07, run 37671279692: 14 minutes in the install step).
 

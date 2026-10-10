@@ -84,7 +84,7 @@ jobs:
         run: npm run test:money
 
   # Puts the browser on the runner ONCE per run and caches what it took, so the
-  # four smoke jobs below do not each download it.
+  # twelve smoke jobs below do not each download it.
   #
   # Why (2026-10-08, runs 37671279692 and 37786454837): the slow smoke jobs
   # were not slow tests. Their "Install Chromium" step took 14:04 and 5:31
@@ -163,22 +163,26 @@ jobs:
   # suite. Runs on pull requests too: it is the only check that would catch a
   # broken screen.
   smoke:
-    name: Headless smoke test (${{ matrix.date }})
+    name: Headless smoke test (${{ matrix.date }}, part ${{ matrix.part }})
     runs-on: ubuntu-latest
     needs: [checks, browser]
     # The suite runs on a fixed date (SMOKE_DATE, noon Edmonton; tests/smoke.js)
-    # so its result cannot change with the calendar. Four dates, one job each:
-    # a regular weekday, a Sunday, the first of a month, and 2026-10-07, the
-    # Wednesday that first showed the Chores money door's tap-size failure.
+    # so its result cannot change with the calendar. Four dates: a regular
+    # weekday, a Sunday, the first of a month, and 2026-10-07, the Wednesday
+    # that first showed the Chores money door's tap-size failure. Each date's
+    # suite runs as three parts side by side (SMOKE_PART, the fixed lists in
+    # tests/smoke-parts/parts.js: every check in exactly one part,
+    # noConsoleErrors in every part), so 4 x 3 = 12 jobs.
     strategy:
       fail-fast: false
       matrix:
         date: ['2026-10-15', '2026-10-11', '2026-10-01', '2026-10-07']
+        part: [1, 2, 3]
     # A GitHub job with no timeout runs for SIX HOURS before the platform kills
-    # it (2026-08-19 needed a human to cancel one). A smoke job takes about 8
-    # minutes (7:37-8:41 measured with a fast install); 15 leaves room for a
-    # slow runner and still fails fast enough to be a signal.
-    timeout-minutes: 15
+    # it (2026-08-19 needed a human to cancel one). One date as one job took
+    # about 8 minutes; a part is meant to stay under 5 with setup. 10 leaves
+    # room for a slow runner and still fails fast enough to be a signal.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -224,15 +228,17 @@ jobs:
         run: npm run test:smoke
         env:
           SMOKE_DATE: ${{ matrix.date }}
+          SMOKE_PART: ${{ matrix.part }}
 
       # Screenshots make a layout regression visible in the run itself rather
       # than only as a failed assertion. The folder also holds
-      # smoke-ran-<date>.json, each check's time (tools/smoke-times.js).
+      # smoke-ran-<date>-part<N>.json, each check's result and time
+      # (tools/smoke-times.js).
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-screenshots-${{ matrix.date }}
+          name: smoke-screenshots-${{ matrix.date }}-p${{ matrix.part }}
           path: tests/out/
           if-no-files-found: warn
           retention-days: 14
@@ -246,7 +252,7 @@ jobs:
   #
   # Its own job, not a step of a smoke job: the pictures set their own clock
   # (Wed 2026-10-07 12:00 Edmonton) and do not read SMOKE_DATE, so they run once
-  # per run, side by side with the four smoke jobs rather than after one of
+  # per run, side by side with the smoke jobs rather than after one of
   # them. One job also keeps the artifact name `pictures` unique. It reuses the
   # browser and system packages the `browser` job cached, as the smoke jobs do.
   pictures:
