@@ -68,8 +68,9 @@ two and a half minutes otherwise. (text only)
 
 **Before a pull request opens:** the full suite green on GitHub — the `checks`
 job, the browser job (with the cleanup-tool tests) and the smoke jobs: all four
-dates, each in three parts. A smoke job takes about 8 minutes; that is accepted until a
-later stage brings every job under 5 minutes. Start a run on a branch with
+dates, each in three parts (12 jobs). Every job is under 5 minutes: a smoke
+job took 1:53-2:56 and the whole run 4:20 (run 38061502763, times in
+`tests/README.md`). Start a run on a branch with
 `gh workflow run ci.yml --ref <branch>`; a pull request starts one by itself. (text only)
 
 `npm test` still runs everything in one go (the short loop, the cleanup tool,

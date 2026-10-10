@@ -16,11 +16,33 @@ list about two and a half. The rules are in `ARCHITECTURE.md`, Verification.
 
 Before a pull request opens — the full suite green on GitHub: the `checks` job,
 the browser job (cleanup-tool tests), the picture job, and the smoke jobs (all
-four dates, each in three parts: 12 jobs), each smoke job about 8 minutes (accepted until a later stage brings every
-job under 5 minutes). A pull request starts the run by itself; on a branch,
+four dates, each in three parts: 12 jobs). Every job is under 5 minutes: a
+smoke job takes about 2-3 minutes and the whole run about 4 and a half (table
+below). A pull request starts the run by itself; on a branch,
 `gh workflow run ci.yml --ref <branch>`. `npm test` still runs all of it in one
 process, but the smoke suite alone is over 30 minutes on a laptop, so it is not
 run locally.
+
+**CI times** (run 38061502763 on `claude/consistency-14`, 2026-10-10, all 15
+jobs green; job time from the run's job list, minutes:seconds; test step's wall
+from `node tools/smoke-times.js`, seconds). The whole run took 4:20; the
+`checks` job 0:23, the `browser` job 0:40 (cache hit), the `pictures` job 3:38.
+
+| Date | Part 1 job | Part 1 wall | Part 2 job | Part 2 wall | Part 3 job | Part 3 wall |
+|---|---|---|---|---|---|---|
+| 2026-10-01 | 2:14 | 107 | 2:28 | 120 | 2:56 | 141 |
+| 2026-10-07 | 1:59 | 84 | 1:53 | 81 | 2:54 | 142 |
+| 2026-10-11 | 2:17 | 111 | 1:54 | 84 | 2:24 | 112 |
+| 2026-10-15 | 2:22 | 114 | 2:09 | 94 | 2:37 | 118 |
+
+On every date the three parts together ran all 453 smoke checks, each exactly
+once (`node tools/smoke-times.js` on the run's artifacts: "453 of 453 checks —
+OK").
+
+**One test on this PC** (2026-10-10, `SMOKE_ONLY=<one check> npm run test:smoke`,
+default date): 33 s for a check declared in `SETUP_NEEDS`
+(`theComponentKitHoldsItsSizes`), 99 s for one that is not
+(`todayShowsWhatAChoreWouldPay`, which gets both house-rules walks).
 
 The parts, individually:
 
