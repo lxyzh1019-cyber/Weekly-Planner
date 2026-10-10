@@ -1,4 +1,4 @@
-// Smoke group: the money screens (noLabelIsCutOnTheMoneyScreens, everyMoneyControlClicksClean). Moved out of tests/smoke.js unchanged (Stage 23) so one worker can edit this group alone; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names.
+// Smoke group: the money screens (noLabelIsCutOnTheMoneyScreens, everyMoneyControlClicksClean). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; since PR 14 the fit check puts back its own copy of the state it found before every row, not the shared snapshots; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names.
 async function moneyFit({ page, want, checks, setLook, clearLooks, MV2_SEED_SRC, KID_SCREENS, KID_SHEETS }) {
   /* ✂️ The money fit check (Plan v6 §M 5a, grown by Money fit and logic PR 5).
      Every money screen and sheet — My money, Money school, All my Sundays, By
@@ -143,14 +143,49 @@ async function moneyFit({ page, want, checks, setLook, clearLooks, MV2_SEED_SRC,
       }
       return [...out];
     };
-    const fitReset = () => page.evaluate(() => {
-      const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
-      const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
-      if (window.__mv2Snap) { const sn = JSON.parse(window.__mv2Snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); window.__mv2Snap = null; saveLocal(); }
-      if (window.__sdSweepSnap) { sdRestore(window.__sdSweepSnap); window.__sdSweepSnap = null; if (mmIsOpen()) mmHide(); profile = window.__sdSweepProfile; window.__sdSweepProfile = null; }
-      const sdo = document.getElementById('sundayOverlay'); if (sdo && sdo.classList.contains('open')) closeSheet('sundayOverlay');
-      profile = 'jenn';   // her screens, as she sees them (Grown-ups' rows leave the parent signed in)
-    });
+    /* The group's own starting point (PR 14). The state it finds is copied
+       once, and every row, the Grown-ups block and the end put that copy back:
+       no row reads what the row before it left, and nothing is restored from
+       the shared window.__mv2Snap / __sdSweepSnap an earlier check may have
+       left behind. The rows still set those two (KID_SHEETS and MV2_HOLD are
+       shared with the house-rules walk); here they are only cleared. The
+       measure, the reset and the settle are put on the page once, so each row
+       costs two round trips. */
+    await page.evaluate(`(() => {
+      window.__moneyFitBase = JSON.stringify(state);
+      window.__moneyFitMeasure = ${fitMeasure.toString()};
+      window.__moneyFitReset = () => {
+        const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
+        const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
+        const s = JSON.parse(window.__moneyFitBase);
+        Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s);
+        mmUndoKid = {}; mmUndoKidGone = {}; sdDrafts = {}; sdOpened = {};
+        window.__mv2Snap = null; window.__sdSweepSnap = null; window.__sdSweepProfile = null;
+        saveLocal();
+        if (mmIsOpen()) mmHide();
+        const sdo = document.getElementById('sundayOverlay'); if (sdo && sdo.classList.contains('open')) closeSheet('sundayOverlay');
+        profile = 'jenn';   // her screens, as she sees them (Grown-ups' rows leave the parent signed in)
+      };
+      /* In place of a fixed 200 ms: two frames (layout, and anything a render
+         left for requestAnimationFrame), the fonts the new text asked for, and
+         the overlay's fade and the sheet's slide run to their end — each moves
+         or fades the whole sheet at once, so no clip, spill or overlap differs
+         between their frames. Any other animation still running (Sunday's
+         coin, stamp and burst, a transition) keeps the old 200 ms from the end of the drawing, so
+         those rows are measured on the same frame as before. */
+      window.__moneyFitSettle = async () => {
+        const t0 = performance.now();
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await document.fonts.ready;
+        let other = false;
+        document.getAnimations().forEach(a => {
+          if (a.playState !== 'running' || !a.effect || !isFinite(a.effect.getComputedTiming().endTime)) return;
+          if (a.animationName === 'fadeIn' || a.animationName === 'slideUp') a.finish(); else other = true;
+        });
+        const left = 200 - (performance.now() - t0);
+        if (other && left > 0) await new Promise(r => setTimeout(r, left));
+      };
+    })()`);
     const MV2_HOLD = `${MV2_SEED_SRC}
       window.__mv2Snap = window.__mv2Snap || JSON.stringify(state);
       const said = window.mv2Seed('jenn');`;
@@ -177,22 +212,28 @@ async function moneyFit({ page, want, checks, setLook, clearLooks, MV2_SEED_SRC,
         for (const [w, h] of [[390, 844], [1194, 834]]) {
           await page.setViewportSize({ width: w, height: h });
           for (const [id, nav, label] of FIT_KID_ROWS) {
-            await fitReset();
             // Her request sheets over a My money with long names in the long pass.
-            if (long && /^sheet\//.test(String(label))) await page.evaluate(`(() => { ${MV2_HOLD} return said; })()`);
-            const said = await page.evaluate(`(${nav.toString()})()`);
-            await page.waitForTimeout(200);
+            const hold = long && /^sheet\//.test(String(label)) ? `{ ${MV2_HOLD} }` : '';
+            const said = await page.evaluate(`(async () => {
+              window.__moneyFitReset();
+              ${hold}
+              const said = (${nav.toString()})();
+              await window.__moneyFitSettle();
+              return said;
+            })()`);
             const where = `${label || id} · ${look} · ${w} · ${pass}`;
             if (typeof said === 'string') { fitFindings.push(`${where} · ${said}`); continue; }
-            const on = await page.evaluate((sid) => { const el = document.getElementById(sid);
-              return !!el && (el.classList.contains('active') || el.classList.contains('open') || el.classList.contains('mny-concept-scrim')); }, id);
-            if (!on) { fitFindings.push(`${where} · the screen was not on show`); continue; }
-            (await page.evaluate(fitMeasure, id)).forEach(f => fitFindings.push(`${where} · ${f}`));
+            const found = await page.evaluate((sid) => {
+              const el = document.getElementById(sid);
+              const on = !!el && (el.classList.contains('active') || el.classList.contains('open') || el.classList.contains('mny-concept-scrim'));
+              return on ? window.__moneyFitMeasure(sid) : null;
+            }, id);
+            if (!found) { fitFindings.push(`${where} · the screen was not on show`); continue; }
+            found.forEach(f => fitFindings.push(`${where} · ${f}`));
           }
-          await fitReset();
           // Grown-ups' six tabs over a seeded week: questions, fines, a loan, money expected.
           await page.evaluate((L) => {
-            window.__fitGuSnap = JSON.stringify(state);
+            window.__moneyFitReset();
             const was = profile, wasToast = window.showToast; window.showToast = () => {};
             try {
               const wk = ctThisWeekKey(), days = mrWeekDayKeys(wk);
@@ -212,30 +253,30 @@ async function moneyFit({ page, want, checks, setLook, clearLooks, MV2_SEED_SRC,
             } finally { profile = was; window.showToast = wasToast; }
           }, long);
           for (const tab of GU_TABS) {
-            await page.evaluate((t) => {
+            const found = await page.evaluate(async (t) => {
               profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
               showScreen('parent'); renderParentHome(); setParentTab('money'); mnyParentSection = t; mnyRenderRulesTab();
+              await window.__moneyFitSettle();
+              return window.__moneyFitMeasure('screen-parent');
             }, tab);
-            await page.waitForTimeout(200);
-            const where = `Grown-ups › ${tab} · ${look} · ${w} · ${pass}`;
-            (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`${where} · ${f}`));
+            found.forEach(f => fitFindings.push(`Grown-ups › ${tab} · ${look} · ${w} · ${pass} · ${f}`));
           }
           // Parent › Now over the same seeded week: its money cards are a money surface too.
-          await page.evaluate(() => {
+          const now = await page.evaluate(async () => {
             profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
             showScreen('parent'); renderParentHome(); setParentTab('now');
+            await window.__moneyFitSettle();
+            return window.__moneyFitMeasure('screen-parent');
           });
-          await page.waitForTimeout(200);
-          (await page.evaluate(fitMeasure, 'screen-parent')).forEach(f => fitFindings.push(`Parent › Now · ${look} · ${w} · ${pass} · ${f}`));
-          await page.evaluate(() => {
-            const s = JSON.parse(window.__fitGuSnap); window.__fitGuSnap = null;
-            Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s);
-            mnyParentSection = 'approve'; saveLocal();
-          });
+          now.forEach(f => fitFindings.push(`Parent › Now · ${look} · ${w} · ${pass} · ${f}`));
+          await page.evaluate(() => { window.__moneyFitReset(); mnyParentSection = 'approve'; });
         }
       }
     }
-    await page.evaluate(() => { window.__fitLong = false; });
+    await page.evaluate(() => {
+      window.__fitLong = false;
+      ['__moneyFitBase', '__moneyFitMeasure', '__moneyFitReset', '__moneyFitSettle'].forEach(k => { delete window[k]; });
+    });
     await clearLooks();
     await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
     await page.setViewportSize({ width: 900, height: 1100 });
@@ -389,6 +430,12 @@ async function moneyClicks({ page, want, checks }) {
       || el.getAttribute('data-mny-action') || el.getAttribute('data-mnyp-action')
       || el.getAttribute('data-rc-action') || el.tagName).slice(0, 50);
     const tick = () => new Promise(r => setTimeout(r, 0));
+    /* One message-port turn before each control is drawn and pressed: the
+       loop runs on from timer callbacks, so Chrome's nested-timer rule would
+       hold every tick to 4 ms (about 5 s over the sweep). Drawn and clicked
+       in one go from a message task, the click's own zero-delay timers and
+       the two ticks after it run unclamped, in the same order as before. */
+    const hop = () => new Promise(r => { const ch = new MessageChannel(); ch.port1.onmessage = () => r(); ch.port2.postMessage(0); });
     let clicked = 0;
     try {
       for (const s of surfaces) {
@@ -401,6 +448,7 @@ async function moneyClicks({ page, want, checks }) {
         const sigs = found.map(sig), labels = found.map(label);
         if (!sigs.length) { problems.push(s.name + ': rendered no controls at all'); continue; }
         for (let i = 0; i < sigs.length; i++) {
+          await hop();
           restore(); as(s.as);
           current = s.name + ' › "' + labels[i] + '"';
           at(current);
