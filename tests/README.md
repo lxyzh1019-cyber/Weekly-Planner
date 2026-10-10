@@ -15,12 +15,34 @@ and outside the 3-minute short loop: a list whose checks are all declared in
 list about two and a half. The rules are in `ARCHITECTURE.md`, Verification.
 
 Before a pull request opens — the full suite green on GitHub: the `checks` job,
-the browser job (cleanup-tool tests), the picture job, and one smoke job per
-date on all four dates, each smoke job about 8 minutes (accepted until a later stage brings every
-job under 5 minutes). A pull request starts the run by itself; on a branch,
+the browser job (cleanup-tool tests), the picture job, and the smoke jobs (all
+four dates, each in three parts: 12 jobs). Every job is under 5 minutes: a
+smoke job takes about 2-3 minutes and the whole run about 4 and a half (table
+below). A pull request starts the run by itself; on a branch,
 `gh workflow run ci.yml --ref <branch>`. `npm test` still runs all of it in one
 process, but the smoke suite alone is over 30 minutes on a laptop, so it is not
 run locally.
+
+**CI times** (run 38061502763 on `claude/consistency-14`, 2026-10-10, all 15
+jobs green; job time from the run's job list, minutes:seconds; test step's wall
+from `node tools/smoke-times.js`, seconds). The whole run took 4:20; the
+`checks` job 0:23, the `browser` job 0:40 (cache hit), the `pictures` job 3:38.
+
+| Date | Part 1 job | Part 1 wall | Part 2 job | Part 2 wall | Part 3 job | Part 3 wall |
+|---|---|---|---|---|---|---|
+| 2026-10-01 | 2:14 | 107 | 2:28 | 120 | 2:56 | 141 |
+| 2026-10-07 | 1:59 | 84 | 1:53 | 81 | 2:54 | 142 |
+| 2026-10-11 | 2:17 | 111 | 1:54 | 84 | 2:24 | 112 |
+| 2026-10-15 | 2:22 | 114 | 2:09 | 94 | 2:37 | 118 |
+
+On every date the three parts together ran all 453 smoke checks, each exactly
+once (`node tools/smoke-times.js` on the run's artifacts: "453 of 453 checks —
+OK").
+
+**One test on this PC** (2026-10-10, `SMOKE_ONLY=<one check> npm run test:smoke`,
+default date): 33 s for a check declared in `SETUP_NEEDS`
+(`theComponentKitHoldsItsSizes`), 99 s for one that is not
+(`todayShowsWhatAChoreWouldPay`, which gets both house-rules walks).
 
 The parts, individually:
 
@@ -110,13 +132,50 @@ width at 375 and 360, read against `docs/handoff/header-exact-values.md`):
 about 11-17 s for the check, 41-48 s wall on the owner's PC (2026-10-09).
 
 Every run times each check and the setup just before it, prints the slowest,
-and writes `tests/out/smoke-ran-<date>.json`. To see where a CI run's time went:
+and writes `tests/out/smoke-ran-<date>.json` (`smoke-ran-<date>-part<N>.json`
+in a part). To see where a CI run's time went:
 `gh run download <run-id> -p 'smoke-screenshots-*' -D <folder>`, then
-`node tools/smoke-times.js <folder>`.
+`node tools/smoke-times.js <folder>`; it also checks that each date's parts
+together ran every smoke check exactly once.
+
+**Where the smoke time went** (CI run 38012172829 on `main`, 2026-10-10,
+`node tools/smoke-times.js <folder> 30`; seconds). A walk's time is booked as
+"setup before" its check, because it runs before the check's `want()`.
+
+| Date | Job | Test step | In checks | Setup | Kid house-rules walk (setup before) | Parent house-rules walk (setup before) | Money fit check | Money click sweep | Pop look walk | Calm look walk | Looks' fonts |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-01 | 420 | 388 | 283 | 104 | 59 | 19 | 77 | 34 | 19 | 19 | 35 |
+| 2026-10-07 | 472 | 444 | 328 | 115 | 65 | 21 | 84 | 42 | 21 | 21 | 38 |
+| 2026-10-11 | 384 | 354 | 256 | 98 | 57 | 18 | 71 | 31 | 18 | 18 | 33 |
+| 2026-10-15 | 477 | 448 | 332 | 117 | 65 | 22 | 85 | 43 | 21 | 21 | 38 |
+
+The three slowest groups, slowest date: the money screens
+(`noLabelIsCutOnTheMoneyScreens` + `everyMoneyControlClicksClean`, 128 s), the
+house-rules walks (kid + parent, 87 s) and the looks walks
+(`thePopLookReadsEverywhere` + `theCalmLookReadsEverywhere` +
+`everyTextUsesTheLooksFonts`, 81 s). Each lives in its own file in
+`tests/smoke-parts/` (`money-screens.js`, `house-rules-walks.js`, `looks.js`),
+called by `smoke.js` at its old place in the run. Nothing else is over 12 s; the
+next are `everyHeaderMeasuresToTheExactValues` (12 s), 8 s of setup before
+`aConflictIsAParentsToDecideNotTheClocks` and 5 s before `portalFitsAPhone`.
+About 34 s of setup (boot, seeds, screenshots) runs whatever is chosen.
+
+`SMOKE_PART=1|2|3 npm run test:smoke` runs one of three fixed parts, listed in
+`tests/smoke-parts/parts.js`; unlike `SMOKE_ONLY` it is allowed under `CI`.
+Part 1 holds the money screens, part 2 the house-rules walks, part 3 the looks
+walks; the other checks are cut in run order. Measured on the slowest date:
+part 1 about 146 s of checks, part 2 about 143 s, part 3 about 141 s, each plus
+the 34 s of setup. A part skips a walk none of its checks declares in
+`SETUP_NEEDS`, prints `SMOKE PART N of 3: … PASSED` or `FAILED`, fails on a
+check of its part that recorded nothing, and writes
+`smoke-ran-<date>-part<N>.json`. `noConsoleErrors` runs in every part. A new
+check goes in one part's list: `npm run check` (`tests/check-smoke-parts.js`)
+fails on a check in no part or in two.
 
 The suite runs on a fixed date, never the real calendar: `SMOKE_DATE=YYYY-MM-DD`
 (default `2026-10-07`) starts every page at noon Edmonton on that day and the
-clock runs on from there. CI runs the smoke job once per date in a matrix --
+clock runs on from there. CI runs the smoke suite once per date, in three parts
+(`SMOKE_PART`), in a matrix --
 `2026-10-15` (a weekday), `2026-10-11` (a Sunday), `2026-10-01` (the first of a
 month) and `2026-10-07` -- so a check that only passes on some days fails there.
 
@@ -171,7 +230,7 @@ machine instead — for trying the test locally only; do not commit them.
 
 **Its own CI job.** The pictures keep their own clock (Wed 2026-10-07 12:00
 Edmonton) and do not read `SMOKE_DATE`, so CI runs them once per run, in the
-`pictures` job, side by side with the four smoke jobs. It installs the browser
+`pictures` job, side by side with the smoke jobs. It installs the browser
 from the caches the `browser` job saved, and uploads the `pictures` artifact
 whether it passes or fails.
 
@@ -180,9 +239,10 @@ whether it passes or fails.
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
 plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
 unit suite), `browser` (installs Chromium and its system packages once, caches
-both, runs the cleanup-tool tests), `smoke`, one job per date, which
+both, runs the cleanup-tool tests), `smoke`, one job per date and part (4 x 3
+= 12, `Headless smoke test (<date>, part <n>)`), which
 installs the browser from those caches and uploads `tests/out/` as an artifact
-(`smoke-screenshots-<date>`) so a layout regression is visible in the run
+(`smoke-screenshots-<date>-p<n>`) so a layout regression is visible in the run
 itself, and `pictures`, the picture test (above) on one fixed clock, which
 installs the browser from the same caches and uploads the artifact `pictures`.
 
