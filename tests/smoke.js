@@ -136,9 +136,9 @@ function findChromium() {
   /* A SMOKE_ONLY run skips the setup steps no chosen check needs. SETUP_NEEDS
      declares, per check, the optional steps it reads; a check given [] sets up
      what it reads itself. A step runs in a full run (no SMOKE_ONLY: CI, always),
-     when a chosen check needs it, or when a chosen check is not in this map — an
-     undeclared check gets every step, so nothing loses setup by being left out
-     here. Read a check before adding it. The steps:
+     or when a chosen check declares it. A check not in this map gets no walk;
+     if it fails only because a walk was skipped, add the walk to its entry.
+     (SMOKE_ONLY is refused under CI, so CI never takes this path.) The steps:
        kidScreensAudit    — the house-rules walk of every kid screen and sheet,
                             both looks, six sizes (about 85 s on the owner's PC)
        parentScreensAudit — the same walk of the parent portal and the profile
@@ -159,8 +159,7 @@ function findChromium() {
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
-      : ONLY.length === 0 || ONLY.some(n => !Object.prototype.hasOwnProperty.call(SETUP_NEEDS, n)
-        || SETUP_NEEDS[n].includes(step));
+      : ONLY.length === 0 || ONLY.some(n => (SETUP_NEEDS[n] || []).includes(step));
     if (!yes) console.log(`${PART ? 'SMOKE_PART' : 'SMOKE_ONLY'}: setup step ${step} skipped (no chosen check needs it)`);
     return yes;
   };
