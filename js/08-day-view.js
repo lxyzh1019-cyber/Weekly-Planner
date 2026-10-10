@@ -83,17 +83,11 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   dayViewAnchorKey = key;
   selectedActivity = null;
 
-  // The header first: applyMeetingLock below hides its badge by id.
+  // The header first: applyMeetingLock below hides its badge by id. A parent's
+  // sub-bar is in it — two named actions and one way out, both drawn by their
+  // owners so the day and week sub-bars cannot drift apart again.
   dayRenderHeader();
-
-  // Parent banner — two named actions and one way out, both filled by their
-  // owners so the day and week banners cannot drift apart again.
-  const banner = document.getElementById('parentBannerDay');
-  banner.style.display = isParent() ? 'block' : 'none';
-  if (isParent()) {
-    document.getElementById('parentBackDay').innerHTML = parentBannerBackButton();
-    renderParentBanners();
-  }
+  if (isParent()) renderParentChoreStrip();
   /* Outside the isParent() branch on purpose — see the note on applyMeetingLock
      in js/11-parent.js. A child's render is what lifts the lock. */
   applyMeetingLock();
@@ -165,6 +159,7 @@ function dayRenderHeader() {
     tools: '<div class="hdr-switch hdr-span" id="daySpanTabs" role="group" aria-label="How many days to show"></div>',
     actions: [{ label: '📑', aria: 'Copy a day', data: { 'hdr-action': 'day-copy' } }],
     badge: kidHeadBadge('dayProfileBadge', isParent() ? parentViewing : profile, isParent()),
+    sub: isParent() ? parentViewSub('day', 'parentDayActions', parentDayActionsHtml()) : '',
   });
 }
 /* Mon=0..Sun=6, the index DAY_LONG and getDayKeys both use. Derived from the

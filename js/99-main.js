@@ -150,14 +150,13 @@ if (document.fonts) {
   if (cfWrap) cfWrap.addEventListener('click', cfHandleClick);
   const cfBanner = document.getElementById('parentConflictBanner');
   if (cfBanner) cfBanner.addEventListener('click', cfHandleClick);
-  // The portal's tab strip: arrow keys move between destinations. The strip is
-  // static markup, so one listener on the container is enough.
-  const ptabs = document.querySelector('#screen-parent .parent-tabs');
-  if (ptabs) ptabs.addEventListener('keydown', parentTabsKeydown);
   // Destinations, landings, the back link and the scope pills all ride on data
-  // attributes, so the screen itself carries one listener for the lot.
+  // attributes, so the screen itself carries one listener for the lot. The
+  // tab strip is drawn into the header (parentRenderHeader), so its arrow
+  // keys ride on the screen too (parentTabsKeydown reads only a focused tab).
   const portal = document.getElementById('screen-parent');
   if (portal) portal.addEventListener('click', parentHandleNavClick);
+  if (portal) portal.addEventListener('keydown', parentTabsKeydown);
   const pnav = document.getElementById('parentNav');
   if (pnav) pnav.addEventListener('click', parentHandleNavClick);
   // Now is rebuilt wholesale on every render, so its rows carry data attributes

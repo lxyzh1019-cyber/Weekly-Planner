@@ -156,6 +156,7 @@ function findChromium() {
     oneBackStackGoesWhereYouCameFrom: [],
     noLabelIsCutOnTheMoneyScreens: [],
     everyMoneyControlClicksClean: [],
+    parentReadingSizeDefaultsToLarger: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
@@ -11453,9 +11454,18 @@ function findChromium() {
                 const b = document.getElementById('dayProfileBadge');
                 const tag = `${dayName}, ${kid ? 'parent viewing ' + kid : kid || p}${scrolled ? ' (scrolled)' : ''}`;
                 if (!bar || !row || !b) { out.push(`${tag}: no Day header, row or badge`); continue; }
-                const want = parseFloat(getComputedStyle(row).height) + parseFloat(getComputedStyle(bar).borderBottomWidth);
+                /* A parent viewing her has the purple 44px sub-bar as the header's
+                   second row (PR 5, D21); a child's header is the one row. */
+                const sub = bar.querySelector(':scope > .hdr-sub');
+                if (!!kid !== !!sub) out.push(`${tag}: ${kid ? 'no parent sub-bar under the row' : "a child's Day header has a second row"}`);
+                if (sub) {
+                  const subH = sub.getBoundingClientRect().height - parseFloat(getComputedStyle(sub).borderTopWidth);
+                  if (Math.abs(subH - 44) > 0.5) out.push(`${tag}: the parent sub-bar is ${subH}px, not 44`);
+                  if (sub.scrollWidth > sub.clientWidth + 1) out.push(`${tag}: the sub-bar's things are ${sub.scrollWidth}px in ${sub.clientWidth}px`);
+                }
+                const want = parseFloat(getComputedStyle(row).height) + (sub ? sub.getBoundingClientRect().height : 0) + parseFloat(getComputedStyle(bar).borderBottomWidth);
                 const h = bar.getBoundingClientRect().height;
-                if (Math.abs(h - want) > 0.5) out.push(`${tag}: the Day bar is ${h}px, over its one-row ${want}px`);
+                if (Math.abs(h - want) > 0.5) out.push(`${tag}: the Day bar is ${h}px, over its ${sub ? 'row and sub-bar' : 'one row'} ${want}px`);
                 if (Math.abs(parseFloat(getComputedStyle(row).height) - (phone ? 60 : 64)) > 0.5) out.push(`${tag}: the row is ${getComputedStyle(row).height}, expected ${phone ? 60 : 64}px`);
                 if (row.scrollWidth > row.clientWidth + 1) out.push(`${tag}: the row's things are ${row.scrollWidth}px in ${row.clientWidth}px — something is pushed out of the bar`);
                 if (!b.classList.contains('hdr-badge') || b.classList.contains('hdr-badge--text') || b.querySelector('.hdr-badge-text')) out.push(`${tag}: the badge is not the round avatar alone`);
@@ -16726,7 +16736,7 @@ function findChromium() {
       /* Looks stage 4: the portal's own components, on its destinations, and
          the picker a parent comes in through. */
       parentViewing = 'jenn'; setParentDest('now');
-      take('Parent › Now', ['#screen-parent .parent-bar', '#screen-parent .parent-tab:not(.active)',
+      take('Parent › Now', ['#screen-parent > .hdr', '#screen-parent .parent-tab:not(.active)',
         '#screen-parent .parent-tab.active',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
         '#pnWrap .pn-card', '#pnWrap .pn-day', '#pnWrap .pn-day.now', '#pnWrap .pn-segbtn.on', '#pnWrap .pn-sunkid',
         '#screen-parent .btn-confirm']);
@@ -24004,6 +24014,33 @@ function findChromium() {
     await guTeardown();
   }
 
+  /* D14 (PR 5): with no wp.parentTextScale stored the parent screen reads at
+     1.2 and "Larger" is the current option; a stored 1.15 (the old Larger)
+     reads as 1.2 too. */
+  if (want('parentReadingSizeDefaultsToLarger')) {
+    const was = await page.evaluate(() => { try { return localStorage.getItem(PA_SCALE_KEY); } catch (e) { return null; } });
+    const bad = [];
+    try {
+      for (const stored of [null, '1.15']) {
+        const r = await page.evaluate((s) => {
+          try { if (s === null) localStorage.removeItem(PA_SCALE_KEY); else localStorage.setItem(PA_SCALE_KEY, s); } catch (e) {}
+          paApplyTextScale();
+          paRenderPrefs();
+          const scale = document.getElementById('screen-parent').style.getPropertyValue('--fs-scale').trim();
+          const cur = [...document.querySelectorAll('#paPrefsWrap [data-pa-scale].active')].map(b => b.textContent.trim());
+          return { scale, cur };
+        }, stored);
+        const label = stored === null ? 'nothing stored' : 'stored ' + stored;
+        if (r.scale !== '1.2') bad.push(`[${label}] --fs-scale is "${r.scale}", not 1.2`);
+        if (r.cur.join() !== 'Larger') bad.push(`[${label}] current option is "${r.cur.join()}", not Larger`);
+      }
+    } catch (e) { bad.push('threw: ' + e.message); }
+    finally {
+      try { await page.evaluate((v) => { try { if (v === null) localStorage.removeItem(PA_SCALE_KEY); else localStorage.setItem(PA_SCALE_KEY, v); } catch (e) {} paApplyTextScale(); paRenderPrefs(); }, was); } catch (e) { bad.push('could not put the Reading size back: ' + e.message); }
+    }
+    checks.parentReadingSizeDefaultsToLarger = bad.length ? bad : true;
+  }
+
   if (want('grownupsExpectedMoneyMoves')) {
     await guSetup();
     checks.grownupsExpectedMoneyMoves = await page.evaluate(() => {
@@ -24601,7 +24638,7 @@ function findChromium() {
         if (!document.getElementById('pnToldOverlay').classList.contains('open') || !document.querySelector('#pnToldBody .pn-answer')) bad.push('🚪 She told me… did not open the On-her-behalf card');
         document.querySelector('#pnToldBody [data-pn-action="told-close"]').click();
         // The header: one row, Money its own tab, no Approve tab on Money.
-        const bar = document.querySelector('#screen-parent .parent-bar');
+        const bar = document.querySelector('#screen-parent > header.hdr.hdr--parent');
         if (!bar || bar.getBoundingClientRect().height > 72) bad.push('the parent header is not one row: ' + (bar && bar.getBoundingClientRect().height));
         if (!document.getElementById('pdestbtn-money')) bad.push('💰 Money is not a top tab');
         if (document.querySelector('#screen-parent .parent-banner')) bad.push('the Parent Mode banner is still there');
@@ -26666,10 +26703,10 @@ function findChromium() {
     const bad = [];
     const count = (re) => (html.match(re) || []).length;
     if (count(/<main\b/g) !== 1) bad.push(`${count(/<main\b/g)} <main> elements, want 1`);
-    // 1 topbar left (Parent Monthly, PR 5) and the 5 kid screens' standard page headers (Today, Week, Day, Sister Sync, Print — PR 4), plus the parent portal's one-row <header class="parent-bar"> (Plan v9 §N).
-    if (count(/<header class="topbar/g) !== 1) bad.push(`${count(/<header class="topbar/g)} topbars are <header>, want 1`);
+    // No topbar left (Parent Monthly moved to the parent header, PR 5); the 5 kid screens' standard page headers (Today, Week, Day, Sister Sync, Print — PR 4) and the 2 parent headers (the portal and Monthly, PR 5).
+    if (count(/<header class="topbar/g)) bad.push(`${count(/<header class="topbar/g)} old topbars, want none`);
     if (count(/<header class="hdr hdr--standard/g) !== 5) bad.push(`${count(/<header class="hdr hdr--standard/g)} standard page headers are <header>, want 5`);
-    if (count(/<header class="parent-bar"/g) !== 1) bad.push('the parent portal one-row bar is not a <header>');
+    if (count(/<header class="hdr hdr--parent/g) !== 2) bad.push(`${count(/<header class="hdr hdr--parent/g)} parent headers are <header>, want 2 (the portal and Monthly)`);
     if (count(/<div class="topbar(?:\s|")/g)) bad.push('a topbar is still a <div>');
     const toggles = html.match(/<div class="(?:buffer|repeat)-toggle[^>]*>/g) || [];
     const bare = toggles.filter(t => !/role="switch"/.test(t) || !/tabindex="0"/.test(t) || !/aria-checked=/.test(t));
@@ -27291,9 +27328,9 @@ function findChromium() {
                   else if (b.px) near(px(getComputedStyle(cells[0]).fontSize), b.px, 0.05, `the ${b.name} icon`);
                 }
                 if (pagePrint) {
-                  // At the top of the page: the first thing under the header (a parent's mode bar aside), above everything else on it.
+                  // At the top of the page: the first thing under the header, above everything else on it.
                   const kids = [...screen.children].filter(k => shown(k) && !/absolute|fixed/.test(getComputedStyle(k).position)), at = kids.indexOf(els[0]), pb = els[0].getBoundingClientRect();
-                  if (kids[0] !== hdr || at < 1 || kids.slice(1, at).some(k => k.id !== 'parentBannerWeek')
+                  if (kids[0] !== hdr || at < 1
                     || kids.slice(at + 1).some(k => k.getBoundingClientRect().top < pb.bottom - 0.5)) out.push(`${tag}: the page Print is not the first thing on the preview page (${kids.slice(0, at + 2).map(k => k.id || k.className).join(', ')})`);
                   if (els[0].getBoundingClientRect().top < hdr.getBoundingClientRect().bottom - 0.5) out.push(`${tag}: the page Print is under the header`);
                 }
@@ -27492,6 +27529,266 @@ function findChromium() {
           }
           return out;
         }, [`[${look}] ${size} My money (parent)`]));
+      }
+    }
+    /* The parent header (PR 5, Stage 30): the Parent rows of the same table —
+       the portal (on Setup, where the girl switch shows, and on Now, where it
+       hides: difference 1), a parent viewing Jenn's Week and Day (the kid's
+       row on the purple and the 44px sub-bar under it) and Parent Monthly —
+       at 1194×834 and 390×844, Pop and Calm: one purple header, the row's
+       height, padding, gap and rule; the title (a phone's portal names its
+       destination); the centre; every named button's box, fill, border,
+       radius, shadow and text; the girl switch as one 2px r999 frame with its
+       cells and the chosen one in --sel; every header button at least 44px;
+       nothing pushed out of a row; no badge on a parent header, the kid's
+       52px avatar on a kid's row; Confirm all and Mark reviewed on the Day's
+       sub-bar, Switch on the Week's. */
+    const prow = (screen, size, lookName) => rows.find(r => r.screen === screen && r.size === size && r.look === lookName);
+    const pnum = (cell, re) => { const m = new RegExp(re).exec(cell || ''); return m ? m.slice(1) : null; };
+    const parentWant = (tag, r) => {
+      if (!r) { problems.push(`${tag}: no row in the per-screen table`); return null; }
+      const bar = read(tag, 'Bar', r.bar, `^(\\d+) \\+ ([\\d.]+) solid ${HEX}; pad 0 (\\d+); gap (\\d+); bg ${HEX}`);
+      const body = pnum(r.bar, 'body (\\d+)px');
+      const title = none(r.title) ? null : read(tag, 'Title', r.title, '= ([\\d.]+)px (\\d{3}) (#[0-9a-f]{6})');
+      const centre = none(r.centre) ? null : read(tag, 'Centre', r.centre, '([\\d.]+)px (\\d{3}) (#[0-9a-f]{6})');
+      const seg = (name) => (r.buttons || '').split('; ').find(x => x.startsWith(name)) || '';
+      const btn = (name) => {
+        const x = seg(name); if (!x) return null;
+        const size = pnum(x, '(\\d+)×(\\d+)'), fill = pnum(x, `${HEX} / ${HEX}`);
+        return { minH: +(pnum(x, 'min-height (\\d+)') || [0])[0], w: size ? +size[0] : 0, h: size ? +size[1] : 0,
+          pad: +(pnum(x, 'pad 0 (\\d+)') || [-1])[0], shadow: pnum(x, 'shadow (\\d+)px (\\d+)px 0'),
+          px: +(pnum(x, '(?:body |glyph |, )(\\d+)px(?: \\d{3})?(?: "|$|,|;)') || [0])[0], weight: (pnum(x, '\\dpx (\\d{3})') || [null])[0],
+          bg: fill ? fill[0] : '#ffffff', fg: fill ? fill[1] : null, seg: x };
+      };
+      const sw = r.sw || '';
+      return {
+        bar: bar && { rowH: +bar[0], rule: +bar[1], pad: +bar[3], gap: +bar[4], bg: bar[5], px: body ? +body[0] : 0 },
+        title: title && { px: +title[0], weight: title[1], ink: title[2] },
+        centre: centre && { px: +centre[0], weight: centre[1], ink: centre[2], minWidth: +(pnum(r.centre, 'min-width (\\d+)') || [0])[0], between: /between ◀ and ▶/.test(r.centre) },
+        menu: btn('menu'), tab: btn('tab'), app: btn('⚙️'), back: btn('back'), step: btn('◀ ▶'), action: btn('action'),
+        confirmFill: pnum(r.buttons, `Confirm all ${HEX} / ${HEX}`),
+        tabSel: pnum(sw, `the current one ${HEX} / ${HEX} (\\d{3})`),
+        scope: /one switch/.test(sw) && { cellH: +(pnum(sw, 'cells (?:\\d+×|h)(\\d+)') || [0])[0], cellW: +(pnum(sw, 'cells (\\d+)×') || [0])[0],
+          px: +(pnum(sw, 'body (\\d+)px') || pnum(sw, ', (\\d+)px; selected') || [0])[0], allPx: +(pnum(sw, '"All" (\\d+)px') || [0])[0],
+          emojiPx: +(pnum(sw, '🐥 🦊 (\\d+)px') || [0])[0],
+          sel: pnum(sw, `selected (?:(\\d{3}) )?${HEX} / ${HEX}`) },
+        kidBadge: pnum(r.badge, '^(\\d+)×(\\d+) #ffe4ec'),
+      };
+    };
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      const lookName = look === 'pop' ? 'Pop' : 'Calm';
+      for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+        await page.setViewportSize({ width: w, height: h });
+        for (const [label, screenName, open] of [['Parent portal (Setup)', 'Parent portal', 'portal-setup'], ['Parent portal (Now)', 'Parent portal', 'portal-now'],
+          ['Parent viewing Jenn: Week', 'Parent sub-bar', 'view-week'], ['Parent viewing Jenn: Day', 'Parent sub-bar', 'view-day'], ['Parent Monthly', 'Parent Monthly', 'monthly']]) {
+          const tag = `[${look}] ${size} ${label}`;
+          const want = parentWant(tag, prow(screenName, size, lookName));
+          if (!want || !want.bar) continue;
+          problems.push(...await page.evaluate(([tag, open, want, phone]) => {
+            const out = [];
+            const wasProfile = profile, wasViewing = parentViewing, wasUnlocked = parentUnlockedThisSession, wasTab = parentTab, wasReturn = mmReturn, wasScope = parentScope;
+            const rgb = (hex) => { let x = hex.slice(1); if (x.length === 3) x = x.split('').map(c => c + c).join(''); return `rgb(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)})`; };
+            const px = (v) => parseFloat(v) || 0;
+            const r1 = (n) => Math.round(n * 100) / 100;
+            const near = (got, exp, tol, what) => { if (Math.abs(got - exp) > tol) out.push(`${tag}: ${what} is ${r1(got)}px, the table's ${exp}px`); };
+            const shown = (el) => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+            const firstFamily = (f) => (f || '').split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+            const rootCs = getComputedStyle(document.documentElement);
+            const headFont = firstFamily(rootCs.getPropertyValue('--font-head')), bodyFont = firstFamily(rootCs.getPropertyValue('--font-text'));
+            const ruleOk = (got, exp) => got <= exp + 0.01 && got >= Math.floor(exp) - 0.01;
+            const font = (el, b, what, family) => {
+              const cs = getComputedStyle(el);
+              if (b.px) near(px(cs.fontSize), b.px, 0.05, `${what} text size`);
+              if (b.weight && cs.fontWeight !== b.weight) out.push(`${tag}: ${what} weight is ${cs.fontWeight}, the table's ${b.weight}`);
+              if (b.ink && cs.color !== rgb(b.ink)) out.push(`${tag}: ${what} colour is ${cs.color}, the table's ${b.ink}`);
+              if (family && firstFamily(cs.fontFamily) !== family) out.push(`${tag}: ${what} font is ${cs.fontFamily}, not ${family}`);
+            };
+            const box = (el, b, what) => {
+              if (!el || !shown(el)) { out.push(`${tag}: no ${what}`); return; }
+              const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+              if (b.w) { near(r.width, b.w, 0.5, `${what} width`); near(r.height, b.h, 0.5, `${what} height`); }
+              if (b.minH) near(r.height, b.minH, 0.5, `${what} height`);
+              if (b.pad >= 0 && !b.w) near(px(cs.paddingLeft), b.pad, 0.01, `${what} side padding`);
+              if (!b.skipFill && cs.backgroundColor !== rgb(b.bg)) out.push(`${tag}: ${what} fill is ${cs.backgroundColor}, the table's ${b.bg}`);
+              if (b.fg && cs.color !== rgb(b.fg)) out.push(`${tag}: ${what} ink is ${cs.color}, the table's ${b.fg}`);
+              if (!ruleOk(px(cs.borderTopWidth), 2) || cs.borderTopColor !== rgb('#1c2240')) out.push(`${tag}: ${what} border is ${cs.borderTopWidth} ${cs.borderTopColor}, the table's 2px #1c2240`);
+              if (/r12/.test(b.seg) && cs.borderTopLeftRadius !== '12px') out.push(`${tag}: ${what} corner is ${cs.borderTopLeftRadius}, the table's 12px`);
+              if (b.shadow ? !cs.boxShadow.includes(`${b.shadow[0]}px ${b.shadow[1]}px 0px`) : cs.boxShadow !== 'none') out.push(`${tag}: ${what} shadow is ${cs.boxShadow}, the table's ${b.shadow ? b.shadow.join('px ') + 'px 0' : 'none'}`);
+              font(el, b, what, bodyFont);
+            };
+            try {
+              profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn'; mmReturn = null; navReturnStack = [];
+              let screen, hdr;
+              if (/^portal/.test(open)) {
+                showScreen('parent'); setParentScope('jenn'); setParentTab(open === 'portal-now' ? 'now' : 'setup');
+                screen = document.getElementById('screen-parent');
+                hdr = screen.querySelector(':scope > header.hdr.hdr--parent');
+              } else if (open === 'monthly') {
+                openParentMonthly('jenn');
+                screen = document.getElementById('screen-parent-monthly');
+                hdr = screen.querySelector(':scope > header.hdr.hdr--parent');
+              } else {
+                goWeek(); setWeekView('full');
+                if (open === 'view-day') openDay(getDayKeys(weekOffset)[0], 0);
+                screen = document.getElementById(open === 'view-day' ? 'screen-day' : 'screen-week');
+                hdr = screen.querySelector(':scope > header.hdr.hdr--standard');
+              }
+              if (!screen || !screen.classList.contains('active')) { out.push(`${tag}: the screen did not open`); return out; }
+              const heads = screen.querySelectorAll('header');
+              if (heads.length !== 1 || !hdr) { out.push(`${tag}: ${heads.length} headers, ${hdr ? 1 : 0} of the right kind — want exactly one`); return out; }
+              if (screen.querySelector('.parent-banner, .parent-bar, .topbar')) out.push(`${tag}: an old .parent-banner / .parent-bar / .topbar is still on the screen`);
+              const row = hdr.querySelector(':scope > .hdr-row');
+              const start = row && row.querySelector(':scope > .hdr-start'), end = row && row.querySelector(':scope > .hdr-end');
+              const ctx = row && row.querySelector(':scope > .hdr-context');
+              const hs = getComputedStyle(hdr);
+              const rule = px(hs.borderBottomWidth), drawn = window.devicePixelRatio === 2 ? 2.5 : 2;
+              if (Math.abs(rule - drawn) > 0.001 || hs.borderBottomStyle !== 'solid' || hs.borderBottomColor !== rgb('#1c2240')) out.push(`${tag}: the rule under the header is ${rule}px ${hs.borderBottomStyle} ${hs.borderBottomColor}, the table's 2.5px (drawn ${drawn}) solid #1c2240`);
+              const sub = hdr.querySelector(':scope > .hdr-sub');
+              if (/^view/.test(open)) {
+                // The kid's row on the purple, its 52px avatar (D25), then the sub-bar.
+                if (hs.backgroundColor !== rgb(want.bar.bg)) out.push(`${tag}: the kid's row is ${hs.backgroundColor}, the table's ${want.bar.bg} when a parent views her`);
+                near(row.getBoundingClientRect().height, phone ? 60 : 64, 0.5, "the kid's row");
+                const badge = end && end.querySelector('.hdr-badge');
+                if (!badge || !shown(badge)) out.push(`${tag}: no avatar on the kid's row`);
+                else if (want.kidBadge) { near(badge.getBoundingClientRect().width, +want.kidBadge[0], 0.5, 'the avatar width'); near(badge.getBoundingClientRect().height, +want.kidBadge[1], 0.5, 'the avatar height'); }
+                if (!sub) { out.push(`${tag}: no sub-bar`); return out; }
+                const c2 = getComputedStyle(sub), top = px(c2.borderTopWidth);
+                if (!ruleOk(top, 1.5) || c2.borderTopStyle !== 'solid' || c2.borderTopColor !== rgb('#1c2240')) out.push(`${tag}: the line between the rows is ${top}px ${c2.borderTopStyle} ${c2.borderTopColor}, the picture's 1.5px solid #1c2240`);
+                near(sub.getBoundingClientRect().height - top, want.bar.rowH, 0.5, 'the sub-bar');
+                near(px(c2.paddingLeft), want.bar.pad, 0.01, 'the sub-bar side padding');
+                near(px(c2.columnGap), want.bar.gap, 0.01, 'the sub-bar gap');
+                font(sub, { px: want.bar.px, ink: '#1c2240' }, 'the sub-bar', bodyFont);
+                near(hdr.getBoundingClientRect().height, row.getBoundingClientRect().height + sub.getBoundingClientRect().height + rule, 0.5, 'the header (two rows and the rule)');
+                if (sub.scrollWidth > sub.clientWidth + 1) out.push(`${tag}: the sub-bar's things are ${sub.scrollWidth}px in ${sub.clientWidth}px`);
+                const name = sub.querySelector('.pv-name');
+                if (!name || !/Jenn/.test(name.textContent)) out.push(`${tag}: the sub-bar does not name Jenn`);
+                const back = sub.querySelector('.pb-back-btn');
+                if (!back || back.getAttribute('aria-label') !== 'Back to the parent hub') out.push(`${tag}: the sub-bar's way back is missing or misnamed`);
+                const acts = [...sub.querySelectorAll('.pv-btn')].filter(shown);
+                acts.forEach(b => box(b, Object.assign({}, want.action, b.classList.contains('pv-btn--main') && want.confirmFill ? { bg: want.confirmFill[0], fg: want.confirmFill[1], weight: '600' } : b.classList.contains('pb-action--notdone') || b.classList.contains('on') ? { skipFill: true } : {}), `"${b.getAttribute('aria-label')}"`));
+                if (open === 'view-day') {
+                  const labels = acts.map(b => b.getAttribute('aria-label') || '');
+                  if (!labels.some(l => /^Confirm all Jenn's blocks/.test(l)) || !labels.some(l => /^Mark Jenn's day reviewed$|^Day reviewed$/.test(l))) out.push(`${tag}: the Day's sub-bar lacks Confirm all or Mark reviewed (${labels.join(' | ')})`);
+                } else if (!sub.querySelector('#parentWeekActions .pb-switch')) out.push(`${tag}: the Week's sub-bar has no Switch`);
+              } else {
+                if (sub) out.push(`${tag}: a parent header with a second row`);
+                if (hs.backgroundColor !== rgb(want.bar.bg)) out.push(`${tag}: the bar is ${hs.backgroundColor}, the table's ${want.bar.bg}`);
+                const rs = getComputedStyle(row);
+                near(row.getBoundingClientRect().height, want.bar.rowH, 0.5, 'the bar row');
+                near(px(rs.paddingLeft), want.bar.pad, 0.01, 'the bar left padding');
+                near(px(rs.paddingRight), want.bar.pad, 0.01, 'the bar right padding');
+                near(px(rs.columnGap), want.bar.gap, 0.01, 'the bar gap');
+                near(hdr.getBoundingClientRect().height, row.getBoundingClientRect().height + rule, 0.5, 'the header (row and rule)');
+                const hr = hdr.getBoundingClientRect();
+                if (row.scrollWidth > row.clientWidth + 1 || (end && end.getBoundingClientRect().right > hr.right - want.bar.pad + 0.5)) out.push(`${tag}: something is pushed out of the bar (${row.scrollWidth}px in ${row.clientWidth}px)`);
+                if (hdr.querySelector('.hdr-badge')) out.push(`${tag}: a badge the table does not draw`);
+                // Title
+                const t = start && start.querySelector('.hdr-title');
+                if (want.title) {
+                  if (!t || !shown(t)) out.push(`${tag}: no title`);
+                  else {
+                    font(t, want.title, 'the title', headFont);
+                    if (t.scrollWidth > t.clientWidth + 1) out.push(`${tag}: the title "${t.textContent}" is cut`);
+                    const wantText = open === 'monthly' ? 'Monthly' : open === 'portal-now' ? 'Now' : 'Setup';
+                    if (t.textContent !== wantText) out.push(`${tag}: the title reads ${JSON.stringify(t.textContent)}, expected ${JSON.stringify(wantText)}`);
+                  }
+                } else if (t && shown(t)) out.push(`${tag}: a title is shown ("${t.textContent}"), the table has none`);
+                // Centre
+                if (want.centre) {
+                  const label = ctx && ctx.querySelector('.hdr-label');
+                  const steps = ctx ? [...ctx.querySelectorAll(':scope > .hdr-step')] : [];
+                  if (!label || !shown(label) || steps.length !== 2) out.push(`${tag}: no ◀ month ▶ in the centre`);
+                  else {
+                    font(label, want.centre, 'the month', bodyFont);
+                    if (want.centre.minWidth) near(px(getComputedStyle(label).minWidth), want.centre.minWidth, 0.01, "the month's min-width");
+                    if (label.scrollWidth > label.clientWidth + 1) out.push(`${tag}: the month "${label.textContent}" is cut`);
+                    const lr = label.getBoundingClientRect(), mid = lr.left + lr.width / 2;
+                    const a = steps[0].getBoundingClientRect(), b = steps[1].getBoundingClientRect();
+                    const off = want.centre.between ? mid - (a.right + b.left) / 2 : mid - (hr.left + hr.width / 2);
+                    if (Math.abs(off) > 1) out.push(`${tag}: the month is ${r1(off)}px off ${want.centre.between ? 'the middle between ◀ and ▶' : "the bar's middle"} (1px allowed)`);
+                    const now = formatDayKey(toDayKeyInZone(new Date()));
+                    const wantMonth = `${phone ? MONTH_SHORT[now.getMonth()] : MONTH_LONG[now.getMonth()]} ${now.getFullYear()}`;
+                    if (label.innerText.trim() !== wantMonth) out.push(`${tag}: the month reads ${JSON.stringify(label.innerText.trim())}, expected ${JSON.stringify(wantMonth)}`);
+                    steps.forEach((s, i) => box(s, want.step, i ? '▶' : '◀'));
+                  }
+                }
+                if (want.back) {
+                  const back = start && start.querySelector('.hdr-back');
+                  box(back, want.back, 'the back button');
+                  if (back && back.getAttribute('aria-label') !== 'Back to Parent') out.push(`${tag}: the ◀ is labelled ${JSON.stringify(back.getAttribute('aria-label'))}, expected "Back to Parent"`);
+                }
+                if (want.menu) {
+                  const m = document.getElementById('parentMenuBtn');
+                  box(m, want.menu, 'the 🔒 menu');
+                  const wantWords = phone ? '🔒 ▾' : '🔒 Parent ▾';
+                  if (m && m.innerText.replace(/\s+/g, ' ').trim() !== wantWords) out.push(`${tag}: the menu reads ${JSON.stringify(m.innerText)}, the table's "${wantWords}"`);
+                }
+                const tabs = [...hdr.querySelectorAll('.parent-tab')];
+                if (/^portal/.test(open)) {
+                  if (tabs.length !== 6) out.push(`${tag}: ${tabs.length} destination tabs, want 6`);
+                  if (phone) { if (tabs.some(shown)) out.push(`${tag}: the destination tabs show on a phone (the bottom bar has them)`); }
+                  else if (want.tab) {
+                    const cur = tabs.filter(t => t.classList.contains('active'));
+                    const wantCur = open === 'portal-now' ? 'now' : 'setup';
+                    if (cur.length !== 1 || cur[0].dataset.pdest !== wantCur) out.push(`${tag}: the current tab is ${cur.map(t => t.dataset.pdest).join(',') || 'none'}, expected ${wantCur}`);
+                    for (const t of tabs) {
+                      const on = t.classList.contains('active');
+                      const b = t.dataset.pdest === 'app' ? want.app : Object.assign({}, want.tab, on && want.tabSel ? { bg: want.tabSel[0], fg: want.tabSel[1], weight: want.tabSel[2] } : {});
+                      box(t, b, `the ${t.dataset.pdest} tab`);
+                      const icon = t.querySelector('.parent-tab-icon');
+                      if (icon && shown(icon) !== on) out.push(`${tag}: the ${t.dataset.pdest} tab ${on ? 'hides' : 'shows'} its icon`);
+                    }
+                  }
+                }
+              }
+              // The girl switch (portal and Monthly)
+              if (want.scope) {
+                const sw = end && end.querySelector('.parent-scope');
+                const hide = open === 'portal-now';
+                if (!sw) out.push(`${tag}: no girl switch`);
+                else if (hide) { if (shown(sw)) out.push(`${tag}: the girl switch shows on Now (difference 1: Now has its own)`); }
+                else if (!shown(sw)) out.push(`${tag}: the girl switch is hidden`);
+                else {
+                  const cs = getComputedStyle(sw);
+                  if (!ruleOk(px(cs.borderTopWidth), 2) || cs.borderTopColor !== rgb('#1c2240') || cs.borderTopLeftRadius !== '999px' || cs.overflow !== 'hidden') out.push(`${tag}: the girl switch is not one 2px ink frame, r999, clipped (${cs.borderTopWidth} ${cs.borderTopColor} ${cs.borderTopLeftRadius} ${cs.overflow})`);
+                  const cells = [...sw.children];
+                  if (cells.length !== (open === 'monthly' ? 2 : 3)) out.push(`${tag}: the girl switch has ${cells.length} cells`);
+                  cells.forEach((c, i) => {
+                    const r = c.getBoundingClientRect(), bl = px(getComputedStyle(c).borderLeftWidth);
+                    near(r.height, want.scope.cellH, 0.5, `cell ${i + 1} height`);
+                    if (want.scope.cellW) near(r.width - bl, want.scope.cellW, 0.5, `cell ${i + 1} width`);
+                    if (i) near(bl, 2, 0.01, `cell ${i + 1}'s divider`);
+                    const isAll = c.dataset.parentScope === 'both';
+                    const wantPx = isAll && want.scope.allPx ? want.scope.allPx : want.scope.emojiPx || want.scope.px;
+                    if (wantPx) near(px(getComputedStyle(c).fontSize), wantPx, 0.05, `cell ${i + 1}'s text`);
+                  });
+                  const sel = cells.filter(c => c.getAttribute('aria-pressed') === 'true');
+                  if (sel.length !== 1 || !/jenn/i.test(sel[0].getAttribute('aria-label') || '')) out.push(`${tag}: the chosen girl is ${sel.map(c => c.getAttribute('aria-label')).join(',') || 'none'}, expected Jenn`);
+                  else if (want.scope.sel) {
+                    const scs = getComputedStyle(sel[0]);
+                    if (scs.backgroundColor !== rgb(want.scope.sel[1]) || scs.color !== rgb(want.scope.sel[2])) out.push(`${tag}: the chosen cell is ${scs.backgroundColor} / ${scs.color}, the table's ${want.scope.sel[1]} / ${want.scope.sel[2]}`);
+                    if (want.scope.sel[0] && scs.fontWeight !== want.scope.sel[0]) out.push(`${tag}: the chosen cell weight is ${scs.fontWeight}, the table's ${want.scope.sel[0]}`);
+                  }
+                }
+              }
+              // Every header button a grown-up's 44px.
+              for (const b of hdr.querySelectorAll('button')) {
+                if (!shown(b) || b.closest('.parent-menu-pop')) continue;
+                const q = b.getBoundingClientRect();
+                if (q.width < 43.5 || q.height < 43.5) out.push(`${tag}: "${b.getAttribute('aria-label') || b.textContent.trim()}" is ${Math.round(q.width)}×${Math.round(q.height)}, under 44px`);
+              }
+              if (hdr.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5 || hdr.scrollWidth > hdr.clientWidth + 1) out.push(`${tag}: the header is wider than the screen`);
+            } finally {
+              profile = wasProfile; parentViewing = wasViewing; parentUnlockedThisSession = wasUnlocked; mmReturn = wasReturn;
+              navReturnStack = [];
+              if (wasTab) parentTab = wasTab;
+              parentScope = wasScope;
+              goToday();
+            }
+            return out;
+          }, [tag, open, want, size === 'phone']));
+        }
       }
     }
     // "Sister Sync" on one line at 375px in Calm: the title is never cut.

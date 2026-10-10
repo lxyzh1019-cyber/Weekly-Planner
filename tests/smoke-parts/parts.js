@@ -442,6 +442,7 @@ const PARTS = {
     'aFreeFineShowsNoAmountAnywhere',
     'rulesFindAPriceAndListRuleChangesOnly',
     'rulesSearchPlaceholderFitsTheIndex',
+    'parentReadingSizeDefaultsToLarger',
     'grownupsExpectedMoneyMoves',
     'grownupsRulesSaveFromNextSunday',
     'grownupsEveryOldSectionHasAHome',

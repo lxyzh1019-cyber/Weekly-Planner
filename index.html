@@ -237,15 +237,11 @@
      SCREEN: WEEK VIEW
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-week">
-  <div class="parent-banner sticky" id="parentBannerWeek" style="display:none">
-    <span class="pb-back" id="parentBackWeek"></span>
-    👨‍👩‍👧‍👦 Parent Mode — Viewing <span id="parentViewingName"></span>
-    <span class="pb-actions" id="parentWeekActions"></span>
-  </div>
-
   <!-- The standard page header, drawn by renderWeek (weekRenderHeader): My
        Week, the week stepper, the Full / Print preview tabs, Print only on
-       the preview, the profile badge. One row at every size. -->
+       the preview, the profile badge. One row at every size; a parent viewing
+       a girl gets the purple 44px sub-bar under it (parentViewSub, PR 5): the
+       way back, whose week it is and Switch. -->
   <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
   <!-- A phone's Print, first on the preview page: the header there is Full's
        (owner, 2026-10-09). Shown by setWeekView on the preview, by css/app.css
@@ -449,16 +445,6 @@
      SCREEN: DAY EDITOR
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-day">
-  <!-- Two named actions, not one that promised both. "Confirm all" asserts the
-       work happened; "Mark reviewed" asserts a grown-up looked at the day. They
-       are filled by renderParentBanners so the buttons always name the child
-       actually being viewed. The back button is parentBannerBackButton's: it
-       reads "Back to weekly meeting" when a meeting is waiting. -->
-  <div class="parent-banner sticky" id="parentBannerDay" style="display:none">
-    <span class="pb-back" id="parentBackDay"></span>
-    👨‍👩‍👧‍👦 Parent Mode — Pin activities with long-tap
-    <span class="pb-actions" id="parentDayActions"></span>
-  </div>
   <!-- The day's paid chores, graded where the day is. Parent-only, filled by
        renderParentChoreStrip, and deliberately EMPTY when the planner put no
        chore on this day: the plan is what says there is anything to grade. -->
@@ -467,7 +453,13 @@
   <!-- The standard page header, drawn by openDay (dayRenderHeader): ◀ back
        through the one back stack, the date as the title between ◀ ▶, the
        1 / 2 / 3 day tabs, 📑 Copy a day and the profile badge. One row: the
-       schedule below is the screen's whole job. -->
+       schedule below is the screen's whole job. A parent viewing a girl gets
+       the purple 44px sub-bar under it (parentViewSub, PR 5): the way back
+       (parentBannerBackButton: "Back to weekly meeting" when a meeting is
+       waiting), whose day it is and two named actions, not one that promised
+       both — "Confirm all" asserts the work happened, "Mark reviewed" that a
+       grown-up looked at the day — drawn by parentDayActionsHtml so they
+       always name the child actually being viewed. -->
   <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
 
   <!-- One scroll container for the whole screen. It used to be three nested
@@ -521,43 +513,12 @@
      SCREEN: PARENT HOME
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-parent">
-  <!-- One row (Plan v9 §N "Header space"): 🔒 Parent ▾ (PIN, the look, Exit
-       inside it), the six destinations, the day, then who is shown. The
-       purple row itself says this is Parent mode; the tabs say where. -->
-  <header class="parent-bar">
-    <div class="parent-menu">
-      <button type="button" class="parent-menu-btn" id="parentMenuBtn" aria-expanded="false" aria-controls="parentMenu" onclick="parentMenuToggle()">🔒 Parent ▾</button>
-      <div class="parent-menu-pop" id="parentMenu" hidden>
-        <button class="btn-icon" onclick="parentMenuToggle(false);changeParentPin()" title="Change parent PIN">🔒 PIN</button>
-        <!-- The parent's own look on this device (L5). applyLook writes the
-             label: the look it switches TO. -->
-        <button class="btn-icon" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the Calm look" aria-label="Switch to the Calm look">🎨 Calm</button>
-        <button class="btn-icon" onclick="parentMenuToggle(false);goProfile()">Exit to the girls</button>
-      </div>
-    </div>
-    <div class="parent-tabs" role="tablist" aria-label="Parent sections">
-      <button class="parent-tab active" role="tab" id="pdestbtn-now" data-pdest="now"
-        aria-selected="true" aria-controls="ptab-now" tabindex="0"
-        data-parent-dest="now">📥 Now<span class="pn-badge" id="pnTabBadge" hidden></span></button>
-      <button class="parent-tab" role="tab" id="pdestbtn-meeting" data-pdest="meeting"
-        aria-selected="false" aria-controls="ptab-review" tabindex="-1"
-        data-parent-dest="meeting">🧑‍🧑‍🧒 Meeting</button>
-      <button class="parent-tab" role="tab" id="pdestbtn-history" data-pdest="history"
-        aria-selected="false" aria-controls="ptab-history" tabindex="-1"
-        data-parent-dest="history">📊 History</button>
-      <button class="parent-tab" role="tab" id="pdestbtn-money" data-pdest="money"
-        aria-selected="false" aria-controls="ptab-money" tabindex="-1"
-        data-parent-dest="money">💰 Money</button>
-      <button class="parent-tab" role="tab" id="pdestbtn-setup" data-pdest="setup"
-        aria-selected="false" aria-controls="ptab-setup" tabindex="-1"
-        data-parent-dest="setup">📋 Setup</button>
-      <span class="parent-date" id="parentDate" aria-hidden="true"></span>
-      <button class="parent-tab" role="tab" id="pdestbtn-app" data-pdest="app"
-        aria-selected="false" aria-controls="ptab-app" tabindex="-1"
-        data-parent-dest="app" aria-label="App">⚙️</button>
-    </div>
-    <div class="parent-scope" id="parentScopePills" aria-label="Which child"></div>
-  </header>
+  <!-- The parent header (PR 5, D35): pageHeader({variant:'parent'}), drawn
+       once by parentRenderHeader (js/11-parent.js) — 🔒 Parent ▾ (PIN, the
+       look, Exit inside it), the six destinations, then who is shown, on one
+       purple 64px row (60 on a phone, where the destinations move to the
+       bottom bar and the row names the destination). -->
+  <header class="hdr hdr--parent"><div class="hdr-row"></div></header>
   <div class="parent-back" id="parentBack" hidden></div>
 
   <!-- Two devices saved different versions of one record. Above the panels, so
@@ -702,23 +663,9 @@
      SCREEN: PARENT MONTHLY HEATMAP
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-parent-monthly">
-  <div class="parent-banner">👨‍👩‍👧‍👦 Parent Mode — Monthly Overview</div>
-  <header class="topbar">
-    <div class="topbar-left">
-      <button class="btn-icon" onclick="showScreen('parent')">◀</button>
-      <h2 id="pmTitle">Monthly</h2>
-    </div>
-    <div style="display:flex;gap:0.4rem">
-      <button class="pill-btn" id="pmKidJenn" onclick="setParentMonthlyKid('jenn')">🐥 Jenn</button>
-      <button class="pill-btn" id="pmKidJess" onclick="setParentMonthlyKid('jess')">🦊 Jess</button>
-    </div>
-  </header>
-
-  <div class="week-nav">
-    <button class="btn-icon" onclick="changeParentMonth(-1)">◀</button>
-    <h3 id="pmMonthLabel"></h3>
-    <button class="btn-icon" onclick="changeParentMonth(1)">▶</button>
-  </div>
+  <!-- The parent header (PR 5): ◀ back to the portal, Monthly, ◀ month ▶ in
+       the middle and the Jenn / Jess switch, drawn by renderParentMonthly. -->
+  <header class="hdr hdr--parent"><div class="hdr-row"></div></header>
 
   <div style="padding:0 0.8rem 0.4rem;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">
     Color shows how much each day is <b>planned</b> — not how much was completed. Tap a day to open it.

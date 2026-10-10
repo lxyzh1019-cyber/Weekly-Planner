@@ -2197,16 +2197,27 @@ async function markDayReviewedForChild(kid, dayKey) {
   showToast(`📋 ${name}'s day reviewed`);
 }
 
-/* The day screen's parent banner names the child it is acting on, and says
-   whether the review is still blocked. Both banners are redrawn from here so
-   the two buttons can never describe a different child from the one shown. */
+/* The day screen's parent sub-bar names the child it is acting on, and says
+   whether the review is still blocked. Its actions are drawn by
+   parentDayActionsHtml, for the header (dayRenderHeader) and for a redraw
+   here, so the buttons can never describe a different child from the one
+   shown. */
 function renderParentBanners() {
   // The chore strip is the same surface's other half, so it is never redrawn
-  // separately and cannot fall out of step with the child the banner names.
+  // separately and cannot fall out of step with the child the sub-bar names.
   renderParentChoreStrip();
+  /* The Day's header was drawn for a child (no sub-bar): draw it again for
+     the parent, sub-bar and all, and let the meeting lock read it. */
+  if (isParent() && !document.getElementById('parentDayActions')) { dayRenderHeader(); applyMeetingLock(); }
   const bar = document.getElementById('parentDayActions');
   if (!bar) return;
-  if (!isParent()) { bar.innerHTML = ''; return; }
+  bar.innerHTML = isParent() ? parentDayActionsHtml() : '';
+}
+
+/* The three named actions, in the parent sub-bar's 44px buttons: the icon
+   and the count always, the words beside them on the iPad (a phone keeps
+   them in the label). */
+function parentDayActionsHtml() {
   const who = parentViewing;
   const name = who === 'jenn' ? 'Jenn' : 'Jess';
   const key = currentDayKey;
@@ -2224,18 +2235,19 @@ function renderParentBanners() {
      gate reads, so the badge and the gate cannot disagree. */
   const waiting = (typeof dayBlocksAwaitingAccount === 'function')
     ? dayBlocksAwaitingAccount(who, key).length : 0;
-  bar.innerHTML =
-    `<button type="button" class="btn-icon pb-action" onclick="confirmAllBlocksForChild()">`
-    + `✅ Confirm all ${escapeHtml(name)}'s blocks${left ? ` (${left})` : ''}</button>`
+  const confirmWords = `Confirm all ${name}'s blocks`;
+  const reviewWords = reviewed ? 'Day reviewed' : `Mark ${name}'s day reviewed`;
+  return `<button type="button" class="pv-btn pv-btn--main pb-action" onclick="confirmAllBlocksForChild()" aria-label="${escapeAttr(confirmWords)}${left ? ` (${left})` : ''}">`
+    + `✅<span class="pv-word"> ${escapeHtml(confirmWords)}</span>${left ? ` (${left})` : ''}</button>`
     + (waiting
-      ? `<button type="button" class="btn-icon pb-action pb-action--notdone"`
-        + ` onclick="markRemainingNotDoneForChild()">`
-        + `🚫 Mark the rest not done (${waiting})</button>`
+      ? `<button type="button" class="pv-btn pb-action pb-action--notdone"`
+        + ` onclick="markRemainingNotDoneForChild()" aria-label="Mark the rest not done (${waiting})">`
+        + `🚫<span class="pv-word"> Mark the rest not done</span> (${waiting})</button>`
       : '')
-    + `<button type="button" class="btn-icon pb-action${reviewed ? ' on' : ''}"`
+    + `<button type="button" class="pv-btn pb-action${reviewed ? ' on' : ''}"`
     + `${why ? ` disabled title="${escapeAttr(why)}"` : ''}`
-    + ` onclick="markDayReviewedForChild()">`
-    + `${reviewed ? '📋 Day reviewed ✓' : `📋 Mark ${escapeHtml(name)}'s day reviewed`}</button>`;
+    + ` onclick="markDayReviewedForChild()" aria-label="${escapeAttr(reviewWords)}">`
+    + `📋<span class="pv-word"> ${escapeHtml(reviewWords)}</span>${reviewed ? ' ✓' : ''}</button>`;
 }
 
 /* ════════════════════════════════════════════════════════════════

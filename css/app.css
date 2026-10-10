@@ -117,7 +117,7 @@
        reads them yet). Shared by both looks: a size or a layer is not a
        look's. Each layer equals the z-index that layer uses today, so moving
        a surface onto its name changes no stacking: the header is the sticky
-       .topbar (100), the nav the kid's bottom bar .kid-nav (60), a sheet the
+       .hdr page header (100), the nav the kid's bottom bar .kid-nav (60), a sheet the
        .overlay (300), a dialog #appDialogOverlay (500). */
     --radius-pill: var(--radius-full);
     --z-header: 100;
@@ -163,6 +163,20 @@
     --hdr-title-size: calc(30px * var(--text-scale, 1));
     --hdr-title-small: calc(28px * var(--text-scale, 1));
     --hdr-tab-size: calc(26px * var(--text-scale, 1));
+    /* The parent header (PR 5, SRC 258-325): a grown-up's 44px buttons, body
+       17px words (16 in the sub-bar's buttons), ◀ ▶ 16px, ⚙️ 18px; the girl
+       switch's cells 44px high, the tap floor (the picture's 42; 46 wide on a phone, "All" 15px, 🐥 🦊 19px);
+       a phone's title 24px × the look's scale. */
+    --hdr-parent-btn: 44px;
+    --hdr-parent-word-size: 17px;
+    --hdr-parent-sub-size: 16px;
+    --hdr-parent-glyph-size: 16px;
+    --hdr-parent-icon-size: 18px;
+    --hdr-parent-cell-h: 44px;
+    --hdr-parent-cell-w: 46px;
+    --hdr-parent-short-size: 15px;
+    --hdr-parent-emoji-size: 19px;
+    --hdr-parent-title-size: calc(24px * var(--text-scale, 1));
 
     /* ════ Look tokens (Stage 1, looks-calm-pop) ════
        Every colour and font in this file reads one of these; each holds
@@ -787,18 +801,6 @@
     padding: 0.4rem 1rem;
   }
 
-  /* ═══════════ TOP BAR ═══════════ */
-  .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0.8rem 1rem;
-    background: var(--paper);
-    border-bottom: 3px dashed var(--paper-line);
-    position: sticky; top: 0; z-index: 100;
-    box-shadow: 0 2px 0 var(--shadow-ink-6);
-  }
-  .topbar-left { display: flex; align-items: center; gap: 0.6rem; }
-  .topbar h2 { font-size: calc(1.84rem * var(--text-scale, 1)); }
-
   /* Text that only a screen reader needs (Sister Sync's "moved" note). */
   .visually-hidden {
     position: absolute;
@@ -948,10 +950,6 @@
     #screen-day.screen.active {
       padding-bottom: env(safe-area-inset-bottom, 0px);
     }
-    #screen-day > .parent-banner.sticky {
-      padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
-      padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
-    }
     /* Landscape: the day still scrolls as ONE surface. It used to be a
        two-column grid whose lanes each had their own max-height and overflow,
        so the schedule scrolled inside a box that scrolled inside the page and a
@@ -969,10 +967,6 @@
     }
     #screen-day .timeline.timeline--multi {
       max-width: 100%;
-    }
-    #screen-week > .parent-banner.sticky {
-      padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
-      padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
     }
   }
 
@@ -3789,26 +3783,21 @@
   .mascot-suggestions .pill-btn { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding:0.3rem 0.6rem; }
 
   /* ═══════════ PARENT MODE ═══════════ */
-  .parent-banner {
-    background: var(--accent-purple); color: var(--ink);
-    padding: 0.4rem 0.8rem; text-align: center; font-weight: 700;
-    border-bottom: 2px dashed var(--ink);
-    font-family: var(--font-text);
+  /* The parent sub-bar's buttons (parentViewSub, PR 5): 44px (the grown-ups'
+     tap floor; the picture's 36, difference 2), pad 0 14, white, 2px ink,
+     radius 12, body 16px; ✅ Confirm all in the look's main fill, 600
+     (SRC 300-304). On a phone the words leave the button for its label. */
+  .pv-btn {
+    box-sizing: border-box; flex: none; display: inline-flex; align-items: center; gap: 6px;
+    min-height: var(--hdr-parent-btn); height: var(--hdr-parent-btn); min-width: var(--hdr-parent-btn);
+    padding: 0 14px; background: var(--paper); color: var(--ink);
+    border: var(--bw-chip) solid var(--ink); border-radius: 12px;
+    font-family: var(--font-text); font-size: var(--hdr-parent-sub-size); line-height: 1; white-space: nowrap; cursor: pointer;
   }
-  .parent-banner.sticky { position: sticky; top: 0; z-index: 99; }
-  /* The banner's two halves. Inline styles used to set the spacing on each
-     button; the buttons are generated now, so the layout belongs here. Wrapping
-     rather than shrinking: on a phone "Confirm all Jenn's blocks" and "Mark
-     Jenn's day reviewed" do not fit beside each other, and a squeezed 30px
-     target is worse than a second line. */
-  .pb-back, .pb-actions { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; vertical-align: middle; }
-  .pb-back { margin-right: var(--space-2); }
-  .pb-actions { margin-left: var(--space-2); }
-  .pb-back-btn, .pb-action, .pb-switch {
-    padding: 4px 10px;
-    min-height: 44px;
-    font-size: calc(max(13px, calc(0.82rem * var(--fs-scale, 1))) * var(--text-scale, 1));
-  }
+  .pv-btn--main { background: var(--btn-main); color: var(--btn-main-ink); font-weight: 600; }
+  .pv-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pv-actions { display: flex; align-items: center; gap: var(--hdr-r2-gap); flex: none; }
+  .pv-actions:empty { display: none; }
   /* Reviewed reads as settled, not as another thing to press. */
   .pb-action.on { background: var(--accent-green); }
   /* Recording what did not happen is a different act from confirming what did,
@@ -3839,50 +3828,36 @@
   .mm-offer-btn--nd { background: var(--status-notdone-fill); }
   .pb-action[disabled] { opacity: 0.55; cursor: default; }
 
-  /* Parent portal: tabbed sections */
-  .parent-tabs {
-    display: flex; gap: 0.4rem; flex-wrap: wrap;
-    border-bottom: 2px solid var(--ink); padding-bottom: 0.5rem;
-  }
+  /* The portal's destinations, in the parent header (parentRenderHeader,
+     PR 5; SRC 266-272): 44px, pad 0 16, white, 2px ink, radius 12, body 17px;
+     the current one the look's --sel, 600, with its icon (the others' words
+     alone); ⚙️ App 44×44, 18px. */
+  .parent-tabs { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
   .parent-tab {
-    background: var(--paper); border: 2px solid var(--ink); border-radius: 12px 12px 0 0;
-    /* 44px, the house floor: they were 41px in Pop and 38px in Calm's
-       smaller type (parentScreensMeetTheHouseRules, Looks stage 4). */
-    min-height: 44px;
-    /* Width floor too: in the one-row bar the tabs can be squeezed below 44px
-       (41px on CI's fonts). */
-    min-width: 44px; text-align: center;
-    padding: 0.4rem 0.75rem; font-family: var(--font-text);
-    font-size: calc(0.98rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; cursor: pointer; color: var(--ink);
+    box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    min-height: var(--hdr-parent-btn); min-width: var(--hdr-parent-btn); padding: 0 16px;
+    background: var(--paper); color: var(--ink); border: var(--bw-chip) solid var(--ink); border-radius: 12px;
+    font-family: var(--font-text); font-size: var(--hdr-parent-word-size); font-weight: 400; line-height: 1; white-space: nowrap; cursor: pointer;
   }
   .parent-tab:hover { background: var(--accent-yellow); }
   /* The selected destination: Pop yellow, Calm navy with white text. Hovered
      too, or Calm's hover fill would sit under the white label. */
-  .parent-tab.active, .parent-tab.active:hover { background: var(--tab-on); color: var(--tab-on-ink); box-shadow: 2px -2px 0 var(--ink); }
+  .parent-tab.active, .parent-tab.active:hover { background: var(--sel); color: var(--sel-ink); font-weight: 600; }
+  .parent-tab:not(.active) .parent-tab-icon { display: none; }
+  .parent-tab--icon { width: var(--hdr-parent-btn); padding: 0; font-size: var(--hdr-parent-icon-size); }
   .parent-panel { padding: 0.8rem 1rem 2.5rem; }
   .parent-panel[hidden] { display: none; }
   .parent-h3 { font-size: calc(1.25rem * var(--text-scale, 1)); margin: 1rem 0 0.4rem; }
   .parent-panel > .parent-h3:first-child { margin-top: 0.4rem; }
-  /* The portal's one row (Plan v9 §N "Header space"): 🔒 Parent ▾ with PIN,
-     the look and Exit inside it, the six destinations, the day, ⚙️ App and
-     the one switcher. The purple row itself says this is Parent mode. On a
-     phone the destinations move to the bottom bar and the row keeps the menu
-     and the switcher. */
-  .parent-bar {
-    display: flex; align-items: center; gap: var(--space-2); padding: 6px 12px;
-    background: var(--accent-purple); border-bottom: 3px solid var(--ink); position: relative; z-index: 5;
-  }
-  .parent-bar .parent-tabs { flex: 1 1 auto; border-bottom: 0; padding-bottom: 0; align-items: center; flex-wrap: nowrap; min-width: 0; }
-  .parent-bar .parent-tab { border-radius: 12px; white-space: nowrap; padding: 0.3rem 0.6rem; font-size: calc(0.92rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-  .parent-bar .parent-scope .pill-btn { padding: 0 0.55rem; }
-  @media (max-width: 1150px) { .parent-date { display: none; } .parent-bar .parent-tabs > .parent-tab:last-child { margin-left: auto; } }
-  .parent-bar .parent-tab.active { box-shadow: 2px 2px 0 var(--ink); }
-  .parent-date { margin-left: auto; padding: 0 6px; font-family: var(--font-display); color: var(--ink); white-space: nowrap; font-size: calc(1.15rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+  /* 🔒 Parent ▾ (SRC 265): 44px, pad 0 14, white, 2px ink, radius 12, the
+     look's shadow, body 17px 600; PIN, the look and Exit drop under it. On a
+     phone "🔒 ▾", pad 0 12, 16px (SRC 318). */
   .parent-menu { position: relative; flex: 0 0 auto; }
   .parent-menu-btn {
-    min-height: 44px; padding: 0 12px; border: 2px solid var(--ink); border-radius: 12px; cursor: pointer; white-space: nowrap;
-    background: var(--paper); color: var(--ink); font-family: inherit; font-weight: 800;
-    font-size: calc(0.98rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px;
+    min-height: var(--hdr-parent-btn); padding: 0 14px; border: var(--bw-chip) solid var(--ink); border-radius: 12px; cursor: pointer; white-space: nowrap;
+    background: var(--paper); color: var(--ink); box-shadow: var(--hdr-sh);
+    font-family: var(--font-text); font-weight: 600; font-size: var(--hdr-parent-word-size); line-height: 1;
   }
   .parent-menu-pop {
     position: absolute; top: calc(100% + 6px); left: 0; z-index: 120; min-width: 210px;
@@ -3891,8 +3866,6 @@
   }
   .parent-menu-pop[hidden] { display: none; }
   .parent-menu-pop .btn-icon { min-height: 44px; width: 100%; }
-  .parent-bar .parent-scope { flex: 0 0 auto; }
-  @media (max-width: 699px) { .parent-bar .parent-scope { margin-left: auto; } }
 
   /* The week reset, rehoused next to the backup. Its own block so the
      destructive control reads as separate from the export above it. */
@@ -3983,9 +3956,25 @@
      the boundary test made visible: Now/Meeting/History are where the week
      happens, Setup/App are where its rules and the app itself live. */
 
-  .parent-scope { display: flex; gap: var(--space-1); }
+  /* The girl switch (SRC 273-277): one joined switch, 2px ink, radius 999,
+     clipped, white; cells 44px high (the tap floor; the picture's 42), pad 0 16 (Both) / 0 14, 2px dividers,
+     body 17px; the chosen one the look's --sel, 600. Parent Monthly's Jenn /
+     Jess is the same switch. On a phone 46×44 cells, All 15px, 🐥 🦊 19px. */
+  .parent-scope {
+    box-sizing: border-box; flex: none; display: flex;
+    border: var(--bw-chip) solid var(--ink); border-radius: 999px; overflow: hidden; background: var(--paper);
+  }
   .parent-scope[hidden] { display: none; }   /* Parent › Now has its own girl switch (Plan v17 item 6) */
-  .parent-scope .pill-btn { min-height: 44px; font-size: calc(max(13px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
+  .parent-scope .pill-btn {
+    box-sizing: content-box; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    height: var(--hdr-parent-cell-h); min-height: 0; margin: 0; padding: 0 14px; border: 0; border-radius: 0; box-shadow: none;
+    background: var(--paper); color: var(--ink);
+    font-family: var(--font-text); font-size: var(--hdr-parent-word-size); font-weight: 400; line-height: 1; white-space: nowrap;
+  }
+  .parent-scope .pill-btn[data-parent-scope="both"] { padding: 0 16px; }
+  .parent-scope .pill-btn + .pill-btn { border-left: var(--bw-chip) solid var(--ink); }
+  .parent-scope .pill-btn.active { background: var(--sel); color: var(--sel-ink); font-weight: 600; }
+  .ps-short { display: none; }
   .parent-back { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4) 0; }
   .parent-back[hidden] { display: none; }
   .parent-back .pill-btn { min-height: 44px; }
@@ -5638,10 +5627,9 @@
     --ck-amber: var(--status-amber); --ck-line: var(--border-warm); --ck-dash: var(--border-soft);
     display: flex; flex-direction: column; gap: 0.7rem;
   }
-  .cp-head {
-    background: var(--bg2); border: 2px solid var(--ink); border-radius: 16px;
-    padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;
-  }
+  /* The tab's own controls, not a card standing in for a header: the parent
+     header is the one header (PR 5). */
+  .cp-head { display: flex; flex-direction: column; gap: 0.5rem; }
   .cp-head-top { display: flex; align-items: center; gap: 0.4rem; }
   .cp-title { font-family: var(--font-text); font-size: calc(1.1rem * var(--text-scale, 1)); font-weight: 700; }
   .cp-head-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
@@ -5671,7 +5659,7 @@
     display: flex; flex-direction: column; gap: 0.4rem;
     background: var(--paper); border: 2px solid var(--ink); border-radius: 15px; padding: 0.65rem 0.75rem;
   }
-  .cp-cap { font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-strong); }
+  .cp-cap { font-size: calc(max(13px, calc(0.62rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-strong); }
   .cp-cap-gap { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 2px dashed var(--ck-line); }
   .cp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; align-items: start; }
   .cp-cols > div { display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
@@ -5780,10 +5768,8 @@
      hairline grid one shade off the paper, thin marks, no dashed rules.
   ═══════════════════════════════════════════════════════════════ */
   .ctr-tab { display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
-  .ctr-head {
-    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-    background: var(--bg2); border: 2px solid var(--ink); border-radius: 16px; padding: 0.6rem 0.75rem;
-  }
+  /* Not a card standing in for a header (PR 5). */
+  .ctr-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .ctr-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
   @media (max-width: 820px) { .ctr-cards { grid-template-columns: 1fr; } }
   .ctr-card { border: 2px solid var(--ink); border-radius: 15px; background: var(--paper); overflow: hidden; }
@@ -5814,7 +5800,7 @@
     height: 28px; display: flex; align-items: center; justify-content: center;
     border: 1.5px solid var(--ink); border-radius: 6px; font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
   }
-  .ctr-xlab2 { text-align: center; font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); }
+  .ctr-xlab2 { text-align: center; font-size: calc(max(13px, calc(0.62rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); }
   .ctr-read-line { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; line-height: 1.55; }
   .ctr-read-line + .ctr-read-line { margin-top: 0.3rem; }
 
@@ -5859,7 +5845,7 @@
     .cp-cols { grid-template-columns: 1fr; }
     .cp-daycards { grid-template-columns: 1fr; }
     .ctr-cards { grid-template-columns: 1fr; }
-    .cp-head, .cp-settle, .cp-sect, .ctr-head { padding: 0.7rem 0.75rem; }
+    .cp-settle, .cp-sect { padding: 0.7rem 0.75rem; }
     .cp-head-row { gap: 0.4rem; }
     .cp-kid { flex: 1; min-height: 48px; }
     .cp-stepper { width: 100%; justify-content: space-between; }
@@ -6965,6 +6951,7 @@
     --hdr-money-btn: 52px; --hdr-money-glyph: 16px; --hdr-money-help-size: 22px; --hdr-money-emoji: 24px;
     --hdr-meeting-icon-size: 21px; --hdr-girls-gap: 4px; --hdr-girl-emoji-size: 22px; --hdr-pill-pad: 2px 10px;
     --hdr-title-size: calc(26px * var(--text-scale, 1));
+    --hdr-parent-word-size: 16px;
   }
 }
 
@@ -7183,10 +7170,24 @@
 .hdr--meeting .hdr-row { height: var(--hdr-meeting-h); }
 .hdr--meeting .hdr-lead { gap: var(--hdr-girls-gap); }
 .hdr--meeting .hdr-actions .hdr-btn { width: 52px; font-size: var(--hdr-meeting-icon-size); }
-.hdr--parent { background: var(--accent-purple); }
-/* A grown-up's header keeps the 44px parent buttons and badge (PR 5 rebuilds it). */
-.hdr--parent .hdr-btn, .hdr--parent .hdr-badge { height: 44px; min-width: 44px; }
-.hdr--parent .hdr-badge:not(.hdr-badge--text) { width: 44px; }
+/* The parent header (PR 5, D35; SRC 258-325): the look's purple, a
+   grown-up's 44px buttons (radius 12, body 17px, ◀ ▶ 16px) and badge; the
+   portal's row 12px apart (SRC 264), Monthly's 16 (as SRC 279). The portal
+   names its destination only on a phone (its tabs say it on the iPad). */
+.hdr--parent { background: var(--accent-purple); --hdr-gap: 12px; }
+.hdr--parent .hdr-btn, .hdr--parent .hdr-badge { height: var(--hdr-parent-btn); min-width: var(--hdr-parent-btn); }
+.hdr--parent .hdr-btn { border-radius: 12px; font-size: var(--hdr-parent-word-size); }
+.hdr--parent .hdr-back { padding: 0 14px; }
+.hdr--parent .hdr-step { width: var(--hdr-parent-btn); font-size: var(--hdr-parent-glyph-size); }
+.hdr--parent .hdr-badge:not(.hdr-badge--text) { width: var(--hdr-parent-btn); }
+#screen-parent > .hdr .hdr-title { display: none; }
+#screen-parent-monthly > .hdr { --hdr-gap: 16px; }
+.pm-month-short { display: none; }
+/* A parent viewing a girl's Week or Day: the kid's row on the purple, and
+   under it the 44px sub-bar (parentViewSub): 1.5px ink between the rows,
+   pad 0 18, gap 10, body 17px (SRC 279, 298). */
+#screen-week > .hdr:has(> .hdr-sub > .pv-name), #screen-day > .hdr:has(> .hdr-sub > .pv-name) { background: var(--accent-purple); }
+.hdr-sub:has(> .pv-name) { font-size: var(--hdr-parent-word-size); }
 /* The money pages and the meeting sit in padded columns: their header spans
    the screen, and the meeting's is a band in the sheet's flex column, not a
    pinned header over the cards (theMeetingKeepsItsHeadAndFeet). */
@@ -7256,7 +7257,30 @@
   .hdr-steps > .hdr-switch-cell { width: 46px; padding: 0; }
   .hdr-seg-word { display: none; }
   .hdr-seg-num { display: inline; font-size: var(--hdr-span-size); }
+  /* The parent header on a phone (SRC 316-325): 60px, pad 10, gap 8; "🔒 ▾",
+     the destination's name 24px × the look's scale taking the room, the girl
+     switch's cells 46×44 (All 15px 600, 🐥 🦊 19px). Monthly (no picture,
+     difference 3): ◀ back, ◀ "Oct 2026" ▶ between, 🐥 🦊 — no title. The
+     sub-bar's buttons keep their icon and count, the words in the label. */
+  .hdr--parent { --hdr-pad: 10px; --hdr-gap: 8px; }
+  #screen-parent-monthly > .hdr { --hdr-gap: 8px; }
+  .parent-menu-btn { padding: 0 12px; }
+  .pm-word, .ps-word, .pv-word, .pm-month-long { display: none; }
+  .ps-short, .pm-month-short { display: inline; }
+  #screen-parent > .hdr .hdr-title { display: block; flex: 1 1 auto; min-width: 0; font-size: var(--hdr-parent-title-size); }
+  .parent-scope .pill-btn, .parent-scope .pill-btn[data-parent-scope="both"] { width: var(--hdr-parent-cell-w); padding: 0; font-size: var(--hdr-parent-emoji-size); }
+  .parent-scope .pill-btn[data-parent-scope="both"] { font-size: var(--hdr-parent-short-size); font-weight: 600; }
+  .hdr--parent .hdr-back { width: var(--hdr-parent-btn); padding: 0; font-size: var(--hdr-parent-glyph-size); }
+  #screen-parent-monthly > .hdr .hdr-row { display: flex; }
+  #screen-parent-monthly > .hdr .hdr-title { display: none; }
+  #screen-parent-monthly > .hdr .hdr-context { flex: 1 1 auto; min-width: 0; gap: var(--hdr-gap); }
+  #screen-parent-monthly > .hdr .hdr-label { flex: 1 1 auto; min-width: 0; }
+  .hdr-sub:has(> .pv-name) { font-size: var(--hdr-parent-sub-size); }
+  .pv-btn { padding: 0 10px; }
 }
+/* Narrower than an iPad held sideways the sub-bar's buttons keep their icon
+   and count, the words in the label: the Day's three do not fit at 768. */
+@media (max-width: 899px) { .pv-word { display: none; } }
 
 /* Difference 15, a week across two months and Money school's selected tab,
    on a phone: the picture's size (20px, the tab 18px) where it fits, else
