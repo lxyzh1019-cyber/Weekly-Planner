@@ -64,7 +64,7 @@ function renderDaySpanTabs() {
   [1, 2, 3].forEach(n => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'day-span-tab' + (cur === n ? ' active' : '') + (n > avail ? ' unavailable' : '');
+    b.className = 'hdr-switch-cell' + (n > avail ? ' hdr-switch-cell--off' : '');
     b.textContent = String(n);
     b.setAttribute('aria-label', n === 1 ? 'Show one day' : `Show ${n} days side by side`);
     b.setAttribute('aria-pressed', cur === n ? 'true' : 'false');
@@ -76,10 +76,15 @@ function renderDaySpanTabs() {
 function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   if (weekOffsetOverride != null) weekOffset = weekOffsetOverride;
   currentDayKey = key;
+  // ◀ goes back to the screen this day was opened from (the one back stack).
+  navReturnPush('day');
   // The anchor is the leftmost column; currentDayKey is the day being edited.
   // They are the same until a tap lands in another column.
   dayViewAnchorKey = key;
   selectedActivity = null;
+
+  // The header first: applyMeetingLock below hides its badge by id.
+  dayRenderHeader();
 
   // Parent banner — two named actions and one way out, both filled by their
   // owners so the day and week banners cannot drift apart again.
@@ -93,17 +98,9 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
      in js/11-parent.js. A child's render is what lifts the lock. */
   applyMeetingLock();
 
-  const dayBadge = document.getElementById('dayProfileBadge');
-  dayBadge.textContent = profileBadgeText(isParent() ? parentViewing : profile, isParent());
-  // Two short lines for a parent — see .profile-badge--parent in css/app.css.
-  dayBadge.classList.toggle('profile-badge--parent', isParent());
-  document.getElementById('dayTitle').textContent = '';
-  renderDayHeading();
-
   showScreen('day');
   renderDaySpanTabs();
   buildTimeline();
-  bindDayTimelineCompactOnScroll();
   renderDayGoalsTodos();
   maybeShowRewardPrompt();
   if (focusBlockId) {
@@ -120,22 +117,55 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   }
 }
 
-/* The date line in the topbar. Names one day, or the span it is showing — a
+/* The Day header's title. Names one day, or the span it is showing — a
    heading that said "Tuesday" over three columns would be lying about two of
-   them. */
-function renderDayHeading() {
-  const el = document.getElementById('daySubtitle');
-  if (!el) return;
+   them. One day reads "Tuesday 6 Oct" on the iPad and the short "Tue 6 Oct"
+   on a phone, as the header pictures draw them (D28, fmtDay); the span form
+   stays until PR 6. */
+function dayHeadingText() {
   const keys = dayViewKeys();
   const first = formatDayKey(keys[0]);
   if (keys.length === 1) {
-    el.textContent = `${DAY_LONG[dayIdxOfKey(keys[0])]}, ${MONTH_SHORT[first.getMonth()]} ${first.getDate()}`;
-    return;
+    const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
+    if (phone) return fmtDay(keys[0], 'long');
+    return `${DAY_LONG[dayIdxOfKey(keys[0])]} ${fmtDay(keys[0])}`;
   }
   const last = formatDayKey(keys[keys.length - 1]);
   const lastPart = last.getMonth() === first.getMonth()
     ? `${last.getDate()}` : `${MONTH_SHORT[last.getMonth()]} ${last.getDate()}`;
-  el.textContent = `${MONTH_SHORT[first.getMonth()]} ${first.getDate()} – ${lastPart}`;
+  return `${MONTH_SHORT[first.getMonth()]} ${first.getDate()} – ${lastPart}`;
+}
+/* The date may be a button (step.titleAction): its text is written into the
+   button so the button stays. Its spoken name starts with the date, so the
+   heading it sits in is read as the date and not as "Copy a day". */
+function dayHeadingAria(text) { return `${text} — copy a day`; }
+function renderDayHeading() {
+  const text = dayHeadingText();
+  const btn = document.querySelector('#screen-day > .hdr .hdr-title-btn');
+  const el = btn || document.querySelector('#screen-day > .hdr .hdr-title');
+  if (el) el.textContent = text;
+  if (btn) btn.setAttribute('aria-label', dayHeadingAria(text));
+}
+/* The Day's standard header: ◀ back through the one back stack (named, as
+   the picture draws it), the date as the title between ◀ ▶, the 1 / 2 / 3
+   span switch (renderDaySpanTabs fills #daySpanTabs), 📑 Copy a day and the
+   badge.
+   A phone hides the tabs and 📑 (css): tapping the date is Copy a day there,
+   the pictures' date menu (D27); the iPad keeps 📑 as well.
+   The 🌙 sat here once (R5 §7 Q3): today's mood is asked on Today, and a
+   past day is reflected on from its 📑 sheet. */
+function dayRenderHeader() {
+  const title = dayHeadingText();
+  hdrMount('screen-day', {
+    back: { to: navReturnTo('week'), named: true, data: { 'hdr-action': 'back', 'hdr-fallback': 'week' } },
+    title,
+    step: { prev: { aria: 'Previous day', data: { 'hdr-action': 'day-prev' } },
+            next: { aria: 'Next day', data: { 'hdr-action': 'day-next' } },
+            titleAction: { aria: dayHeadingAria(title), data: { 'hdr-action': 'day-copy' } } },
+    tools: '<div class="hdr-switch hdr-span" id="daySpanTabs" role="group" aria-label="How many days to show"></div>',
+    actions: [{ label: '📑', aria: 'Copy a day', data: { 'hdr-action': 'day-copy' } }],
+    badge: kidHeadBadge('dayProfileBadge', isParent() ? parentViewing : profile, isParent()),
+  });
 }
 /* Mon=0..Sun=6, the index DAY_LONG and getDayKeys both use. Derived from the
    date rather than passed in, because a column three days along may not be in
@@ -245,9 +275,7 @@ function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   refreshRestDayButton();
   const tl = document.getElementById('timeline');
-  const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
-  if (topbar) topbar.classList.remove('day-topbar--compact');
 
   const keys = dayViewKeys();
   tl.classList.toggle('timeline--multi', keys.length > 1);
@@ -1314,27 +1342,6 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
   // just inherits the activity's column/width, so it hugs the card it
   // belongs to instead of spanning the whole lane under a neighbour.
   overlayBlocks.forEach(buf => renderBlockPixel(canvas, buf, zMinStart, colIdx, colCount));
-}
-
-/* Bound to .day-workspace, which is the day screen's one scroller. It used to
-   listen on #screen-day itself — right while the screen was the scrolling
-   element, wrong now that the workspace inside it is. Scroll events do not
-   bubble, so listening on the wrong element is silent rather than noisy. */
-function bindDayTimelineCompactOnScroll() {
-  if (dayTopbarCompactBound) return;
-  const screen = document.getElementById('screen-day');
-  const topbar = screen ? screen.querySelector('.day-topbar') : null;
-  const scroller = screen ? screen.querySelector('.day-workspace') : null;
-  if (!screen || !topbar || !scroller) return;
-  const threshold = 36;
-  scroller.addEventListener('scroll', () => {
-    if (!window.matchMedia('(min-width: 980px) and (orientation: landscape)').matches) {
-      topbar.classList.remove('day-topbar--compact');
-      return;
-    }
-    topbar.classList.toggle('day-topbar--compact', scroller.scrollTop > threshold);
-  }, { passive: true });
-  dayTopbarCompactBound = true;
 }
 
 function formatDuration(min) {

@@ -477,6 +477,8 @@ function mmReturnToMeeting() {
   if (!mmHasReturn()) { showScreen('parent'); return; }
   const r = mmReturn;
   mmClearReturn();
+  // The week's and the day's badges come back with the sitting (js/11).
+  applyMeetingLock();
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctWeekKey = r.weekKey;
   mmSelectedDay = r.selectedDay;
@@ -512,7 +514,13 @@ function mmOpenDayForBlocks(kid, dayIdx) {
   parentViewing = kid;
   currentDayKey = dayKey;
   dayViewAnchorKey = dayKey;
+  // The Day's header as openDay draws it: ◀ back to the meeting, the date and
+  // the badge, which the sitting's lock hides (js/11-parent.js).
+  navReturnPush('day', 'meeting');
+  dayRenderHeader();
+  applyMeetingLock();
   showScreen('day');
+  renderDaySpanTabs();
   buildTimeline();
 }
 /* What the "run the family meeting" buttons call. */
@@ -941,18 +949,22 @@ function renderMeetingMode() {
   ctPrepareRead();
   const wk = ctWeekKey || ctThisWeekKey();
   const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
-  const stepper = MM_STEPS.map((st, i) => {
+  /* The three steps as one joined switch in the middle of row 1: on the
+     iPad each step's name (✓ before a done one), on a phone its number (✓ for
+     a done one). */
+  const stepper = `<nav class="hdr-switch hdr-steps" aria-label="Meeting steps">${MM_STEPS.map((st, i) => {
     const n = i + 1;
-    const cls = n === mmStep ? 'mm-step-cur' : (n < mmStep ? 'mm-step-done' : 'mm-step-up');
-    return `<button type="button" class="mm-step ${cls}" onclick="mmGoIndex(${n})" aria-label="${escapeAttr(n + ' · ' + st.label)}">${n}<span class="ph-word">·${escapeHtml(st.label)}</span></button>`;
-  }).join('');
+    const done = n < mmStep;
+    return `<button type="button" class="hdr-switch-cell"${n === mmStep ? ' aria-current="step"' : ''} onclick="mmGoIndex(${n})" aria-label="${escapeAttr(n + ' · ' + st.label + (done ? ' · done' : ''))}">${done ? '✓<span class="hdr-seg-word"> ' + escapeHtml(st.label) + '</span>' : `<span class="hdr-seg-num">${n}</span><span class="hdr-seg-word">${escapeHtml(st.label)}</span>`}</button>`;
+  }).join('')}</nav>`;
 
   // Catch-up mode replaces the stepper entirely: a week nobody is going to
   // discuss does not need five steps to close.
   if (mmExpressWeek) {
     const xhost = document.getElementById('familyMeetingBody');
     const xrestore = mmCaptureUiState(xhost);
-    xhost.innerHTML = mmRenderExpress(mmExpressWeek);
+    xhost.innerHTML = pageHeader({ variant: 'meeting', moneySurface: true, title: 'Family meeting' })
+      + mmRenderExpress(mmExpressWeek);
     xrestore();
     return;
   }
@@ -995,28 +1007,48 @@ function renderMeetingMode() {
   if (id === 'money' && typeof sdAfterRender === 'function') sdAfterRender();
 }
 
-/* ── The meeting's head: two rows (Plan v17 §0, Stage 6h) ──
-   Row 1: on the money step the girls as round pictures (js/44,
-   `sdMeetingAvatars`), then the meeting's name, the three steps as pills and
-   the week at the right (with "catching up" and This week ▶ on an older
-   week). Row 2: on the money step whose money it is, the four Sunday steps,
-   🔊 Sound and 🗣️ Parent's card (`sdMeetingStepRow`); on the other steps
-   where the family left off (`mmLastReviewedLine`). The screen's own title
-   hides while the head shows. */
+/* ── The meeting's header: two rows (PR 4; Stage 20, the owner's turn-2
+   meeting picture) ──
+   The meeting variant of pageHeader. Row 1: on the money step the girls as
+   round pictures (js/44, `sdMeetingAvatars`), then the meeting's name, the
+   three steps (`stepper`) in the middle of the bar, and on the money step
+   🔊 Sound and 🗣️ Parent's card. Row 2: on the money step the four Sunday
+   steps (`sdMeetingSteps`), on the others where the family left off
+   (`mmLastReviewedLine`); at its right the week, "Week of Oct 5 – 11"
+   (`mmWeekLine`), with "catching up" and This week ▶ on an older week. A
+   phone drops the name and the week. No ◀ and no profile badge: the sitting
+   is left by its own Close step. */
 function mmHead(wk, stepper, id) {
   const late = mrWeeksSince(wk);
   // The money step names the money week, Monday to Sunday like the
-  // planner's (decision 15); the Sun–Sat mapping behind mrMoneyWeekLabel
+  // planner's (decision 15); the Sun–Sat mapping behind mrMoneyWeekEnds
   // stays only as tested code until it is deleted (PR 13).
-  const label = id === 'money' ? mrMoneyWeekLabel(wk) : mmWeekLabel(wk);
-  const week = `<span class="mm-head-wk"><span class="ph-word">Week of </span>${escapeHtml(label)}</span>`
+  const ends = id === 'money' ? mrMoneyWeekEnds(wk) : mmWeekEnds(wk);
+  const week = `<span class="hdr-week">Week of ${escapeHtml(mmWeekLine(ends[0], ends[1]))}</span>`
     + (late ? `<span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
        <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button>` : '');
   const money = id === 'money' && typeof sdMeetingAvatars === 'function';
-  return `<div class="mm-head mm-head--two${late ? ' late' : ''}" data-money-surface>
-      <div class="mm-head-r1">${money ? sdMeetingAvatars(wk) : ''}<h2 class="mm-head-title" aria-label="Family meeting">👨‍👧‍👧<span class="ph-word"> Family meeting</span></h2><div class="mm-stepper">${stepper}</div><span class="mm-head-right">${week}</span></div>
-      <div class="mm-head-r2">${money ? sdMeetingStepRow(wk) : mmLastReviewedLine()}</div>
-    </div>`;
+  return pageHeader({
+    variant: 'meeting',
+    moneySurface: true,
+    lead: money ? sdMeetingAvatars(wk) : '',
+    title: 'Family meeting',
+    centre: stepper,
+    actions: money ? sdMeetingActions() : [],
+    sub: `<div class="hdr-r2-start">${money ? sdMeetingSteps(wk) : mmLastReviewedLine()}</div><div class="hdr-r2-end">${week}</div>`,
+  });
+}
+/* The planner week's Monday and Sunday. */
+function mmWeekEnds(wk) {
+  const mon = formatDayKey(wk);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  return [mon, sun];
+}
+/* The meeting's week line, as the owner's picture writes it: the month once
+   when the week is in one ("Oct 5 – 11"), at both ends when it is not
+   ("Sep 28 – Oct 4"). */
+function mmWeekLine(a, b) {
+  return `${MONTH_SHORT[a.getMonth()]} ${a.getDate()} – ${a.getMonth() === b.getMonth() ? '' : MONTH_SHORT[b.getMonth()] + ' '}${b.getDate()}`;
 }
 
 /* ── Keeping the meeting usable across a re-render ──

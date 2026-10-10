@@ -62,8 +62,9 @@ npm run test:fast   # the short loop: npm run check + every unit suite
 **Before a push:** the short loop — `npm run test:fast` plus the tests the test
 map in `FEATURES.md` (`## References`, `Tests:` lines) names for the files
 changed, under 3 minutes on the owner's PC. The `SMOKE_ONLY=<checks>` lists the
-map gives for a screen (below) are optional: each pays a few minutes of setup on
-a laptop, so they are outside the 3-minute target. (text only)
+map gives for a screen (below) are optional and outside the 3-minute target:
+about half a minute when every check named is declared in `SETUP_NEEDS`, about
+two and a half minutes otherwise. (text only)
 
 **Before a pull request opens:** the full suite green on GitHub — the `checks`
 job, the browser job (with the cleanup-tool tests) and one smoke job per date on
@@ -188,7 +189,9 @@ places in the same order.
 **Iterating on a few smoke checks:** `SMOKE_ONLY=checkA,checkB npm run test:smoke`
 runs just those (plus `noConsoleErrors`, which has no guard) in a fraction of the
 full run's time. Each check statement is prefixed `if (want('name'))`, so the setup
-between checks still runs — but a skipped check's own body does not, and the
+between checks still runs, except the steps `SETUP_NEEDS` in `tests/smoke.js`
+lets a subset skip (the house-rules walks: a step runs when a chosen check needs
+it or is not declared there; a full run runs every step) — but a skipped check's own body does not, and the
 checks share one page, so a subset result is a hint, not a verdict. It is for
 iteration only and cannot stand in for the gate: an unknown name exits 1, the
 last line reads `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the
@@ -437,8 +440,10 @@ Kid-facing copy is a product surface, not filler. The rules:
   midday. A row's seed may return a sentence, which the sweep reports — the
   Day view rows say so when the ghost was not drawn. Joining found, besides the
   ghost's buttons: the top bar's 📋 at 38px and, once scrolled into its
-  compact form, the ◀ ▶ arrows at 30px and 📋 / profile badge at 34px (all
-  44px now — compact tightens padding and type, never targets); the block's
+  compact form, the ◀ ▶ arrows at 30px and 📋 / profile badge at 34px. The
+  compact bar is retired (PR 4): the Day's header is the standard page header
+  (`pageHeader`, js/47-header.js), one row of a fixed height that does not
+  shrink on scroll, its buttons and badge 52px; the block's
   ✓ tick at 32px (`.block-done-btn` keeps its 32px look, with an `::after`
   reaching 6px past it for a 44px target, and sits 6px in from the block's
   corner so the target stays inside the block's clip); and `.block-meta` at
@@ -1614,9 +1619,15 @@ box, and `enhanceAccessibility` (`js/99-main.js`) injected
 `aria-label="Open profile selector"` on **every** `.profile-badge` with no
 `[onclick]` filter — while `enhanceNonButtonClickables`, three lines above it,
 did filter, so the dead badges got a label and no role, no focus and no
-keyboard. All five are `<button class="profile-badge" onclick="…"
-aria-label="Switch profile">` now, and the aria pass only labels a badge that
-has a click path, so the next inert one cannot re-tell the lie.
+keyboard. Every kid header's badge (Today, Week, Day, Sister Sync) is now
+the page header's `<button class="hdr-badge"
+data-hdr-action="profile">` (`kidHeadBadge`, js/47-header.js): the 52px round
+avatar at every width (D25), its words — the one wording, `profileBadgeParts`
+/ `profileBadgeText` — in the aria-label, "Jenn, switch profile" or "Parent
+(Jenn), switch profile". The aria pass in js/99-main.js labels no badge, so
+the next inert one cannot re-tell the lie. `.hdr-badge` is `display:
+inline-flex`, which outranks the browser's `[hidden]`, so `.hdr-badge[hidden]`
+is `display: none` — the meeting lock hides a badge with `hidden`.
 `everyProfileBadgeSwitchesProfile` asserts it by **activating** each badge and
 watching for `#profileSwitchOverlay`: a control can carry every attribute on the
 list and still open nothing. (checked by smoke: everyProfileBadgeSwitchesProfile)
@@ -2500,8 +2511,9 @@ actually happened. It is withdrawn once money moves after the commit — see
 was celebrated as zero, and it showed the preliminary money figure as though it
 had been recorded. (text only)
 
-**One scroller, both ends pinned.** `.mm-head` sticks to the top of the sheet and
-`.mm-nav` to the bottom, inside the sheet's own scroll area — nesting a second
+**One scroller, both ends pinned.** The meeting's header (`mmHead`, a meeting
+`pageHeader`) is a band at the top of the sheet and `.mm-nav` one at the
+bottom, around the sheet's own scroll area — nesting a second
 scroller would mean a flick on an iPad moves the wrong one. (text only)
 
 ## Buffer defaults: you go to some things
@@ -2806,6 +2818,21 @@ invite wrong-day bug (PR #93): it outlives the Day view that set it. Now: (check
   for a day before today only — today's door is on Today, and a future day has
   nothing to look back on. The sheet captures the day when it opens and passes
   it; the Day view's evening toast now points to Today. (text only)
+- **The Day's ◀ goes back where the day was opened from** (PR 4). Every
+  header ◀ goes through one back stack, `navReturnPush` / `navReturnBack`
+  (js/05-helpers.js): the screen on show is pushed as a page opens — or a
+  named `from`, as the meeting's day rows push `'meeting'`
+  (`mmOpenDayForBlocks`, js/15, which also draws the Day's header and applies
+  the meeting lock) — and ◀ pops it and calls that screen's own open. The ◀
+  is labelled "Back to <screen>" from the same stack (`navReturnTo`); an
+  empty stack goes to the caller's fallback (the week). An entry is `{ screen
+  }` only — no scroll is kept. Device-local module state, never in `state`,
+  bounded by `NAV_RETURN_MAX`. The Day's ◀ used to say "◀ Week" and go to the
+  week from anywhere. On a phone the Day's 📑 and 1 2 3 are hidden and tapping
+  the date is Copy a day (`step.titleAction`, D27); the iPad keeps 📑. The
+  date reads "Tuesday 6 Oct" on the iPad and "Tue 6 Oct" on a phone (D28).
+  (checked by smoke: oneBackStackGoesWhereYouCameFrom,
+  kidScreensHaveOneStandardHeader)
 - **"Today's Vibe" is folded into the row**: the card, `renderVibe`,
   `setDayMood`, `#vibeMoods`, `#vibeSubtext`, `.vibe-card` and `.vibe-title` are
   gone. `.vibe-moods` / `.vibe-mood` stay (the sheet and the ritual). Today's
@@ -4141,10 +4168,10 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   same boxes and the 13px floor holds. Two widths are look tokens too
   (`--sd-legend-w`, `--sd-own-name-w`). A new tight label on these screens
   takes the same form. (text only)
-- **Phone heads are two rows; a describing word is `.ph-word`.** Under 768px
-  it hides and the icon, number or picture stays; the control carries its
-  full name in `aria-label`. My money's head breaks into rows with an
-  `::after` row break and `order`. (text only)
+- **Phone headers drop describing words.** The money pages' and the
+  meeting's headers are `pageHeader`'s (PR 4): on a phone the money tabs show
+  the current one's name and the other's icon, the meeting's steps their
+  numbers; every control carries its full name in `aria-label`. (text only)
 - **A floored fine says so.** Fines can zero a day, never create debt, so a
   fine listed at its cost (−$1.00) can take nothing; the row keeps the minus
   and adds `sdFineFloorNote` ("nothing taken — the day was $0"), read through
@@ -4246,7 +4273,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   money and 🎓 Money school (`mnyTabBar`, icons and names, no numbers; a
   grown-up still gets the whole tagged rail from `mnyTabsFor`). The money story
   page and its head button are gone. 📒 My passbook has two doors, each a full
-  page under My money's head (`mnyMoneyHead`, ◀ back to My money) on
+  page under My money's header (`mnyHead`, ◀ back to My money) on
   `#screen-moneystory`: the 📖 icon (`sundays`) opens **📖 All my Sundays**
   (`mnySundaysPage` — every settled Sunday from the frozen ledger row through
   `sdHistGroups`, labelled with `mrMoneyWeekLabel`) and **📊 By month ▸**

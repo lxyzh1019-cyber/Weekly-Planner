@@ -113,7 +113,7 @@
     --z-overlay:  400;
     --z-toast:    999;
 
-    /* Consistency PR 3 — the component kit's names (.ui-*, .ph-*; nothing
+    /* Consistency PR 3 — the component kit's names (.ui-*, .hdr-*; nothing
        reads them yet). Shared by both looks: a size or a layer is not a
        look's. Each layer equals the z-index that layer uses today, so moving
        a surface onto its name changes no stacking: the header is the sticky
@@ -124,11 +124,45 @@
     --z-nav:    60;
     --z-sheet:  300;
     --z-dialog: 500;
-    /* The page header: 64px on the iPad and at 700–1099px, 56px on a phone
-       (≤699px, set beside the kit's classes); the sub-bar is 48px everywhere. */
+    /* The page header (.hdr-*, Stage 20): every value from the per-screen
+       table in docs/handoff/header-exact-values.md (the owner's turn-2
+       picture, SRC lines there). Rows: standard 64px on the iPad, 60px on a
+       phone (≤699px, beside the kit's classes); money 72px / 64px; the
+       meeting's first row 62px / 60px; the sub-bar and the meeting's second
+       row 44px everywhere. The rules are drawn under the rows. The sizes the
+       picture types in px in BOTH looks are tokens so the one size reaches
+       both looks as drawn: the date and week label, every emoji, glyph and
+       button word. The titles are 30px / 28px / 26px × the look's scale
+       (SRC 50, 103, 168), taken here at the root so a money surface, which
+       sets its own --text-scale (Deviation 35), still draws its header at
+       the picture's size. */
     --hdr-h: 64px;
-    --hdr-sub-h: 48px;
-    --hdr-title-rem: 1.75rem;
+    --hdr-money-h: 72px;
+    --hdr-meeting-h: 62px;
+    --hdr-sub-h: 44px;
+    --hdr-pad: 18px;
+    --hdr-gap: 16px;
+    --hdr-r2-pad: 18px;
+    --hdr-r2-gap: 10px;
+    --hdr-r2-size: 18px;
+    --hdr-label-size: 22px;
+    --hdr-emoji-size: 24px;
+    --hdr-glyph-size: 17px;
+    --hdr-word-size: 18px;
+    --hdr-icon-size: 20px;
+    --hdr-span-size: 19px;
+    --hdr-money-btn: 54px;
+    --hdr-money-glyph: 18px;
+    --hdr-money-help-size: 24px;
+    --hdr-money-emoji: 26px;
+    --hdr-tab-icon-size: 21px;
+    --hdr-meeting-icon-size: 22px;
+    --hdr-girls-gap: 8px;
+    --hdr-girl-emoji-size: 24px;
+    --hdr-pill-pad: 4px 14px;
+    --hdr-title-size: calc(30px * var(--text-scale, 1));
+    --hdr-title-small: calc(28px * var(--text-scale, 1));
+    --hdr-tab-size: calc(26px * var(--text-scale, 1));
 
     /* ════ Look tokens (Stage 1, looks-calm-pop) ════
        Every colour and font in this file reads one of these; each holds
@@ -481,6 +515,16 @@
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--accent-yellow);
     --series-jess: var(--accent);
+    /* The rebuilt header (Stage 20; header-exact-values.md, Look values):
+       the selected cell, the badge, the meeting's ring, the date's ink and the
+       buttons' hard shadow. Badge, ring and ink are the same literals in both
+       looks in the owner's source (SRC 52, 209, 51). */
+    --sel: #ffc83d;
+    --sel-ink: #1c2240;
+    --hdr-badge-bg: #ffe4ec;
+    --hdr-ring: #ff5c8a;
+    --hdr-label-ink: #1c2240;
+    --hdr-sh: 3px 3px 0 var(--ink);
   }
 
   /* Calm: new fonts at today's size, cool graph paper, white cards and rows,
@@ -633,6 +677,14 @@
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--jenn);
     --series-jess: var(--jess);
+    /* The rebuilt header (Stage 20): navy selected with white text, the
+       2px shadow; badge, ring and ink as Pop (SRC 612, 615). */
+    --sel: #1c2240;
+    --sel-ink: #fff;
+    --hdr-badge-bg: #ffe4ec;
+    --hdr-ring: #ff5c8a;
+    --hdr-label-ink: #1c2240;
+    --hdr-sh: 2px 2px 0 var(--ink);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -746,37 +798,8 @@
   }
   .topbar-left { display: flex; align-items: center; gap: 0.6rem; }
   .topbar h2 { font-size: calc(1.84rem * var(--text-scale, 1)); }
-  /* Which day it is, centred between the screen's name and whose screen it is.
-     flex:1 rather than relying on space-between, so it sits in the middle of the
-     BAR and not in the middle of whatever is left over — "Today" and the profile
-     badge are not the same width, and the date drifted with the name's length.
 
-     15px, the floor for anything a child has to read to act, and it wraps rather
-     than truncating: a date cut to "Thursday 20 Aug…" is worse than one on two
-     lines. At 390px it measures ~130px against ~178px of room, so the wrap is a
-     safety net rather than the normal case. */
-  .topbar-date {
-    flex: 1 1 auto; min-width: 0; text-align: center;
-    font-size: calc(max(15px, calc(1rem * var(--fs-scale, 1))) * var(--text-scale, 1));
-    font-weight: 700; color: var(--ink-light);
-  }
-
-  /* Day view: one sticky bar, one row inside it. */
-  #screen-day .topbar.day-topbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding-bottom: 0.45rem;
-  }
-  #screen-day .day-topbar__row1 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  /* Text that only a screen reader needs. #dayTitle is written by openDay and
-     read by the print heading, but says nothing the date line does not. */
+  /* Text that only a screen reader needs (Sister Sync's "moved" note). */
   .visually-hidden {
     position: absolute;
     width: 1px; height: 1px;
@@ -786,38 +809,6 @@
     overflow: hidden;
     white-space: nowrap;
   }
-  /* 1 / 2 / 3 days at once. */
-  .day-span-tabs {
-    display: flex;
-    gap: 0.2rem;
-    border: 2px solid var(--ink);
-    border-radius: 12px;
-    padding: 2px;
-    background: var(--paper);
-    flex: 0 0 auto;
-  }
-  .day-span-tab {
-    min-width: 44px;
-    min-height: 44px;
-    border: 0;
-    border-radius: 9px;
-    background: transparent;
-    cursor: pointer;
-    font-family: var(--font-text);
-    font-size: calc(1.05rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    font-weight: 800;
-    color: var(--ink);
-  }
-  .day-span-tab.active { background: var(--pill-on); color: var(--pill-on-ink); }
-  /* Chosen, but the viewport can only carry fewer — say so rather than
-     silently disagreeing with the button that looks selected. */
-  /* Muted and struck through rather than faded: at 40% opacity the digit read
-     2.4:1 (thePopLookReadsEverywhere). */
-  .day-span-tab.unavailable { color: var(--ink-light); text-decoration: line-through; }
-  /* The day topbar's second row lived here, along with the "Schedule" /
-     "Activities" panel labels and the tray's bridge hint. The topbar is one row
-     now and the panels it labelled are down to one, so a label naming it would
-     be naming the only thing on screen. */
 
   /* Must chain .screen.active so #screen-day does not override .screen { display:none }. */
   /* BOUNDED, not min-height. With min-height the flex column grew to its own
@@ -961,47 +952,6 @@
       padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
     }
-    #screen-day .topbar.day-topbar {
-      padding-left: max(1rem, env(safe-area-inset-left, 0px));
-      padding-right: max(1rem, env(safe-area-inset-right, 0px));
-      padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
-    }
-    #screen-day .day-nav-center h3 {
-      min-width: 0;
-      font-size: calc(1.42rem * var(--text-scale, 1));
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact {
-      gap: 0.16rem;
-      padding-top: max(0.28rem, env(safe-area-inset-top, 0px));
-      padding-bottom: 0.22rem;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar__row1 {
-      gap: 0.38rem;
-    }
-    /* Compact tightens the bar's padding and type, never its targets: the
-       house 44px floor holds on a scrolled Day view too (Plan v7 — found when
-       the Day view joined kidScreensMeetTheHouseRules; these were 34px). */
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .btn-icon,
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .profile-badge {
-      min-height: 44px;
-      min-width: 44px;
-      font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center {
-      gap: 0.3rem;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center h3 {
-      font-size: calc(1.12rem * var(--text-scale, 1));
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-arrow {
-      min-height: 44px;
-      min-width: 44px;
-      padding: 0.16rem 0.44rem;
-      font-size: calc(0.94rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    }
     /* Landscape: the day still scrolls as ONE surface. It used to be a
        two-column grid whose lanes each had their own max-height and overflow,
        so the schedule scrolled inside a box that scrolled inside the page and a
@@ -1024,59 +974,8 @@
       padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
     }
-    #screen-week .topbar.week-topbar {
-      padding-left: max(1rem, env(safe-area-inset-left, 0px));
-      padding-right: max(1rem, env(safe-area-inset-right, 0px));
-      padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
-    }
-    #screen-week .week-topbar__row1 {
-      gap: 0.45rem;
-      flex-wrap: nowrap;
-    }
-    #screen-week .week-topbar__row1 .topbar-left {
-      flex: 0 1 auto;
-      min-width: 0;
-    }
-    /* Landscape has the width for the whole row on one line, so the tools stop
-       wrapping and the date label takes whatever is left over. */
-    #screen-week .week-topbar__tools {
-      flex-wrap: nowrap;
-      gap: 0.45rem;
-      min-width: 0;
-    }
-    #screen-week .week-nav--inline {
-      flex: 1 1 auto;
-      justify-content: center;
-      min-width: 0;
-    }
-    #screen-week .week-nav--inline h3 {
-      min-width: 0;
-      font-size: calc(1.52rem * var(--text-scale, 1));
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #screen-week .week-actions {
-      flex: 0 0 auto;
-      justify-content: flex-end;
-      flex-wrap: nowrap;
-    }
-    #screen-week .view-tab {
-      min-height: 40px;
-      padding: 0.36rem 0.88rem;
-      font-size: calc(0.96rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    }
   }
 
-  .profile-badge {
-    display: flex; align-items: center; gap: 0.4rem;
-    background: var(--bg); border-radius: 20px;
-    padding: 0.26rem 0.8rem;
-    font-weight: 600; font-size: calc(1.15rem * var(--text-scale, 1));
-    cursor: pointer;
-    border: 2px solid var(--ink);
-    transform: rotate(-1deg);
-  }
   .btn-icon {
     background: var(--paper); border: 2px solid var(--ink);
     border-radius: 12px; padding: 0.42rem 0.78rem;
@@ -1095,7 +994,6 @@
      so a child is not guessing at an emoji. */
   button:focus-visible,
   [role="button"]:focus-visible,
-  .view-tab:focus-visible,
   .filter-chip:focus-visible,
   .pill-btn:focus-visible,
   .profile-card:focus-visible {
@@ -1103,10 +1001,8 @@
     outline-offset: 2px;
   }
   .btn-icon:focus-visible,
-  .view-tab:focus-visible,
   .filter-chip:focus-visible,
   .pill-btn:focus-visible,
-  .profile-badge:focus-visible,
   .btn-template:focus-visible {
     outline: 3px solid var(--accent-blue);
     outline-offset: 2px;
@@ -1157,101 +1053,11 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══════════ WEEK VIEW ═══════════ */
-  /* One row. It was two — the selector above a dashed rule, the view tabs and
-     Print below it — which cost about a third of an iPad's first screen before
-     the plan started. The tools that act on a week now sit beside the week they
-     name, and wrap together rather than as three loose items. */
-  .week-topbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.35rem;
-    padding-bottom: 0.45rem;
-  }
-  .week-topbar__row1 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .week-topbar__tools {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    flex: 1 1 auto;
-  }
-  /* Scoped to the component, not the screen: the day screen has a .btn-template
-     too, and screen-scoping a size rule is how the parent portal's copy of
-     .ck-navbtn was left at 36×36. */
-  .week-print-btn {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0.35rem 0.9rem;
-    flex: 0 0 auto;
-  }
-  .week-nav--inline {
-    padding: 0;
-    gap: 0.45rem;
-    flex-wrap: nowrap;
-  }
-  .week-nav--inline h3 {
-    font-size: calc(1.66rem * var(--text-scale, 1));
-    min-width: 9.5rem;
-    text-align: center;
-    margin: 0;
-  }
-  #screen-week .view-tabs {
-    padding: 0;
-    justify-content: center;
-    flex: 0 0 auto;
-  }
-  #screen-week .week-actions {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
   .week-nav {
     display: flex; align-items: center; justify-content: center;
     gap: 1rem; padding: 0.8rem;
   }
   .week-nav h3 { font-size: calc(1.4rem * var(--text-scale, 1)); transform: rotate(-1deg); }
-  .day-topbar-actions {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  /* Right-hand group of a plain .topbar (the chore screen), so a screen can
-     carry an action next to its profile badge. */
-  .topbar-actions { display: flex; gap: 0.5rem; align-items: center; }
-  /* 44px, the house floor (Plan v7 — this rule's 38px beat the kid floor's
-     bare .btn-icon on the Day view's 📋 until the Day view joined the sweep). */
-  .day-topbar-actions .btn-icon {
-    padding: 0.34rem 0.62rem;
-    font-size: calc(1.16rem * var(--text-scale, 1));
-    min-height: 44px;
-    min-width: 44px;
-  }
-  /* A parent's Day badge reads `👨‍👩‍👧‍👦 Parent (Jenn)` (profileBadgeText), not
-     the old `🐥 (P)`. On one line it no longer fit beside 📋, and the pair
-     dropped to a row of their own — ~52px more bar on every phone and iPad
-     portrait. So it wraps inside the badge to `👨‍👩‍👧‍👦 Parent` / `(Jenn)` in
-     smaller type, about the width the old text took. Two ids so it also
-     beats the scrolled (compact) rule's font-size. A child's badge is short,
-     carries no class, and is untouched. Held by parentDayTopBarStaysCompact. */
-  #screen-day .day-topbar-actions #dayProfileBadge.profile-badge--parent {
-    max-width: 7.2em;
-    justify-content: center;
-    text-align: center;
-    white-space: normal;
-    line-height: 1.1;
-    padding: 0.14rem 0.55rem;
-    font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1));
-  }
   /* Rest-day toggle now lives inside the Template sheet */
   #restDayBtn.on {
     background: var(--cat-sleep);
@@ -1259,66 +1065,9 @@
     font-weight: 700;
   }
 
-  /* Weekly view toggle */
-  .view-tabs {
-    display: flex; gap: 0.3rem; padding: 0 0.8rem 0.5rem;
-    justify-content: center;
-  }
-  .view-tab {
-    background: var(--paper); border: 2px solid var(--ink);
-    border-radius: 18px; padding: 0.3rem 0.8rem;
-    cursor: pointer; font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 600;
-    font-family: var(--font-text);
-    box-shadow: 2px 2px 0 var(--ink);
-    min-height: 38px;
-  }
-  .view-tab.active { background: var(--pill-on); color: var(--pill-on-ink); }
 
   /* Time-Grid weekly view: 7-column × hour-row grid that visualizes free time */
   .tg-wrap { padding: 0 0.5rem 0.5rem; overflow-x: auto; }
-  .tg-grid {
-    display: grid;
-    /* 1 hour-label column + 7 day columns */
-    grid-template-columns: 44px repeat(7, minmax(40px, 1fr));
-    gap: 1px;
-    background: var(--ink);
-    border: 2px solid var(--ink);
-    border-radius: 12px;
-    overflow: hidden;
-    min-width: 380px;
-  }
-  .tg-cell {
-    background: var(--paper);
-    min-height: 22px;
-    font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    text-align: center;
-    color: var(--ink-light);
-    padding: 1px 2px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .tg-quarter {
-    flex: 1 1 0;
-    min-height: 6px;
-    border-bottom: 1px solid var(--border-ink-3);
-    box-sizing: border-box;
-  }
-  .tg-quarter:last-child { border-bottom: none; }
-  .tg-head { font-weight: 700; background: var(--bg); color: var(--ink); padding: 4px 2px; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-  .tg-time { background: var(--bg); color: var(--ink-light); font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 2px; line-height: 22px; }
-  .tg-block {
-    color: var(--ink-on-strong);
-    font-size: calc(0.65rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    line-height: 1.1;
-    padding: 1px 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .tg-block.partial { font-style: italic; opacity: 0.85; }
-  .tg-hint { text-align: center; color: var(--ink-light); margin-top: 0.5rem; font-style: italic; font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
   /* 2a category legend under the Time-Grid */
   .tg-legend {
     display: flex; flex-wrap: wrap; justify-content: center;
@@ -1373,24 +1122,7 @@
   @media (max-width: 640px) {
   }
 
-  /* ── INVERTED MODE (default) ──
-     Free cells = bright profile color (saturated, celebratory).
-     Scheduled cells = neutral grey with small icon. */
-  .tg-wrap.inverted .tg-block {
-    background: var(--surface-inverted-block) !important;
-    color: var(--ink-light);
-    border-radius: 3px;
-    font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1));
-  }
   /* ── TIME-GRID CONTROLS (toggle + streak banner) ── */
-  .tg-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.8rem 0.3rem;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-  }
   .tg-streak {
     font-family: var(--font-hand);
     font-size: calc(1.05rem * var(--text-scale, 1));
@@ -1405,64 +1137,11 @@
     0%, 100% { transform: scale(1) rotate(0deg); }
     50% { transform: scale(1.15) rotate(15deg); }
   }
-  .tg-toggle {
-    background: var(--paper);
-    border: 2px solid var(--ink);
-    border-radius: 999px;
-    padding: 0.3rem 0.8rem;
-    font-family: var(--font-hand);
-    font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    cursor: pointer;
-    color: var(--ink);
-    box-shadow: 2px 2px 0 var(--shadow-ink-15);
-    transition: all 0.15s;
-  }
-  .tg-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--shadow-ink-15); }
 
   /* Brick colors — shared between weekly overview and MY TIME panel */
 
-  /* ── MY FREE TIME TODAY summary panel (kid view) ── */
-  .tg-mytime {
-    margin: 0.8rem 0.5rem 0.5rem;
-    padding: 0.9rem 1rem;
-    background: linear-gradient(135deg, var(--mytime-surface) 0%, var(--mytime-paper) 100%);
-    border: 2.5px solid var(--accent-yellow);
-    border-radius: 18px;
-    box-shadow: 3px 4px 0 var(--mytime-glow);
-  }
-  .tg-mytime[data-profile="jess"] {
-    background: linear-gradient(135deg, var(--mytime-jess-surface) 0%, var(--mytime-paper) 100%);
-    border-color: var(--accent-blue);
-    box-shadow: 3px 4px 0 var(--mytime-jess-glow);
-  }
 
   /* .week-grid lived here, for the retired compact week view. */
-  .day-card {
-    background: var(--paper);
-    border-radius: 14px;
-    padding: 0.5rem 0.3rem;
-    cursor: pointer;
-    border: 2px solid var(--ink);
-    transition: all 0.2s;
-    min-height: 130px;
-    display: flex; flex-direction: column; align-items: center;
-    gap: 0.2rem;
-    box-shadow: 2px 2px 0 var(--ink);
-    position: relative;
-  }
-  .day-card:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
-  .day-card.today { background: var(--surface-today); }
-  .day-card.today::after {
-    content:'today'; position:absolute; top: -8px; right: -4px;
-    font-family: var(--font-script); font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    background: var(--today-mark); color:var(--today-mark-ink); padding: 1px 8px;
-    border-radius: 10px; transform: rotate(5deg);
-    border: 1.5px solid var(--ink);
-  }
-  .day-label { font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; text-transform: uppercase; color: var(--ink-light); letter-spacing: 1px; }
-  .day-date { font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; font-family: var(--font-display); }
-  .day-mood { font-size: calc(1.3rem * var(--text-scale, 1)); margin-top: 2px; }
-  .day-pct { font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); font-weight: 700; }
 
   /* ═══════════ PARENT MONTHLY HEATMAP ═══════════ */
   .pm-grid-wrap { padding: 0.5rem 0.8rem; }
@@ -1656,11 +1335,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 0.8rem;
   }
-  .chore-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.8rem;
-  }
   .chore-card {
     background: var(--paper);
     border: 2px solid var(--ink);
@@ -1668,9 +1342,6 @@
     padding: 0.7rem;
     box-shadow: 2px 2px 0 var(--ink);
   }
-  /* Week selector: the range label lives between the prev/next arrows on one
-     row to save vertical space. */
-  .ct-weeknav { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 
   /* The day's chore grades, where the day is. Parent-only, and hidden entirely
      when the planner put no chore here rather than explaining an empty state. */
@@ -1688,8 +1359,6 @@
     font-size: calc(var(--text-sm) * var(--text-scale, 1)); font-family: inherit; cursor: pointer;
   }
   .pc-chore.on { background: var(--accent-green); }
-  /* A second heading inside one card needs air above it. */
-  .mny-gap { margin-top: var(--space-3); }
 
   /* The meeting's own fine chips, on the day they belong to. Same 44px floor as
      every other control a grown-up taps. */
@@ -1715,25 +1384,14 @@
      dashed, so it does not read as a settled row sitting among settled rows. */
 
   /* ═══════ 2c/1b/2b: Meeting Mode ═══════ */
-  .mm-stepper { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
-  .mm-head-title { margin: 0; white-space: nowrap; font-size: calc(max(15px, 1.05rem) * var(--text-scale, 1)); }
-  .mm-step {
-    font-family: var(--font-text); font-weight: 800; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer;
-    min-height: 44px;   /* the money step is a kid screen now (Sunday v15): 44px targets */
-    background: var(--paper-card, var(--paper)); color: var(--ink);
-  }
-  .mm-step-cur { background: var(--pill-on); color: var(--ink-on-strong-cream); }
-  .mm-step-done { background: var(--accent-green); }
   .mm-h { font-family: var(--font-display); font-size: calc(1.25rem * var(--text-scale, 1)); margin: 2px 0 8px; }
   .mm-h-sub { font-size: calc(1.05rem * var(--text-scale, 1)); margin-top: 12px; }
-  .mm-hint, .mm-cap { font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); margin: 6px 0; }
+  .mm-cap { font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); margin: 6px 0; }
   .mm-legend { display: flex; gap: 12px; align-items: center; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); margin-bottom: 6px; flex-wrap: wrap; }
   .mm-legend .mm-sw { display: inline-block; width: 12px; height: 12px; border: 1.5px solid var(--ink); border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
   .mm-legend-note { color: var(--ink-light); }
   .mm-bar-j { background: var(--series-jenn); }
   .mm-bar-s { background: var(--series-jess); }
-  .mm-bar { width: 40%; max-width: 18px; min-height: 2px; border: 2px solid var(--ink); border-bottom: 0; border-radius: 5px 5px 0 0; }
   .mm-detail { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: var(--paper-card, var(--paper)); }
   .mm-detail-cols { display: grid; grid-template-columns: 1fr 2px 1fr; gap: 8px; }
   .mm-detail-div { background: repeating-linear-gradient(var(--border-soft), var(--border-soft) 3px, transparent 3px, transparent 6px); }
@@ -1937,11 +1595,6 @@
   .mm-detail-empty { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); opacity: 0.6; font-style: italic; padding: 2px 4px; }
   .mm-item-pay { margin-left: auto; font-weight: 800; font-size: calc(0.74rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-pay); white-space: nowrap; }
   .mm-item-said { margin-left: auto; font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); opacity: 0.7; font-style: italic; white-space: nowrap; }
-  .ct-history > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  .ct-history > summary::-webkit-details-marker { display: none; }
-  .ct-history > summary::before { content: '▸'; font-weight: 900; transition: transform 0.15s; }
-  .ct-history[open] > summary::before { transform: rotate(90deg); }
-  .ct-history > summary h3 { margin: 0; }
   .mm-confirm-day { width: 100%; margin-top: 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-card, var(--paper)); box-shadow: 2px 2px 0 var(--ink); padding: 6px; font-weight: 800; cursor: pointer; }
   .mm-confirm-day.confirmed { background: var(--accent-green); }
   .mm-ready { margin-top: 8px; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; background: var(--bg2); border: 2px dashed var(--paper-line); border-radius: 10px; padding: 6px 10px; }
@@ -1950,10 +1603,7 @@
     display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
     margin-top: var(--space-2);
   }
-  .mm-wins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .mm-win { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper-card, var(--paper)); }
   .mm-win-kid { font-weight: 800; margin-bottom: 4px; }
-  .mm-win-item { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 1px 0; }
   .mm-2b { display: flex; flex-direction: column; gap: 10px; }
   .mm-2b-kid { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper-card, var(--paper)); }
   .mm-2b-row { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; align-items: center; margin-top: 5px; }
@@ -1962,7 +1612,6 @@
   .mm-2b-plan { position: absolute; inset: 0; width: 0; background: repeating-linear-gradient(-45deg, var(--surface-muted-10) 0 4px, transparent 4px 8px); border-radius: 5px; }
   .mm-2b-done { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 5px; border: 2px solid var(--ink); }
   .mm-2b-num { font-size: calc(0.74rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; white-space: nowrap; }
-  .mm-pay { border: 2px solid var(--ink); border-radius: 12px; background: var(--surface-warm); padding: 8px 10px; margin: 8px 0; }
   .mm-recorded { font-size: calc(0.86rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; background: var(--accent-green); border: 2px solid var(--ink); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
   /* ── The meeting is a BOUNDED COLUMN, and the ends are OUTSIDE it ──
      The two things you steer with must never scroll away: on step 3 or 4 —
@@ -2001,26 +1650,12 @@
     height: 100vh;
     height: 100dvh;
   }
-  /* The meeting names itself once, at the top, and then gets out of the way —
-     it used to be a sheet heading, which is the one thing a dialog must have
-     and a screen mostly does not need shouting. */
-  .mm-title {
-    flex: 0 0 auto;
-    margin: 0 0 0.6rem; font-size: calc(max(15px, 1.05rem) * var(--text-scale, 1));
-  }
   #familyMeetingBody {
     flex: 1 1 auto;
     min-height: 0;   /* or the body refuses to shrink and the column overflows */
     display: flex;
     flex-direction: column;
   }
-  .mm-head {
-    flex: 0 0 auto;
-    margin: -1.2rem -1.2rem 0; padding: 1.2rem 1.2rem 0;
-    background: var(--paper);
-    border-bottom: 2px solid var(--paper-line);
-  }
-  .mm-head .mm-stepper { margin-bottom: 8px; }
   .mm-nav {
     display: flex; justify-content: space-between; gap: 8px;
     flex: 0 0 auto;
@@ -2197,20 +1832,9 @@
   button.ct-check { padding: 0; font: inherit; line-height: 1; }
   button.ct-check:disabled { cursor: default; opacity: 0.8; }
   button.ct-check:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
-  .ct-badge {
-    font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    font-weight: 700;
-    border: 1.5px solid var(--ink);
-    border-radius: 7px;
-    padding: 1px 6px;
-    background: var(--accent-yellow);
-    white-space: nowrap;
-  }
   /* Money identity = amber; paid = green (color law) */
   .chore-card.paid { background: color-mix(in srgb, var(--accent-green) 22%, var(--paper)); border-color: var(--accent-green); }
-  .ct-meta { font-size: calc(0.88rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-muted); }  @media (max-width: 900px) {
-    .chore-grid { grid-template-columns: 1fr; }
-  }
+  .ct-meta { font-size: calc(0.88rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-muted); }
 
   /* ═══════════ FULL WEEKLY VIEW — zones as rows, days as columns ═══════════ */
   /* min-height:0 is what makes this a scroller at all. A flex item defaults to
@@ -2768,14 +2392,6 @@
   .wk-sig-btn--clear { background: transparent; box-shadow: none; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); border-style: dashed; }
 
   /* ═══════════ DAY EDITOR ═══════════ */
-  /* Labeled "back to week" button in the day topbar */
-  .btn-back-week {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: auto; padding: 0 0.7rem; gap: 0.25rem;
-    font-family: var(--font-text);
-    font-size: calc(0.95rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
-    white-space: nowrap;
-  }
   /* Event-zone chips — secondary jump-to filter, kept small so the schedule
      stays the focus (All Day is the default). */
 
@@ -2801,22 +2417,6 @@
   #reflectOverlay .vibe-mood { width: 44px; height: 44px; flex: 0 0 44px; }
   .obj-item.refl-block-row { flex-wrap: wrap; justify-content: space-between; font-size: calc(max(15px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
 
-  .day-controls {
-    display: flex; gap: 0.5rem; padding: 0.15rem 0;
-    align-items: center; justify-content: center;
-  }
-  .day-controls h3 { font-size: calc(1.5rem * var(--text-scale, 1)); }
-  .day-nav-center {
-    display: flex; align-items: center; gap: 0.75rem;
-    flex: 1 1 auto; justify-content: center;
-  }
-  .day-nav-center h3 {
-    font-size: calc(1.6rem * var(--text-scale, 1)); margin: 0;
-    text-align: center; min-width: 9rem;
-  }
-  .day-nav-arrow {
-    font-size: calc(1.27rem * var(--text-scale, 1)); padding: 0.35rem 0.78rem;
-  }
   .btn-template {
     background: var(--accent-strong); color: var(--ink-on-strong);
     border: 2px solid var(--ink);
@@ -3530,7 +3130,6 @@
      box-shadow rather than outline so a block that is also in a clash keeps
      both signals. */
   .placed-block.placed-block--notdone { box-shadow: inset 0 0 0 2.5px var(--ink); }
-  .block-badges { display:flex; gap: 3px; }
   .badge { font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); filter: drop-shadow(0 1px 1px var(--shadow-black-20)); }
   /* Dark ink on a light neutral chip — never white on a pastel, which all fail
      contrast against the category colours this sits on top of. */
@@ -3855,13 +3454,6 @@
     height: 100%;
   }
   .sheet-time-grid-row h4 { margin-top: 0.1rem; margin-bottom: 0.35rem; min-height: 1.55rem; }
-  .sheet-time-main {
-    min-height: 172px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-  }
-  .sheet-time-main .sheet-row { margin-bottom: 0; }
   /* Aligns duration column custom-min row with start column (same vertical rhythm) */
   .sheet-time-col--duration .duration-custom-slot {
     min-height: 0;
@@ -3908,7 +3500,6 @@
   }
   @media (max-width: 560px) {
     .sheet-time-grid-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; align-items: stretch; }
-    .sheet-time-main { min-height: 162px; }
   .sheet h4 { font-size: calc(1.16rem * var(--text-scale, 1)); margin: 0.5rem 0 0.28rem; }
     .repeat-toggle, .buffer-toggle { padding: 0.45rem 0.6rem; margin-bottom: 0.35rem; }
     .toggle-label { font-size: calc(0.96rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
@@ -4478,7 +4069,6 @@
      frames today in navy instead of filling it (--day-now-*, the look's). */
   .pn-day.now { background: var(--day-now-bg); border-color: var(--ink); color: var(--day-now-ink); box-shadow: var(--day-now-ring); }
   /* On her behalf (R5 §5 C1): the chosen child and day, then her answers. */
-  .pn-answer-cap { margin-top: var(--space-4); }
   .pn-answer { padding: var(--space-3); }
   .pn-answer-kids { display: flex; gap: var(--space-2); margin-bottom: var(--space-2); }
   .pn-kidbtn {
@@ -4768,7 +4358,6 @@
     border-bottom: 2px double var(--print-ink); padding-bottom: 0.12rem;
   }
   .print-header h1 { font-family:var(--print-font-head); font-weight: var(--print-head-weight); font-size: 1.25rem; line-height: 1.1; } /* look: print sheet ignores the look (L12) */
-  .print-subhead { font-size: 9pt; color: var(--print-subhead); font-weight: 700; margin-top: 2px; } /* look: print sheet ignores the look (L12) */
   /* On-screen controls (never printed) */
   .print-controls {
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.2rem;
@@ -4783,10 +4372,6 @@
   }
   .print-ctrl input { width: 60px; text-align: center; }
   .print-ctrl-hint { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
-  /* Printed summary */
-  .print-summary { margin-top: 0.7rem; padding-top: 0.4rem; border-top: 2px solid var(--print-ink); }
-  .print-sleep { margin-top: 0.45rem; font-size: 9.5pt; padding: 0.3rem 0.5rem; background: var(--print-sleep); border-radius: 8px; } /* look: print sheet ignores the look (L12) */
-  @media print { .print-sleep { background: var(--print-sleep) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
     display: grid;
     /* Leading 14px column = time-of-day sideband (Before School / School /
@@ -5076,10 +4661,6 @@
     border:2px solid var(--ink); border-radius:8px; font-family:inherit;
   }
   .date-range-wrap .hint { font-size: calc(0.86rem * var(--fs-scale, 1) * var(--text-scale, 1)); color:var(--ink-muted); margin-top:0.4rem; }
-
-  @media(max-width:400px) {
-    .day-card { padding: 0.3rem 0.2rem; min-height: 110px; }
-  }
 
   /* ── Audit fix: larger chore checkbox tap targets (was 20×20px, now 28px visible + 48px hit area) ── */
   .ct-check {
@@ -5881,26 +5462,6 @@
     #screen-parent .mny-strip-arrow { align-self: center; transform: none; margin-left: 0; }
   }
 
-  /* An earnings row: what it is, where the number came from, what it is worth. */
-
-  .mny-was { color: var(--ink-light); font-weight: 400; }
-  /* Where a number came from. "From the planner" and "Changed by a grown-up"
-     are different claims, and a kid is entitled to know which she is looking at. */
-  .mny-src {
-    font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); letter-spacing: 0.03em; text-transform: uppercase; font-weight: 700;
-    border: 1.5px solid var(--ink); border-radius: 6px; padding: 0.08rem 0.3rem; color: var(--ink-light);
-    background: var(--bg);
-  }
-  .mny-src.edited { background: var(--accent-yellow); color: var(--ink); }
-  .mny-src.amber { background: var(--mny-amber-fill); color: var(--mny-amber-ink); border-color: var(--mny-amber-border); }
-  .mny-stepgrp { display: inline-flex; align-items: center; gap: 0.25rem; }
-
-  .mny-field { display: block; margin-top: 0.4rem; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
-  .mny-field span { display: block; margin-bottom: 0.15rem; }
-  .mny-field input {
-    width: 100%; min-height: 40px; border: 2px solid var(--ink); border-radius: 9px;
-    background: var(--paper); color: var(--ink); font: inherit; padding: 0.3rem 0.5rem;
-  }
 
   /* The confirm / commit bar: total, what is in the way, the button. The button
      says what is missing rather than just refusing. */
@@ -5917,10 +5478,6 @@
   .mny-note.warn, .warn { color: var(--mny-fine-ink); }
 
   /* ── Money rules (parent) ── */
-  /* A queued edit is visibly different from a saved one: nothing on this page
-     takes effect until the pending bar is confirmed, and a stepper that looked
-     saved would be a lie about what the kid's page is showing. */
-  .mny-card.mny-pending { background: var(--bg2); border-width: 3px; }
   .mny-row.changed b { background: var(--accent-yellow); border-radius: 5px; padding: 0 0.2rem; }
   #mnyRulesWrap .mny-card { margin-bottom: 0.7rem; }
   /* A stage she has not reached is dimmed rather than hidden: seeing what is
@@ -5945,35 +5502,6 @@
      separate apps, and the whole idea is that "what I earned" and "what I do
      with it" are two halves of one Sunday.
      ══════════════════════════════════════════════════════════════ */
-  .mny-head {
-    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
-    padding: 0.5rem 0.2rem 0.6rem; border-bottom: 3px solid var(--ink);
-  }
-  .mny-head-title { margin: 0; font-size: calc(1.4rem * var(--text-scale, 1)); font-weight: 800; }
-  .mny-head-strap { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
-  .mny-head-btns { margin-left: auto; display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  .mny-head-btns .mny-btn { min-height: 40px; padding: 0.25rem 0.7rem; font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-
-  .mny-tabs {
-    display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
-    padding: 0.5rem 0.2rem; border-bottom: 3px solid var(--ink); margin-bottom: 0.7rem;
-  }
-  .mny-tab {
-    display: flex; align-items: center; gap: 0.4rem; min-height: 40px;
-    border: 2.5px solid var(--ink); border-radius: 11px; background: var(--paper);
-    color: var(--ink); font: inherit; font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.2rem 0.7rem; cursor: pointer;
-  }
-  .mny-tab:hover { filter: brightness(1.05); }
-  .mny-tab.on { background: var(--pill-on); color: var(--pill-on-ink); cursor: default; }
-  /* Who a page is for. A kid tapping the parent tab is not refused, she is
-     told — a different and much better message. */
-  /* Floored at 13px: at Calm's text scale 1 the 0.62rem × 1.2 came to 11.9px
-     (kidScreensMeetTheHouseRules, Looks stage 3); Pop's 1.1 already cleared it. */
-  .mny-tab-tag { font-size: max(13px, calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1))); text-transform: uppercase; letter-spacing: 0.09em; opacity: 0.65; }
-  @media (max-width: 720px) {
-    .mny-tab { font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.2rem 0.5rem; }
-    .mny-tab-tag { display: none; }
-  }
 
 
 
@@ -6003,12 +5531,6 @@
     background: var(--paper); cursor: pointer;
   }
   .mny-dot.on { background: var(--accent-strong); }
-  .mny-back {
-    min-width: 40px; min-height: 40px; border: 2.5px solid var(--ink); border-radius: 11px;
-    background: var(--paper); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer;
-  }
-  .mny-back:hover { background: var(--bg2); }
-  .mny-head-kids { display: flex; gap: 0.3rem; }
 
   /* ═══════════════════════════════════════════════════════════════
      CHORE CONTROLS (redesign 2a — "Kid" frame)
@@ -6321,8 +5843,6 @@
   .co-who.on { background: var(--accent-blue); color: var(--ink-on-blue); }
   .co-goalrow { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.45rem; }
   .co-goallab { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); }
-  .co-num { display: flex; align-items: center; gap: 0.4rem; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); padding: 0.35rem 0.55rem; margin-top: 0.3rem; }
-  .co-numv { min-width: 44px; text-align: center; font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; }
   .co-danger { background: var(--status-warn-wash); }
   .co-danger:hover { background: var(--status-danger-hover); }
 
@@ -6367,8 +5887,6 @@
     .co-lanes, .co-whos { grid-column: 1 / -1; }
     .co-lane, .co-who { flex: 1; min-height: 44px; }
     .co-row > .ck-navbtn, .co-row > .ck-btn { grid-column: 1 / -1; width: 100%; height: 44px; }
-    .co-num { flex-wrap: wrap; }
-    .co-num .ck-navbtn { width: 44px; height: 44px; font-size: calc(18px * var(--text-scale, 1)); }
 
     /* Charts keep their aspect and stay legible; the heatmap scrolls. */
     .ctr-head { flex-wrap: wrap; }
@@ -6400,8 +5918,6 @@
     --fs-scale: 1.2;
   }
   /* A few fixed-size chips would clip their label at 1.2x — let them grow. */
-  #screen-meeting .mny-tab-tag, #screen-mymoney .mny-tab-tag,
-  #screen-moneyschool .mny-tab-tag,
   #screen-meeting .cp-gbtn {
     white-space: normal;
     min-height: auto;
@@ -6490,29 +6006,12 @@
   .ck-segbtn,
   .ck-btn,
   .cp-gbtn,
-  .mny-back,
-  .mny-tab,
   .mny-btn,
   .mny-chip,
-  .mny-acc,
   .wk-sig-btn,
-  .view-tab,
-  .btn-icon,
-  .profile-badge {
+  .btn-icon {
     min-height: 44px;
     min-width: 44px;
-  }
-  /* Beats .mny-head-btns .mny-btn, which pins 40px at a higher specificity than
-     a bare class can reach. Matching the selector rather than reaching for
-     !important keeps the cascade readable. */
-  .mny-head-btns .mny-btn { min-height: 44px; }
-  /* Same problem, found only once the sweep ran at tablet-landscape and desktop:
-     `#screen-week .view-tab` inside the >=980px landscape query is an id plus a
-     class, so a bare `.view-tab` never reached it and the view switcher stayed
-     40px on exactly the screens this app is used on. The 44px floor is not a
-     small-screen rule. */
-  @media (min-width: 980px) and (orientation: landscape) {
-    #screen-week .view-tab { min-height: 44px; }
   }
   /* An input needs the height but must keep its own width — a number field
      sized for two digits should not stretch to 44px wide. */
@@ -7322,25 +6821,6 @@
 }
 .rc-btn.primary { background: var(--ink); color: var(--paper); }
 
-/* Now counts and routes; this is the one control on it that opens a door. */
-.pn-record {
-  width: 100%; min-height: 44px; margin-top: var(--space-2, 0.6rem);
-  border: 2px dashed var(--ink); border-radius: var(--radius-sm, 10px);
-  background: transparent; color: var(--ink);
-  font-size: calc(max(15px, 1rem) * var(--text-scale, 1)); font-weight: 800; cursor: pointer;
-}
-
-
-/* The one control in the app that moves real money. It sits in the meeting's
-   footer rather than somewhere in the middle of a long panel — always visible,
-   always in the same place — so it is marked as the consequential thing it is
-   rather than looking like another Next. */
-.mm-nav .mm-commit {
-  border-width: 3px;
-  box-shadow: var(--shadow-sm, 0 2px 0 var(--ink));
-  font-weight: 900;
-}
-
 /* ── Chores seen in their new homes — C2 (R5 §5 rows 9–15) ──────────────────
    Read-only views of what the Chores screen shows, each drawn from that
    screen's own reader. Kid surfaces (Today, My money, Money story, the Week
@@ -7468,15 +6948,24 @@
 /* ══════════════════════════════════════════════════════════════
    THE COMPONENT KIT — Consistency PR 3 (no visible change)
    One button, chip, tab row, card, section head, sheet, kid switch and
-   stepper (.ui-*), and the page header pageHeader draws (.ph-*, js/47-header.js).
+   stepper (.ui-*), and the page header pageHeader draws (.hdr-*, js/47-header.js).
    Nothing uses them yet: PRs 4–12 move one surface at a time onto them and
    delete that surface's own classes. Token-driven only — colours, fonts,
    radii, borders, layers and header sizes all read a :root or look token, so
    both looks reach every piece. Every target is at least 44px. The header is
-   kept minimal until its picture is approved (Stage 17).
+   kept minimal until its picture is approved (Stage 17); its sizes follow the
+   owner's header pictures (PR 4, D21).
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 699px) {
-  :root { --hdr-h: 56px; --hdr-title-rem: 1.45rem; }
+  /* The page header on a phone (SRC 122-125, 133-151, 184-192, 235-250). */
+  :root {
+    --hdr-h: 60px; --hdr-money-h: 64px; --hdr-meeting-h: 60px;
+    --hdr-pad: 12px; --hdr-gap: 10px; --hdr-r2-pad: 12px; --hdr-r2-gap: 6px; --hdr-r2-size: 16px;
+    --hdr-label-size: 20px; --hdr-glyph-size: 16px;
+    --hdr-money-btn: 52px; --hdr-money-glyph: 16px; --hdr-money-help-size: 22px; --hdr-money-emoji: 24px;
+    --hdr-meeting-icon-size: 21px; --hdr-girls-gap: 4px; --hdr-girl-emoji-size: 22px; --hdr-pill-pad: 2px 10px;
+    --hdr-title-size: calc(26px * var(--text-scale, 1));
+  }
 }
 
 .ui-btn {
@@ -7549,39 +7038,258 @@
   font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
 }
 
-/* The page header. Its one 2.5px solid rule sits inside its own height. */
-.ph {
+/* ══════════════════════════════════════════════════════════════
+   THE PAGE HEADER (.hdr-*, Stage 20) — pageHeader, js/47-header.js.
+   Built new from the owner's turn-2 picture, value for value: the
+   per-screen table in docs/handoff/header-exact-values.md (SRC = the copied
+   source, docs/handoff/consistency/headers/source/header-system-turn2.dc.html).
+   The row is a 1fr auto 1fr grid: the left group (back, title) starts
+   column 1, the centre (.hdr-context: the date, a stepper, the Day's date,
+   the meeting's steps) is column 2, so it sits in the middle of the BAR
+   rather than of the space the sides leave, and the right group (tools,
+   actions, badge) ends column 3. A row with no centre (.hdr-row--ends:
+   money, Sister Sync, Print) keeps its two groups at the ends. Buttons and
+   badges are border-box (52px is the whole button, the kids' tap rule); a
+   switch's cells are their picture size inside its 2px frame. Measured by
+   everyHeaderMeasuresToTheExactValues.
+   ══════════════════════════════════════════════════════════════ */
+/* Bar: 64px (60 on a phone), #fff, a 2.5px ink rule under it (SRC 49, 122). */
+.hdr {
   box-sizing: border-box; position: sticky; top: 0; z-index: var(--z-header);
   background: var(--paper); color: var(--ink);
+  border-bottom: var(--bw-card) solid var(--ink);
 }
-.ph::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: var(--bw-card); background: var(--ink); }
-.ph-row { box-sizing: border-box; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4); }
-.ph-main { height: var(--hdr-h); }
-.ph-sub { height: var(--hdr-sub-h); border-top: var(--bw-info) solid var(--ink); }
-.ph-title {
-  flex: 1 1 auto; min-width: 0; margin: 0; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-family: var(--font-head); font-weight: var(--head-weight, 400); font-size: calc(var(--hdr-title-rem) * var(--text-scale, 1));
+.hdr-row {
+  box-sizing: border-box; height: var(--hdr-h); padding: 0 var(--hdr-pad);
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: var(--hdr-gap);
 }
-.ph-context { flex: 0 1 auto; white-space: nowrap; color: var(--ink-light); font-family: var(--font-text); font-size: calc(1rem * var(--text-scale, 1)); }
-.ph-actions { display: flex; gap: var(--space-2); flex: none; }
-.ph-btn, .ph-badge {
-  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
-  height: 44px; min-width: 44px; padding: 0;
+.hdr-start { grid-column: 1; justify-self: start; display: flex; align-items: center; gap: var(--hdr-gap); min-width: 0; }
+.hdr-context {
+  grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 10px;
+  white-space: nowrap; text-align: center;
+  font-family: var(--font-text); font-size: var(--hdr-label-size); font-weight: 600; color: var(--hdr-label-ink);
+}
+.hdr-end { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: var(--hdr-gap); }
+.hdr-row--ends { display: flex; justify-content: space-between; gap: var(--hdr-gap); }
+.hdr-row--ends > .hdr-start { flex: 1 1 auto; }
+.hdr-lead, .hdr-actions, .hdr-tools { display: flex; align-items: center; gap: var(--hdr-gap); flex: none; }
+/* Title: head font 30px × the look's scale, 700, line-height 1 (SRC 50);
+   the Day's date and the meeting's name 28px × (SRC 103, 210). */
+.hdr-title {
+  margin: 0; white-space: nowrap; line-height: 1; color: var(--ink);
+  font-family: var(--font-head); font-weight: 700; font-size: var(--hdr-title-size);
+}
+.hdr-context > .hdr-title { min-width: 220px; text-align: center; font-size: var(--hdr-title-small); }
+.hdr--meeting .hdr-title { font-size: var(--hdr-title-small); }
+.hdr-title-btn {
+  display: inline-block; min-height: 52px; margin: 0; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; line-height: 52px; white-space: nowrap; cursor: pointer;
+}
+/* The week between its ◀ ▶: at least 200px (SRC 64). */
+.hdr-label { min-width: 200px; text-align: center; }
+/* Buttons: 52px, white, 2px ink, radius 14, the look's hard shadow; an
+   icon 20px, ◀ ▶ 17px, a word 18px (SRC 63, 100, 111). */
+.hdr-btn {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 52px; height: 52px; padding: 0;
   background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
-  font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
+  border: var(--bw-chip) solid var(--ink); border-radius: 14px; box-shadow: var(--hdr-sh);
+  font-family: var(--font-text); font-size: var(--hdr-icon-size); line-height: 1; cursor: pointer;
 }
-.ph-badge { gap: var(--space-1); padding: 0 var(--space-3) 0 var(--space-1); border-radius: var(--radius-pill); background: var(--bg); }
-.ph-badge--avatar { width: 44px; padding: 0; }
-.ph-av { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-pill); }
-.ph--money .ph-main { height: 72px; }
-.ph--money .ph-btn { height: 54px; min-width: 54px; }
-.ph--meeting .ph-main { height: 54px; }
-.ph-r2 { height: 52px; justify-content: center; border-top: var(--bw-info) solid var(--ink); }
-.ph--parent { background: var(--accent-purple); }
+.hdr-step { width: 52px; font-size: var(--hdr-glyph-size); }
+.hdr-back { padding: 0 16px; font-size: var(--hdr-word-size); }
+.hdr-btn--word { padding: 0 16px; font-size: var(--hdr-word-size); }
+/* Print, on the preview only: the look's main fill, "Print" 18px 600 (SRC 90). */
+.hdr-print { padding: 0 18px; background: var(--btn-main); color: var(--btn-main-ink); font-size: var(--hdr-word-size); font-weight: 600; }
+/* The same Print at the top of the preview page (#weekPagePrint), on a phone
+   only: there the header is Full's (owner, 2026-10-09; header-exact-values.md
+   note 3). */
+.wpp-print { display: none; }
+/* Badge: 52×52 circle, pink, 2px ink, emoji 24px, no name (SRC 52). */
+.hdr-badge {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; padding: 0;
+  background: var(--hdr-badge-bg); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: 50%;
+  font-family: var(--font-text); font-size: var(--hdr-emoji-size); line-height: 1; cursor: pointer;
+}
+.hdr-badge--text { width: auto; gap: 4px; padding: 0 12px 0 4px; border-radius: var(--radius-pill); }
+.hdr-badge-text { white-space: nowrap; font-size: var(--hdr-word-size); }
+/* display:inline-flex outranks the browser's [hidden]; the meeting lock hides
+   a badge with `hidden` (applyMeetingLock). */
+.hdr-badge[hidden] { display: none; }
+/* One joined switch (Week's 📋 / 🖨, the Day's 1 2 3, the meeting's steps):
+   a 2px ink frame, radius 14, cells 48px high with 2px dividers, the chosen
+   cell the look's --sel (Pop yellow, Calm navy with white) (SRC 67-69, 106-110,
+   213-218). */
+.hdr-switch {
+  box-sizing: border-box; flex: none; display: flex;
+  border: var(--bw-chip) solid var(--ink); border-radius: 14px; overflow: hidden; background: var(--paper);
+}
+.hdr-switch-cell {
+  box-sizing: content-box; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 56px; height: 48px; margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-text); font-size: var(--hdr-icon-size); line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.hdr-switch-cell + .hdr-switch-cell { border-left: var(--bw-chip) solid var(--ink); }
+.hdr-switch-cell[aria-selected="true"], .hdr-switch-cell[aria-pressed="true"], .hdr-switch-cell[aria-current] { background: var(--sel); color: var(--sel-ink); }
+.hdr-span > .hdr-switch-cell { width: 52px; font-size: var(--hdr-span-size); }
+.hdr-span > [aria-pressed="true"], .hdr-steps > [aria-current] { font-weight: 600; }
+/* Chosen, but the screen can carry fewer days: struck through, not faded. */
+.hdr-switch-cell--off { color: var(--ink-light); text-decoration: line-through; }
+.hdr-steps > .hdr-switch-cell { width: auto; padding: 0 18px; font-size: var(--hdr-word-size); }
+.hdr-seg-num { display: none; }
+/* Second rows: 44px; the meeting's under a 1.5px dashed rule in the page's
+   grid colour, body 18px ink, the week at its right (SRC 207, 222-227). */
+.hdr-sub, .hdr-r2 {
+  box-sizing: content-box; height: var(--hdr-sub-h); padding: 0 var(--hdr-r2-pad);
+  display: flex; align-items: center; gap: var(--hdr-r2-gap);
+  font-family: var(--font-text); font-size: var(--hdr-r2-size); color: var(--hdr-label-ink);
+}
+.hdr-sub { border-top: var(--bw-info) solid var(--ink); }
+.hdr-r2 { justify-content: space-between; border-top: var(--bw-info) dashed var(--page-grid); }
+.hdr-r2-start, .hdr-r2-end { display: flex; align-items: center; gap: var(--hdr-r2-gap); min-width: 0; }
+.hdr-r2-end { flex: none; }
+.hdr-week { white-space: nowrap; font-weight: 600; }
+.hdr-sub .ui-kids { margin-left: auto; }
+/* Money: 72px, its buttons and badge 54px, ◀ 18px, ? 24px 600, the badge's
+   emoji 26px; her two tabs are pills in the head font, 26px × the look's
+   scale, the current one --sel (SRC 168-176). No title and no date: the
+   tabs name the page. */
+.hdr--money { --hdr-pad: 18px; --hdr-gap: 16px; }
+.hdr--money .hdr-row { height: var(--hdr-money-h); }
+.hdr--money .hdr-btn, .hdr--money .hdr-badge { min-width: var(--hdr-money-btn); width: var(--hdr-money-btn); height: var(--hdr-money-btn); }
+.hdr--money .hdr-back { padding: 0; font-size: var(--hdr-money-glyph); }
+.hdr--money .hdr-actions .hdr-btn { font-size: var(--hdr-money-help-size); font-weight: 600; }
+.hdr--money .hdr-badge { font-size: var(--hdr-money-emoji); }
+.hdr-tabs { display: flex; align-items: center; gap: 10px; flex: none; min-width: 0; }
+.hdr-tab {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 54px; padding: 0 22px;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  font-family: var(--font-head); font-weight: 700; font-size: var(--hdr-tab-size);
+  line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.hdr-tab[aria-current="page"] { background: var(--sel); color: var(--sel-ink); cursor: default; }
+/* A grown-up's five, in the sub-bar: the current one named, the others'
+   icons; a tag says whose page each is. */
+.hdr-tab-tag { font-family: var(--font-text); font-size: max(13px, calc(0.7rem * var(--text-scale, 1))); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+.hdr-tabs--many .hdr-tab:not([aria-current]) { padding: 0; min-width: 44px; }
+.hdr-tabs--many .hdr-tab:not([aria-current]) .hdr-tab-word, .hdr-tabs--many .hdr-tab:not([aria-current]) .hdr-tab-tag { display: none; }
+.hdr-sub .hdr-tab { min-height: 44px; height: 44px; min-width: 44px; font-size: calc(1.1rem * var(--text-scale, 1)); }
+/* The meeting: row 1 62px with the girls (8px apart) at its left, 🗣️ 22px. */
+.hdr--meeting .hdr-row { height: var(--hdr-meeting-h); }
+.hdr--meeting .hdr-lead { gap: var(--hdr-girls-gap); }
+.hdr--meeting .hdr-actions .hdr-btn { width: 52px; font-size: var(--hdr-meeting-icon-size); }
+.hdr--parent { background: var(--accent-purple); }
+/* A grown-up's header keeps the 44px parent buttons and badge (PR 5 rebuilds it). */
+.hdr--parent .hdr-btn, .hdr--parent .hdr-badge { height: 44px; min-width: 44px; }
+.hdr--parent .hdr-badge:not(.hdr-badge--text) { width: 44px; }
+/* The money pages and the meeting sit in padded columns: their header spans
+   the screen, and the meeting's is a band in the sheet's flex column, not a
+   pinned header over the cards (theMeetingKeepsItsHeadAndFeet). */
+#familyMeetingBody > .hdr { position: relative; flex: none; margin: -1.2rem -1.2rem 8px; }
+.mm-screen:has(.sd) #familyMeetingBody > .hdr { margin: 0 -14px 6px; }
+#mnyPage1Wrap > .hdr, #mnySchoolWrap > .hdr, #mnyStoryWrap > .hdr { margin: -0.8rem -0.8rem 0; }
+@media (min-width: 768px) {
+  #mnyPage1Wrap > .hdr, #mnySchoolWrap > .hdr, #mnyStoryWrap > .hdr { margin: 0 -14px; }
+}
+#screen-print > .hdr { margin: -1rem -1rem 1rem; }
+#screen-day > .hdr { flex: none; }
+/* Narrower than an iPad held sideways (and on a phone) the back button keeps
+   only its ◀, its "Back to <screen>" in the label: there is no room for the
+   word beside the Day's longest date (difference 3, kept). */
+@media (max-width: 899px) {
+  .hdr-back-to { display: none; }
+  .hdr-back { width: 52px; padding: 0; font-size: var(--hdr-glyph-size); }
+}
 @media (max-width: 699px) {
-  .ph-row { padding: 0 var(--space-2); }
-  .ph-context { display: none; }
+  /* Week and Day on a phone (SRC 133-151): pad 10, gap 6, one flex row, the
+     centre taking the room between the sides — the week or the date between
+     its ◀ ▶ (the picture's flex:1). Week has no title and shows the switch's
+     other cell alone, a 52px button (🖨 opens the preview, 📋 goes back to
+     Full); the preview's header is Full's, its Print at the top of the page
+     (owner, 2026-10-09, note 3). The Day keeps ◀
+     back and the badge either side, so its date is in the middle of the bar,
+     body 20px 600, its ◀ ▶ plain arrows, and drops 1 2 3 and 📑 (tapping the
+     date is Copy a day there, D27). */
+  #screen-week > .hdr, #screen-day > .hdr { --hdr-pad: 10px; --hdr-gap: 6px; }
+  #screen-week > .hdr .hdr-row, #screen-day > .hdr .hdr-row { display: flex; }
+  #screen-week > .hdr .hdr-context, #screen-day > .hdr .hdr-context { flex: 1 1 auto; min-width: 0; gap: var(--hdr-gap); }
+  #screen-week > .hdr .hdr-label, #screen-day > .hdr .hdr-context > .hdr-title { flex: 1 1 auto; min-width: 0; }
+  #screen-week > .hdr .hdr-start { display: none; }
+  #screen-week > .hdr .hdr-switch { box-shadow: var(--hdr-sh); }
+  #screen-week > .hdr .hdr-switch > [aria-selected="true"] { display: none; }
+  #screen-week > .hdr .hdr-switch-cell { width: 48px; border-left: 0; }
+  #screen-week > .hdr .hdr-actions { display: none; }
+  .wpp-print:not([hidden]) { display: inline-flex; align-self: flex-start; margin: 0.5rem 0.75rem 0; }
+  #screen-day > .hdr .hdr-context > .hdr-title { font-family: var(--font-text); font-size: var(--hdr-label-size); font-weight: 600; }
+  #screen-day > .hdr .hdr-step { background: none; border-color: transparent; box-shadow: none; }
+  #screen-day > .hdr .hdr-tools, #screen-day > .hdr .hdr-actions { display: none; }
+  /* Money on a phone (SRC 184-192): 64px, pad 8, gap 6, 52px buttons; the
+     tabs one joined switch taking the room, the current one named 18px 600,
+     the other its icon 21px; the date (D26) hides. */
+  .hdr--money { --hdr-pad: 8px; --hdr-gap: 6px; }
+  .hdr--money .hdr-context { display: none; }
+  .hdr--money .hdr-lead { flex: 1 1 auto; min-width: 0; }
+  .hdr-tabs { flex: 1 1 auto; gap: 0; border: var(--bw-chip) solid var(--ink); border-radius: 14px; overflow: hidden; background: var(--paper); }
+  .hdr-tab {
+    box-sizing: content-box; flex: none; min-height: 0; width: 52px; height: 48px; padding: 0; border: 0; border-radius: 0;
+    font-family: var(--font-text); font-weight: 400; font-size: var(--hdr-tab-icon-size);
+  }
+  .hdr-tab + .hdr-tab { border-left: var(--bw-chip) solid var(--ink); }
+  .hdr-tab[aria-current="page"] { flex: 1 1 auto; width: auto; gap: 6px; font-size: var(--hdr-word-size); font-weight: 600; }
+  .hdr-tab[aria-current="page"][data-mny-tab="school"] { font-size: var(--hdr-school-tab-size, var(--hdr-word-size)); }
+  .hdr-tab:not([aria-current]) .hdr-tab-word, .hdr-tab-tag, .hdr-tabs--many .hdr-tab-word, .hdr-sub .ui-kids .hdr-tab-word { display: none; }
+  .hdr-sub .hdr-tabs { flex: none; gap: var(--space-1); border: 0; border-radius: 0; overflow: visible; background: none; }
+  .hdr-sub .hdr-tab { box-sizing: border-box; width: auto; height: 44px; min-width: 44px; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); }
+  .hdr-sub .ui-kids > button { min-width: 44px; padding: 0 var(--space-2); }
+  /* The meeting on a phone (SRC 235-250): pad 10, no title, steps as
+     numbers in 46px cells (✓ 18px, 2 3 19px), no week in row 2. The row's
+     gap is 4px, not the picture's 6: with 🔊 Sound kept beside 🗣️
+     (difference 2) the two girls, the steps and the two buttons need 378px
+     at 6px and a 390px phone has 370 (see header-exact-values.md). */
+  .hdr--meeting { --hdr-pad: 10px; --hdr-gap: 4px; }
+  .hdr--meeting .hdr-title, .hdr-r2 .hdr-week, .hdr-r2 .mm-weekbar-late { display: none; }
+  .hdr-steps > .hdr-switch-cell { width: 46px; padding: 0; }
+  .hdr-seg-word { display: none; }
+  .hdr-seg-num { display: inline; font-size: var(--hdr-span-size); }
+}
+
+/* Difference 15, a week across two months and Money school's selected tab,
+   on a phone: the picture's size (20px, the tab 18px) where it fits, else
+   stepped by width (owner, 2026-10-09) — steps at 360, 375 and 390 wide, each
+   the largest half-pixel size that fits the widest text at the step's lowest
+   width, up to the width where the picture's size fits. Measured with
+   tools/header-fit-sizes.js; the table is docs/handoff/header-exact-values.md,
+   notes 5-7. Later blocks are narrower and win. Calm's widest two-month week
+   ("Nov 30 – Dec 6", 150px at 20px) has 108px at 360, 123 at 375, 138 at 390
+   and fits at 20px from 402; Pop's ("Apr 27 – May 3", 109.3px) from 361.
+   Calm's widest Day date ("Wed 20 May", 122.8px) fits at 20px from 375.
+   "🎓 Money school" fits the joined switch at 18px from 401 (Calm) and 364
+   (Pop); Calm's 360 step is the 13px kid floor (12.5px would clear the last
+   half pixel, note 7). */
+.hdr-label--two-months { font-size: var(--hdr-two-month-size, var(--hdr-label-size)); }
+@media (max-width: 401px) {
+  :root[data-look="calm"] { --hdr-two-month-size: 18px; }
+}
+@media (max-width: 400px) {
+  :root[data-look="calm"] { --hdr-school-tab-size: 16.5px; }
+}
+@media (max-width: 389px) {
+  :root[data-look="calm"] { --hdr-two-month-size: 16px; --hdr-school-tab-size: 14.5px; }
+}
+@media (max-width: 374px) {
+  :root[data-look="calm"] { --hdr-two-month-size: 14px; --hdr-school-tab-size: 13px; }
+  :root[data-look="calm"] #screen-day > .hdr { --hdr-label-size: 17.5px; }
+}
+@media (max-width: 363px) {
+  :root[data-look="pop"] { --hdr-school-tab-size: 17px; }
+}
+@media (max-width: 360px) {
+  :root[data-look="pop"] { --hdr-two-month-size: 19.5px; }
 }
 
 /* money-tokens:start — from here to money-tokens:end every corner, border width and shadow size is a var(--…) token (tests/check-look-tokens.js rule 5; ARCHITECTURE.md, Money fit and logic PR 3). */
@@ -7880,8 +7588,6 @@
 .gu-ovtoggle { align-self: flex-start; }
 .gu-ovrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; border-top: var(--bw-hair) dashed var(--mny-v15-dash); font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-was { color: var(--mny-v15-muted); }
-.gu-owns { gap: 2px; }
-.gu-bought { align-self: flex-end; background: var(--mny-v15-green); }
 .gu-warnline { color: var(--mny-v15-red); }
 .gu-why { color: var(--mny-v15-muted); }
 .gu-date { width: auto; min-width: 0; }
@@ -7894,7 +7600,6 @@ button.gu-loanrow {
 .gu-loanfacts { font-size: max(13px, calc(0.8125rem * var(--fs-scale, 1) * var(--text-scale, 1))); color: var(--mny-v15-muted); line-height: 1.25; }
 .gu-late { color: var(--mny-v15-red); }
 .gu-weeks { gap: 4px; }
-.gu-weekrow { padding: 4px 0; border-bottom: var(--bw-hair) dashed var(--mny-v15-dash-faint); }
 .gu-weekrow--gf { background: var(--mny-v15-lav); border-radius: var(--radius-bar); padding: 4px; }
 /* 📒 Weeks: both girls side by side (Plan v9 §M 5b / §N) */
 .gu-weeks2 { display: flex; flex-direction: column; gap: 10px; }
@@ -8124,7 +7829,7 @@ button.gu-loanrow {
 @media (min-width: 1100px) {
   /* At least the whole screen under the 72px head, so the cards fill it; a
      longer page (more loans, more asks) scrolls as a whole. */
-  .mv2 { min-height: calc(100vh - 90px); min-height: calc(100dvh - 90px); }
+  .mv2 { min-height: calc(100vh - 92px); min-height: calc(100dvh - 92px); }
   /* Plan v18 B1: the passbook keeps the reference's 426px; Coming up takes
      whatever room is left, and its rows grow their text first (rule C). */
   .mv2-book { flex: 0 0 426px; }
@@ -8134,29 +7839,13 @@ button.gu-loanrow {
 @media (max-width: 1099px) { .mv2 { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 767px) { .mv2-pair { grid-template-columns: minmax(0, 1fr); } }
 
-/* The head and the My money · Money school tabs in one row. */
-.mny-head.mny-head--one { flex-wrap: wrap; row-gap: 6px; padding-bottom: 8px; margin-bottom: 10px; border-bottom: var(--bw-rule) solid var(--mny-v15-ink); }
-.mny-head--one .mny-tabs { margin: 0; padding: 0; border: 0; flex-wrap: nowrap; }
-.mny-head-date { font-family: var(--font-script); font-size: calc(1.625rem * var(--text-scale, 1)); color: var(--mny-v15-muted); white-space: nowrap; }
-.mny-head--one .mny-head-btns { margin-left: auto; }
-.mny-btn--icon { min-width: 44px; justify-content: center; }
-/* My money's 72px row: 54px buttons, the title in the title font (§1). */
-.mny-head.mny-head--big { min-height: 72px; gap: 8px; flex-wrap: nowrap; padding: 6px 0 8px; margin-bottom: 0; }
 @media (min-width: 768px) {
   #mnyPage1Wrap { padding: 0 14px 8px; gap: 10px; }
-  #mnyPage1Wrap .mny-head--big { margin: 0 -14px; padding: 0 14px; background: var(--mny-v15-paper); }
 }
-.mny-head--big .mny-back { width: 54px; height: 54px; min-height: 54px; }
-.mny-head--big .mny-head-title { font-family: var(--font-head); font-size: calc(1.75rem * var(--text-scale, 1)); white-space: nowrap; }
-.mny-head--big .mny-tab, .mny-head--big .mny-btn { min-height: 54px; padding: 0 16px; font-size: calc(1.0625rem * var(--text-scale, 1)); white-space: nowrap; }
-.mny-head--big .mny-tabs { margin-left: 10px; gap: 8px; flex-wrap: wrap; min-width: 0; }
 @media (max-width: 1099px) {
-  .mny-head.mny-head--big { flex-wrap: wrap; }
-  .mny-head--big .mny-tabs { flex-wrap: wrap; margin-left: 0; }
   .mv2-cardhead { flex-wrap: wrap; }
 }
 @media (max-width: 767px) {
-  .mny-head--big .mny-tab, .mny-head--big .mny-btn { white-space: normal; padding: 0 10px; }
   .mv2-left { white-space: normal; }
 }
 
@@ -8395,30 +8084,12 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 }
 
 /* ── Plan v18 (owner, 2026-10-05): the phone ──
-   C · Heads: at most two rows. A word that only describes (`.ph-word`) hides
-   and the icon stays; every control keeps its name in aria-label.
-   My money: ◀ · title · date on row 1, the tabs and 📖 ? on row 2 (the
-   `::after` is the row break). The meeting: pictures, numbers and icons.
+   C · Heads: the money pages' and the meeting's headers are pageHeader's
+   (PR 4, js/47-header.js and the .hdr rules).
    D · Tables: at least 15px on the phone.
    E · I choose: the columns stack, each says where its block starts. */
 .sd-col-start { display: none; }
 @media (max-width: 767px) {
-  .ph-word { display: none; }
-  .mny-head.mny-head--big { flex-wrap: wrap; row-gap: 6px; }
-  .mny-head--big .mny-head-date { order: 1; margin-left: auto; font-size: calc(1.25rem * var(--text-scale, 1)); }
-  .mny-head--big::after { content: ''; order: 2; flex-basis: 100%; height: 0; }
-  .mny-head--big .mny-tabs { order: 3; margin-left: 0; flex-wrap: nowrap; }
-  .mny-head--big .mny-head-btns { order: 4; margin-left: auto; }
-  .mny-head--big .mny-tab, .mny-head--big .mny-btn { min-width: 54px; justify-content: center; font-size: calc(1.25rem * var(--text-scale, 1)); }
-  .mm-head--two .mm-head-r1, .mm-head--two .mm-head-r2:has(.sd-steps) { flex-wrap: nowrap; gap: 4px; padding: 0 8px; }
-  .mm-head--two .mm-head-right { margin-left: auto; }
-  .mm-head--two .mm-stepper { margin: 0; flex-wrap: nowrap; }
-  .mm-head--two .mm-step { min-width: 44px; padding: 0 8px; }
-  .mm-head--two .mm-head-right { flex-wrap: nowrap; }
-  .mm-head--two .mm-head-wk, .mm-head--two .mm-weekbar-late { display: none; }   /* the week is a description: not on the phone (C) */
-  .sd-steps { flex-wrap: nowrap; }
-  .sd-stepchip { min-width: 44px; justify-content: center; }
-  .sd-headbtns .sd-btn { min-width: 44px; padding: 0 6px; }
   .mv2-bookhead, .mv2-booktable .mv2-bookrow, .mv2-bookdate, .mv2-loantable th, .mv2-loantable td, .sd-l4, .sd-l4 th { font-size: calc(0.9375rem * var(--text-scale, 1)); }
   .mv2-bookrow { grid-template-columns: 56px 66px repeat(3, minmax(0, 1fr)); }
   .sd-col-start { display: block; flex-basis: 100%; order: 3; font-size: calc(0.875rem * var(--text-scale, 1)); color: var(--mny-v15-muted); }
@@ -8568,43 +8239,33 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
   box-shadow: var(--mny-shadow-btn);
 }
 .sd-btn.on { background: var(--mny-v15-teal-ink); color: var(--mny-v15-white); }
-.sd-btn--dad { background: var(--mny-v15-amber); }
 .sd-go { background: var(--btn-main); color: var(--btn-main-ink); font-size: calc(1.0625rem * var(--text-scale, 1)); }
 .sd-go.off { background: var(--btn-off); color: var(--btn-off-ink); box-shadow: none; }
 .sd-chip.on, .sd-chip.dark { background: var(--mny-v15-teal-ink); color: var(--mny-v15-white); }
 .sd-chip.dark { background: var(--mny-v15-ink); }
 .sd-chip.lock { border-style: dashed; opacity: 0.6; }
 
-/* ── The family meeting's head on the money step: two rows (Plan v17 §0) ── */
-.mm-screen:has(.mm-head--two) > .mm-title { display: none; }
+/* ── The family meeting's header on the money step (PR 4, js/44
+   sdMeetingAvatars / sdMeetingSteps; the header itself is pageHeader's) ──
+   The girls as 52px round pictures, the one on screen ringed; a signed girl
+   wears a green ✓. The four Sunday steps as words between ›, the current one
+   in a pill, a done one with ✓. */
 .mm-screen:has(.sd) { padding: 0 14px 6px; }
-.mm-head.mm-head--two { margin: 0 -14px 6px; padding: 0; border-bottom: var(--bw-rule) solid var(--mny-v15-ink); background: var(--mny-v15-paper); }
-.mm-screen:not(:has(.sd)) .mm-head.mm-head--two { margin: -1.2rem -1.2rem 8px; }
-.mm-head-r1 { min-height: 56px; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-bottom: var(--bw-info) solid var(--mny-v15-dash-faint); flex-wrap: wrap; }
-.mm-head-r2 { min-height: 49px; display: flex; align-items: center; gap: 7px; padding: 0 14px; background: var(--mny-v15-no); flex-wrap: wrap; }
-.mm-head--two .mm-head-title { margin: 0 0 0 6px; font-family: var(--font-head); font-weight: 400; font-size: calc(1.375rem * var(--text-scale, 1)); white-space: nowrap; letter-spacing: 0; }
-.mm-head--two .mm-stepper { margin: 0 0 0 14px; flex-wrap: nowrap; }
-.mm-head--two .mm-step { font-family: var(--font-body); font-weight: 400; font-size: calc(1rem * var(--text-scale, 1)); padding: 0 10px; }
-.mm-head--two .mm-step-done { background: var(--mny-v15-bar); }
-.mm-head--two .mm-step-cur { background: var(--mny-v15-red); color: var(--mny-v15-white); }
-.mm-head-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.mm-head-wk { font-size: calc(1.0625rem * var(--text-scale, 1)); white-space: nowrap; }
-.sd-avs { display: flex; gap: 8px; }
-.sd-av { position: relative; width: 46px; min-height: 56px; border: 0; background: transparent; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; font: inherit; color: var(--mny-v15-ink); }
-.sd-av-pic { width: 36px; height: 36px; border-radius: var(--radius-full); border: var(--bw-card) solid var(--mny-v15-ink); background: var(--mny-v15-white); display: flex; align-items: center; justify-content: center; font-size: calc(1.25rem * var(--text-scale, 1)); }
-.sd-av.on .sd-av-pic { background: var(--mny-v15-jenn); box-shadow: 0 0 0 var(--bw-rule) var(--mny-v15-red); }
-.sd-av-name { font-size: calc(0.8125rem * var(--text-scale, 1)); line-height: 1; }
-.sd-av-ok { position: absolute; right: -8px; top: 0; width: 17px; height: 17px; border-radius: var(--radius-full); background: var(--mny-v15-teal-ink); color: var(--mny-v15-white); font-size: calc(0.8125rem * var(--text-scale, 1)); line-height: 17px; text-align: center; }
-.sd-for { font-size: calc(0.875rem * var(--text-scale, 1)); color: var(--mny-v15-muted); white-space: nowrap; margin-right: 4px; }
-.sd-steps, .sd-headbtns { display: flex; gap: 6px; align-items: center; }
-.sd-headbtns { margin-left: auto; }
-.sd-headbtns .sd-btn { font-size: calc(0.9375rem * var(--text-scale, 1)); padding: 0 9px; }
-.sd-stepchip {
-  min-height: 44px; display: flex; align-items: center; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-btn); box-shadow: var(--mny-shadow-btn);
-  padding: 0 9px; font-size: calc(0.9375rem * var(--text-scale, 1)); background: var(--mny-v15-paper); white-space: nowrap;
-}
-.sd-stepchip.on { background: var(--mny-v15-red); color: var(--mny-v15-white); }
-.sd-stepchip.done { background: var(--mny-v15-green); }
+/* The girls as the owner's turn-2 meeting picture draws them (SRC 208-209,
+   236-237): 52px circles, 2px ink on white, emoji 24px (22 on a phone); the
+   chosen one 2.5px ink on the badge's pink inside a 3px pink ring — the
+   same literals in both looks (--hdr-badge-bg, --hdr-ring). */
+.sd-avs { display: flex; gap: var(--hdr-girls-gap); }
+.sd-av { position: relative; width: 52px; height: 52px; border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; color: var(--hdr-label-ink); }
+.sd-av-pic { box-sizing: border-box; width: 52px; height: 52px; border-radius: var(--radius-full); border: var(--bw-chip) solid var(--hdr-label-ink); background: var(--paper); display: flex; align-items: center; justify-content: center; font-size: var(--hdr-girl-emoji-size); }
+.sd-av.on .sd-av-pic { border-width: var(--bw-card); background: var(--hdr-badge-bg); box-shadow: 0 0 0 var(--bw-rule) var(--hdr-ring); }
+.sd-av-ok { position: absolute; right: -6px; top: -2px; width: 17px; height: 17px; border-radius: var(--radius-full); background: var(--mny-v15-teal-ink); color: var(--mny-v15-white); font-size: calc(0.8125rem * var(--text-scale, 1)); line-height: 17px; text-align: center; }
+/* Row 2's steps, as drawn (SRC 222-225, 248-250): ink words and › 10px apart
+   (6 on a phone), the current one a pill in the look's main fill, 600. */
+.sd-steps { display: flex; gap: var(--hdr-r2-gap); align-items: center; white-space: nowrap; }
+.sd-stepsep { color: var(--hdr-label-ink); }
+.sd-stepchip { display: inline-flex; align-items: center; white-space: nowrap; }
+.sd-stepchip.on { padding: var(--hdr-pill-pad); border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill); background: var(--btn-main); color: var(--btn-main-ink); font-weight: 600; }
 
 /* The content: main card and a 356px right side (§0), filling the screen. */
 .sd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 356px; gap: 14px; align-items: stretch; }
@@ -8631,7 +8292,6 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 .sd-red { color: var(--mny-v15-red); }
 .sd-teal { color: var(--mny-v15-teal-ink); }
 .sd-green { color: var(--mny-v15-teal-ink); }
-.sd-violet { color: var(--sd-purple); }
 /* Money fit and logic PR 5 (Stage C a): an amount in a title row — My money's
    loan wall and What I own, Payday's pile, I choose's What I owe / What I own —
    is one family: the title font (Gochi in Pop, Baloo in Calm) coloured by what
@@ -9169,7 +8829,6 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
   .sd-job { grid-column: 1 / 3; }
   .sd-inout-part { grid-template-columns: minmax(0, 1fr); }
   .sd-grid { grid-template-columns: minmax(0, 1fr); }
-  .mm-head--two .mm-stepper { margin-left: 0; }
 }
 @media (max-width: 767px) {
   .sd-pay, .sd-cols, .sd-offs, .sd-pulls { grid-template-columns: minmax(0, 1fr); }
@@ -9182,8 +8841,6 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
   .sd-own { grid-template-columns: 104px minmax(0, 1fr) 52px 62px; font-size: calc(1rem * var(--text-scale, 1)); }
   .sd-gg { grid-template-columns: minmax(0, 1fr); }
   .sd-gg-give, .sd-gg-tip { text-align: left; }
-  .sd-headbtns { margin-left: 0; }
-  .sd-steps { flex-wrap: wrap; }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9255,12 +8912,11 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 .pn-told-sheet { max-width: 620px; }
 /* ── Money fit and logic PR 4 part B: the old pages join the new look ──
    Money school and the passbook's two pages (📖 All my Sundays, 📊 By month)
-   wear My money's head and `.mv2` cards. The same padding as My money under
+   wear My money's header and `.mv2` cards. The same padding as My money under
    its head, and on the iPad a grid that fills the 1194×834 screen; under
    768px every grid is one column. */
 @media (min-width: 768px) {
   #mnySchoolWrap, #mnyStoryWrap { padding: 0 14px 8px; gap: 10px; }
-  #mnySchoolWrap .mny-head--big, #mnyStoryWrap .mny-head--big { margin: 0 -14px; padding: 0 14px; background: var(--mny-v15-paper); }
 }
 .mv2-school, .mv2-hist, .mv2-flow {
   display: grid; gap: 14px; align-items: stretch;
@@ -9272,7 +8928,7 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 /* The last card in a column takes what is left, so no empty band sits under it. */
 .mv2-col > .mv2-card:last-child, .mv2-hist > .mv2-card, .mv2-flow > .mv2-card { flex: 1 1 auto; }
 @media (min-width: 768px) {
-  .mv2-school, .mv2-hist, .mv2-flow { min-height: calc(100vh - 90px); min-height: calc(100dvh - 90px); }   /* their text size: [data-money-surface] */
+  .mv2-school, .mv2-hist, .mv2-flow { min-height: calc(100vh - 92px); min-height: calc(100dvh - 92px); }   /* their text size: [data-money-surface] */
 }
 @media (max-width: 1099px) { .mv2-school { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .mv2-school > .mv2-col:last-child { grid-column: 1 / -1; } }
 @media (max-width: 767px) { .mv2-school, .mv2-hist, .mv2-flow { grid-template-columns: minmax(0, 1fr); } }

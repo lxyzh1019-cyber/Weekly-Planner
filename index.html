@@ -130,16 +130,11 @@
      Reachable from the week's tab bar; not yet the default landing.
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-today">
-  <header class="topbar">
-    <div class="topbar-left">
-      <h2>Today</h2>
-    </div>
-    <!-- Which day this actually is. Filled by tdRenderToday from todayKey(), so
-         it reads the family's clock rather than the device's — the same reason
-         theAppTellsFamilyTimeOnAnyDevice exists. -->
-    <div class="topbar-date" id="tdTodayDate"></div>
-    <button class="profile-badge" onclick="openProfileSwitcher()" id="todayProfileBadge" aria-label="Switch profile"></button>
-  </header>
+  <!-- The standard page header (pageHeader, js/47-header.js): Today, the date,
+       the profile badge. Drawn by tdRenderToday; the date comes from
+       todayKey(), the family's clock rather than the device's — the same
+       reason theAppTellsFamilyTimeOnAnyDevice exists. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
   <div id="tdWrap" class="td-wrap"></div>
 
   <!-- Moved here off the day timeline's left rail, which was headed "Today" and
@@ -248,38 +243,14 @@
     <span class="pb-actions" id="parentWeekActions"></span>
   </div>
 
-  <header class="topbar week-topbar">
-    <div class="week-topbar__row1">
-      <div class="topbar-left">
-        <button class="profile-badge" onclick="openProfileSwitcher()" id="weekProfileBadge" aria-label="Switch profile"></button>
-        <h2>My Week</h2>
-      </div>
-      <!-- The week selector and the controls that act on the week it names sit
-           together on the right. They were two rows — selector above, view tabs
-           and Print below a dashed rule — which spent a third of the screen
-           before the plan itself started. One row, wrapping as a unit on a
-           phone. The six-button shortcut row that predated both is long gone:
-           every destination is in the persistent nav or behind More. -->
-      <div class="week-topbar__tools">
-        <div class="week-nav week-nav--inline">
-          <button class="btn-icon" onclick="changeWeek(-1)" aria-label="Previous week">◀</button>
-          <h3 id="weekRangeLabel"></h3>
-          <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
-        </div>
-        <!-- View switcher: Full (cards) / Time-Grid (hours) -->
-        <!-- Full is the week now. Day Blocks was what the screen opened on,
-             and the tab beside it is read-only, so landing on the preview
-             would have meant landing somewhere nothing can be planned. -->
-        <div class="view-tabs">
-          <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
-          <button class="view-tab" id="viewTabPrintPreview" onclick="setWeekView('preview')">🖨 Print preview</button>
-        </div>
-        <!-- Print sits on the week it prints, and this is now its only door:
-             the More sheet's copy is gone, so the two labels cannot drift. -->
-        <button class="btn-template no-print week-print-btn" onclick="openPrint()">🖨 Print</button>
-      </div>
-    </div>
-  </header>
+  <!-- The standard page header, drawn by renderWeek (weekRenderHeader): My
+       Week, the week stepper, the Full / Print preview tabs, Print only on
+       the preview, the profile badge. One row at every size. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
+  <!-- A phone's Print, first on the preview page: the header there is Full's
+       (owner, 2026-10-09). Shown by setWeekView on the preview, by css/app.css
+       .wpp-print on a phone only. -->
+  <button type="button" class="hdr-btn hdr-print wpp-print" id="weekPagePrint" data-hdr-action="print-open" aria-label="Print this week" hidden>Print</button>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
   <!-- The offer to add the missing School Day cards, above the grid it is about,
@@ -299,7 +270,7 @@
        builds a live one from CAT_HEX (#tgLegend) that everyone can see. -->
 
   <!-- Full week view — the one the week opens on, and the only one you plan in. -->
-  <div id="weekFull" style="display:flex">
+  <div id="weekFull" role="tabpanel" aria-labelledby="viewTabFull" style="display:flex">
     <div class="weekly-full-wrap">
       <div class="weekly-full" id="weeklyFullGrid"></div>
       <!-- Under the grid it describes, same as the Day Blocks copy. -->
@@ -326,7 +297,7 @@
        before spending paper. renderPrintSheet (js/16-print.js) is the one
        renderer; this is a second HOST, never a second copy of it. Its output
        carries no handlers, which is what makes read-only free to enforce. -->
-  <div id="weekPrintPreview" style="display:none">
+  <div id="weekPrintPreview" role="tabpanel" aria-labelledby="viewTabPrintPreview" style="display:none">
     <div class="wpp-wrap">
       <p class="wpp-note">This is what the Print button prints. Tap 🖨 Print to open it full size.</p>
       <div class="print-sheet wpp-sheet" id="weekPreviewSheet" aria-label="Print preview of this week"></div>
@@ -413,7 +384,6 @@
      meant scrolling a small window up and down the whole way through. -->
 <div class="screen" id="screen-meeting">
   <div class="mm-screen">
-    <h2 class="mm-title">🧑‍🧑‍🧒 Weekly family meeting</h2>
     <div id="familyMeetingBody"></div>
   </div>
 </div>
@@ -494,34 +464,11 @@
        chore on this day: the plan is what says there is anything to grade. -->
   <div class="parent-chores sticky" id="parentDayChores" style="display:none"></div>
 
-  <!-- One row, not two. The title, the date and every control the screen has
-       sit together: two topbar rows on a screen whose whole job is a single
-       vertical schedule cost a fifth of the plannable height and made the day
-       feel like a form. The zone filters and the Timeline/Quest switch that used
-       to justify the second row are both long gone. -->
-  <header class="topbar day-topbar">
-    <div class="day-topbar__row1">
-      <button class="btn-icon btn-back-week" onclick="goWeek()" aria-label="Back to week view" title="Back to week view"><span aria-hidden="true">◀</span> Week</button>
-      <div class="day-nav-center">
-        <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" aria-label="Previous day">◀</button>
-        <h3 id="daySubtitle"></h3>
-        <button class="btn-icon day-nav-arrow" onclick="navDay(1)" aria-label="Next day">▶</button>
-      </div>
-      <!-- How many days at once. A column count, not a mode: what a block says
-           and how the day is edited are identical at 1, 2 and 3. Kept in
-           localStorage only — every synced write is a full-document upload. -->
-      <div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>
-      <div class="day-topbar-actions">
-        <!-- 🌙 sat here (R5 §7 Q3): today's mood is asked on Today, and a past
-             day is reflected on from its 📋 sheet. -->
-        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Copy a day" title="Copy a day, or rest">📋</button>
-        <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
-      </div>
-    </div>
-    <!-- #dayTitle kept: openDay and the parent view still write to it, and it is
-         read by the print sheet's heading. It carries no visible text here. -->
-    <h2 id="dayTitle" class="visually-hidden"></h2>
-  </header>
+  <!-- The standard page header, drawn by openDay (dayRenderHeader): ◀ back
+       through the one back stack, the date as the title between ◀ ▶, the
+       1 / 2 / 3 day tabs, 📑 Copy a day and the profile badge. One row: the
+       schedule below is the screen's whole job. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
 
   <!-- One scroll container for the whole screen. It used to be three nested
        ones — workspace, lane, timeline-wrap — which on an iPad meant the schedule
@@ -540,13 +487,9 @@
      SCREEN: SISTER SYNC
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-sync">
-  <header class="topbar">
-    <div class="topbar-left">
-      <button class="btn-icon" onclick="goWeek()">◀</button>
-      <h2>Sister Sync 👯</h2>
-    </div>
-    <button class="profile-badge" onclick="openProfileSwitcher()" id="syncProfileBadge" aria-label="Switch profile"></button>
-  </header>
+  <!-- The standard page header, drawn by renderSync: Sister Sync and the
+       profile badge. No ◀ — it is a nav tab. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
 
   <div class="week-nav">
     <button class="btn-icon" onclick="changeSyncDay(-1)">◀</button>
@@ -800,13 +743,9 @@
      SCREEN: PRINT
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-print">
-  <header class="topbar no-print">
-    <div class="topbar-left">
-      <button class="btn-icon" onclick="goWeek()">◀</button>
-      <h2>Print Week</h2>
-    </div>
-    <button class="btn-template" onclick="window.print()">🖨 Print</button>
-  </header>
+  <!-- The standard page header, drawn by openPrint, never printed: ◀ back
+       through the one back stack, Print week, 🖨 Print. -->
+  <header class="hdr hdr--standard no-print"><div class="hdr-row"></div></header>
   <div class="print-controls no-print">
     <label class="print-ctrl">🕐 Show
       <select id="printStartHour" aria-label="Print from hour" onchange="onPrintWindowChange()"></select>

@@ -55,6 +55,12 @@ if (document.fonts) {
   // rather than through a delegate — nothing ever replaces it.
   const undo = document.getElementById('undoToastBtn');
   if (undo) undo.addEventListener('click', undoLastCompletion);
+  // The kid screens' standard headers are redrawn with their screen, so their
+  // buttons are answered by one delegate per screen (js/47-header.js).
+  KID_HEAD_SCREENS.forEach(id => {
+    const screen = document.getElementById(id);
+    if (screen) screen.addEventListener('click', kidHeadClick);
+  });
 })();
 // The pocket-money pages delegate the same way, for the same reason: every
 // render replaces the whole wrap, so a listener bound to a card would be gone
@@ -204,7 +210,6 @@ function enhanceNonButtonClickables(root = document) {
   // Generic clickable divs → role="button" + keyboard access
   const buttonSelectors = [
     '.profile-card[onclick]',
-    '.profile-badge[onclick]',
     '.mascot-close[onclick]',
   ];
   root.querySelectorAll(buttonSelectors.join(',')).forEach(el => {
@@ -298,23 +303,9 @@ function applyIconButtonAriaLabels(root = document) {
 function enhanceAccessibility(root = document) {
   enhanceNonButtonClickables(root);
   applyIconButtonAriaLabels(root);
-  /* Only a badge that can actually be PRESSED gets told it is a control.
-     This pass used to label every .profile-badge, filter-free, which is how
-     three inert <div>s — Today, the chore tab, Sister Sync — came to be
-     announced to a screen reader as "Open profile selector" with no role, no
-     focus and no handler, while css/app.css gave them cursor:pointer and a
-     44px box. enhanceNonButtonClickables above already filters on [onclick];
-     this one did not, and the label is the half a screen reader reads out.
-     All five badges are real buttons now, so this changes nothing today — it
-     is here so the next inert badge somebody adds cannot re-tell the lie.
-     A <button> is included because an empty one still needs a name. */
-  root.querySelectorAll('.profile-badge').forEach((badge) => {
-    const tag = (badge.tagName || '').toLowerCase();
-    const isControl = tag === 'button' || tag === 'a'
-      || badge.hasAttribute('onclick') || badge.getAttribute('role') === 'button';
-    if (!isControl) return;
-    if (!badge.getAttribute('aria-label')) badge.setAttribute('aria-label', 'Open profile selector');
-  });
+  /* The profile badges' labelling pass lived here. Every badge is a
+     pageHeader button now (js/47-header.js), drawn with its own
+     aria-label ("Jenn, switch profile"), so there is nothing left to label. */
   root.querySelectorAll('.mascot-close').forEach((closeBtn) => {
     if (!closeBtn.getAttribute('aria-label')) closeBtn.setAttribute('aria-label', 'Close owl helper');
   });

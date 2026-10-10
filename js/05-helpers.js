@@ -1436,6 +1436,68 @@ function showScreen(id) {
   }
 }
 
+/* ── The one back stack (Consistency PR 4) ──
+   Every header ◀ goes back through here: the screen that opened this one is
+   pushed as it opens, and ◀ pops it and opens it again. Money school's own
+   return (mnySchoolReturn) was generalised into it and is gone. Module state
+   on this device only — never in `state`, which every write uploads whole.
+   An entry is { screen, scrollY }: each screen's own open() puts it back as
+   it draws, and a scrollY above 0 (My money under the '?' explainer, js/22)
+   is scrolled back to after it; a screen this table does not name is not
+   pushed, and an empty stack goes to the caller's fallback. Opening the
+   screen already on top of the stack — My money's tab from Money school,
+   which My money opened — takes it off instead: that is going back, and
+   ◀ there must not lead to the page itself. NAV_RETURN_MAX keeps a long
+   session from growing it without end. */
+const NAV_RETURN_MAX = 8;
+const NAV_RETURN_SCREENS = {
+  today: { name: 'Today', open: () => goToday() },
+  week: { name: 'Week', open: () => goWeek() },
+  sync: { name: 'Sister Sync', open: () => openSisterSync() },
+  mymoney: { name: 'My money', open: () => mnyOpenMyMoney(mnyViewKid()) },
+  /* A Day opened from the sitting (mmOpenDayForBlocks) left a return behind:
+     going back through it restores the step, the day and the scroll, and
+     lifts the sitting's lock. Money school from the meeting leaves none. */
+  meeting: { name: 'the meeting', open: () => {
+    if (typeof mmHasReturn === 'function' && mmHasReturn()) mmReturnToMeeting();
+    else { showScreen('meeting'); renderMeetingMode(); }
+  } },
+  parent: { name: 'Hub', open: () => showScreen('parent') },
+  'parent-monthly': { name: 'Monthly', open: () => openParentMonthly(parentMonthlyKid) },
+};
+let navReturnStack = [];
+
+/* The screen on show now, as showScreen names it ('week', not 'screen-week'). */
+function navActiveScreen() {
+  const active = document.querySelector('.screen.active');
+  return active ? active.id.replace(/^screen-/, '') : '';
+}
+/* Remember where ◀ goes: `from` (default: the screen on show) unless it is
+   the screen being opened, or a screen the table cannot reopen. */
+function navReturnPush(opening, from, scrollY) {
+  const top = navReturnPeek();
+  if (top && top.screen === opening) { navReturnStack.pop(); return; }
+  const screen = from || navActiveScreen();
+  if (!screen || screen === opening || !NAV_RETURN_SCREENS[screen]) return;
+  navReturnStack.push({ screen, scrollY: Number(scrollY) > 0 ? Number(scrollY) : 0 });
+  if (navReturnStack.length > NAV_RETURN_MAX) navReturnStack.shift();
+}
+function navReturnPeek() {
+  return navReturnStack.length ? navReturnStack[navReturnStack.length - 1] : null;
+}
+/* The name a ◀ says it goes back to — its aria-label is "Back to <this>". */
+function navReturnTo(fallback) {
+  const top = navReturnPeek();
+  const screen = top ? top.screen : fallback;
+  return (NAV_RETURN_SCREENS[screen] || NAV_RETURN_SCREENS.week).name;
+}
+function navReturnBack(fallback) {
+  const top = navReturnStack.pop() || { screen: fallback };
+  const dest = NAV_RETURN_SCREENS[top.screen] || NAV_RETURN_SCREENS.week;
+  dest.open();
+  if (top.scrollY > 0) { try { window.scrollTo(0, top.scrollY); } catch (e) {} }
+}
+
 /* Parent PIN — a *soft* child-lock, not real security (anyone reading the
    source or the synced state can see it). Stored per-family in shared state so a
    parent can change it; defaults to '1234'. A real gate needs Firebase Auth +
@@ -1565,6 +1627,9 @@ async function selectProfile(p) {
      navigation below then draws the new one. */
   applyLook(lookStored(p));
   profile = p;
+  /* The way back belongs to the one who walked it: a new profile starts with
+     an empty stack, so her ◀ cannot lead to a page the last one opened. */
+  navReturnStack = [];
   if (p === 'parent') {
     parentViewing = 'jenn';
     showScreen('parent');

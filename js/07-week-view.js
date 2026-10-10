@@ -9,10 +9,11 @@
    the Full week rather than on a blank container. */
 function setWeekView(v) {
   weekView = (v === 'preview') ? 'preview' : 'full';
-  document.getElementById('viewTabFull').classList.toggle('active', weekView === 'full');
-  document.getElementById('viewTabPrintPreview').classList.toggle('active', weekView === 'preview');
+  // The tabs that say which view this is are in the header renderWeek draws.
   document.getElementById('weekFull').style.display = weekView === 'full' ? 'flex' : 'none';
   document.getElementById('weekPrintPreview').style.display = weekView === 'preview' ? 'flex' : 'none';
+  // A phone's Print at the top of the preview page (css/app.css .wpp-print).
+  document.getElementById('weekPagePrint').hidden = weekView !== 'preview';
   /* The school-day offer above the grid is a SIBLING of #weekFull, so hiding
      the Full view does not take it with it — and renderSchoolDayBanner is only
      ever called from renderFullWeek, so without this it would keep whatever it
@@ -365,7 +366,51 @@ function clearWeekSignature() {
   renderWeekSignature(keys);
 }
 
+/* The week's standard header (the owner's turn-2 picture): My Week, the
+   week stepper ◀ week ▶ in the middle of the bar, the Full / Preview switch
+   (one joined control, 📋 / 🖨), Print (only on the preview, the view it
+   prints) and the badge. A phone draws no title and shows the switch's other
+   cell alone (🖨 opens the preview, 📋 goes back); its preview keeps Full's
+   header and has Print at the top of the page instead (index.html
+   .wpp-print). Drawn before applyMeetingLock, which
+   hides this badge by id. */
+function weekRenderHeader() {
+  const keys = getDayKeys(weekOffset);
+  const mon = formatDayKey(keys[0]);
+  const sun = formatDayKey(keys[6]);
+  /* A phone writes the month once when the week is in one ("Oct 5 – 11"),
+     as its header picture does; the iPad names it at both ends. */
+  const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
+  const endMonth = phone && sun.getMonth() === mon.getMonth() ? '' : `${MONTH_SHORT[sun.getMonth()]} `;
+  const range = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${endMonth}${sun.getDate()}`;
+  const cell = (id, view, action, aria, icon, panel) => {
+    const on = weekView === view ? 'true' : 'false';
+    return `<button type="button" class="hdr-switch-cell" role="tab" id="${id}" aria-controls="${panel}" data-hdr-action="${action}" aria-label="${aria}" title="${aria}" aria-selected="${on}">${icon}</button>`;
+  };
+  const tools =
+    `<div class="hdr-switch hdr-switch--view" role="tablist" aria-label="How to show the week">`
+    + cell('viewTabFull', 'full', 'view-full', 'Full week', '📋', 'weekFull')
+    + cell('viewTabPrintPreview', 'preview', 'view-preview', 'Print preview', '🖨', 'weekPrintPreview')
+    + `</div>`;
+  hdrMount('screen-week', {
+    title: 'My Week',
+    context: range,
+    step: { prev: { aria: 'Previous week', data: { 'hdr-action': 'week-prev' } },
+            next: { aria: 'Next week', data: { 'hdr-action': 'week-next' } },
+            labelId: 'weekRangeLabel' },
+    tools,
+    actions: weekView === 'preview' ? [{ label: 'Print', aria: 'Print this week', cls: 'hdr-print', data: { 'hdr-action': 'print-open' } }] : [],
+    badge: kidHeadBadge('weekProfileBadge', isParent() ? parentViewing : activeProfile(), isParent()),
+  });
+  /* A week across two months ("Sep 28 – Oct 4") is wider than a phone's room
+     at 20px; css/app.css sizes it down only on the widths where it does not
+     fit (docs/handoff/header-exact-values.md, note 6). */
+  const label = document.getElementById('weekRangeLabel');
+  if (label) label.classList.toggle('hdr-label--two-months', sun.getMonth() !== mon.getMonth());
+}
+
 function renderWeek() {
+  weekRenderHeader();
   // parent banner
   const parentBanner = document.getElementById('parentBannerWeek');
   if (isParent()) {
@@ -384,15 +429,7 @@ function renderWeek() {
      render had no way to put it back. */
   applyMeetingLock();
 
-  const p = activeProfile();
-  document.getElementById('weekProfileBadge').textContent =
-    profileBadgeText(isParent() ? parentViewing : p, isParent());
-
   const keys = getDayKeys(weekOffset);
-  const mon = formatDayKey(keys[0]);
-  const sun = formatDayKey(keys[6]);
-  document.getElementById('weekRangeLabel').textContent =
-    `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} — ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
 
   if (weekView === 'preview') renderWeekPrintPreview();
   else                        renderFullWeek(keys);

@@ -58,7 +58,16 @@ function onPrintWindowChange() {
    a long time — so the one thing it could have done was throw. Age is not asked
    for anywhere now; currentAge() answers it. */
 
+/* Print's standard header, never printed: ◀ back through the one back stack
+   (the week it was opened from), Print week, and 🖨 Print, which prints. */
 function openPrint() {
+  navReturnPush('print');
+  hdrMount('screen-print', {
+    noPrint: true,
+    back: { to: navReturnTo('week'), data: { 'hdr-action': 'back', 'hdr-fallback': 'week' } },
+    title: 'Print Week',
+    actions: [{ label: '🖨 Print', aria: 'Print', cls: 'hdr-btn--word', data: { 'hdr-action': 'print-now' } }],
+  });
   showScreen('print');
   renderPrintControls();
   renderPrintSheet();

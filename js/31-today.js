@@ -1267,7 +1267,7 @@ function tdAnsweredCard(kid) {
 function tdShowJobs() {
   const card = document.querySelector('#tdWrap .td-jobs');
   if (!card) return;
-  const bar = document.querySelector('#screen-today .topbar');
+  const bar = document.querySelector('#screen-today > .hdr');
   const top = card.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
   window.scrollTo(0, Math.max(0, top));
 }
@@ -1287,7 +1287,7 @@ function tdGoWaiting(kid) {
   if (!host || host.hidden) return;
   const cell = host.querySelector('.wcr-cell--claimed');
   const target = (cell && cell.closest('.wcr-row')) || host;
-  const bar = document.querySelector('#screen-week .topbar');
+  const bar = document.querySelector('#screen-week > .hdr');
   const top = target.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
   window.scrollTo(0, Math.max(0, top));
 }
@@ -1297,9 +1297,18 @@ function tdOpenInvites() {
   const sync = document.getElementById('screen-sync');
   const sec = document.getElementById('invitesSection');
   if (!sync || !sync.classList.contains('active') || !sec) return;
-  const bar = sync.querySelector('.topbar');
+  const bar = sync.querySelector(':scope > .hdr');
   const top = sec.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
   window.scrollTo(0, Math.max(0, top));
+}
+
+/* Today's date as the header pictures draw it: "Tuesday 6 October" on the
+   iPad, the short "Tue 6 Oct" on a phone (fmtDay). */
+function tdHeadDate(key) {
+  const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
+  if (phone) return fmtDay(key, 'long');
+  const d = formatDayKey(key);
+  return `${DAY_LONG[dayIdxOfKey(key)]} ${d.getDate()} ${MONTH_LONG[d.getMonth()]}`;
 }
 
 function tdRenderToday() {
@@ -1309,17 +1318,18 @@ function tdRenderToday() {
   /* The date, from todayKey() and not from a bare new Date(): formatDayKey
      rebuilds it as local midnight of the day the app thinks it is, so the
      weekday cannot drift away from the day the rest of the screen is about. */
-  const dateEl = document.getElementById('tdTodayDate');
-  if (dateEl) {
-    dateEl.textContent = formatDayKey(todayKey())
-      .toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-  }
-  const badge = document.getElementById('todayProfileBadge');
-  /* Says who is on screen, a grown-up included, in the one wording every
-     badge shares (profileBadgeText, js/01-config.js). `kid` is activeProfile(),
-     so for a parent it is already whoever is being viewed; an unset profile
-     gives an empty badge. */
-  if (badge) badge.textContent = profileBadgeText(kid, isParent());
+  /* The badge says who is on screen, a grown-up included, in the one wording
+     every badge shares (profileBadgeText, js/01-config.js). `kid` is
+     activeProfile(), so for a parent it is already whoever is being viewed; an
+     unset profile gives an empty badge. The date shows on a phone too, as the
+     header picture draws it (D26): "Fri 9 Oct". */
+  /* The owner's turn-2 picture value for value (Stage 20): the date in the
+     middle of the bar. */
+  hdrMount('screen-today', {
+    title: 'Today',
+    context: tdHeadDate(todayKey()),
+    badge: kidHeadBadge('todayProfileBadge', kid, isParent()),
+  });
   if (!kid || kid === 'parent') {
     wrap.innerHTML = `<div class="td-card"><div class="td-cap">Today</div>
       <div class="td-empty">Pick a profile to see the day.</div></div>`;
