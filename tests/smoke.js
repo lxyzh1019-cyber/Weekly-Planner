@@ -28106,9 +28106,17 @@ function findChromium() {
     setup: setupMs,
   }, null, 1));
 
+  /* The names of this run's failed checks, one per line, go to tests/.smoke-failed
+     (git-ignored); an empty file when none failed. `npm run test:failed`
+     (tests/run-failed.js) re-runs only those through SMOKE_ONLY, and a SMOKE_ONLY
+     run rewrites the file with only the names still failing. */
+  const saveFailed = (names) => fs.writeFileSync(path.join(__dirname, '.smoke-failed'),
+    [...new Set(names)].map(n => n + '\n').join(''));
+
   if (ONLY.length) {
     // A named check that recorded nothing is a failure, not a quiet skip.
     const neverRan = ONLY.filter(n => !(n in checks));
+    saveFailed(failed.concat(neverRan));
     if (failed.length) console.log(`FAILED: ${failed.join(', ')}`);
     if (neverRan.length) console.log(`NEVER RAN: ${neverRan.join(', ')} (named in SMOKE_ONLY, no result recorded)`);
     console.log(`PARTIAL RUN (SMOKE_ONLY): ${Object.keys(checks).length} of ${ALL_CHECKS.length} checks — not a pass of the suite`);
@@ -28118,6 +28126,7 @@ function findChromium() {
   if (PART) {
     // Every check of the part must record a result; one that did not is a failure.
     const neverRan = PARTS[PART].filter(n => !(n in checks));
+    saveFailed(failed.concat(neverRan));
     if (failed.length) console.log(`FAILED: ${failed.join(', ')}`);
     if (neverRan.length) console.log(`NEVER RAN: ${neverRan.join(', ')} (in SMOKE_PART ${PART}, no result recorded)`);
     console.log(`SMOKE PART ${PART} of ${Object.keys(PARTS).length}: ${Object.keys(checks).length} of ${ALL_CHECKS.length} checks `
@@ -28125,6 +28134,7 @@ function findChromium() {
     await browser.close();
     process.exit(failed.length || neverRan.length ? 1 : 0);
   }
+  saveFailed(failed);
   console.log(failed.length ? `FAILED: ${failed.join(', ')}` : 'ALL SMOKE CHECKS PASSED');
   await browser.close();
   process.exit(failed.length ? 1 : 0);

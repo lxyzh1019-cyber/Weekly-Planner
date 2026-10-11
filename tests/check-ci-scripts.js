@@ -39,7 +39,11 @@ const scripts = Object.keys(pkg.scripts || {});
 // `test` is the aggregate a person runs locally; `check` is a chain the
 // workflow invokes by name. Everything else that starts a suite is a step CI
 // has to carry itself.
-const suites = scripts.filter(n => n.startsWith('test:'));
+// `test:failed` re-runs the smoke checks a local run saved as failed
+// (tests/run-failed.js, through SMOKE_ONLY, which CI refuses): a local tool,
+// not a suite, so neither CI nor `npm test` runs it.
+const LOCAL_ONLY = ['test:failed'];
+const suites = scripts.filter(n => n.startsWith('test:') && !LOCAL_ONLY.includes(n));
 
 const problems = [];
 
