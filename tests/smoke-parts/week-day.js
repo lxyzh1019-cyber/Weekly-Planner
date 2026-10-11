@@ -252,13 +252,16 @@ module.exports = async ({ page, want, checks }) => {
         pa: pa ? (pa.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]') ? 'both' : pa.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]') ? 'tick' : 'none') : 'missing' };
     });
     await page.setViewportSize({ width: 834, height: 1194 });
-    await page.waitForTimeout(400);
-    problems.push(...await page.evaluate(([was]) => {
+    problems.push(...await page.evaluate(async ([was]) => {
       const out = [];
       const r = window.__kit44Rot;
       try {
+        /* The redraw waits 150 ms for the resize to settle; a loaded CI
+           runner can take longer, so wait up to 3 s for the new columns. */
+        const t0 = Date.now();
+        while (Date.now() - t0 < 3000 && document.querySelectorAll('#timeline .tl-col').length !== dayViewSpanEffective()) await new Promise(res => setTimeout(res, 50));
         const cols = document.querySelectorAll('#timeline .tl-col').length;
-        if (cols !== dayViewSpanEffective()) out.push(`iPad turned 1194→834 Day: ${cols} day columns still drawn (${was.cols} at 1194), the new width carries ${dayViewSpanEffective()}`);
+        if (cols !== dayViewSpanEffective()) out.push(`iPad turned 1194→834 Day: ${cols} day columns still drawn (${was.cols} at 1194) after 3 s, the new width carries ${dayViewSpanEffective()} (screen ${document.querySelector('.screen.active')?.id}, drag ${typeof blockDragActive === 'function' && blockDragActive()}, drawn at ${dayTimelineDrawnW}px, window ${window.innerWidth}px)`);
         ['kit44-pa', 'kit44-pb'].forEach(id => {
           const blk = document.getElementById('block-' + id);
           if (!blk) { out.push(`iPad turned 1194→834 Day: clash block ${id} is not drawn`); return; }
