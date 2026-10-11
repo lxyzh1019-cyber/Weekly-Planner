@@ -12,6 +12,7 @@ const { PARTS, smokeCheckNames, partProblems } = require('./smoke-parts/parts');
 const houseRulesWalks = require('./smoke-parts/house-rules-walks');
 const moneyScreens = require('./smoke-parts/money-screens');
 const looksWalks = require('./smoke-parts/looks');
+const weekDay = require('./smoke-parts/week-day');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -152,6 +153,7 @@ function findChromium() {
     parentScreensMeetTheHouseRules: ['parentScreensAudit'],
     weekOpensOnTheLayoutYouCanPlanIn: [],
     theComponentKitHoldsItsSizes: [],
+    kitButtonsHold44pxOnWeekAndDay: [],
     everyHeaderMeasuresToTheExactValues: [],
     oneBackStackGoesWhereYouCameFrom: [],
     noLabelIsCutOnTheMoneyScreens: [],
@@ -1014,7 +1016,7 @@ function findChromium() {
         problems.push(`${label}: the fixture week offers only ${offered.length} school day, so adding one on its own cannot be distinguished from adding them all`);
         return;
       }
-      let chips = [...banner.querySelectorAll('.wsb-day')];
+      let chips = [...banner.querySelectorAll('.ui-chip')];
       if (chips.length !== offered.length) {
         problems.push(`${label}: the offer draws ${chips.length} day chips for ${offered.length} school days missing their card`);
         return;
@@ -1042,7 +1044,7 @@ function findChromium() {
 
       renderWeek();
       const after = host();
-      chips = after ? [...after.querySelectorAll('.wsb-day')] : [];
+      chips = after ? [...after.querySelectorAll('.ui-chip')] : [];
       const gone = DAY_SHORT[(formatDayKey(target).getDay() + 6) % 7];
       if (chips.some(c => c.textContent.trim() === gone)) {
         problems.push(`${label}: ${gone} is still offered a School Day card after one landed on it`);
@@ -1050,7 +1052,7 @@ function findChromium() {
       if (chips.length !== others.length) {
         problems.push(`${label}: ${chips.length} day chips remain, but ${others.length} school days are still missing their card`);
       }
-      const bulk = after ? [...after.querySelectorAll('button')].filter(b => !b.classList.contains('wsb-day')) : [];
+      const bulk = after ? [...after.querySelectorAll('button')].filter(b => !b.classList.contains('ui-chip')) : [];
       if (others.length > 1 && !bulk.length) {
         problems.push(`${label}: ${others.length} days are still missing their card and there is no way to add them all at once`);
       }
@@ -5798,6 +5800,8 @@ function findChromium() {
   await page.addInitScript(SD_HELPERS_SRC);
   await page.evaluate(SD_HELPERS_SRC);
 
+  // Week and Day keep the kit's 44px: tests/smoke-parts/week-day.js.
+  await weekDay({ page, want, checks });
   // The kid and parent house-rules walks: tests/smoke-parts/house-rules-walks.js.
   await houseRulesWalks({ page, want, checks, setupNeeded, setLook, clearLooks, kidStandards, KID_SCREENS, KID_SHEETS });
   // The money fit check: tests/smoke-parts/money-screens.js.
@@ -15811,7 +15815,7 @@ function findChromium() {
           if (miss.length) bad.push(`${what}'s "${b.textContent.trim()}" is not hittable: ${miss[0]}`);
         });
         const blk = document.getElementById('block-' + blockId);
-        const tick = blk && blk.querySelector('.block-done-btn');
+        const tick = blk && blk.querySelector('.ui-btn--icon');
         if (!tick) bad.push(`${blockWhat} has no ✓ drawn`);
         else {
           const miss = hitsSelf(tick).filter(Boolean);

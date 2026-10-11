@@ -1171,7 +1171,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   // tick here even though nobody pressed this button.
   const blockDone = isBlockCompleted(b, blockKid);
   const doneHtml = !isBuffer
-    ? `<button type="button" class="block-done-btn${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
+    ? `<button type="button" class="ui-btn ui-btn--icon${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
     : '';
   // List as many objectives/goals as the block's own height can hold — same
   // "show what this block is about" idea as print/week, and the day view has
@@ -1197,7 +1197,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
     ${nameHtml}
     ${metaHtml}
     ${objHtml}
-    ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
+    ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
   if (showTrainingChecks) blockEl.appendChild(buildBlockTrainingChecks(b));
