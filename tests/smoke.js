@@ -12,6 +12,7 @@ const { PARTS, smokeCheckNames, partProblems } = require('./smoke-parts/parts');
 const houseRulesWalks = require('./smoke-parts/house-rules-walks');
 const moneyScreens = require('./smoke-parts/money-screens');
 const looksWalks = require('./smoke-parts/looks');
+const todayChecks = require('./smoke-parts/today');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -158,6 +159,7 @@ function findChromium() {
     everyMoneyControlClicksClean: [],
     theSundayKitHolds44pxInItsBoxes: [],
     parentReadingSizeDefaultsToLarger: [],
+    withMumReadsInBothLooks: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
@@ -12788,7 +12790,7 @@ function findChromium() {
     if (d == null) return true;
     const jobs = tdJobsToday('jenn');
     goToday();
-    const card = [...document.querySelectorAll('#tdWrap .td-card')]
+    const card = [...document.querySelectorAll('#tdWrap .ui-card')]
       .find(c => /Jobs I can do/.test(c.textContent));
     if (!card) { bad.push('no jobs card on Today'); return bad; }
     const body = card.textContent.replace(/Jobs I can do/, '').trim();
@@ -16193,6 +16195,8 @@ function findChromium() {
 
   // The looks walks (Pop, Calm, fonts): tests/smoke-parts/looks.js.
   await looksWalks({ page, want, checks, shot, setLook, clearLooks, KID_SCREENS, defineAuditSeeds });
+  // Today's own checks ("with Mum" contrast): tests/smoke-parts/today.js.
+  await todayChecks({ page, want, checks, shot, setLook, clearLooks });
 
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code
@@ -16714,7 +16718,7 @@ function findChromium() {
       profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
       // Measured while the seeded day is on screen: putting it back re-draws Today empty.
       const undo = seedTodayAudit(); goToday();
-      take('Today', ['#tdWrap .td-card', '#tdWrap .td-now', '#tdWrap .td-now-tick', '#tdWrap .td-now-bar',
+      take('Today', ['#tdWrap .ui-card', '#tdWrap .td-now', '#tdWrap .td-now-tick', '#tdWrap .td-now-bar',
         '#tdWrap .quest-card', '#tdWrap .quest-card--next', '#tdWrap .quest-card-icon', '#tdWrap .quest-complete-btn',
         '.td-plan', '#kidNav .kid-nav-btn', '#kidNav .kid-nav-btn.on']);
       undo();
