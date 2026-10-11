@@ -821,7 +821,7 @@ function rqMoveState(kid, d) {
   const lockWeeks = Number(mrRuleOr(mrRules(), 'pots.lockWeeks')) || 4;
   if (d.mode === 'dep') {
     const ready = !!d.to;
-    const preview = d.to ? `I bring $${amt} of cash to my parents on Sunday. It goes into ${rqHomeShort(d.to)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${fmtMoney(amt * (1 + bonus / 100))}` : ''}.` : 'Where should the cash go?';
+    const preview = d.to ? `I bring ${fmtMoney(amt)} of cash to my parents on Sunday. It goes into ${rqHomeShort(d.to)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${fmtMoney(amt * (1 + bonus / 100))}` : ''}.` : 'Where should the cash go?';
     return { ready, preview, amt, max, need: 'Where should the cash go?' };
   }
   const to = d.mode === 'cash' ? 'cash' : d.to;
@@ -885,7 +885,7 @@ function rqAdvState(kid, d) {
   const ready = !!(d.why && left >= 1);
   // The prototype's tip, with "a parent" (Plan v18 A, owner 2026-10-05).
   const preview = left < 1 ? `I already drew ${fmtMoney(used)} in advance this week. That's the most.`
-    : `A parent gives me $${amt} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is $${amt} smaller.`;
+    : `A parent gives me ${fmtMoney(amt)} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is ${fmtMoney(amt)} smaller.`;
   return { ready, preview, amt, left, need: left < 1 ? preview : 'What is it for?' };
 }
 /* The reference's body (Plan v18 B4) with the prototype's tip (owner,
@@ -895,7 +895,7 @@ function rqAdvState(kid, d) {
 function rqAdvBody(kid, d) {
   const st = rqAdvState(kid, d);
   return `<div class="rq-plain">⏪ Draw early: money I need before Sunday. It comes off next Sunday’s payday.</div>
-    <div class="rq-amtline"><span class="rq-q">How much</span>${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}<b class="rq-amtval">$${st.amt}</b>${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}</div>
+    <div class="rq-amtline"><span class="rq-q">How much</span>${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}<b class="rq-amtval">${fmtMoney(st.amt)}</b>${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}</div>
     <div class="rq-opts">${RQ_ADV_WHY.map(([icon, w]) => rqOpt(icon + ' ' + w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join('')}</div>`
     + rqPreviewAndFoot({ notNow: false });
 }
@@ -937,7 +937,7 @@ function rqGoalState(kid, d) {
   const start = d.keep === 'ready' ? 0 : jar.saved;
   const wks = Math.ceil(Math.max(0, price - start) / 3);
   const preview = !ready ? 'Type what I want to buy, then pick a price.'
-    : `${d.icon} ${name} · $${price}. ${start ? `I start with ${fmtMoney(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. A parent says yes, then my jar switches.`;
+    : `${d.icon} ${name} · ${fmtMoney(price)}. ${start ? `I start with ${fmtMoney(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. A parent says yes, then my jar switches.`;
   return { ready, preview, need: 'What do I want to buy?' };
 }
 function rqGoalBody(kid, d) {
@@ -1213,10 +1213,10 @@ function rqSend() {
   } else if (d.kind === 'move' && d.mode === 'early') {
     rec = mnyAddRequest(kid, { kind: 'adv', amount: st.amt, why: d.why,
       day: fmtDay(todayKey(), 'weekday'),
-      text: `Draw $${st.amt} in advance · ${d.why}` });
+      text: `Draw ${fmtMoney(st.amt)} in advance · ${d.why}` });
   } else if (d.kind === 'move' && d.mode === 'dep') {
     rec = mnyAddRequest(kid, { kind: 'deposit', amount: st.amt, note: 'into ' + rqHomeShort(d.to),
-      text: `Put $${st.amt} cash in → ${rqHomeShort(d.to)}` });
+      text: `Put ${fmtMoney(st.amt)} cash in → ${rqHomeShort(d.to)}` });
   } else if (d.kind === 'move') {
     rec = mnyAddRequest(kid, { kind: 'move', from: d.from, to: d.mode === 'cash' ? 'cash' : d.to,
       amount: st.amt, note: d.why });

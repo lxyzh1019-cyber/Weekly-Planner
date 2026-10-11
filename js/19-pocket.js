@@ -35,7 +35,7 @@ function pmPriceCards(r, only = null) {
     ${row('On time <b>and</b> to standard', fmtMoney(g[3] || 0))}
     ${row('To standard, but late', fmtMoney(g[2] || 0))}
     ${row('Redone, then to standard', fmtMoney(g[1] || 0))}
-    ${row('Not done, or fails the redo', '$0.00')}
+    ${row('Not done, or fails the redo', fmtMoney(0))}
     ${row('Most you can earn in a day', fmtMoney((r.chores || {}).dailyCap || 0))}
     <div class="ct-meta">Past your daily max, extra chores earn <b>XP</b> instead of money.</div>
   </div>`;

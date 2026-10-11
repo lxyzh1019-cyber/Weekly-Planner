@@ -643,7 +643,7 @@ function ctPreSystemBoard(kid, weekKey) {
   });
   return `<div class="pn-card pre-board" data-kid="${kid === 'jenn' ? 'jenn' : 'jess'}">
     <div class="pre-title">${CT_PROFILE_ICON[kid] || ''} ${escapeHtml(kidLabel(kid).name)} · ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}</div>
-    <div class="pre-money">${fmtMoney(money)} <span class="pre-meta">/ $${CT_MONEY_CAP} max · earned before the new money system</span></div>
+    <div class="pre-money">${fmtMoney(money)} <span class="pre-meta">/ ${fmtMoney(CT_MONEY_CAP)} max · earned before the new money system</span></div>
     <div class="pre-meta">${paid ? '✅ Paid out at the family meeting' : 'Not paid out at a family meeting'}</div>
     ${goal ? `<div class="pre-meta">Goal: ${escapeHtml(ctGoalLabel(goal))}${ctGetGoalBonus(weekKey, kid) ? ' · met ⭐' : ''}</div>` : ''}
     <div class="pre-gridwrap"><div class="pre-grid">

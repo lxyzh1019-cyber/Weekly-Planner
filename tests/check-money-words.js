@@ -60,12 +60,18 @@
 //                 function whose name ends in "$" (the house mark for "returns
 //                 dollars as text").
 //   toFixed $   — `.toFixed(2)` on a line whose string text holds a "$".
+//   raw $${     — a template that writes "$" straight before a hole (`$${n}`):
+//                 it prints "$2.5" and "$-3" (Stage 32). Put the number through
+//                 fmtMoney instead. A hole with no "$" before it (`${n} weeks`)
+//                 is not money and passes.
+//   $N.00       — a hard-coded "$0.00"-style literal in string text: D2 writes
+//                 whole dollars without cents ("$0"); use fmtMoney(0).
 //   toLocaleDateString — anywhere in code (the device's locale and zone pick
 //                 the words; fmtDay does not).
 //   kid ternary — `x === 'jenn' ? '…Jenn…' : '…Jess…'` (either order).
 // FMT_ALLOW names the few that are right where they are, each with why; an
 // entry that no longer matches FAILS as stale, like ALLOW above. It does not
-// see a formatter nested inside another function, nor "$" + n with no toFixed.
+// see a formatter nested inside another function, nor '$' + n with no toFixed.
 
 const fs = require('fs');
 const path = require('path');
@@ -105,6 +111,10 @@ const FMT_ALLOW = [
     why: 'owner decision pending (Stage 32): "$100 and up shown rounded" on the passbook and the forecast; below $100 it is fmtMoney' },
   { file: 'js/43-sunday-core.js', name: 'sdOff$', rule: 'formatter',
     why: 'not a format: "taken off is always negative" (Plan v18 §W), the minus put in front of fmtMoney' },
+  { file: 'js/15-meeting.js', name: '$${y.target.toFixed(0)}', rule: 'raw $${',
+    why: 'owner decision pending (Stage 32): whole-dollar display (the yearly target), same as sdBook$' },
+  { file: 'js/20-loan.js', name: '$${(100 * (1 + bonus / 100)).toFixed(0)}', rule: 'raw $${',
+    why: 'owner decision pending (Stage 32): whole-dollar display (what $100 paid early clears), same as sdBook$' },
 ];
 const FMT_NAME = /(?:Money|Dollars?|Signed|DayName|DayLabel|DayMonth|ShortDate|ShortDay|MonthYear|KidName)$/;
 const FMT_CODE = /\.toFixed\(|toLocaleDateString|MONTH_SHORT/;
@@ -265,6 +275,14 @@ function scanFormatters(file, rawLines, codeLines, strLines, textLines) {
       if (/\$$/.test(name) || (FMT_NAME.test(name) && formats)) report(idx, 'formatter', name);
     }
     if (/\.toFixed\(2\)/.test(line) && /\$/.test(noHole(strLines[idx]))) report(idx, 'toFixed $', '.toFixed(2)');
+    for (let k = strLines[idx].indexOf('$${'); k >= 0; k = strLines[idx].indexOf('$${', k + 1)) {
+      const raw = rawLines[idx];
+      let d = 1, j = k + 3;
+      while (j < raw.length && d) { if (raw[j] === '{') d++; else if (raw[j] === '}') d--; j++; }
+      report(idx, 'raw $${', raw.slice(k, j));
+    }
+    const lit = strLines[idx].match(/\$\d+\.00(?!\d)/);
+    if (lit) report(idx, '$N.00', lit[0]);
     if (/\btoLocaleDateString\b/.test(line)) report(idx, 'toLocaleDateString', 'toLocaleDateString');
     const kt = textLines[idx].match(KID_TERNARY);
     if (kt) report(idx, 'kid ternary', kt[0]);

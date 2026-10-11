@@ -6341,7 +6341,7 @@ function findChromium() {
           const card = sdBody().querySelector('.sd-newrow');
           if (!card) bad.push('the new-row card did not show');
           else {
-            if (!/💡 Does it earn back\? My competitions pay me about \$12\.00 each\. This row is paid back by about 3 competitions./.test(card.textContent)) bad.push('no "Does it earn back?" line: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 200));
+            if (!/💡 Does it earn back\? My competitions pay me about \$12 each\. This row is paid back by about 3 competitions./.test(card.textContent)) bad.push('no "Does it earn back?" line: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 200));
             if (!/How could I get back under half\?/.test(card.textContent) || card.querySelectorAll('[data-mny-action="sd-newidea"]').length !== 3) bad.push('over half, the card does not ask how to get back under half with three ideas (steady ' + guSteady(kid) + ')');
             sdClick('[data-mny-action="sd-newok"]');
           }
@@ -7306,7 +7306,7 @@ function findChromium() {
 
       // ── This month: 20 in, 30 put away, nothing out.
       flPeriod = 'month'; flMonth = m2; mnyRenderHistory();
-      if (!/\$20\.00/.test(text())) problems.push('this month does not name the $20 that came in');
+      if (!/\$20(?![.\d])/.test(text())) problems.push('this month does not name the $20 that came in');
       if (!/Savings/.test(text())) problems.push('money moved to Savings is not drawn as somewhere it went');
 
       // ── All of it: every group, across all three months.
@@ -7315,8 +7315,8 @@ function findChromium() {
       ['Money I earned', 'Home', 'Money I was given', 'Money my money made', 'Taken off', 'Spent', 'Savings'].forEach(l => {
         if (all.indexOf(l) < 0) problems.push('"' + l + '" is missing from the whole story');
       });
-      if (!/\$60\.00/.test(all)) problems.push('jobs across all months do not total $60');
-      if (!/\$12\.00/.test(all)) problems.push('what was spent is not shown');
+      if (!/\$60(?![.\d])/.test(all)) problems.push('jobs across all months do not total $60');
+      if (!/\$12(?![.\d])/.test(all)) problems.push('what was spent is not shown');
 
       /* ── The "left" figure (`.fl-left`, "in cash right now") is retired by
          decision 14 / row 7: what is waiting is My money's 📥 door, so this
@@ -7326,7 +7326,7 @@ function findChromium() {
       // ── A typical month divides by months ELAPSED, empty ones included.
       flPeriod = 'typical'; mnyRenderHistory();
       if (!/across the 3 months/.test(text())) problems.push('the typical month skipped the empty month: ' + (host.querySelector('.fl-story') || {}).innerText);
-      if (!/I earned \$20\.00/.test(text())) problems.push('the typical month is not the total over months elapsed');
+      if (!/I earned \$20(?![.\d])/.test(text())) problems.push('the typical month is not the total over months elapsed');
 
       // ── The strip keeps the empty month, and is a picker.
       const cols = [...host.querySelectorAll('.fl-col')];
@@ -7338,7 +7338,7 @@ function findChromium() {
       if (flPeriod !== 'month' || flMonth !== m0) {
         problems.push('tapping a month did not select it');
       }
-      if (!/\$50\.00/.test(host.innerText)) problems.push('selecting that month did not show its gift');
+      if (!/\$50(?![.\d])/.test(host.innerText)) problems.push('selecting that month did not show its gift');
 
       /* ── The settled-week list that sat under the Flow ("📖 Week by week")
          is retired here by decision 14 / row 7: it is the passbook's own
@@ -22067,8 +22067,8 @@ function findChromium() {
       showScreen('parent'); setParentTab('money'); mnyParentSection = 'weeks'; guWeeksKid = 'jenn'; guWeekOpen = T; mnyRenderRulesTab();
       const wrap = document.getElementById('mnyRulesWrap');
       const txt = wrap.textContent.replace(/\s+/g, ' ');
-      if (!/👴 Grandfather rule \$3\.00 \+ competitions \$21\.00/.test(txt)) bad.push('the Grandfather week does not read "👴 Grandfather rule $3 + competitions $21": ' + txt.slice(0, 400));
-      if (!/No meeting — default \$3\.00 \+ competitions \$0\.00/.test(txt)) bad.push('the older default week does not read "No meeting — default $3 + competitions $0"');
+      if (!/👴 Grandfather rule \$3 \+ competitions \$21(?![.\d])/.test(txt)) bad.push('the Grandfather week does not read "👴 Grandfather rule $3 + competitions $21": ' + txt.slice(0, 400));
+      if (!/No meeting — default \$3 \+ competitions \$0(?![.\d])/.test(txt)) bad.push('the older default week does not read "No meeting — default $3 + competitions $0"');
       [G, D].forEach(wk => {
         if (wrap.querySelector(`[data-mnyp-action="guled"][data-mnyp-id="${wk}"]`)) bad.push('week ' + wk + ' still has steppers');
         if (wrap.querySelector(`[data-mnyp-action="guleddel"][data-mnyp-id="${wk}"]`)) bad.push('week ' + wk + ' can still be removed');
@@ -23447,7 +23447,7 @@ function findChromium() {
       const qAdv = mnyAddRequest(kid, { kind: 'adv', amount: 3, day: 'Wed', why: 'book fair' });
       toasts.length = 0;
       const qAdv2 = mnyAddRequest(kid, { kind: 'adv', amount: 3 });
-      if (!qAdv || qAdv2 || !toasts.some(t => /up to \$5\.00 a week — \$2\.00 left/.test(t))) bad.push('requests: the advance maximum was not held with a sentence: ' + toasts.join(' | '));
+      if (!qAdv || qAdv2 || !toasts.some(t => /up to \$5 a week — \$2 left/.test(t))) bad.push('requests: the advance maximum was not held with a sentence: ' + toasts.join(' | '));
       const qDis = mnyAddRequest(kid, { kind: 'dispute', fineId: fine.id, why: 'it was not me' });
       const qGoal = mnyAddRequest(kid, { kind: 'goal', name: 'Guards', icon: '🛼', target: 35, keep: 'move' });
       const qComp = mnyAddRequest(kid, { kind: 'comp', sport: 'swim', name: 'Club trial', dayKey: days[6],
@@ -23789,7 +23789,7 @@ function findChromium() {
         guOpen('commit');
         const wrap = document.getElementById('mnyRulesWrap');
         const jcard = [...wrap.querySelectorAll('.gu-tint--jess')][0];
-        if (!jcard || !/1\. 🏊 Swim club fees/.test(jcard.textContent) || !/\$360\.00 of \$500\.00/.test(jcard.textContent)) bad.push('her wall card does not list the row with what is left: ' + (jcard && jcard.textContent));
+        if (!jcard || !/1\. 🏊 Swim club fees/.test(jcard.textContent) || !/\$360 of \$500(?![.\d])/.test(jcard.textContent)) bad.push('her wall card does not list the row with what is left: ' + (jcard && jcard.textContent));
         guPress('[data-mnyp-action="gucmkid"][data-mnyp-id="jess"]');
         guCommit().share = 50;   // her share is the − 50% + stepper alone now (Money fit and logic PR 5)
         guPress('[data-mnyp-action="gucmweeksset"][data-mnyp-id="26"]');
@@ -23889,13 +23889,13 @@ function findChromium() {
         if (rows.length !== 3 || !/free/.test(rows[0]) || !/free/.test(rows[1]) || !/−\$1(?![.\d])/.test(rows[2])) bad.push('the week list is not free, free, −$1: ' + JSON.stringify(rows));
         if (!/2 of 2 free · the next one costs \$1/.test(wrap.textContent)) bad.push('the standing does not say the next one costs $1');
         const see = wrap.querySelector('.gu-side').textContent.replace(/\s+/g, ' ');
-        if (!/What she sees on Sunday/.test(see) || !/Jess · 📦 Fines\s*−\$1\.00/.test(see) || !/Mom logged/.test(see)) bad.push('the right pane does not say what she sees: ' + see);
+        if (!/What she sees on Sunday/.test(see) || !/Jess · 📦 Fines\s*−\$1(?![.\d])/.test(see) || !/Mom logged/.test(see)) bad.push('the right pane does not say what she sees: ' + see);
         // Back-dated to Monday, entered last: it is the week's first, so Tue is
         // the second free one and Wed and Thu cost (mrFinesWeek: day, then at).
         guPress('[data-mnyp-action="gufnday"][data-mnyp-id="0"]');
         guPress('[data-mnyp-action="gufnsave"]');
         const rows2 = [...wrap.querySelectorAll('.gu-tint--jess .gu-finerow')].map(r => r.textContent.replace(/\s+/g, ' '));
-        if (rows2.length !== 4 || !/^Mon/.test(rows2[0]) || !/free/.test(rows2[0]) || !/free/.test(rows2[1]) || !/−\$1\.00/.test(rows2[2]) || !/−\$1\.00/.test(rows2[3])) bad.push('a back-dated Monday fine is not the week\'s first free one: ' + JSON.stringify(rows2));
+        if (rows2.length !== 4 || !/^Mon/.test(rows2[0]) || !/free/.test(rows2[0]) || !/free/.test(rows2[1]) || !/−\$1(?![.\d])/.test(rows2[2]) || !/−\$1(?![.\d])/.test(rows2[3])) bad.push('a back-dated Monday fine is not the week\'s first free one: ' + JSON.stringify(rows2));
         const id = mrFines(kid).find(f => days.indexOf(f.dayKey) >= 0).id;
         guPress(`[data-mnyp-action="gufinedel"][data-mnyp-id="${id}"]`);
         if (mrFines(kid).some(f => f.id === id) || !state.shared.tombstones['fine:' + id]) bad.push('✕ did not remove the fine for good');
@@ -23930,7 +23930,7 @@ function findChromium() {
         const ap = guOpen('approve');
         const card = [...ap.querySelectorAll('.gu-req')].find(e => /joking/i.test(e.textContent));
         if (!card) bad.push('the dispute card is not on Approve');
-        else if (zero.test(card.textContent) || /\$0\.00/.test(card.textContent)) bad.push('the dispute of a free fine shows a $0 amount: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 160));
+        else if (zero.test(card.textContent) || /\$0(?![.\d])/.test(card.textContent)) bad.push('the dispute of a free fine shows a $0 amount: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 160));
         const rules = guOpen('rules');
         if (!/Savings pays/.test(rules.textContent) || /Kept ready pays/.test(rules.textContent)) bad.push('the Pots row does not say "Savings pays"');
       } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
@@ -24547,7 +24547,7 @@ function findChromium() {
         ensureWallet(kid).cash = 7;
         mnyRenderMyMoney();
         const w = wrap.querySelector('.mv2-waiting');
-        if (!w || !/📥 Waiting for Sunday/.test(w.textContent) || !/\$7\.00/.test(w.textContent)) bad.push('$7 waiting does not show as one 📥 Waiting for Sunday line');
+        if (!w || !/📥 Waiting for Sunday/.test(w.textContent) || !/\$7(?![.\d])/.test(w.textContent)) bad.push('$7 waiting does not show as one 📥 Waiting for Sunday line');
         ensureWallet(kid).cash = 0;
         // The passbook (Plan v17 §1, as the prototype): each Sunday's in-bar by group over where it went.
         const key = (wrap.querySelector('.mv2-bookkey') || {}).textContent || '';

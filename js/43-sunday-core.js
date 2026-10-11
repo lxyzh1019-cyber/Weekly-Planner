@@ -253,7 +253,7 @@ function sdIsOpen(k, w, rules) {
 }
 function sdCanPlace(k, w, rules) {
   if (k === 'extra' || k === 'spend' || k === 'adv') return { ok: true, why: null };
-  const fill = `🛟 fill Savings to $${sdRule(rules, 'pots.safety')} first`;
+  const fill = `🛟 fill Savings to ${fmtMoney(sdRule(rules, 'pots.safety'))} first`;
   if (k === 'goal') {
     if (!sdIsOpen('ready', w, rules)) {
       return { ok: false, why: `🔒 opens at ${sdRule(rules, 'school.stagePct.ready')}% paid` };
@@ -283,7 +283,7 @@ function sdPlace(w, k, d, n, rules) {
     moved = Math.max(0, Math.min(want, room));
     if (!moved) {
       let why = '💰 nothing left to place';
-      if (k === 'adv') why = `up to $${sdRule(rules, 'advance.maxPerWeek')} early, from next Sunday`;
+      if (k === 'adv') why = `up to ${fmtMoney(sdRule(rules, 'advance.maxPerWeek'))} early, from next Sunday`;
       else if (k === 'spend' && P.pile > 0) why = `full · ${sdCapWords(sdRule(rules, 'spend.capPct'))} of my share`;
       return { ok: false, alloc: a, moved: 0, why };
     }
@@ -306,7 +306,7 @@ function sdSetPull(w, k, d, rules) {
   const cap = k === 'ready' ? sdFloor(Math.max(0, ((x.pots || {}).ready || 0) - sdRule(rules, 'pots.safety')))
             : k === 'stock' ? sdFloor((x.pots || {}).stock || 0) : Infinity;
   if (nv === p[k]) return { ok: false, pull: p };
-  if (d > 0 && nv > cap) return { ok: false, pull: p, why: `$${cap} free` };
+  if (d > 0 && nv > cap) return { ok: false, pull: p, why: `${fmtMoney(cap)} free` };
   const next = Object.assign({}, p, { [k]: nv });
   const H2 = sdHers(Object.assign({}, x, { pull: next }), rules);
   if (d < 0 && H2 < sdPlacedOf(x.alloc)) return { ok: false, pull: p, why: 'Place every dollar first' };
@@ -321,7 +321,7 @@ function sdSetAdvance(w, d, rules) {
   const tot = sdR2(adv.owed + nv);
   const max = sdRule(rules, 'advance.maxPerWeek');
   if (nv === adv.manual) return { ok: false, adv };
-  if (tot > max) return { ok: false, adv, why: `up to $${max} early, from next Sunday` };
+  if (tot > max) return { ok: false, adv, why: `up to ${fmtMoney(max)} early, from next Sunday` };
   const H2 = sdHers(Object.assign({}, x, { adv: { owed: adv.owed, manual: nv } }), rules);
   if (H2 < sdPlacedOf(x.alloc)) return { ok: false, adv, why: 'Place every dollar first' };
   return { ok: true, adv: { owed: adv.owed, manual: nv } };
@@ -446,11 +446,11 @@ function sdOweAfterPlan(w, rules) {
 function sdSign(w, rules) {
   const x = w || {};
   const P = sdPile(x, rules);
-  if (P.pile > 0) return { ok: false, why: `place $${P.pile} first` };
+  if (P.pile > 0) return { ok: false, why: `place ${fmtMoney(P.pile)} first` };
   const a = sdAlloc(x.alloc);
   // A placement is dollars put somewhere; a negative one is not a plan.
   if (SD_ALLOC_KEYS.some(k => !(Number(a[k]) >= 0))) return { ok: false, why: 'Every box needs $0 or more — nothing was signed.' };
-  if (P.pile < 0) return { ok: false, why: `That is $${-P.pile} more than my pile — nothing was signed.` };
+  if (P.pile < 0) return { ok: false, why: `That is ${fmtMoney(-P.pile)} more than my pile — nothing was signed.` };
   const pull = Object.assign({ ready: 0, stock: 0, cash: 0 }, x.pull || {});
   const week = Number(x.week) || 0;
   const { pots, loan, left0, toGoal, goalOver, readyOpen, overToLoan, extraUsed, spill, loanAfter, nl, pay } = sdLoanPlan(x, P, rules);
@@ -566,8 +566,8 @@ function sdVerdicts(res, w, rules) {
   const dateIn = n => fmtDay(sdSundayIn(x.weekKey, n), 'month');
   const safeLow = after.pots.ready < safety;
   const st = left <= 0 ? ['🎉 Loan free', 'The wall is done. Every payday is all mine now.', 'Next: grow my pots and enjoy.', 'good']
-    : cover < 1 ? ['🚨 Risky', `If bonus weeks stop, I can't make my ${fmtMoney(minW)} payment. That is how people go broke.`, `Next: keep 🛟 $${safety} safe and add steady work: chores and club sessions.`, 'bad']
-    : exP >= 35 ? ['🚀 Fast track', `${exP}% of my choice went on the wall. Every week like this, I'm free by ${dateIn(freePn)}${sooner ? `, ${sooner} weeks sooner` : ''}. Pay now, enjoy later.`, safeLow ? `Next: fill 🛟 $${safety} too, in case a week goes wrong.` : 'Next: keep the steady money coming.', 'good']
+    : cover < 1 ? ['🚨 Risky', `If bonus weeks stop, I can't make my ${fmtMoney(minW)} payment. That is how people go broke.`, `Next: keep 🛟 ${fmtMoney(safety)} safe and add steady work: chores and club sessions.`, 'bad']
+    : exP >= 35 ? ['🚀 Fast track', `${exP}% of my choice went on the wall. Every week like this, I'm free by ${dateIn(freePn)}${sooner ? `, ${sooner} weeks sooner` : ''}. Pay now, enjoy later.`, safeLow ? `Next: fill 🛟 ${fmtMoney(safety)} too, in case a week goes wrong.` : 'Next: keep the steady money coming.', 'good']
     : cashP >= 15 && exP < 10 ? ['🎈 Enjoy now', `I took ${fmtMoney(cash)} as cash. Fun is OK! The loan still gets its ${fmtMoney(minW)}, but stays till ${dateIn(freeNn)}.`, `Next: try a few $ on the wall. Each $1 counts as ${fmtMoney(counts)}.`, 'warn']
     : saveP >= 40 ? ['🌱 Saver', `${saveP}% went into my pots. I'm building a cushion and my goal.`, 'Next: a little extra on the wall gets me free sooner.', 'good']
     : ['⚖️ Balanced', `${exP}% wall · ${saveP}% saved · ${cashP}% cash. A bit of everything.`, 'Next: pick one thing to push a little more.', 'neutral'];
@@ -576,7 +576,7 @@ function sdVerdicts(res, w, rules) {
   const capAmt = sdFloor((sg.hers || 0) * sdRule(rules, 'spend.capPct') / 100);
   const strategyLines = [
     '🧱 Loan ' + fmtMoney(sg.loanCash) + ' (' + pc0(sg.loanCash) + ')' + (sg.extra ? ' = ' + fmtMoney(minW) + ' must-pay + ' + fmtMoney(sg.extra) + ' extra (counted ' + fmtMoney(sdR2(sg.extra * counts)) + ').' : ' = must-pay only.') + ' Free by ' + dateIn(freePn) + (sooner ? ', ' + sooner + ' weeks sooner.' : '.'),
-    '🌱 Saved ' + fmtMoney(saveAmt) + ' (' + pc0(saveAmt) + ')' + ((sg.goal || 0) > 0 ? ' · 🎯 ' + (goalLeft2 > 0 ? fmtMoney(goalLeft2) + ' to my goal' : 'goal reached!') : '') + (after.pots.ready < safety ? ` · 🛟 safety $${safety} not full yet` : ' · 🛟 safety full') + '.',
+    '🌱 Saved ' + fmtMoney(saveAmt) + ' (' + pc0(saveAmt) + ')' + ((sg.goal || 0) > 0 ? ' · 🎯 ' + (goalLeft2 > 0 ? fmtMoney(goalLeft2) + ' to my goal' : 'goal reached!') : '') + (after.pots.ready < safety ? ` · 🛟 safety ${fmtMoney(safety)} not full yet` : ' · 🛟 safety full') + '.',
     '💵 Cash ' + fmtMoney(sdR2(cash + (sg.adv || 0))) + ' (' + pc0(sdR2(cash + (sg.adv || 0))) + ')' + (cash + (sg.adv || 0) > 0.004 ? ' to enjoy. Fun is part of the plan.' : ', no treat this week (up to $' + capAmt + ' allowed).'),
     st[2]];
   return {

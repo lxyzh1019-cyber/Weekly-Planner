@@ -312,7 +312,7 @@ function pnLastAnswerCard() {
   const wk = ctThisWeekKey();
   const rows = ['jenn', 'jess'].map(kid => {
     const a = sdLastAnswer(kid, wk);
-    return a && a.said ? `<div class="pn-said">${guKidChip(kid)} “${escapeHtml(a.said)}”${a.guess != null ? ` <span class="pn-sub">guessed $${escapeHtml(String(a.guess))}</span>` : ''}</div>` : '';
+    return a && a.said ? `<div class="pn-said">${guKidChip(kid)} “${escapeHtml(a.said)}”${a.guess != null ? ` <span class="pn-sub">guessed ${escapeHtml(fmtMoney(a.guess))}</span>` : ''}</div>` : '';
   }).join('');
   if (!rows) return '';
   return `<div class="pn-card pn-side-card">

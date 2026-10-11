@@ -1379,7 +1379,7 @@ function guWeekRecord(kid, wk, r) {
       ${sec('Where every dollar went', went)}
       ${stickers ? sec('⭐ Stickers', `<div class="gu-line">${escapeHtml(stickers)}</div>`) : ''}
       ${sec('Verdict', verdict)}
-      ${answer ? sec('💬 Her answer', `<div class="gu-line">${escapeHtml(MNY_REFLECT.question)} “${escapeHtml(answer)}”${r.guess != null ? escapeHtml(` · she guessed $${r.guess}`) : ''}</div>`) : ''}
+      ${answer ? sec('💬 Her answer', `<div class="gu-line">${escapeHtml(MNY_REFLECT.question)} “${escapeHtml(answer)}”${r.guess != null ? escapeHtml(` · she guessed ${fmtMoney(r.guess)}`) : ''}</div>`) : ''}
       <div class="gu-line gu-rec-foot">${escapeHtml(`Signed by ${r.confirmedBy || 'a grown-up'}${signedAt ? ' · ' + new Date(signedAt).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''} · ${r.rulesEffectiveFrom ? 'rules of ' + fmtDay(r.rulesEffectiveFrom, 'dated') : 'the rules of that week'}`)}</div>
     </div>`;
 }

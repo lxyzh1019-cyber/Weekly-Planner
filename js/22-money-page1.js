@@ -801,7 +801,7 @@ function mnyInfoSheetBody(d) {
       + li('&nbsp;&nbsp;🏆 Competitions', escapeHtml(fmtMoney(get('comp'))))
       + li('🎁 Money I was given', escapeHtml(fmtMoney(get('given'))), 'g')
       + li('🌱 Money my money made', escapeHtml(fmtMoney(get('made'))), 'g')
-      + li('➖ Taken off', escapeHtml(w.data.fines > 0 ? '−' + fmtMoney(w.data.fines) : '$0.00'), 'g')
+      + li('➖ Taken off', escapeHtml(w.data.fines > 0 ? '−' + fmtMoney(w.data.fines) : fmtMoney(0)), 'g')
       + mnyFineRows(kid, mnyWeekKey())
       + `<div class="mv2-line mv2-teal">About ${escapeHtml(fmtMoney(w.bySunday))} by Sunday if the rest goes well.${c.routineDays ? ` 🔥 ${c.routineDays} routine day${c.routineDays === 1 ? '' : 's'} kept.` : ''}</div>`
       + (c.unpaid.length ? `<div class="mv2-line">${escapeHtml(`${fmtMoney(unpaidTotal)} still to come · ${c.unpaid.length} week${c.unpaid.length === 1 ? '' : 's'} not settled yet`)}</div>` : '')
