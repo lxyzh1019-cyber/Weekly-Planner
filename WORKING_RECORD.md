@@ -26,6 +26,12 @@ Single working record for this repository. Updated by the main session at the en
 - [agreed] Owner 2026-10-11 K8: a kit list-row part (44px, 2px border, 11px corner, dashed add variant); Today and Week/Day rows use it in PR 11 — search: kit list-row part
 - [agreed] Owner 2026-10-11 K9: inner corners 11px so rows are not rounder than their card — search: inner corners 11px
 - [agreed] Owner 2026-10-11 PR 8 Q3: on any block 46px or taller, show the stopwatch as a 44px icon-only button beside the tick; only blocks under 46px lose both — search: icon-only stopwatch
+- [agreed] Owner 2026-10-11 answer 1: the other questions on the Part 7, 8 and 10 pages are accepted as built — search: accepted as built
+- [agreed] Owner 2026-10-11 answer 2: the icon-only stopwatch goes into Part 8 before its merge — search: stopwatch into Part 8
+- [agreed] Owner 2026-10-11 answer 3: Parts 7, 8 and 10 merge as they are; nothing builds on the flagged kit parts until Kit 1.1 — search: nothing builds on the flagged parts
+- [agreed] Owner 2026-10-11 answer 4: Part 9 opens now; it adds no new private girl switch, day row or green button; order Part 9, then Kit 1.1, then Part 11 — search: Part 9 then Kit 1.1
+- [agreed] Owner 2026-10-11 answer 5: dark mode removal and its guard go into Kit 1.1 — search: dark mode in Kit 1.1
+- [agreed] Owner 2026-10-11 answer 6: copy D9–D14 (app-consistency-plan-v1.md), header-exact-values.md and kit-gaps-pr7-10.md into docs/handoff/, notes only, in Kit 1.1 — search: copy D9–D14
 - [agreed] Owner 2026-10-10: PR 5 differences 1, 2, 3, 5, 6, 7, 8 and 10 accepted as built — search: accept 1, 2, 3, 5, 6, 7, 8 and 10
 - [agreed] Owner 2026-10-10: Day keeps both ways back — "◀ Week" in row 1 (the kid's) and "◀ Hub" in the sub-bar (the parent's); Week keeps its single "◀ Hub" — search: keep both buttons on Day
 - [agreed] Owner 2026-10-10: when a parent views a girl, the avatar is that girl's (🐥 Jenn / 🦊 Jess, 52px pink circle), not the family emoji; aria-label "Viewing Jenn, switch profile"; measured by the check — search: avatar shows that girl's avatar
