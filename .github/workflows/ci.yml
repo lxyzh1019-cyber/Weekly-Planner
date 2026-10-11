@@ -4,6 +4,7 @@ on:
   # One run per push, on every branch: the run reports on the pull request's
   # head commit, so there is no separate pull_request trigger.
   push:
+    branches: ['**']
   schedule:
     # Nightly, 07:00 UTC — catches drift in the pinned browser and toolchain
     # even on weeks when nothing is pushed.
@@ -84,7 +85,7 @@ jobs:
         run: npm run test:money
 
   # Puts the browser on the runner ONCE per run and caches what it took, so the
-  # twelve smoke jobs below do not each download it.
+  # smoke jobs below do not each download it.
   #
   # Why (2026-10-08, runs 37671279692 and 37786454837): the slow smoke jobs
   # were not slow tests. Their "Install Chromium" step took 14:04 and 5:31
@@ -160,8 +161,8 @@ jobs:
 
   # Boots the app over file:// in headless Chromium and drives the main flows,
   # including the chore -> money hand-off that is the most valuable join in the
-  # suite. Runs on pull requests too: it is the only check that would catch a
-  # broken screen.
+  # suite. Runs on every push; 2026-10-07 only off main: it is the only check that
+  # would catch a broken screen.
   smoke:
     name: Headless smoke test (${{ matrix.date }}, part ${{ matrix.part }})
     runs-on: ubuntu-latest
@@ -172,7 +173,8 @@ jobs:
     # that first showed the Chores money door's tap-size failure. Each date's
     # suite runs as three parts side by side (SMOKE_PART, the fixed lists in
     # tests/smoke-parts/parts.js: every check in exactly one part,
-    # noConsoleErrors in every part), so 4 x 3 = 12 jobs.
+    # noConsoleErrors in every part), so 4 x 3 = 12 jobs on main and nightly;
+    # 1 date x 3 = 3 jobs on other branches.
     strategy:
       fail-fast: false
       matrix:
