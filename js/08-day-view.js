@@ -362,7 +362,37 @@ function buildTimeline() {
 
   enhanceAccessibility(tl);
   updateStopwatchGoalToasts(allBlocks);
+  dayTimelineDrawnW = window.innerWidth;
 }
+
+/* THE DAY FOLLOWS THE WINDOW. Columns and each block's head buttons are worked
+   out from the width at draw time (canvasW above), so an iPad turned to
+   portrait kept three days and ✓ buttons that left a name under 60px. A
+   width change redraws the timeline once it settles (150 ms), with the
+   schedule's scroll put back. Not while a block is being dragged — the redraw
+   would pull the element out from under the finger, and the drop draws the
+   timeline again anyway (same rule as js/03-sync.js) — and not when the Day is
+   not on show, since openDay draws it fresh. A height-only change (a phone's
+   address bar) draws nothing. Attached once, here at load, never by a render. */
+let dayTimelineDrawnW = 0;
+let dayResizeTimer = null;
+function dayRedrawForWidth() {
+  dayResizeTimer = null;
+  if (document.querySelector('.screen.active')?.id !== 'screen-day') return;
+  if (typeof blockDragActive === 'function' && blockDragActive()) return;
+  if (window.innerWidth === dayTimelineDrawnW) return;
+  const ws = document.querySelector('#screen-day .day-workspace');
+  const top = ws ? ws.scrollTop : 0, left = ws ? ws.scrollLeft : 0;
+  renderDaySpanTabs();
+  buildTimeline();
+  if (ws) { ws.scrollTop = top; ws.scrollLeft = left; }
+}
+function dayQueueRedrawForWidth() {
+  clearTimeout(dayResizeTimer);
+  dayResizeTimer = setTimeout(dayRedrawForWidth, 150);
+}
+window.addEventListener('resize', dayQueueRedrawForWidth);
+window.addEventListener('orientationchange', dayQueueRedrawForWidth);
 
 /* The 6am-10pm ladder, once. */
 function buildHourGutter(canvasHeight, spanMin) {

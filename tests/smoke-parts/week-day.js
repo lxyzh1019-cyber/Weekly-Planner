@@ -226,6 +226,64 @@ module.exports = async ({ page, want, checks }) => {
         return out;
       }, [size]));
     }
+    /* An iPad turned to portrait (Stage 47): the Day drawn at 1194 wide with
+       three days and the clash pair, then the window narrowed to 834. The
+       timeline is drawn again for the new width (debounced, about 150 ms): as
+       many columns as 834px carries, every head button chosen from the new
+       lane width by the same 60px name rule, and the schedule's scroll kept. */
+    await page.setViewportSize({ width: 1194, height: 834 });
+    const rotBefore = await page.evaluate(() => {
+      const k = todayKey();
+      const sw = () => ({ enabled: true, running: false, elapsedSec: 0 });
+      window.__kit44Rot = { snap: JSON.stringify(state), wasSpan: localStorage.getItem(DAY_SPAN_LS_KEY),
+        wasProfile: profile, wasViewing: parentViewing, wasOffset: weekOffset };
+      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+      setDayBlocks(k, [
+        { id: 'kit44-pa', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
+        { id: 'kit44-pb', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
+        { id: 'kit44-late', actId: 'reading', startMin: 20 * 60 + 30, durationMin: 60 },
+      ], 'jenn');
+      setDayViewSpan(3);
+      openDay(k, getDayKeys(0).indexOf(k));
+      const ws = document.querySelector('#screen-day .day-workspace');
+      ws.scrollTop = 200;
+      const pa = document.getElementById('block-kit44-pa');
+      return { cols: document.querySelectorAll('#timeline .tl-col').length, scrollTop: ws.scrollTop,
+        pa: pa ? (pa.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]') ? 'both' : pa.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]') ? 'tick' : 'none') : 'missing' };
+    });
+    await page.setViewportSize({ width: 834, height: 1194 });
+    await page.waitForTimeout(400);
+    problems.push(...await page.evaluate(([was]) => {
+      const out = [];
+      const r = window.__kit44Rot;
+      try {
+        const cols = document.querySelectorAll('#timeline .tl-col').length;
+        if (cols !== dayViewSpanEffective()) out.push(`iPad turned 1194→834 Day: ${cols} day columns still drawn (${was.cols} at 1194), the new width carries ${dayViewSpanEffective()}`);
+        ['kit44-pa', 'kit44-pb'].forEach(id => {
+          const blk = document.getElementById('block-' + id);
+          if (!blk) { out.push(`iPad turned 1194→834 Day: clash block ${id} is not drawn`); return; }
+          const tick = blk.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]');
+          const swb = blk.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]');
+          const pad = parseFloat(getComputedStyle(blk).paddingLeft);
+          const room = n => blk.clientWidth - pad - 44 * n;
+          const drawn = swb ? 'both' : tick ? 'tick' : 'none';
+          const want = room(2) >= 60 ? 'both' : room(1) >= 60 ? 'tick' : 'none';
+          if (drawn !== want) out.push(`iPad turned 1194→834 Day: the ${blk.getBoundingClientRect().width.toFixed(1)}px-wide block ${id} (name room ${room(1).toFixed(1)}px beside ✓) draws ${drawn} (it drew ${was.pa} at 1194), the new width calls for ${want}`);
+        });
+        const ws = document.querySelector('#screen-day .day-workspace');
+        const keep = Math.min(was.scrollTop, ws.scrollHeight - ws.clientHeight);
+        if (Math.abs(ws.scrollTop - keep) > 1) out.push(`iPad turned 1194→834 Day: the schedule scrolled from ${was.scrollTop}px to ${ws.scrollTop}px, expected it kept at ${keep}px`);
+      } catch (e) {
+        out.push(`iPad turned 1194→834: threw ${e.message}`);
+      } finally {
+        if (r.wasSpan == null) localStorage.removeItem(DAY_SPAN_LS_KEY); else localStorage.setItem(DAY_SPAN_LS_KEY, r.wasSpan);
+        const sn = JSON.parse(r.snap); Object.keys(state).forEach(key => { delete state[key]; }); Object.assign(state, sn); saveLocal();
+        profile = r.wasProfile; parentViewing = r.wasViewing; weekOffset = r.wasOffset;
+        delete window.__kit44Rot;
+        goToday();
+      }
+      return out;
+    }, [rotBefore]));
     await page.setViewportSize(before);
     checks.kitButtonsHold44pxOnWeekAndDay = problems.length ? problems : true;
   }
