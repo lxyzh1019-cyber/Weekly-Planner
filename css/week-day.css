@@ -696,9 +696,10 @@
   .wins-lbl { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); }
   .wins-cats { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 0.4rem; }
   .wins-chip { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); background: var(--surface-card); border: 1.5px solid var(--ink); border-radius: 999px; padding: 0.1rem 0.55rem; }
-  /* ⏱ Start stopwatch on a block: the kit's secondary button, full width. Not
-     drawn on a compact block (renderBlockPixel): 44px does not fit in its
-     one line. The block's sheet starts the stopwatch there. */
+  /* ⏱ Start stopwatch on a block: the kit's secondary button, full width.
+     Drawn only where the block holds it under its name and duration lines
+     (renderBlockPixel: Pop 105px, Calm 99px); the block's sheet starts the
+     stopwatch elsewhere. */
   .placed-block > .ui-btn--secondary { margin-top: 0.25rem; width: 100%; }
   .block-focus-pulse {
     animation: blockFocusPulse 1.1s ease-in-out 2;

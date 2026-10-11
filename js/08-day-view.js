@@ -1178,6 +1178,27 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   const doneHtml = !isBuffer && tickFits
     ? `<button type="button" class="ui-btn ui-btn--icon${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
     : '';
+  /* ⏱ Start stopwatch is the kit's 44px button under the name and duration
+     lines, and the block is a flex column that clips: drawn where those lines
+     leave no 44px, it squeezes the name to nothing and its centre lands on the
+     resize handle. So it is drawn only where it fits, from the stylesheet's own
+     figures (css/week-day.css): padding 5px top and bottom; the name and the
+     duration each one line at line-height 1.15 of their font tier's size (rem
+     16px) times the look's --text-scale (Pop 1.1, Calm 1); a 1px gap after
+     each; the button's 0.25rem (4px) margin. Measured on the Day: a Pop block
+     needs 105px (iPad and phone alike: a 77-minute block), a Calm block 99px
+     (73 minutes); a pinned block 2px more. Anywhere shorter the
+     block's sheet starts the stopwatch (routine and training sheets on open,
+     other blocks with Start on the edit sheet). */
+  let stopwatchFits = false;
+  if (!isBuffer && !isCompact && b.stopwatch && b.stopwatch.enabled) {
+    const textScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--text-scale')) || 1;
+    const [namePx, metaPx] = fontTier === ' block-font-lg' ? [1.22 * 16, 0.95 * 16]
+                           : fontTier === ' block-font-md' ? [1.12 * 16, 0.88 * 16]
+                           : [1.04 * 16, Math.max(13, 0.81 * 16)];
+    const headPx = 5 + namePx * textScale * 1.15 + 1 + metaPx * textScale * 1.15 + 1;
+    stopwatchFits = height - 2 * (b.parentPinned ? 3 : 2) - headPx - 4 - 5 >= 44;
+  }
   // List as many objectives/goals as the block's own height can hold — same
   // "show what this block is about" idea as print/week, and the day view has
   // the most room, so a Piano block gets its whole goal list, not just the
@@ -1188,8 +1209,11 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   if (blockTierAtLeast(tier, 'detail') && objList.length) {
     // Reserve the space the training checks are about to take, so the two
     // never fight over the same pixels.
-    const reserved = showTrainingChecks ? 20 + Math.ceil(TRAINING_CHECKS.length / 2) * 30
+    let reserved = showTrainingChecks ? 20 + Math.ceil(TRAINING_CHECKS.length / 2) * 30
                    : showTrainingChip ? 24 : 0;
+    /* And the stopwatch button under them: its 4px margin, the 1px gap and
+       44px, so the goals never push it out of the block. */
+    reserved += stopwatchFits ? 49 : 0;
     const maxObjRows = Math.max(0, Math.floor((height - 62 - reserved) / 17));
     if (maxObjRows > 0) {
       const shown = sliceDetailLines(objList.map(o => ({ icon: '🎯', text: o })), maxObjRows);
@@ -1202,7 +1226,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
     ${nameHtml}
     ${metaHtml}
     ${objHtml}
-    ${!isBuffer && !isCompact && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
+    ${stopwatchFits ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
   if (showTrainingChecks) blockEl.appendChild(buildBlockTrainingChecks(b));

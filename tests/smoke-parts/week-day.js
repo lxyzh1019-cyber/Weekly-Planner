@@ -24,6 +24,7 @@ module.exports = async ({ page, want, checks }) => {
         const k = todayKey();
         const saved = getDayBlocks(k, 'jenn').slice();
         const sw = () => ({ enabled: true, running: false, elapsedSec: 0 });
+        const goals = ['Read one chapter', 'Write three new words', 'Tell Mum the story', 'Draw the best part', 'Pick the next book', 'Put the book back'];
         const measure = (screenId, where, need) => {
           const screen = document.getElementById(screenId);
           if (!screen || !screen.classList.contains('active')) { out.push(`${size} ${where}: #${screenId} is not on show`); return; }
@@ -52,10 +53,11 @@ module.exports = async ({ page, want, checks }) => {
         try {
           profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
           setDayBlocks(k, saved.concat([
-            { id: 'kit44-day', actId: 'reading', startMin: 13 * 60, durationMin: 120, stopwatch: sw() },
+            { id: 'kit44-day', actId: 'reading', startMin: 13 * 60, durationMin: 120, stopwatch: sw(), objectives: goals },
             { id: 'kit44-30m', actId: 'reading', startMin: 15 * 60 + 30, durationMin: 30, stopwatch: sw() },
-            { id: 'kit44-35m', actId: 'reading', startMin: 16 * 60 + 30, durationMin: 35 },
-            { id: 'kit44-45m', actId: 'reading', startMin: 17 * 60 + 30, durationMin: 45 },
+            { id: 'kit44-35m', actId: 'reading', startMin: 16 * 60 + 30, durationMin: 35, stopwatch: sw() },
+            { id: 'kit44-45m', actId: 'reading', startMin: 17 * 60 + 30, durationMin: 45, stopwatch: sw() },
+            { id: 'kit44-60m', actId: 'reading', startMin: 18 * 60 + 30, durationMin: 60, stopwatch: sw(), objectives: goals },
           ]), 'jenn');
           goWeek(); setWeekView('full');
           measure('screen-week', 'Week', [['.ui-btn', 'Sign this week / Unsign button']]);

@@ -461,7 +461,12 @@ Kid-facing copy is a product surface, not filler. The rules:
   32px with an `::after` reach), flush in the block's top-right corner and
   drawn only where the block's clip holds all 44px of it — so never on a
   compact block, nor on the 46-47px ones just above (renderBlockPixel,
-  js/08-day-view.js); and `.block-meta` at
+  js/08-day-view.js); the block's ⏱ Start stopwatch, the kit's 44px
+  `.ui-btn--secondary`, drawn only where the space under the name and
+  duration lines (from the stylesheet's padding, line heights and the look's
+  --text-scale) holds its 44px and 4px margin — Pop 105px, Calm 99px, a pinned
+  block 2px more, on iPad and phone alike — with its room taken out of the
+  goal-line budget when drawn; and `.block-meta` at
   12.96px (floored at 13px).
   Scope target rules to the **component**, not the screen: `.ck-navbtn` is both a
   kid's week arrow and the parent portal's, and screen-scoping it left the portal
