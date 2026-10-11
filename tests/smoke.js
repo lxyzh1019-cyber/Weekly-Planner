@@ -16195,7 +16195,7 @@ function findChromium() {
   // The looks walks (Pop, Calm, fonts): tests/smoke-parts/looks.js.
   await looksWalks({ page, want, checks, shot, setLook, clearLooks, KID_SCREENS, defineAuditSeeds });
   // Today's own checks ("with Mum" contrast): tests/smoke-parts/today.js.
-  await todayChecks({ page, want, checks, setLook, clearLooks });
+  await todayChecks({ page, want, checks, shot, setLook, clearLooks });
 
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code

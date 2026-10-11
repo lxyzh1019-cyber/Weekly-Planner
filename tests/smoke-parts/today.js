@@ -1,5 +1,5 @@
 // Smoke group: Today (Consistency PR 7) — withMumReadsInBothLooks. tests/smoke.js calls it after the looks walks, on its one shared page; the check seeds the "with Mum" row it measures and puts back what it seeded.
-module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
+module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
   /* D18 — a chore she has claimed and Mum has not answered reads "with Mum"
      on Today's Jobs I can do card. In Calm the words were the look's
      --accent-strong on a row faded to 0.75, too pale to read. Measured on the
@@ -79,6 +79,8 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           colour: getComputedStyle(go).color, opacity: getComputedStyle(row).opacity };
       });
       if (r.missing) { bad.push(`${look}: no "with Mum" row on Today after the claim`); continue; }
+      const jobs = await page.$('#tdWrap .td-jobs');
+      if (jobs) await jobs.screenshot({ path: shot(`today-with-mum-${look}`) });
       console.log(`withMumReadsInBothLooks: ${look} "${r.text}" ${r.ratio.toFixed(2)}:1 (text ${r.fg} on ${r.bg}; colour ${r.colour}, row opacity ${r.opacity})`);
       if (r.text !== 'with Mum') bad.push(`${look}: the waiting row reads "${r.text}", want "with Mum"`);
       if (!(r.ratio >= 4.5)) bad.push(`${look}: "with Mum" is ${r.ratio.toFixed(2)}:1 on its row (text ${r.fg} on ${r.bg}), want at least 4.5:1`);
