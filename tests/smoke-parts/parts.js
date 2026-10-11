@@ -331,6 +331,7 @@ const PARTS = {
     'thePopLookReadsEverywhere',
     'theCalmLookReadsEverywhere',
     'everyTextUsesTheLooksFonts',
+    'withMumReadsInBothLooks',
     'theClosingRitualCountsWhatWasDone',
     'copyingNothingSaysSoAndChangesNothing',
     'aCopyNamesItsOverlapWithAKeptPin',
