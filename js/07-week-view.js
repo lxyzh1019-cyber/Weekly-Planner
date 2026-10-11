@@ -295,7 +295,7 @@ async function addSchoolDayToDay(dayKey) {
 
 function weekEmptyOffer(keys) {
   const p = activeProfile();
-  const plan = `<button class="wins-btn" onclick="goPlanWeek('${escapeJsAttr(keys[0])}')">✏️ Start planning</button>`;
+  const plan = `<button type="button" class="ui-btn ui-btn--primary" onclick="goPlanWeek('${escapeJsAttr(keys[0])}')">✏️ Start planning</button>`;
   /* The 🏫 offer used to be a button here too, and this was the copy that could
      not be relied on: it needed the whole week blank, it needed keys[6] to be
      today or later, and the stale-calendar branch above pre-empted it — so it
@@ -307,7 +307,7 @@ function weekEmptyOffer(keys) {
   }
   const src = nearestPlannedWeek(keys[0], p, 8);
   const copy = src
-    ? ` <button class="wins-btn" onclick="fillWeekFromNearest('${escapeJsAttr(keys[0])}')">📋 Copy ${escapeHtml(mmWeekLabel(src))}</button>`
+    ? ` <button type="button" class="ui-btn ui-btn--primary" onclick="fillWeekFromNearest('${escapeJsAttr(keys[0])}')">📋 Copy ${escapeHtml(mmWeekLabel(src))}</button>`
     : '';
   return `📝 <b>Nothing was planned this week.</b> Put back what you actually did, then review it together. ${plan}${copy}`;
 }
@@ -335,14 +335,14 @@ function renderWeekSignature(keys) {
         <span class="wk-sig-name">${escapeHtml(sig.name || name)}</span>
         <span class="wk-sig-date">on ${dateStr}</span>
       </div>
-      <button type="button" class="wk-sig-btn wk-sig-btn--clear" onclick="clearWeekSignature()">Unsign</button>`;
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="clearWeekSignature()">Unsign</button>`;
   } else {
     bar.innerHTML = `
       <div class="wk-sig-line wk-sig-line--empty">
         <span class="wk-sig-label">✍️ ${name}</span>
         <span class="wk-sig-blank"></span>
       </div>
-      <button type="button" class="wk-sig-btn" onclick="signWeek()">Sign this week ✍️</button>`;
+      <button type="button" class="ui-btn ui-btn--primary" onclick="signWeek()">Sign this week ✍️</button>`;
   }
 }
 async function signWeek() {
@@ -405,7 +405,7 @@ function weekRenderHeader() {
        child mid-meeting loses the sitting, so the meeting lock hides Switch
        rather than leaving a control that quietly discards your place. */
     sub: parentViewSub('week', 'parentWeekActions',
-      `<button type="button" class="pv-btn no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${escapeHtml(kidLabel(parentViewing === 'jenn' ? 'jess' : 'jenn').name)}">Switch</button>`),
+      `<button type="button" class="ui-btn ui-btn--secondary no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${escapeAttr(kidLabel(parentViewing === 'jenn' ? 'jess' : 'jenn').name)}">Switch</button>`),
   });
   /* A week across two months ("Sep 28 – Oct 4") is wider than a phone's room
      at 20px; css/app.css sizes it down only on the widths where it does not
@@ -473,7 +473,7 @@ function renderWeek() {
       const free = fmtHrsMin(t.free);
       coachEl.classList.add('week-review-tip');
       coachEl.style.display = 'block';
-      coachEl.innerHTML = `🗓️ <b>Sunday review</b> — this week: 📚 ${learn} learning · 🏃 ${active} active · 🌤 ${free} free. Look back together, then tweak one thing for next week. <button class="wins-btn" onclick="openWeeklyWins()">🎉 See wins</button> <button class="tip-dismiss" aria-label="Dismiss" onclick="dismissWeekReview()">✕</button>`;
+      coachEl.innerHTML = `🗓️ <b>Sunday review</b> — this week: 📚 ${learn} learning · 🏃 ${active} active · 🌤 ${free} free. Look back together, then tweak one thing for next week. <button type="button" class="ui-btn ui-btn--primary" onclick="openWeeklyWins()">🎉 See wins</button> <button type="button" class="ui-btn ui-btn--icon" aria-label="Dismiss" onclick="dismissWeekReview()">✕</button>`;
     } else if (!isParent()) {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
@@ -1814,10 +1814,10 @@ function renderSchoolDayBanner(bannerId = 'weekSchoolBannerTop') {
      exactly the moment it matters. With one day left the chip IS the action, so
      no bulk button is drawn beside it. */
   const chips = days.map(k =>
-    `<button type="button" class="wsb-day" onclick="addSchoolDayToDay('${escapeJsAttr(k)}')">`
+    `<button type="button" class="ui-chip" onclick="addSchoolDayToDay('${escapeJsAttr(k)}')">`
     + `${escapeHtml(DAY_SHORT[(formatDayKey(k).getDay() + 6) % 7])}</button>`).join('');
   const all = days.length > 1
-    ? `<button type="button" class="wins-btn" onclick="addSchoolDaysToWeek('${escapeJsAttr(keys[0])}')">Add all ${days.length}</button>`
+    ? `<button type="button" class="ui-btn ui-btn--primary" onclick="addSchoolDaysToWeek('${escapeJsAttr(keys[0])}')">Add all ${days.length}</button>`
     : '';
   banner.innerHTML =
     `<span class="wcb-icon">🏫</span>`

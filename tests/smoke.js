@@ -12,6 +12,7 @@ const { PARTS, smokeCheckNames, partProblems } = require('./smoke-parts/parts');
 const houseRulesWalks = require('./smoke-parts/house-rules-walks');
 const moneyScreens = require('./smoke-parts/money-screens');
 const looksWalks = require('./smoke-parts/looks');
+const weekDay = require('./smoke-parts/week-day');
 const todayChecks = require('./smoke-parts/today');
 
 /* A throwaway static server for the handful of checks that need a real origin.
@@ -153,6 +154,7 @@ function findChromium() {
     parentScreensMeetTheHouseRules: ['parentScreensAudit'],
     weekOpensOnTheLayoutYouCanPlanIn: [],
     theComponentKitHoldsItsSizes: [],
+    kitButtonsHold44pxOnWeekAndDay: [],
     everyHeaderMeasuresToTheExactValues: [],
     oneBackStackGoesWhereYouCameFrom: [],
     noLabelIsCutOnTheMoneyScreens: [],
@@ -1017,7 +1019,7 @@ function findChromium() {
         problems.push(`${label}: the fixture week offers only ${offered.length} school day, so adding one on its own cannot be distinguished from adding them all`);
         return;
       }
-      let chips = [...banner.querySelectorAll('.wsb-day')];
+      let chips = [...banner.querySelectorAll('.ui-chip')];
       if (chips.length !== offered.length) {
         problems.push(`${label}: the offer draws ${chips.length} day chips for ${offered.length} school days missing their card`);
         return;
@@ -1045,7 +1047,7 @@ function findChromium() {
 
       renderWeek();
       const after = host();
-      chips = after ? [...after.querySelectorAll('.wsb-day')] : [];
+      chips = after ? [...after.querySelectorAll('.ui-chip')] : [];
       const gone = DAY_SHORT[(formatDayKey(target).getDay() + 6) % 7];
       if (chips.some(c => c.textContent.trim() === gone)) {
         problems.push(`${label}: ${gone} is still offered a School Day card after one landed on it`);
@@ -1053,7 +1055,7 @@ function findChromium() {
       if (chips.length !== others.length) {
         problems.push(`${label}: ${chips.length} day chips remain, but ${others.length} school days are still missing their card`);
       }
-      const bulk = after ? [...after.querySelectorAll('button')].filter(b => !b.classList.contains('wsb-day')) : [];
+      const bulk = after ? [...after.querySelectorAll('button')].filter(b => !b.classList.contains('ui-chip')) : [];
       if (others.length > 1 && !bulk.length) {
         problems.push(`${label}: ${others.length} days are still missing their card and there is no way to add them all at once`);
       }
@@ -5395,9 +5397,10 @@ function findChromium() {
     ['screen-week',    () => { goWeek(); renderWeek(); }],
     /* The same screen on a Sunday. The weekly-review banner renders one day in
        seven (js/07-week-view.js, the `isSunday` branch) and it is the only place
-       .wins-btn and .tip-dismiss appear — so six days a week this audit walked
-       straight past them, and a 22x22 dismiss target with a 12.8px label lived
-       there until the Sunday-night CI run of 2026-08-09 happened to look.
+       its 🎉 See wins (.ui-btn--primary) and its ✕ (.ui-btn--icon, PR 8; they
+       were .wins-btn and .tip-dismiss) appear — so six days a week this audit
+       walked straight past them, and a 22x22 dismiss target with a 12.8px label
+       lived there until the Sunday-night CI run of 2026-08-09 happened to look.
 
        A rule the suite can only check on one weekday is a rule that is unenforced
        six days out of seven. Pin the clock to this week's Sunday for the length of
@@ -5417,9 +5420,10 @@ function findChromium() {
       Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
       /* The empty-week invitation outranks the Sunday review, and by the time
          this runs earlier checks have emptied the week — so without a block here
-         the audit renders the wrong branch and passes without ever seeing
-         .tip-dismiss. It measured `wins-btn@124x20` ("Start planning") instead of
-         `76x22` ("See wins"), which is how that was caught. Seed one block, then
+         the audit renders the wrong branch and passes without ever seeing the
+         review's ✕. It measured "Start planning" (then .wins-btn, 124x20) instead
+         of "See wins" (76x22), which is how that was caught; both are kit
+         buttons now (PR 8). Seed one block, then
          put the day back exactly as it was. */
       const kid = activeProfile();
       const key = getDayKeys(0)[1];
@@ -5801,6 +5805,8 @@ function findChromium() {
   await page.addInitScript(SD_HELPERS_SRC);
   await page.evaluate(SD_HELPERS_SRC);
 
+  // Week and Day keep the kit's 44px: tests/smoke-parts/week-day.js.
+  await weekDay({ page, want, checks });
   // The kid and parent house-rules walks: tests/smoke-parts/house-rules-walks.js.
   await houseRulesWalks({ page, want, checks, setupNeeded, setLook, clearLooks, kidStandards, KID_SCREENS, KID_SHEETS });
   // The money fit check: tests/smoke-parts/money-screens.js.
@@ -15814,7 +15820,7 @@ function findChromium() {
           if (miss.length) bad.push(`${what}'s "${b.textContent.trim()}" is not hittable: ${miss[0]}`);
         });
         const blk = document.getElementById('block-' + blockId);
-        const tick = blk && blk.querySelector('.block-done-btn');
+        const tick = blk && blk.querySelector('.ui-btn--icon');
         if (!tick) bad.push(`${blockWhat} has no ✓ drawn`);
         else {
           const miss = hitsSelf(tick).filter(Boolean);

@@ -456,10 +456,23 @@ Kid-facing copy is a product surface, not filler. The rules:
   compact form, the ◀ ▶ arrows at 30px and 📋 / profile badge at 34px. The
   compact bar is retired (PR 4): the Day's header is the standard page header
   (`pageHeader`, js/47-header.js), one row of a fixed height that does not
-  shrink on scroll, its buttons and badge 52px; the block's
-  ✓ tick at 32px (`.block-done-btn` keeps its 32px look, with an `::after`
-  reaching 6px past it for a 44px target, and sits 6px in from the block's
-  corner so the target stays inside the block's clip); and `.block-meta` at
+  shrink on scroll, its buttons and badge 52px; the block's head row — the
+  ✓ tick and, when the block's stopwatch is on, an icon-only ⏱ (aria-label
+  "Start stopwatch"; owner answer 2026-10-11), both the kit's 44px
+  `.ui-btn--icon` (PR 8; the ✓ was `.block-done-btn`, 32px with an `::after`
+  reach; the ⏱ a full-width worded button), side by side in the block's
+  top-right corner, the ✓ flush in it — drawn only where the block's clip
+  holds 44px (48px, 50px pinned), so never on a compact block, nor on the
+  46-47px ones just above (renderBlockPixel, js/08-day-view.js), and only
+  where the name keeps 60px beside it (owner answer 2026-10-11: name room =
+  the block's inner width, from its lane's share of the canvas width known at
+  render, less its left padding and 44px per button; the ⏱ drops first, then
+  the ✓; their sheet ticks and starts the stopwatch), with the name and
+  duration lines padded to end before it — and since that width is read at
+  render, a width change (an iPad turned, a window resized) redraws the Day
+  timeline once it settles (dayRedrawForWidth: 150 ms, the scroll kept, the
+  heading and focused day following the columns; asked again while a block
+  is dragged; one listener attached at load); and `.block-meta` at
   12.96px (floored at 13px).
   Scope target rules to the **component**, not the screen: `.ck-navbtn` is both a
   kid's week arrow and the parent portal's, and screen-scoping it left the portal
@@ -3114,7 +3127,7 @@ resolve their days through `schoolDaysToOffer` first —
 `addSchoolDaysToWeek(mondayKey)` for the week, `addSchoolDayToDay(dayKey)` for
 one — so a chip that is stale because another device already added that card
 becomes the "already has one" toast rather than a second School Day on the same
-day. The banner draws a `.wsb-day` chip per offered day beside the count, and
+day. The banner draws a `.ui-chip` per offered day beside the count, and
 the bulk `Add all N` only when there is more than one — with a single day left
 the chip **is** the action. The smallest true answer has to be available: a week
 whose Thursday is a PD day the family is away for must not have to refuse the
