@@ -323,7 +323,7 @@ function renderParentHome() {
    renderParentHome, where it would have run for every tab. */
 function renderParentReviewHeader() {
   const name = document.getElementById('reviewKidName');
-  if (name) name.textContent = parentViewing === 'jenn' ? '🐥 Jenn' : '🦊 Jess';
+  if (name) name.textContent = `${kidLabel(parentViewing).icon} ${kidLabel(parentViewing).name}`;
 }
 
 /* Age moved to App › Profiles, which draws a field per kid and writes through
@@ -438,7 +438,7 @@ function renderMeetingHub() {
      the week's money is the pool's number; "earned for her work" is a
      different figure and keeps its own label elsewhere. */
   const money = ['jenn', 'jess'].map(kid =>
-    `${CT_PROFILE_ICON[kid]} $${mnyPool(wk, kid).cameIn.toFixed(2)}`).join(' · ');
+    `${CT_PROFILE_ICON[kid]} ${fmtMoney(mnyPool(wk, kid).cameIn)}`).join(' · ');
   const status = held
     ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
     : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
@@ -504,7 +504,7 @@ function renderPendingApproval() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
+      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${kidLabel(owner).icon} ${escapeHtml(kidLabel(owner).name)} added</span></div>
       <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
@@ -556,9 +556,9 @@ function renderPendingTaskApproval() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">🎁 ${escapeHtml(mnyMoney(gift.amount))} · ${escapeHtml(gift.from || 'A gift')}
+      <div class="challenge-title">🎁 ${escapeHtml(fmtMoney(gift.amount))} · ${escapeHtml(gift.from || 'A gift')}
         <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
-      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(mnyShortDate(gift.dayKey || gift.weekKey))}
+      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(fmtDay(gift.dayKey || gift.weekKey, 'dated'))}
         · nothing has moved yet</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
@@ -759,8 +759,7 @@ function parentActivityCard(act, owner) {
   const card = document.createElement('div');
   card.className = 'challenge-card';
   const ownerLabel = owner==='shared' ? '🔗 Shared'
-                    : owner==='jenn'   ? '🐥 Jenn only'
-                    : '🦊 Jess only';
+                    : `${kidLabel(owner).icon} ${kidLabel(owner).name} only`;
   card.innerHTML = `
     <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(ownerLabel)}</span></div>
     <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
@@ -1085,7 +1084,7 @@ function renderPerfTrend() {
       + `<span class="perf-fill ${cls}" style="display:block;width:${dw}%"></span></span>`
       + `<span class="perf-num">${st.planned ? fmtHrsMin(st.done) + ' / ' + fmtHrsMin(st.planned) : '—'}</span>`;
   };
-  const money = (st) => st.money != null ? `$${st.money.toFixed(2)}` : '—';
+  const money = (st) => st.money != null ? `${fmtMoney(st.money)}` : '—';
   let rows = '';
   weeks.forEach(w => {
     rows += `<button type="button" class="perf-row${w.off === perfWeekOffset ? ' sel' : ''}" onclick="perfSelectWeek(${w.off})">
@@ -1129,10 +1128,10 @@ function renderPerfDetail() {
           <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
     }).join('') || `<div class="ct-meta">Nothing was planned this week.</div>`;
     const money = st.money != null
-      ? `$${st.money.toFixed(2)} recorded`
-      : (perfWeekOffset === 0 ? `$${ctWeekMoney(monKey, kid).toFixed(2)} preliminary — recorded at the meeting` : 'not recorded');
+      ? `${fmtMoney(st.money)} recorded`
+      : (perfWeekOffset === 0 ? `${fmtMoney(ctWeekMoney(monKey, kid))} preliminary — recorded at the meeting` : 'not recorded');
     return `<div class="mm-2b-kid">
-        <div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(st.done)} completed / ${fmtHrsMin(st.planned)} planned</div>${rows}
+        <div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${escapeHtml(kidLabel(kid).name)} — ${fmtHrsMin(st.done)} completed / ${fmtHrsMin(st.planned)} planned</div>${rows}
         <div class="perf-facts">✅ ${st.routinesTotal ? `${st.routinesDone}/${st.routinesTotal} routines kept` : 'no routines on the plan'} · 💰 ${money}</div>
       </div>`;
   };
@@ -1442,7 +1441,7 @@ function parentBannerBackButton() {
    them). The kid's row above keeps its 52px avatar (D25). '' for a child. */
 function parentViewSub(what, actionsId, actionsHtml) {
   if (!isParent()) return '';
-  const name = parentViewing === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(parentViewing).name;
   return parentBannerBackButton()
     + `<span class="pv-name" id="parentViewingName"><span class="pv-word">Reviewing </span>${escapeHtml(name)}<span class="pv-word">'s ${escapeHtml(what)}</span></span>`
     + `<span class="pv-actions" id="${escapeAttr(actionsId)}">${actionsHtml || ''}</span>`;
@@ -1481,7 +1480,7 @@ function applyMeetingLock() {
 
 function parentView(p) {
   parentViewing = p;
-  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b=>b.classList.toggle('active', b.textContent.includes(p==='jenn'?'Jenn':'Jess')));
+  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b=>b.classList.toggle('active', b.textContent.includes(kidLabel(p).name)));
   showScreen('week');
   renderWeek();
 }

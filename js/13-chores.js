@@ -149,7 +149,7 @@ function ctGoalLabel(goal) {
   if (g.points != null) return `${g.points} points`;
   const bits = [];
   if (g.routineDays != null) bits.push(`${g.routineDays} clean day${g.routineDays === 1 ? '' : 's'}`);
-  if (g.money != null) bits.push(`$${Number(g.money).toFixed(2)}`);
+  if (g.money != null) bits.push(`${fmtMoney(g.money)}`);
   return bits.join(' · ');
 }
 function ctGetWeekGoals(weekKey) {
@@ -595,9 +595,8 @@ function ctMatrixRows(kid) {
   const groups = ctGroupsForKid(kid);
   const inGroups = new Set();
   groups.forEach(g => {
-    const val = (Number(g.valueDollars)||0).toFixed(2);
     const cad = g.cadence === 'daily' ? 'day' : 'week';
-    const section = `${g.icon||'🧺'} ${g.name} · $${val} / ${cad}`;
+    const section = `${g.icon||'🧺'} ${g.name} · ${fmtMoney(g.valueDollars)} / ${cad}`;
     (g.choreIds||[]).forEach(cn => { inGroups.add(cn); rows.push({ section, label:cn, kind:'optional', key:cn, icon:ctChoreIcon(cn) }); });
   });
   ctPickableChoreNames().filter(cn => !inGroups.has(cn)).forEach(cn =>
@@ -643,8 +642,8 @@ function ctPreSystemBoard(kid, weekKey) {
     body += `<div class="pre-row"><span class="pre-label">${row.icon || ''} ${escapeHtml(row.label)}</span>${cells}<span class="pre-total">${n}</span></div>`;
   });
   return `<div class="pn-card pre-board" data-kid="${kid === 'jenn' ? 'jenn' : 'jess'}">
-    <div class="pre-title">${CT_PROFILE_ICON[kid] || ''} ${kid === 'jenn' ? 'Jenn' : 'Jess'} · ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}</div>
-    <div class="pre-money">$${money.toFixed(2)} <span class="pre-meta">/ $${CT_MONEY_CAP} max · earned before the new money system</span></div>
+    <div class="pre-title">${CT_PROFILE_ICON[kid] || ''} ${escapeHtml(kidLabel(kid).name)} · ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}</div>
+    <div class="pre-money">${fmtMoney(money)} <span class="pre-meta">/ ${fmtMoney(CT_MONEY_CAP)} max · earned before the new money system</span></div>
     <div class="pre-meta">${paid ? '✅ Paid out at the family meeting' : 'Not paid out at a family meeting'}</div>
     ${goal ? `<div class="pre-meta">Goal: ${escapeHtml(ctGoalLabel(goal))}${ctGetGoalBonus(weekKey, kid) ? ' · met ⭐' : ''}</div>` : ''}
     <div class="pre-gridwrap"><div class="pre-grid">

@@ -366,7 +366,7 @@ function reflEvidence(wk, kid, tab) {
         if (!st.count) return;
         const times = st.count > 1 ? ` — ${st.count} times this week` : '';
         const next = st.nextCosts
-          ? ` From here each one costs ${mnyMoney(st.nextCosts)}.`
+          ? ` From here each one costs ${fmtMoney(st.nextCosts)}.`
           : (st.freeLeft === 1 ? ' One more and they start costing.' : '');
         add('fine_' + item.id, `${item.label}${times}.${next}`);
       });
@@ -635,7 +635,7 @@ function mmRenderReflect(wk) {
   const body = tab.id === 'doingWell' ? reflRenderDoingWell(wk, kid, rec)
              : tab.id === 'needsWork' ? reflRenderNeedsWork(wk, kid, rec)
              : reflRenderPlanNext(wk, kid, rec);
-  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(kid).name;
   const skipped = reflIsSkipped(rec);
   const locked = reflIsLocked(wk);
 
@@ -644,7 +644,7 @@ function mmRenderReflect(wk) {
       const r = reflWorking(wk, k);
       return `<button type="button" class="refl-kid${k === kid ? ' on' : ''}"
           data-mm-action="refl-kid" data-kid="${escapeAttr(k)}"
-          >${CT_PROFILE_ICON[k]} ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}
+          >${CT_PROFILE_ICON[k]} ${escapeHtml(kidLabel(k).name)}
           <span class="refl-kid-n">${reflDoneCount(r)}/${REFL_TABS.length}</span></button>`;
     }).join('')}</div>
     <div class="refl-tabs">${REFL_TABS.map(t =>
@@ -674,7 +674,7 @@ function mmRenderReflect(wk) {
     <div class="mm-cap">Solid = planned hours completed · dashed = planned, on one scale for both girls. The app records which planned blocks were finished, not how long anything took.</div>
     <div class="mm-blocklink">${['jenn', 'jess'].map(k =>
       `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
-        >${CT_PROFILE_ICON[k]} Open ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}'s week ›</button>`).join('')}
+        >${CT_PROFILE_ICON[k]} Open ${escapeHtml(kidLabel(k).name)}'s week ›</button>`).join('')}
       <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
 }
 
@@ -720,8 +720,8 @@ async function reflAddToPlan(wk, kid, linkId) {
      will appear, before anything is written. */
   const ok = await showConfirm(
     link
-      ? `Add to ${kid === 'jenn' ? "Jenn's" : "Jess's"} to-do list for ${when}, alongside ${link.name}?\n\n"${text}"\n\nOne to-do, on the week she will be living it, showing how that routine is going.`
-      : `Add to ${kid === 'jenn' ? "Jenn's" : "Jess's"} to-do list for ${when}?\n\n"${text}"\n\nOne to-do, on the week she will be living it.`,
+      ? `Add to ${kidLabel(kid).name}'s to-do list for ${when}, alongside ${link.name}?\n\n"${text}"\n\nOne to-do, on the week she will be living it, showing how that routine is going.`
+      : `Add to ${kidLabel(kid).name}'s to-do list for ${when}?\n\n"${text}"\n\nOne to-do, on the week she will be living it.`,
     { okLabel: 'Add it', cancelLabel: 'Not now' });
   if (!ok) return false;
 

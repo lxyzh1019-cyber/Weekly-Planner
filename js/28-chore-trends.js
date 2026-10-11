@@ -92,20 +92,20 @@ function ctrCards(d) {
     return `<div class="ctr-card">
       <div class="ctr-card-head" style="background:${CTR_KID_WASH[k]}">
         <span class="ctr-card-icon">${CT_PROFILE_ICON[k]}</span>
-        <span class="ctr-card-name">${k === 'jenn' ? 'Jenn' : 'Jess'}</span>
+        <span class="ctr-card-name">${escapeHtml(kidLabel(k).name)}</span>
         <span class="ck-spacer"></span>
-        <span class="ck-hist-total">${ckMoney(total)}</span>
+        <span class="ck-hist-total">${fmtMoney(total)}</span>
         <span class="ctr-card-xp">${xp} XP</span>
       </div>
       <div class="ctr-card-body">
         <div class="ctr-tiles">
           ${tile('weeks with data', `${withData} of ${CT_SUMMARY_WEEKS}`)}
-          ${tile('best week', ckMoney(best))}
-          ${tile('average', ckMoney(avg))}
-          ${tile('this year', ckMoney(ytd))}
+          ${tile('best week', fmtMoney(best))}
+          ${tile('average', fmtMoney(avg))}
+          ${tile('this year', fmtMoney(ytd))}
         </div>
         ${target ? `<div class="ctr-goalbar"><div class="ctr-goalfill" style="width:${pct}%"></div></div>
-        <div class="ck-sub">${pct}% of this year's ${ckMoney(target)} — the target is a starting point, reviewed every quarter.</div>` : ''}
+        <div class="ck-sub">${pct}% of this year's ${fmtMoney(target)} — the target is a starting point, reviewed every quarter.</div>` : ''}
       </div></div>`;
   }).join('');
 }
@@ -126,7 +126,7 @@ function ctrBars(d) {
   for (let i = 0; i <= 4; i++) {
     const v = peak / 4 * i, yy = y(v);
     grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" style="stroke:var(--paper-line)" stroke-width="1"/>`;
-    ticks += `<text x="${padL - 6}" y="${yy + 3}" text-anchor="end" class="ctr-tick">${ckMoney(v)}</text>`;
+    ticks += `<text x="${padL - 6}" y="${yy + 3}" text-anchor="end" class="ctr-tick">${fmtMoney(v)}</text>`;
   }
   let bars = '', labels = '';
   d.weeks.forEach((w, i) => {
@@ -138,7 +138,7 @@ function ctrBars(d) {
       if (h > 0) {
         bars += `<rect x="${x}" y="${y(r.total)}" width="${bw}" height="${h}" rx="4"
           style="fill:${CTR_KID_COLOR[k]};stroke:var(--ink)" stroke-width="2">
-          <title>${k === 'jenn' ? 'Jenn' : 'Jess'} · week of ${escapeHtml(w.label)}: ${ckMoney(r.total)}${r.frozen ? ' (settled)' : ''}</title></rect>`;
+          <title>${escapeHtml(kidLabel(k).name)} · week of ${escapeHtml(w.label)}: ${fmtMoney(r.total)}${r.frozen ? ' (settled)' : ''}</title></rect>`;
       }
     });
     labels += `<text x="${cx}" y="${H - 8}" text-anchor="middle" class="ctr-xlab">${escapeHtml(w.label)}</text>`;
@@ -164,7 +164,7 @@ function ctrLines(d) {
   for (let i = 0; i <= 3; i++) {
     const v = peak / 3 * i, yy = y(v);
     grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" style="stroke:var(--paper-line)" stroke-width="1"/>`;
-    ticks += `<text x="${padL - 6}" y="${yy + 3}" text-anchor="end" class="ctr-tick">${ckMoney(v)}</text>`;
+    ticks += `<text x="${padL - 6}" y="${yy + 3}" text-anchor="end" class="ctr-tick">${fmtMoney(v)}</text>`;
   }
   // Two lines that finish close together would stack their end labels on top
   // of each other. Nudge them apart, lower value downward, before drawing.
@@ -183,13 +183,13 @@ function ctrLines(d) {
       stroke-linejoin="round" stroke-linecap="round"/>`;
     d.rows[k].forEach((r, i) => {
       dots += `<circle cx="${padL + step * i}" cy="${y(r.cum)}" r="4"
-        style="fill:${CTR_KID_COLOR[k]};stroke:var(--paper)" stroke-width="2"><title>${k === 'jenn' ? 'Jenn' : 'Jess'} by ${escapeHtml(r.week.label)}: ${ckMoney(r.cum)}</title></circle>`;
+        style="fill:${CTR_KID_COLOR[k]};stroke:var(--paper)" stroke-width="2"><title>${escapeHtml(kidLabel(k).name)} by ${escapeHtml(r.week.label)}: ${fmtMoney(r.cum)}</title></circle>`;
     });
     // The label wears ink; a small mark beside it carries identity. Colouring
     // the text itself would make the value legible only to colour.
     const last = d.rows[k][d.rows[k].length - 1];
     ends += `<circle cx="${padL + plotW + 10}" cy="${endY[k]}" r="3.5" style="fill:${CTR_KID_COLOR[k]};stroke:var(--ink)" stroke-width="1"/>`
-          + `<text x="${padL + plotW + 17}" y="${endY[k] + 4}" class="ctr-endlab">${ckMoney(last.cum)}</text>`;
+          + `<text x="${padL + plotW + 17}" y="${endY[k] + 4}" class="ctr-endlab">${fmtMoney(last.cum)}</text>`;
   });
   let labels = '';
   d.weeks.forEach((w, i) => {
@@ -204,7 +204,7 @@ function ctrLines(d) {
 
 function ctrLegend() {
   return `<div class="ctr-legend">${['jenn', 'jess'].map(k =>
-    `<span class="ctr-legend-item"><span class="ctr-swatch" style="background:${CTR_KID_COLOR[k]}"></span>${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</span>`).join('')}</div>`;
+    `<span class="ctr-legend-item"><span class="ctr-swatch" style="background:${CTR_KID_COLOR[k]}"></span>${CT_PROFILE_ICON[k]} ${escapeHtml(kidLabel(k).name)}</span>`).join('')}</div>`;
 }
 
 /* ── Heatmap: where the money came from ──
@@ -229,7 +229,7 @@ function ctrHeat(d, kid) {
       const bg = v <= 0 ? 'var(--paper)' : CTR_HEAT[Math.min(CTR_HEAT.length - 1, Math.floor(v / peak * CTR_HEAT.length))];
       const fg = v <= 0 ? 'var(--ink-faint)' : (v / peak > 0.55 ? 'var(--mny-heat-ink-on-dark)' : 'var(--mny-heat-ink)');
       return `<div class="ctr-heat-cell" style="background:${bg};color:${fg}"
-        title="${escapeAttr(c.label)} · week of ${escapeHtml(r.week.label)}: ${ckMoney(v)}">${v > 0 ? ckMoney(v) : '·'}</div>`;
+        title="${escapeAttr(c.label)} · week of ${escapeHtml(r.week.label)}: ${fmtMoney(v)}">${v > 0 ? fmtMoney(v) : '·'}</div>`;
     }).join('');
     return `<div class="ctr-heat-row"><div class="ctr-heat-label">${escapeHtml(c.label)}</div>${cells}</div>`;
   }).join('');
@@ -241,7 +241,7 @@ function ctrHeat(d, kid) {
 function ctrRead(d) {
   const bits = [];
   ['jenn', 'jess'].forEach(k => {
-    const rs = d.rows[k], name = k === 'jenn' ? 'Jenn' : 'Jess';
+    const rs = d.rows[k], name = kidLabel(k).name;
     const live = rs.filter(r => r.has);
     if (!live.length) { bits.push(`${name} has nothing recorded in this window yet.`); return; }
     // Compare weeks that actually finished. The last column is usually the week
@@ -257,8 +257,8 @@ function ctrRead(d) {
     const chores = rs.reduce((s, r) => s + r.chores, 0);
     const fines = rs.reduce((s, r) => s + r.fines, 0);
     const share = total > 0 ? Math.round(chores / total * 100) : 0;
-    bits.push(`${name} is ${dir} — ${ckMoney(total)} across ${live.length} week${live.length === 1 ? '' : 's'}, `
-      + `${share}% of it from household chores${fines ? `, with ${ckMoney(fines)} lost to fines` : ', with no fines at all'}`
+    bits.push(`${name} is ${dir} — ${fmtMoney(total)} across ${live.length} week${live.length === 1 ? '' : 's'}, `
+      + `${share}% of it from household chores${fines ? `, with ${fmtMoney(fines)} lost to fines` : ', with no fines at all'}`
       + `${running ? '. This week is still being lived, so it is not counted in that direction' : ''}.`);
   });
   const settled = d.weeks.filter(w => ['jenn', 'jess'].some(k => ctrRow(w.key, k).frozen)).length;
@@ -317,7 +317,7 @@ function ctrRenderTrends() {
       ${ctrLines(d)}
     </div>
     <div class="cp-sect">
-      <div class="cp-cap">Where it came from — ${ctParentKid === 'jess' ? 'Jess' : 'Jenn'}</div>
+      <div class="cp-cap">Where it came from — ${escapeHtml(kidLabel(ctParentKid).name)}</div>
       <div class="ck-sub">Darker is more. Every cell carries its number, so the colour is a second reading and never the only one.</div>
       ${ctrHeat(d, ctParentKid === 'jess' ? 'jess' : 'jenn')}
     </div>

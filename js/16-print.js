@@ -145,7 +145,7 @@ function renderPrintSheet(host, opts) {
   const mon = formatDayKey(keys[0]);
   const sun = formatDayKey(keys[6]);
   const p = o.profile || activeProfile();
-  const nameStr = p==='jenn'?'🐥 Jenn':'🦊 Jess';
+  const nameStr = `${kidLabel(p).icon} ${kidLabel(p).name}`;
 
   // Chosen display window (defaults to 6am–10pm).
   const winStartMin = win.startHour * 60;
@@ -312,7 +312,7 @@ function renderPrintSheet(host, opts) {
 
   // Signature footer: the kid commits to the plan (carried over from the weekly
   // view if already signed), with blank lines for a parent co-sign and the date.
-  const kidName = p==='jenn' ? 'Jenn' : 'Jess';
+  const kidName = kidLabel(p).name;
   const sig = getWeekSignature(keys, p);
   // Named *Html because it is already escaped — the suffix is what stops it
   // being escaped a second time, and stops the lint asking.

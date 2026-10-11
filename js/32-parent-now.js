@@ -103,7 +103,7 @@ function pnQueueRows() {
   const c = pnClaimCounts();
   if (c.total) {
     const who = ['jenn', 'jess'].filter(k => c[k])
-      .map(k => `${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'} ${c[k]}`).join(' · ');
+      .map(k => `${CT_PROFILE_ICON[k]} ${kidLabel(k).name} ${c[k]}`).join(' · ');
     rows.push({
       icon: '🧹', action: 'grade', cta: 'Grade ›', go: true,
       title: `${c.total} chore${c.total === 1 ? '' : 's'} waiting on a grade`,
@@ -116,7 +116,7 @@ function pnQueueRows() {
     rows.push({
       icon: '➕', action: 'approve', cta: 'Look ›',
       title: `${pend.length} activit${pend.length === 1 ? 'y' : 'ies'} to approve`,
-      sub: `${CT_PROFILE_ICON[first.owner] || ''} ${first.owner === 'jenn' ? 'Jenn' : 'Jess'} added “${first.act.name}”`,
+      sub: `${CT_PROFILE_ICON[first.owner] || ''} ${kidLabel(first.owner).name} added “${first.act.name}”`,
     });
   }
   const pendT = pnPendingTasks();
@@ -135,7 +135,7 @@ function pnQueueRows() {
   if (notes.length) {
     rows.push({
       icon: '💬', action: 'notes', cta: 'Read ›',
-      title: `${notes.map(k => k === 'jenn' ? 'Jenn' : 'Jess').join(' and ')} left a note this week`,
+      title: `${notes.map(k => kidLabel(k).name).join(' and ')} left a note this week`,
       sub: 'Worth reading before the meeting',
     });
   }
@@ -229,7 +229,7 @@ function pnBoughtCards(kids) {
     const saved = mnyGoalJarValue(kid, g);
     return mnyGoalPace(kid, Object.assign({}, g, { saved })).reached;
   }).map(g => `<div class="gu-req gu-req--open">
-      <div class="gu-req-top">${guKidChip(kid)}<span class="gu-kind">jar is full</span><span class="gu-amt"><b>${escapeHtml(guMoney$(mnyGoalJarValue(kid, g)))}</b></span></div>
+      <div class="gu-req-top">${guKidChip(kid)}<span class="gu-kind">jar is full</span><span class="gu-amt"><b>${escapeHtml(fmtMoney(mnyGoalJarValue(kid, g)))}</b></span></div>
       <div class="gu-req-text">${escapeHtml((g.icon || '🎯') + ' ' + g.name)} — did she buy it?</div>
       <div class="gu-check">🔎 Takes it out of the jar and writes a line</div>
       <div class="gu-answer"><button type="button" class="gu-yes" data-mnyp-action="guboughtit" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(g.id)}">✓ She bought it</button></div>
@@ -252,7 +252,7 @@ function pnRequestsHtml() {
     body = PN_KIND_GROUPS.map(([id, title, kinds]) => group(title, rest.filter(q => kinds.indexOf(q.kind) >= 0),
       id === 'goals' ? pnBoughtCards(kids).join('') : '')).join('');
   } else {
-    body = kids.map(kid => group(mnyKidName(kid), rest.filter(q => q.kid === kid), pnBoughtCards([kid]).join(''))).join('');
+    body = kids.map(kid => group(kidLabel(kid).name, rest.filter(q => q.kid === kid), pnBoughtCards([kid]).join(''))).join('');
   }
   const talkHtml = talk.length ? `<div class="pn-group pn-group--talk">
       <div class="pn-group-head"><span class="pn-group-title">💬 To talk about on Sunday</span><span class="pn-group-n">${talk.length}</span></div>
@@ -287,9 +287,9 @@ function pnSundayCard() {
     const pool = mnyPool(wk, kid);
     const wait = mnyRequestsFor(kid).filter(q => q.open).length;
     return `<div class="pn-sunkid ${'gu-tint--' + kid}">
-        <div class="pn-sunkid-head"><b>${escapeHtml(mnyKidName(kid))}</b>
+        <div class="pn-sunkid-head"><b>${escapeHtml(kidLabel(kid).name)}</b>
           <span class="pn-sunkid-wait${wait ? '' : ' ok'}">${wait ? `⏳ ${wait} to answer` : '✓ payday can open'}</span></div>
-        <div class="pn-sunkid-flow">came in <b>${escapeHtml(mnyMoney(pool.cameIn))}</b> → loan <b>${escapeHtml(mnyMoney(pool.mustPay))}</b> → hers <b class="pn-hers">${escapeHtml(mnyMoney(pool.mine))}</b></div>
+        <div class="pn-sunkid-flow">came in <b>${escapeHtml(fmtMoney(pool.cameIn))}</b> → loan <b>${escapeHtml(fmtMoney(pool.mustPay))}</b> → hers <b class="pn-hers">${escapeHtml(fmtMoney(pool.mine))}</b></div>
         <div class="gu">${guOverrideRows(kid)}</div>
       </div>`;
   }).join('');
@@ -312,7 +312,7 @@ function pnLastAnswerCard() {
   const wk = ctThisWeekKey();
   const rows = ['jenn', 'jess'].map(kid => {
     const a = sdLastAnswer(kid, wk);
-    return a && a.said ? `<div class="pn-said">${guKidChip(kid)} “${escapeHtml(a.said)}”${a.guess != null ? ` <span class="pn-sub">guessed $${escapeHtml(String(a.guess))}</span>` : ''}</div>` : '';
+    return a && a.said ? `<div class="pn-said">${guKidChip(kid)} “${escapeHtml(a.said)}”${a.guess != null ? ` <span class="pn-sub">guessed ${escapeHtml(fmtMoney(a.guess))}</span>` : ''}</div>` : '';
   }).join('');
   if (!rows) return '';
   return `<div class="pn-card pn-side-card">
@@ -333,26 +333,26 @@ function pnOwnsCard() {
   const row = (label, f, cls) => `<tr class="${cls || ''}"><th scope="row">${escapeHtml(label)}</th>${K.map(k => `<td>${escapeHtml(f(k))}</td>`).join('')}</tr>`;
   const tile = (k, id) => parts[k].tiles.find(t => t.k === id).value;
   const jarRows = K.some(k => parts[k].jars.length)
-    ? row('of which 🎯 goal jars', k => mnyMoney(parts[k].jarTotal), 'pn-owns-sub') : '';
+    ? row('of which 🎯 goal jars', k => fmtMoney(parts[k].jarTotal), 'pn-owns-sub') : '';
   // The next lock to come back, either girl's (the day a parent hands it back to her pile).
   const back = K.flatMap(k => mnyHoldingsOfKind(k, 'gic').map(h => String(h.maturesOn || ''))).filter(Boolean).sort()[0] || '';
-  const waiting = K.some(k => parts[k].waiting > 0) ? row('📥 Waiting for Sunday', k => mnyMoney(parts[k].waiting)) : '';
+  const waiting = K.some(k => parts[k].waiting > 0) ? row('📥 Waiting for Sunday', k => fmtMoney(parts[k].waiting)) : '';
   return `<div class="pn-card pn-side-card pn-owns">
       <div class="pn-side-head"><span class="pn-side-title">👛 What they own</span></div>
       <p class="pn-purpose">Check before you say yes to a move or a cash-out.</p>
       <table class="pn-owns-table">
         <thead><tr><td></td>${K.map(k => `<th scope="col">${guKidChip(k)}</th>`).join('')}</tr></thead>
         <tbody>
-          ${row('🏦 Savings', k => mnyMoney(tile(k, 'ready')))}
+          ${row('🏦 Savings', k => fmtMoney(tile(k, 'ready')))}
           ${jarRows}
-          ${row(`🔒 Locked away${back ? ' · back ' + mnyDayName(back) : ''}`, k => mnyMoney(tile(k, 'gic')))}
-          ${row('📈 Companies', k => mnyMoney(tile(k, 'stock')))}
+          ${row(`🔒 Locked away${back ? ' · back ' + fmtDay(back, 'long') : ''}`, k => fmtMoney(tile(k, 'gic')))}
+          ${row('📈 Companies', k => fmtMoney(tile(k, 'stock')))}
           ${waiting}
-          ${row('Total', k => mnyMoney(parts[k].total), 'pn-owns-total')}
-          ${row('🧱 Loan left', k => mnyMoney(mnyTotalOwing(k)))}
+          ${row('Total', k => fmtMoney(parts[k].total), 'pn-owns-total')}
+          ${row('🧱 Loan left', k => fmtMoney(mnyTotalOwing(k)))}
         </tbody>
       </table>
-      <div class="pn-owns-fix">${K.map(k => `<button type="button" class="gu-btn" data-mnyp-action="gufixowns" data-mnyp-kid="${k}">✏️ Fix ${escapeHtml(mnyKidName(k))}’s</button>`).join('')}</div>
+      <div class="pn-owns-fix">${K.map(k => `<button type="button" class="gu-btn" data-mnyp-action="gufixowns" data-mnyp-kid="${k}">✏️ Fix ${escapeHtml(kidLabel(k).name)}’s</button>`).join('')}</div>
     </div>`;
 }
 /* 🔧 Tidy-up — one-time and repair jobs (the stream set-up, weeks the
@@ -407,7 +407,7 @@ function pnAnswerCard() {
   const { kid, wk, d, todayIdx, dayKey } = pnAnswerTarget();
   const kids = ['jenn', 'jess'].map(k => `<button type="button" class="pn-kidbtn${k === kid ? ' on' : ''}"
       data-pn-action="answer-kid" data-kid="${k}" aria-pressed="${k === kid}">
-      ${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('');
+      ${CT_PROFILE_ICON[k]} ${escapeHtml(kidLabel(k).name)}</button>`).join('');
   const mon = formatDayKey(wk);
   const days = [0, 1, 2, 3, 4, 5, 6].map(i => {
     const date = new Date(mon); date.setDate(mon.getDate() + i);

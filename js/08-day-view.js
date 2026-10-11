@@ -114,20 +114,17 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
 /* The Day header's title. Names one day, or the span it is showing — a
    heading that said "Tuesday" over three columns would be lying about two of
    them. One day reads "Tuesday 6 Oct" on the iPad and the short "Tue 6 Oct"
-   on a phone, as the header pictures draw them (D28, fmtDay); the span form
-   stays until PR 6. */
+   on a phone, as the header pictures draw them (D28, fmtDay); a span reads
+   its weekdays, "Tue–Thu" (en dash, no spaces; D28, Consistency PR 6). The
+   date button's spoken name follows (dayHeadingAria). */
 function dayHeadingText() {
   const keys = dayViewKeys();
-  const first = formatDayKey(keys[0]);
   if (keys.length === 1) {
     const phone = !!(window.matchMedia && window.matchMedia('(max-width: 699px)').matches);
     if (phone) return fmtDay(keys[0], 'long');
     return `${DAY_LONG[dayIdxOfKey(keys[0])]} ${fmtDay(keys[0])}`;
   }
-  const last = formatDayKey(keys[keys.length - 1]);
-  const lastPart = last.getMonth() === first.getMonth()
-    ? `${last.getDate()}` : `${MONTH_SHORT[last.getMonth()]} ${last.getDate()}`;
-  return `${MONTH_SHORT[first.getMonth()]} ${first.getDate()} – ${lastPart}`;
+  return `${fmtDay(keys[0], 'weekday')}–${fmtDay(keys[keys.length - 1], 'weekday')}`;
 }
 /* The date may be a button (step.titleAction): its text is written into the
    button so the button stays. Its spoken name starts with the date, so the
@@ -687,7 +684,7 @@ function renderPendingInvitesOnTimeline(canvas, ghosts, lanes) {
     el.style.height = (g.bot - g.top) + 'px';
     el.style.left = `calc(${slot.col * widthPct}% + 2px)`;
     el.style.width = `calc(${widthPct}% - 4px)`;
-    const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
+    const fromName = kidLabel(inv.from).name;
     /* THE SECOND ACCEPT DOOR, on the inbox's rules: inviteAcceptable decides
        whether ✅ Accept is offered at all, and on a day already gone the ghost
        offers only 📌 Add it anyway and Decline — both through the same owners

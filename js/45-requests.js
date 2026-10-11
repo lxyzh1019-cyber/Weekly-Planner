@@ -119,7 +119,7 @@ function mnyAddRequest(kid, fields) {
     const left = money2(Math.max(0, max - mnyAdvanceUsed(kid, weekKey)));
     if (!(amount > 0)) { showToast('How much?'); return null; }
     if (amount > left) {
-      showToast(`I can draw up to ${mnyMoney(max)} a week — ${mnyMoney(left)} left this week.`);
+      showToast(`I can draw up to ${fmtMoney(max)} a week — ${fmtMoney(left)} left this week.`);
       return null;
     }
     Object.assign(r, { amount, day: String(f.day || '').slice(0, 10), why: String(f.why || '').slice(0, 80) });
@@ -179,13 +179,13 @@ function mnyRequestText(store, r) {
   if (store === 'moveRequests') {
     const from = MNY_REQUEST_POT_NAMES[r.from] || r.from, to = MNY_REQUEST_POT_NAMES[r.to] || r.to;
     return r.to === 'cash'
-      ? `Cash out ${mnyMoney(r.amount)} from ${String(from).replace(/^\S+ /, '')}`
-      : `Move ${mnyMoney(r.amount)} ${String(from).replace(/^\S+ /, '')} → ${String(to).replace(/^\S+ /, '')}`;
+      ? `Cash out ${fmtMoney(r.amount)} from ${String(from).replace(/^\S+ /, '')}`
+      : `Move ${fmtMoney(r.amount)} ${String(from).replace(/^\S+ /, '')} → ${String(to).replace(/^\S+ /, '')}`;
   }
-  if (store === 'deposits') return `${mnyGiftLabel(r)} · ${mnyMoney(r.amount)}`;
+  if (store === 'deposits') return `${mnyGiftLabel(r)} · ${fmtMoney(r.amount)}`;
   if (r.kind === 'comp') return `${r.name || mnySportLabel(r.sport)} · ${r.pts} pts`;
-  if (r.kind === 'goal') return `New goal: ${r.icon || '🎯'} ${r.name} · ${mnyMoney(r.target)}`;
-  if (r.kind === 'adv') return `Draw ${mnyMoney(r.amount)} early${r.why ? ' · ' + r.why : ''}`;
+  if (r.kind === 'goal') return `New goal: ${r.icon || '🎯'} ${r.name} · ${fmtMoney(r.target)}`;
+  if (r.kind === 'adv') return `Draw ${fmtMoney(r.amount)} early${r.why ? ' · ' + r.why : ''}`;
   if (r.kind === 'skip') return `Can't make a club session${r.why ? ' · ' + r.why : ''}`;
   if (r.kind === 'dispute') return `A fine I think is wrong${r.why ? ' · ' + r.why : ''}`;
   return '';
@@ -539,7 +539,7 @@ function mnySetClubPaid(kid, weekKey) {
   c.clubPaidThroughAt[kid] = syncNow();
   mrLogAppend({ path: 'clubPaidThrough.' + kid, from: before, to: String(weekKey),
                 reason: MR_DEFAULT_REASON,
-                note: '✓ Club paid — ' + mnyKidName(kid) + ', through the week of ' + weekKey });
+                note: '✓ Club paid — ' + kidLabel(kid).name + ', through the week of ' + weekKey });
   saveAll();
   return true;
 }
@@ -601,11 +601,7 @@ const RQ_HOMES = { ready: '🏦 Savings', locked: '🔒 Locked away', invest: '�
                    cash: '💵 Cash out', wall: '🧱 Loan wall' };
 let rqDraft = null;
 
-/* "$5" for whole dollars, "$5.50" otherwise — the prototype's `'$' + n`. */
-function rqDollars(v) { const n = money2(v); return '$' + (n % 1 ? n.toFixed(2) : String(n)); }
 function rqOrd(n) { return n ? ['1st', '2nd', '3rd'][n - 1] : '—'; }
-/* "Tue 29 Sep" — the prototype's way (owner's review M13-1). */
-function rqDayLabel(dayKey) { return mnyDayName(dayKey); }
 function rqHomeShort(h) { return String(RQ_HOMES[h] || h).replace(/^\S+ /, ''); }
 
 /* `kind`: result · club · move · adv · goal · gift · prices · list
@@ -692,10 +688,10 @@ function rqResultState(kid, d) {
   let preview;
   if (p.sport === 'swim') {
     const tot = races.reduce((a, r) => a + (Number(r.pts) || 0), 0);
-    preview = `${tot} points × ${rqDollars(p.prov ? sw.provincialPerPoint : sw.perPoint)}${p.qual ? ` + ${rqDollars(sw.qualifyBonus)} for qualifying` : ''} = ${rqDollars(pay)}`;
+    preview = `${tot} points × ${fmtMoney(p.prov ? sw.provincialPerPoint : sw.perPoint)}${p.qual ? ` + ${fmtMoney(sw.qualifyBonus)} for qualifying` : ''} = ${fmtMoney(pay)}`;
   } else {
     const pl = sk.placement || {};
-    preview = `${Number(p.pts) || 0} points × ${rqDollars(sk.perPoint)}${p.grp ? ` + ${rqDollars((pl.group || {})[p.grp])} group` : ''}${p.ovr ? ` + ${rqDollars((pl.overall || {})[p.ovr])} overall` : ''} = ${rqDollars(pay)}`;
+    preview = `${Number(p.pts) || 0} points × ${fmtMoney(sk.perPoint)}${p.grp ? ` + ${fmtMoney((pl.group || {})[p.grp])} group` : ''}${p.ovr ? ` + ${fmtMoney((pl.overall || {})[p.ovr])} overall` : ''} = ${fmtMoney(pay)}`;
   }
   const ready = !!(name && (p.sport !== 'swim' || races.some(r => (Number(r.pts) || 0) > 0 || String(r.time || '').trim())));
   return { ready, preview, pay, need: !name ? 'What was it called?' : 'Put in a race: its points or its time.' };
@@ -756,9 +752,9 @@ function rqResultBody(kid, d) {
   const items = planned.map(x => {
     const on = !!(p && !p.custom && p.blockId === x.blockId);
     const can = x.st === 'open';
-    const sub = x.st === 'done' ? `${rqDayLabel(x.dayKey)} · ✓ recorded ${rqDollars(x.award)}`
-      : x.st === 'sent' ? `${rqDayLabel(x.dayKey)} · ⏳ sent to parents`
-      : x.st === 'soon' ? `${rqDayLabel(x.dayKey)} · coming up` : `${rqDayLabel(x.dayKey)} · no result yet`;
+    const sub = x.st === 'done' ? `${fmtDay(x.dayKey, 'long')} · ✓ recorded ${fmtMoney(x.award)}`
+      : x.st === 'sent' ? `${fmtDay(x.dayKey, 'long')} · ⏳ sent to parents`
+      : x.st === 'soon' ? `${fmtDay(x.dayKey, 'long')} · coming up` : `${fmtDay(x.dayKey, 'long')} · no result yet`;
     const why = can ? '' : (x.st === 'done' ? 'My parents already have this one.' : x.st === 'sent' ? 'Already sent to parents.' : 'Not yet — it is still coming up.');
     return `<button type="button" class="rq-meet ${'rq-meet--' + x.st}${on ? ' on' : ''}" data-mny-action="rq-pick" data-mny-id="${escapeAttr(x.blockId || '')}"${can ? '' : ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"`}><span class="rq-meet-ico">${x.icon}</span><span class="rq-meet-name">${escapeHtml(x.title)}</span><span class="rq-meet-sub">${escapeHtml(sub)}</span></button>`;
   }).join('') || `<div class="rq-empty">Nothing on my planner in the last 4 weeks.</div>`;
@@ -770,7 +766,7 @@ function rqResultBody(kid, d) {
      from its own row above. */
   if (d.customAsk && !custom) {
     left += `<div class="rq-check"><div class="rq-q">First, is it one of these?</div>
-      ${planned.map(x => `<div class="rq-check-row">${escapeHtml(x.icon + ' ' + x.title + ' · ' + rqDayLabel(x.dayKey))}</div>`).join('')}
+      ${planned.map(x => `<div class="rq-check-row">${escapeHtml(x.icon + ' ' + x.title + ' · ' + fmtDay(x.dayKey, 'long'))}</div>`).join('')}
       <div class="rq-opts rq-two">${rqOpt('← Yes, one of these', false, 'rq-customback')}${rqOpt('✓ No, none of these', false, 'rq-customok')}</div></div>`;
   }
   if (custom) {
@@ -795,7 +791,7 @@ function rqResultBody(kid, d) {
         ${rqOpt('✕', false, 'rq-racedel', ` data-mny-i="${i}" aria-label="Take this race off"`, races.length > 1 ? '' : 'One race stays — change it instead.')}
       </div>`).join('')}
       ${races.length < 4 ? `<button type="button" class="rq-custom" data-mny-action="rq-raceadd">➕ Add a race (${4 - races.length} left)</button>` : ''}
-      <div class="rq-opts">${rqOpt(`🎯 Qualified for Provincials (+${rqDollars(rules.qualifyBonus)})`, !!p.qual, 'rq-qual')}${rqOpt(`🏟️ This was Provincials (${rqDollars(rules.provincialPerPoint)}/pt)`, !!p.prov, 'rq-prov')}</div>`;
+      <div class="rq-opts">${rqOpt(`🎯 Qualified for Provincials (+${fmtMoney(rules.qualifyBonus)})`, !!p.qual, 'rq-qual')}${rqOpt(`🏟️ This was Provincials (${fmtMoney(rules.provincialPerPoint)}/pt)`, !!p.prov, 'rq-prov')}</div>`;
   } else {
     right += `<div class="rq-q">② My result</div>
       <div class="rq-side">${rqRow('In my group', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.grp || 0) === n, 'rq-grp', ` data-mny-id="${n}"`)).join(''))}
@@ -825,7 +821,7 @@ function rqMoveState(kid, d) {
   const lockWeeks = Number(mrRuleOr(mrRules(), 'pots.lockWeeks')) || 4;
   if (d.mode === 'dep') {
     const ready = !!d.to;
-    const preview = d.to ? `I bring $${amt} of cash to my parents on Sunday. It goes into ${rqHomeShort(d.to)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${mnyMoney(amt * (1 + bonus / 100))}` : ''}.` : 'Where should the cash go?';
+    const preview = d.to ? `I bring ${fmtMoney(amt)} of cash to my parents on Sunday. It goes into ${rqHomeShort(d.to)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${fmtMoney(amt * (1 + bonus / 100))}` : ''}.` : 'Where should the cash go?';
     return { ready, preview, amt, max, need: 'Where should the cash go?' };
   }
   const to = d.mode === 'cash' ? 'cash' : d.to;
@@ -835,11 +831,11 @@ function rqMoveState(kid, d) {
   const preview = max < 1 ? 'Nothing to take out of there yet.'
     : refusal ? refusal
     : !ready ? 'Pick the details and why.'
-    : to === 'cash' ? `A parent hands me $${amt} in real cash on Sunday. It leaves the bank — no more interest.`
-    : to === 'locked' ? `$${amt} locked for ${lockWeeks} weeks, back on a Saturday with a little extra.`
-    : to === 'wall' ? `$${amt} counts as ${mnyMoney(amt * (1 + bonus / 100))} off my wall. It can’t come back.`
-    : to === 'invest' ? `$${amt} could go up or down. A parent talks it through first.`
-    : `$${amt} goes back where I can reach it.`;
+    : to === 'cash' ? `A parent hands me ${fmtMoney(amt)} in real cash on Sunday. It leaves the bank — no more interest.`
+    : to === 'locked' ? `${fmtMoney(amt)} locked for ${lockWeeks} weeks, back on a Saturday with a little extra.`
+    : to === 'wall' ? `${fmtMoney(amt)} counts as ${fmtMoney(amt * (1 + bonus / 100))} off my wall. It can’t come back.`
+    : to === 'invest' ? `${fmtMoney(amt)} could go up or down. A parent talks it through first.`
+    : `${fmtMoney(amt)} goes back where I can reach it.`;
   return { ready, preview, amt, max, need: max < 1 ? 'Nothing to take out of there yet.' : (refusal || 'Pick the details and why.') };
 }
 function rqMoveBody(kid, d) {
@@ -853,7 +849,7 @@ function rqMoveBody(kid, d) {
   const jars = money2(mnyReadyHomeTotal(kid) - mnySavedTotal(kid));
   const fromRow = rqRow('① Take it from', ['ready', 'locked', 'invest'].map(h => {
     const bal = money2(evHomeBalance(kid, h));
-    const shown = h === 'ready' ? `${mnyMoney(money2(bal + jars))}${jars > 0 ? ` · 🎯 ${mnyShort$(jars)} inside stays` : ''}` : mnyMoney(bal);
+    const shown = h === 'ready' ? `${fmtMoney(money2(bal + jars))}${jars > 0 ? ` · 🎯 ${fmtMoney(jars)} inside stays` : ''}` : fmtMoney(bal);
     const shut = h !== 'ready' && !evHomeOpen(kid, h);
     const why = h === 'locked' ? 'Locked money comes back on its own date.'
       : shut ? mnyNeedLabel(evHomeNeed(h)) : (bal < 1 ? 'Nothing to take out of there yet.' : '');
@@ -861,7 +857,7 @@ function rqMoveBody(kid, d) {
       d.from === h, 'rq-from', ` data-mny-id="${h}"`, why);
   }).join(''));
   const amtRow = rqRow(d.mode === 'dep' ? '① How much cash?' : '③ How much?',
-    `${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal('$' + st.amt)}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.max ? 'That is all there is.' : '')}${d.mode === 'dep' ? '' : rqOpt('All of it', false, 'rq-amtall', '', st.max < 1 ? 'Nothing to take out of there yet.' : '')}`);
+    `${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal(fmtMoney(st.amt))}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.max ? 'That is all there is.' : '')}${d.mode === 'dep' ? '' : rqOpt('All of it', false, 'rq-amtall', '', st.max < 1 ? 'Nothing to take out of there yet.' : '')}`);
   const whyRow = rqRow('④ Why?', RQ_MOVE_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''));
   const toList = d.mode === 'dep' ? ['ready', 'wall', 'locked'] : ['wall', 'locked', 'invest', 'ready'].filter(h => h !== d.from);
   const toRow = rqRow('② Put it in', toList.map(h => {
@@ -888,8 +884,8 @@ function rqAdvState(kid, d) {
   const amt = Math.min(d.amt || 1, Math.max(1, left));
   const ready = !!(d.why && left >= 1);
   // The prototype's tip, with "a parent" (Plan v18 A, owner 2026-10-05).
-  const preview = left < 1 ? `I already drew ${rqDollars(used)} in advance this week. That's the most.`
-    : `A parent gives me $${amt} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is $${amt} smaller.`;
+  const preview = left < 1 ? `I already drew ${fmtMoney(used)} in advance this week. That's the most.`
+    : `A parent gives me ${fmtMoney(amt)} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is ${fmtMoney(amt)} smaller.`;
   return { ready, preview, amt, left, need: left < 1 ? preview : 'What is it for?' };
 }
 /* The reference's body (Plan v18 B4) with the prototype's tip (owner,
@@ -899,7 +895,7 @@ function rqAdvState(kid, d) {
 function rqAdvBody(kid, d) {
   const st = rqAdvState(kid, d);
   return `<div class="rq-plain">⏪ Draw early: money I need before Sunday. It comes off next Sunday’s payday.</div>
-    <div class="rq-amtline"><span class="rq-q">How much</span>${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}<b class="rq-amtval">$${st.amt}</b>${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}</div>
+    <div class="rq-amtline"><span class="rq-q">How much</span>${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}<b class="rq-amtval">${fmtMoney(st.amt)}</b>${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}</div>
     <div class="rq-opts">${RQ_ADV_WHY.map(([icon, w]) => rqOpt(icon + ' ' + w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join('')}</div>`
     + rqPreviewAndFoot({ notNow: false });
 }
@@ -920,7 +916,7 @@ function rqDisputeBody(kid, d) {
   const st = rqDisputeState(kid, d);
   const f = st.fine || mrFines(kid).find(x => x && x.id === d.fineId);
   const cost = f ? guDisputeAmount(kid, { fineId: f.id }) : 0;
-  const head = f ? `<div class="rq-fine"><span>📦 ${escapeHtml(guFineLabel(f.itemId))} · ${escapeHtml(mnyDayName(f.dayKey))}</span><b>${escapeHtml(cost > 0 ? sdOff$(cost, mnyMoney) : 'free')}</b></div>` : '';
+  const head = f ? `<div class="rq-fine"><span>📦 ${escapeHtml(guFineLabel(f.itemId))} · ${escapeHtml(fmtDay(f.dayKey, 'long'))}</span><b>${escapeHtml(cost > 0 ? sdOff$(cost) : 'free')}</b></div>` : '';
   return head
     + rqRow('What happened? (if I want to say)', RQ_DISPUTE_WHY.map(([icon, w]) => rqOpt(icon + ' ' + w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''))
     + `<input type="text" class="rq-input" data-mny-action="rq-disputenote" maxlength="80" placeholder="In my own words…" value="${escapeAttr(d.note || '')}" aria-label="What happened, in my own words">`
@@ -941,7 +937,7 @@ function rqGoalState(kid, d) {
   const start = d.keep === 'ready' ? 0 : jar.saved;
   const wks = Math.ceil(Math.max(0, price - start) / 3);
   const preview = !ready ? 'Type what I want to buy, then pick a price.'
-    : `${d.icon} ${name} · $${price}. ${start ? `I start with ${mnyMoney(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. A parent says yes, then my jar switches.`;
+    : `${d.icon} ${name} · ${fmtMoney(price)}. ${start ? `I start with ${fmtMoney(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. A parent says yes, then my jar switches.`;
   return { ready, preview, need: 'What do I want to buy?' };
 }
 function rqGoalBody(kid, d) {
@@ -949,9 +945,9 @@ function rqGoalBody(kid, d) {
   const price = d.amt || 30;
   return `<input class="rq-input" type="text" value="${escapeAttr(d.name || '')}" placeholder="what I want to buy · e.g. new skate bag" data-mny-action="rq-goalname" aria-label="What I want to buy">`
     + rqRow('① Pick a picture', RQ_GOAL_ICONS.map(i => rqOpt(i, d.icon === i, 'rq-icon', ` data-mny-id="${i}"`)).join(''))
-    + rqRow('② How much does it cost?', `${rqOpt('−', false, 'rq-price', ' data-mny-d="-5" aria-label="Less"', price <= 5 ? 'That is the least.' : '')}${rqVal('$' + price)}${rqOpt('+', false, 'rq-price', ' data-mny-d="5" aria-label="More"')}${[20, 35, 50, 80].map(v => rqOpt('$' + v, price === v, 'rq-priceset', ` data-mny-id="${v}"`)).join('')}`)
+    + rqRow('② How much does it cost?', `${rqOpt('−', false, 'rq-price', ' data-mny-d="-5" aria-label="Less"', price <= 5 ? 'That is the least.' : '')}${rqVal(fmtMoney(price))}${rqOpt('+', false, 'rq-price', ' data-mny-d="5" aria-label="More"')}${[20, 35, 50, 80].map(v => rqOpt('$' + v, price === v, 'rq-priceset', ` data-mny-id="${v}"`)).join('')}`)
     + `<div class="rq-row"><div class="rq-q">③ When do I want it by? <span class="rq-hint">(if there is a day)</span></div><input class="rq-input rq-date" type="date" value="${escapeAttr(d.targetDate || '')}" data-mny-action="rq-goaldate" aria-label="When do I want it by"></div>`
-    + (jar.saved > 0 ? rqRow(`④ My jar has ${mnyMoney(jar.saved)} for ${jar.goal}. What happens to it?`,
+    + (jar.saved > 0 ? rqRow(`④ My jar has ${fmtMoney(jar.saved)} for ${jar.goal}. What happens to it?`,
         [['move', '➡️ Use it for the new goal'], ['ready', '🏦 Put it in Savings']].map(([k, l]) => rqOpt(l, (d.keep || 'move') === k, 'rq-keep', ` data-mny-id="${k}"`)).join('')) : '')
     + rqPreviewAndFoot();
 }
@@ -961,15 +957,15 @@ function rqClubState(kid, d) {
   const sw = mrSessionsWeek(ctThisWeekKey(), kid);
   const s = sw.sessions.find(x => x.blockId === d.blockId);
   const ready = !!(s && d.why);
-  const preview = s ? `If a parent says yes, ${rqDayLabel(s.dayKey)} shows as missed on Sunday. A missed session pays $0. It is not a fine.`
-    : sw.sessions.length ? `Each session I go to pays ${rqDollars(sw.rate)} on Sunday.` : 'No club sessions on my planner this week.';
+  const preview = s ? `If a parent says yes, ${fmtDay(s.dayKey, 'long')} shows as missed on Sunday. A missed session pays $0. It is not a fine.`
+    : sw.sessions.length ? `Each session I go to pays ${fmtMoney(sw.rate)} on Sunday.` : 'No club sessions on my planner this week.';
   return { ready, preview, need: s ? 'Why?' : 'Which one can’t I make?' };
 }
 function rqClubBody(kid, d) {
   const sw = mrSessionsWeek(ctThisWeekKey(), kid);
   const asked = (id) => mnyEnsureRequests(kid).some(r => r && r.kind === 'skip' && r.blockId === id && r.status !== 'no');
   return rqRow('① Which one can’t I make?', sw.sessions.map(x =>
-      rqOpt(rqDayLabel(x.dayKey) + (asked(x.blockId) ? ' · asked ✓' : ''), d.blockId === x.blockId, 'rq-session',
+      rqOpt(fmtDay(x.dayKey, 'long') + (asked(x.blockId) ? ' · asked ✓' : ''), d.blockId === x.blockId, 'rq-session',
         ` data-mny-id="${escapeAttr(x.blockId)}"`, asked(x.blockId) ? 'I already asked about this one.' : '')).join(''))
     + rqRow('② Why?', RQ_SKIP_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''))
     + rqPreviewAndFoot();
@@ -991,17 +987,17 @@ function rqGiftState(kid, d) {
   const amt = money2(d.amt);
   const giver = String(d.giver || '').trim();
   const ready = amt > 0 && !!d.from;
-  const when = d.dayKey === todayKey() ? 'today' : rqDayLabel(d.dayKey);
+  const when = d.dayKey === todayKey() ? 'today' : fmtDay(d.dayKey, 'long');
   const preview = !ready ? 'How much was it?'
-    : `${rqDollars(amt)} · ${d.from}${giver ? ' from ' + giver : ''} · ${when}. A parent says yes, then it goes into my payday on Sunday.`;
+    : `${fmtMoney(amt)} · ${d.from}${giver ? ' from ' + giver : ''} · ${when}. A parent says yes, then it goes into my payday on Sunday.`;
   return { ready, preview, need: 'How much was it?' };
 }
 function rqGiftBody(kid, d) {
   const amt = money2(d.amt) || 0;
-  return rqRow('① How much?', `${rqOpt('−', false, 'rq-giftamt', ' data-mny-d="-1" aria-label="Less"', amt <= 1 ? 'That is the least.' : '')}${rqVal(rqDollars(amt))}${rqOpt('+', false, 'rq-giftamt', ' data-mny-d="1" aria-label="More"')}${RQ_GIFT_CHIPS.map(v => rqOpt('$' + v, amt === v, 'rq-giftset', ` data-mny-id="${v}"`)).join('')}`)
+  return rqRow('① How much?', `${rqOpt('−', false, 'rq-giftamt', ' data-mny-d="-1" aria-label="Less"', amt <= 1 ? 'That is the least.' : '')}${rqVal(fmtMoney(amt))}${rqOpt('+', false, 'rq-giftamt', ' data-mny-d="1" aria-label="More"')}${RQ_GIFT_CHIPS.map(v => rqOpt('$' + v, amt === v, 'rq-giftset', ` data-mny-id="${v}"`)).join('')}`)
     + `<div class="rq-row"><div class="rq-q">② Who gave it to me?</div><input class="rq-input" type="text" value="${escapeAttr(d.giver || '')}" placeholder="e.g. Grandma, Uncle Mike" data-mny-action="rq-giver" aria-label="Who gave it to me"></div>`
     + rqRow('③ What kind?', MNY_FROM.map(f => rqOpt(f, d.from === f, 'rq-giftfrom', ` data-mny-id="${escapeAttr(f)}"`)).join(''))
-    + rqRow('④ Which day?', rqGiftDays().map((k, i) => rqOpt(i === 0 ? 'Today' : i === 1 ? 'Yesterday' : rqDayLabel(k), d.dayKey === k, 'rq-giftday', ` data-mny-id="${k}"`)).join(''))
+    + rqRow('④ Which day?', rqGiftDays().map((k, i) => rqOpt(i === 0 ? 'Today' : i === 1 ? 'Yesterday' : fmtDay(k, 'long'), d.dayKey === k, 'rq-giftday', ` data-mny-id="${k}"`)).join(''))
     + rqPreviewAndFoot();
 }
 /* 💷 What things pay — today's prices, read-only (the list My money and
@@ -1033,7 +1029,7 @@ function rqStatusText(q) {
       move: r.to === 'cash' ? '✓ cash on Sunday' : r.to === 'wall' ? (r.appliedWeek ? '✓ on the wall' : '✓ on the wall on Sunday') : '✓ moved',
       adv: '✓ cash given · off Sunday', deposit: '✓ in the bank', dispute: '✓ parents took the fine away' })[q.kind] || '✓ in Sunday’s payday';
     // 💬 Agreed at the meeting (Deviation 41): what she asked, and what was agreed.
-    return q.agreed != null && q.asked != null ? `${said} · agreed ${mnyShort$(q.agreed)} (asked ${mnyShort$(q.asked)})` : said;
+    return q.agreed != null && q.asked != null ? `${said} · agreed ${fmtMoney(q.agreed)} (asked ${fmtMoney(q.asked)})` : said;
   }
   if (q.status === 'no') return '✗ not this time';
   if (q.status === 'talk') return '💬 to talk about on Sunday';
@@ -1053,8 +1049,8 @@ function rqGiftsList(kid) {
     .sort((a, b) => String(b.dayKey || '').localeCompare(String(a.dayKey || ''))).slice(0, 10);
   if (!all.length) return '';
   return `<div class="rq-q">🎁 Gifts</div>${all.map(dep => {
-    const inner = `<span>🎁 ${escapeHtml(dep.giver || dep.from || 'A gift')}${dep.giver && dep.from ? ' · ' + escapeHtml(dep.from) : ''} · ${escapeHtml(mnyShortDate(dep.dayKey || dep.weekKey))}</span>
-      <b>${escapeHtml(mnyMoney(dep.amount))} · ${escapeHtml(dep.rejectedAt ? 'not this time' : dep.pendingApproval ? '⏳ waiting' : '✓ counted')}</b>`;
+    const inner = `<span>🎁 ${escapeHtml(dep.giver || dep.from || 'A gift')}${dep.giver && dep.from ? ' · ' + escapeHtml(dep.from) : ''} · ${escapeHtml(fmtDay(dep.dayKey || dep.weekKey, 'dated'))}</span>
+      <b>${escapeHtml(fmtMoney(dep.amount))} · ${escapeHtml(dep.rejectedAt ? 'not this time' : dep.pendingApproval ? '⏳ waiting' : '✓ counted')}</b>`;
     return isParent()
       ? `<button type="button" class="rq-chip rq-chip--tap" data-mny-action="gift-edit" data-mny-dep="${escapeAttr(dep.id)}">${inner}</button>`
       : `<div class="rq-chip">${inner}</div>`;
@@ -1216,11 +1212,11 @@ function rqSend() {
       qualified: !!p.qual, provincial: !!p.prov, text: `${String(p.name || '').trim()} · ${sum}` });
   } else if (d.kind === 'move' && d.mode === 'early') {
     rec = mnyAddRequest(kid, { kind: 'adv', amount: st.amt, why: d.why,
-      day: new Date().toLocaleDateString('en-US', { weekday: 'short' }),
-      text: `Draw $${st.amt} in advance · ${d.why}` });
+      day: fmtDay(todayKey(), 'weekday'),
+      text: `Draw ${fmtMoney(st.amt)} in advance · ${d.why}` });
   } else if (d.kind === 'move' && d.mode === 'dep') {
     rec = mnyAddRequest(kid, { kind: 'deposit', amount: st.amt, note: 'into ' + rqHomeShort(d.to),
-      text: `Put $${st.amt} cash in → ${rqHomeShort(d.to)}` });
+      text: `Put ${fmtMoney(st.amt)} cash in → ${rqHomeShort(d.to)}` });
   } else if (d.kind === 'move') {
     rec = mnyAddRequest(kid, { kind: 'move', from: d.from, to: d.mode === 'cash' ? 'cash' : d.to,
       amount: st.amt, note: d.why });
@@ -1231,16 +1227,16 @@ function rqSend() {
   } else if (d.kind === 'gift') {
     const giver = String(d.giver || '').trim();
     rec = mnyAddRequest(kid, { kind: 'gift', amount: money2(d.amt), from: d.from, giver, dayKey: d.dayKey,
-      text: `${d.from}${giver ? ' · ' + giver : ''} · ${rqDollars(d.amt)}` });
+      text: `${d.from}${giver ? ' · ' + giver : ''} · ${fmtMoney(d.amt)}` });
   } else if (d.kind === 'dispute') {
     const f = mrFines(kid).find(x => x && x.id === d.fineId);
     const why = [d.why, String(d.note || '').trim()].filter(Boolean).join(' · ');
     rec = mnyAddRequest(kid, { kind: 'dispute', fineId: d.fineId, why,
-      text: `This fine is wrong: ${f ? guFineLabel(f.itemId) + ' · ' + mnyDayName(f.dayKey) : 'a fine'}${why ? ' · ' + why : ''}` });
+      text: `This fine is wrong: ${f ? guFineLabel(f.itemId) + ' · ' + fmtDay(f.dayKey, 'long') : 'a fine'}${why ? ' · ' + why : ''}` });
   } else if (d.kind === 'club') {
     const s = mrSessionsWeek(ctThisWeekKey(), kid).sessions.find(x => x.blockId === d.blockId);
     rec = mnyAddRequest(kid, { kind: 'skip', blockId: d.blockId, dayKey: s ? s.dayKey : todayKey(), why: d.why,
-      text: `Can’t make ${s ? rqDayLabel(s.dayKey) : 'a session'} · ${d.why}` });
+      text: `Can’t make ${s ? fmtDay(s.dayKey, 'long') : 'a session'} · ${d.why}` });
   }
   if (!rec) return;
   showToast('Sent to parents ✋');

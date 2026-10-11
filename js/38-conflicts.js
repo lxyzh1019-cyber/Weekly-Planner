@@ -29,9 +29,6 @@ function cfKeyParts(key) {
   const [wk, kid] = String(key || '').split('/');
   return { wk: wk || '', kid: kid || '' };
 }
-function cfKidName(kid) {
-  return kid === 'jenn' ? 'Jenn' : kid === 'jess' ? 'Jess' : (kid || 'someone');
-}
 
 /* What this version actually SAYS — not how much of it there is.
 
@@ -210,7 +207,7 @@ function cfRenderPanel() {
     return `<div class="cf-row${done ? ' cf-row--done' : ''}">
         <div class="cf-row-head">
           <span class="cf-row-icon">${lab.icon}</span>
-          <span class="cf-row-title">${escapeHtml(cfKidName(kid))}’s ${escapeHtml(lab.noun)} — week of ${escapeHtml(wk)}</span>
+          <span class="cf-row-title">${escapeHtml(kid ? kidLabel(kid).name : 'someone')}’s ${escapeHtml(lab.noun)} — week of ${escapeHtml(wk)}</span>
           ${done ? '<span class="cf-tag cf-tag--done">sorted</span>' : ''}
         </div>
         <p class="parent-hint cf-row-sub">${escapeHtml(lab.what)}. Both versions are here; pick the one that is right.</p>

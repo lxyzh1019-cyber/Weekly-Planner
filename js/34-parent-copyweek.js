@@ -41,7 +41,6 @@ let pcwToDay   = 0;          // 0..6 — destination weekday
 function pcwClamp(o) { return Math.max(PCW_MIN_OFFSET, Math.min(PCW_MAX_OFFSET, o)); }
 // perfMondayKey (js/11-parent.js) already turns an offset into a Monday key.
 function pcwMonday(offset) { return perfMondayKey(pcwClamp(offset)); }
-function pcwKidName(kid) { return kid === 'jenn' ? 'Jenn' : 'Jess'; }
 
 /* Who copies to whom. parentScope is the portal's one switcher, so it decides
    the source: Both means each girl copies from her own week, which is the case
@@ -187,14 +186,14 @@ const PCW_ACTION_TEXT = {
 
 function pcwPreviewRow(row) {
   const who = row.cross
-    ? `${CT_PROFILE_ICON[row.srcKid]} ${pcwKidName(row.srcKid)} → ${CT_PROFILE_ICON[row.dstKid]} ${pcwKidName(row.dstKid)}`
-    : `${CT_PROFILE_ICON[row.srcKid]} ${pcwKidName(row.srcKid)}`;
+    ? `${CT_PROFILE_ICON[row.srcKid]} ${kidLabel(row.srcKid).name} → ${CT_PROFILE_ICON[row.dstKid]} ${kidLabel(row.dstKid).name}`
+    : `${CT_PROFILE_ICON[row.srcKid]} ${kidLabel(row.srcKid).name}`;
   /* Seven identical "nothing to copy" rows is not a description of a blank
      week, it is padding a parent has to read past to reach the girl whose week
      actually has something in it. One line says the same thing. */
   if (row.days.every(d => d.action === 'none')) {
     const why = row.days.some(d => d.dropped)
-      ? `nothing here that ${escapeHtml(pcwKidName(row.dstKid))} can use — those activities are not on her list`
+      ? `nothing here that ${escapeHtml(kidLabel(row.dstKid).name)} can use — those activities are not on her list`
       : 'nothing was planned that week';
     return `<div class="pn-card pcw-preview">
         <div class="pcw-who">${escapeHtml(who)}</div>
@@ -217,7 +216,7 @@ function pcwPreviewRow(row) {
   }).join('');
   const dropped = row.days.reduce((n, d) => n + d.dropped, 0);
   const note = dropped
-    ? `<p class="pn-note">${dropped} block${dropped === 1 ? '' : 's'} left behind — ${escapeHtml(pcwKidName(row.dstKid))} does not have
+    ? `<p class="pn-note">${dropped} block${dropped === 1 ? '' : 's'} left behind — ${escapeHtml(kidLabel(row.dstKid).name)} does not have
         ${dropped === 1 ? 'that activity' : 'those activities'} on her list. Share it in Setup › Activities and sports first.</p>`
     : '';
   return `<div class="pn-card pcw-preview">
@@ -239,7 +238,7 @@ function pcwRender() {
   const targets = scoped ? [
     ['same', `${CT_PROFILE_ICON[scoped]} Her own plan`],
     [scoped === 'jenn' ? 'jess' : 'jenn',
-      `${CT_PROFILE_ICON[scoped === 'jenn' ? 'jess' : 'jenn']} Over to ${pcwKidName(scoped === 'jenn' ? 'jess' : 'jenn')}`],
+      `${CT_PROFILE_ICON[scoped === 'jenn' ? 'jess' : 'jenn']} Over to ${kidLabel(scoped === 'jenn' ? 'jess' : 'jenn').name}`],
   ] : null;
   const cur = (pcwTargetKid === 'jenn' || pcwTargetKid === 'jess') ? pcwTargetKid : 'same';
   const whoCard = targets

@@ -111,13 +111,13 @@ function coGoalsCard() {
     const bar = (v, target, unit) => {
       const pct = target > 0 ? Math.min(100, Math.round(v / target * 100)) : 0;
       return `<div class="ctr-goalbar"><div class="ctr-goalfill" style="width:${pct}%"></div></div>
-        <div class="ck-sub">${unit === '$' ? ckMoney(v) : v} of ${unit === '$' ? ckMoney(target) : target}${target > 0 ? ` · ${pct}%` : ' — not set'}</div>`;
+        <div class="ck-sub">${unit === '$' ? fmtMoney(v) : v} of ${unit === '$' ? fmtMoney(target) : target}${target > 0 ? ` · ${pct}%` : ' — not set'}</div>`;
     };
     const step = (kind, delta, label) =>
       `<button type="button" class="ck-navbtn" data-co-action="goal" data-kid="${k}" data-kind="${kind}" data-delta="${delta}" aria-label="${label}">${delta > 0 ? '+' : '–'}</button>`;
     return `<div class="ctr-card"><div class="ctr-card-head">
         <span class="ctr-card-icon">${CT_PROFILE_ICON[k]}</span>
-        <span class="ctr-card-name">${k === 'jenn' ? 'Jenn' : 'Jess'}</span>
+        <span class="ctr-card-name">${escapeHtml(kidLabel(k).name)}</span>
         <span class="ck-spacer"></span>
         <span class="ck-sub">${ctGetGoalBonus(ctWeekKey, k) ? '✅ +$1 banked' : '+$1 when both land'}</span>
       </div>
@@ -143,7 +143,7 @@ function coGoalsCard() {
 function coPriceCard() {
   const r = mrRulesForWeek(ctWeekKey);
   const tiers = CP_GRADES.map(x =>
-    `<div class="co-tier"><span>${escapeHtml(x.label)}</span><span class="co-tier-n">${ckMoney(ckGradePay(r, x.g))}</span></div>`).join('');
+    `<div class="co-tier"><span>${escapeHtml(x.label)}</span><span class="co-tier-n">${fmtMoney(ckGradePay(r, x.g))}</span></div>`).join('');
   return `<div class="cp-sect"><div class="cp-cap">What a grade is worth</div>
     <div class="ck-sub">Changed in one place only, so a price can never be two things at once.</div>
     ${tiers}

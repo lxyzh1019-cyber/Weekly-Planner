@@ -9,7 +9,7 @@
 //
 // Five rules:
 //
-// 1. css/app.css. Comments are stripped first. Outside a TOKEN BLOCK no
+// 1. css/app.css and every other file in css/. Comments are stripped first. Outside a TOKEN BLOCK no
 //    declaration may carry a colour literal — hex, rgb()/rgba(), hsl()/hsla(),
 //    hwb()/lab()/lch()/oklab()/oklch(), or a CSS named colour (transparent,
 //    currentColor, inherit, initial and unset are keywords, not colours) — and
@@ -180,22 +180,9 @@ function literalsInCssValue(value) {
   return found;
 }
 
-const cssSrc = fs.readFileSync(path.join(ROOT, CSS_FILE), 'utf8');
-// Lines carrying `/* look: <reason> */` — read by rule 4 (text scale) only.
-const cssMarks = new Set();
-for (const m of cssSrc.matchAll(/\/\*([\s\S]*?)\*\//g)) {
-  const line = lineOf(cssSrc, m.index);
-  if (readMark(CSS_FILE, line, m[1])) cssMarks.add(line);
-}
-// Rule 5: the money span, read from the source before comments are blanked.
-const startMarks = [...cssSrc.matchAll(MONEY_START)].map(m => m.index);
-const endMarks = [...cssSrc.matchAll(MONEY_END)].map(m => m.index);
-let moneySpan = null;
-if (startMarks.length !== 1 || endMarks.length !== 1 || endMarks[0] < startMarks[0]) {
-  problems.push({ where: CSS_FILE, rule: 'money markers',
-    detail: `found ${startMarks.length} money-tokens:start and ${endMarks.length} money-tokens:end marker(s)${startMarks.length === 1 && endMarks.length === 1 ? ', end before start' : ''}`,
-    fix: 'keep exactly one /* money-tokens:start … */ before the money sections and one /* money-tokens:end */ after them' });
-} else moneySpan = { start: startMarks[0], end: endMarks[0] };
+// Every stylesheet in css/ (Stage 33): css/app.css, one file per screen and
+// css/floors.css. Rules 1, 3, 4 and 5 read them all, not only app.css.
+const CSS_FILES = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css')).sort().map(f => 'css/' + f);
 const sizeExemptHits = new Map(SIZE_EXEMPT.map(x => [x, 0]));
 let moneySizeDecls = 0;
 // A size typed in the value: what is left after the var(--…) tokens and bare 0s
@@ -209,10 +196,25 @@ function moneySizeProblem(value) {
   return /\d/.test(v) ? 'a typed size' : '';
 }
 let unscaledKept = 0;
-// Strip comments, keeping every newline so offsets map to lines.
-const css = cssSrc.replace(/\/\*[\s\S]*?\*\//g, blank);
 const looks = new Map();          // look name → Set of custom properties
 let cssDecls = 0, tokenBlocks = 0;
+const moneyMarks = [];           // per file: how many start / end markers, and whether they make a span
+for (const cssFile of CSS_FILES) {
+const cssSrc = fs.readFileSync(path.join(ROOT, cssFile), 'utf8');
+// Lines carrying `/* look: <reason> */` — read by rule 4 (text scale) only.
+const cssMarks = new Set();
+for (const m of cssSrc.matchAll(/\/\*([\s\S]*?)\*\//g)) {
+  const line = lineOf(cssSrc, m.index);
+  if (readMark(cssFile, line, m[1])) cssMarks.add(line);
+}
+// Rule 5: the money span, read from the source before comments are blanked.
+const startMarks = [...cssSrc.matchAll(MONEY_START)].map(m => m.index);
+const endMarks = [...cssSrc.matchAll(MONEY_END)].map(m => m.index);
+let moneySpan = null;
+if (startMarks.length === 1 && endMarks.length === 1 && endMarks[0] > startMarks[0]) moneySpan = { start: startMarks[0], end: endMarks[0] };
+moneyMarks.push({ file: cssFile, starts: startMarks.length, ends: endMarks.length, span: !!moneySpan });
+// Strip comments, keeping every newline so offsets map to lines.
+const css = cssSrc.replace(/\/\*[\s\S]*?\*\//g, blank);
 {
   const stack = [];               // preludes of the open blocks
   let buf = '', bufStart = -1, quote = null;
@@ -234,7 +236,7 @@ let cssDecls = 0, tokenBlocks = 0;
       looks.get(look[2]).add(prop);
     }
     if (inToken && prop.startsWith('--')) return;              // the shared value set itself
-    const where = `${CSS_FILE}:${lineOf(css, at)}`;
+    const where = `${cssFile}:${lineOf(css, at)}`;
     const ctx = `${selector.replace(/\s+/g, ' ').slice(0, 60)} { ${prop}: ${value.replace(/\s+/g, ' ').slice(0, 70)} }`;
     // Rule 5: inside the money markers a size is a token.
     if (moneySpan && at > moneySpan.start && at < moneySpan.end && SIZE_PROP.test(prop)) {
@@ -280,6 +282,18 @@ let cssDecls = 0, tokenBlocks = 0;
     if (c === '}') { flushDecl(); stack.pop(); continue; }
     if (bufStart < 0 && !/\s/.test(c)) bufStart = i;
     buf += c;
+  }
+}
+}
+// Rule 5: exactly one start and one end marker over every css/ file, in one file, start first.
+{
+  const starts = moneyMarks.reduce((n, m) => n + m.starts, 0);
+  const ends = moneyMarks.reduce((n, m) => n + m.ends, 0);
+  if (starts !== 1 || ends !== 1 || !moneyMarks.some(m => m.span)) {
+    const where = moneyMarks.filter(m => m.starts || m.ends).map(m => m.file).join(', ') || CSS_FILE;
+    problems.push({ where, rule: 'money markers',
+      detail: `found ${starts} money-tokens:start and ${ends} money-tokens:end marker(s)${starts === 1 && ends === 1 ? ', end before start or in different files' : ''}`,
+      fix: 'keep exactly one /* money-tokens:start … */ before the money sections and one /* money-tokens:end */ after them, in one css/ file' });
   }
 }
 

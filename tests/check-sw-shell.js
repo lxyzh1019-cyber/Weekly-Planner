@@ -59,6 +59,24 @@ inShell.forEach(src => {
   }
 });
 
+// ── 1b · every stylesheet in css/ is linked and cached (Stage 33) ──
+// css/app.css, one file per screen and css/floors.css: a sheet missing from the
+// SHELL is unstyled offline, the same failure as a missing script.
+const cssOnDisk = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css')).map(f => 'css/' + f);
+const cssInHtml = [...html.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"/g)]
+  .map(m => m[1]).filter(href => !/^https?:/.test(href)).map(href => href.replace(/^\.\//, ''));
+const cssInShell = [...sw.matchAll(/'\.\/(css\/[^']+)'/g)].map(m => m[1]);
+cssOnDisk.forEach(f => {
+  if (!cssInHtml.includes(f)) problems.push(`${f} exists and index.html never links it`);
+  if (!cssInShell.includes(f)) problems.push(`${f} exists and sw.js never caches it — it will 404 offline`);
+});
+cssInShell.concat(cssInHtml).forEach(f => {
+  if (!cssOnDisk.includes(f)) problems.push(`"${f}" is linked or cached but not in css/`);
+});
+if (cssInHtml[cssInHtml.length - 1] !== 'css/floors.css') {
+  problems.push('css/floors.css is not the last stylesheet index.html links — the minimum sizes must load last to win');
+}
+
 // ── 2 · every script ON DISK is loaded ──
 // A file nobody loads is dead weight; a file loaded but not on disk is a 404
 // on every boot, online and off.
@@ -100,7 +118,7 @@ if (!version) {
   if (committedRaw) changed = [...new Set(committed.concat(working))];
   if (changed && changed.length) {
     const shellTouched = changed.some(f =>
-      f === 'index.html' || f === 'css/app.css' || f === 'manifest.json' || /^js\/.+\.js$/.test(f));
+      f === 'index.html' || /^css\/.+\.css$/.test(f) || f === 'manifest.json' || /^js\/.+\.js$/.test(f));
     const swTouched = changed.includes('sw.js');
     if (shellTouched && !swTouched) {
       problems.push(
@@ -134,4 +152,4 @@ if (problems.length) {
   console.error('the first time a child opens the app without signal.');
   process.exit(1);
 }
-console.log(`OK  ${inShell.length} scripts, all loaded and all cached (SW_VERSION ${version} = APP_BUILD)`);
+console.log(`OK  ${inShell.length} scripts and ${cssInShell.length} stylesheets (${cssInShell.join(", ")}), all loaded and all cached (SW_VERSION ${version} = APP_BUILD)`);

@@ -201,7 +201,7 @@ async function mmToggleDayReviewed(kid, d) {
       return;
     }
     if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
-    if (can.reason === 'open' && !(await mmConfirmOpenDay(kid === 'jenn' ? 'Jenn' : 'Jess'))) return;
+    if (can.reason === 'open' && !(await mmConfirmOpenDay(kidLabel(kid).name))) return;
   }
   markDayReviewed(kid, k, !on);
   saveAll();
@@ -212,7 +212,7 @@ async function mmToggleDayReviewed(kid, d) {
    blocks keep their unanswered state and the day counts as reviewed, which is
    a parent saying "I have looked at this" and nothing more. */
 function mmReviewLeavingBlocks(kid, d) {
-  const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const nm = kidLabel(kid).name;
   markDayReviewed(kid, mmDayKey(d), true);
   saveAll();
   renderMeetingMode();
@@ -226,7 +226,7 @@ function mmReviewLeavingBlocks(kid, d) {
    and the meeting's own refresh. */
 async function mmRecordNotDoneAndReview(kid, d) {
   const key = mmDayKey(d);
-  const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const nm = kidLabel(kid).name;
   /* A settled week's money is frozen, and there is no way back: nothing clears
      committedAt, mnyReopenWeek refuses a committed week, and the meeting's Undo
      is a session-local snapshot that is gone once the sheet closes. An earlier
@@ -669,17 +669,17 @@ function mmExpressToggle(which) {
    accessor, so a figure here can never disagree with the full meeting's. */
 function mmExpressKidCard(wk, kid) {
   const b = mrWeekBreakdown(wk, kid);
-  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(kid).name;
   const row = (label, value) =>
     `<div class="mm-xp-row"><span>${escapeHtml(label)}</span><span class="mm-xp-n">${value}</span></div>`;
   return `<div class="mm-xp-card">
       <div class="mm-xp-name">${CT_PROFILE_ICON[kid]} <b>${name}</b></div>
-      ${row('Chores graded', ckMoney(b.chorePaid))}
-      ${row('Learning', ckMoney(b.learnPaid))}
-      ${row('Routine streak', ckMoney(b.streakBonus))}
-      ${row('Competition', ckMoney(b.compPaid))}
-      ${row('Fines', b.fines.total ? '−' + ckMoney(b.fines.total) : 'none')}
-      <div class="mm-xp-row mm-xp-total"><span><b>Total</b></span><span class="mm-xp-n"><b>${ckMoney(b.net)}</b></span></div>
+      ${row('Chores graded', fmtMoney(b.chorePaid))}
+      ${row('Learning', fmtMoney(b.learnPaid))}
+      ${row('Routine streak', fmtMoney(b.streakBonus))}
+      ${row('Competition', fmtMoney(b.compPaid))}
+      ${row('Fines', b.fines.total ? '−' + fmtMoney(b.fines.total) : 'none')}
+      <div class="mm-xp-row mm-xp-total"><span><b>Total</b></span><span class="mm-xp-n"><b>${fmtMoney(b.net)}</b></span></div>
       <button type="button" class="pill-btn" data-mm-action="express-adjust">Adjust in the full meeting ›</button>
     </div>`;
 }
@@ -701,7 +701,7 @@ function mmRenderExpress(wk) {
       <div class="mm-xp-ticks">
         <button type="button" class="mm-xp-tick" data-mm-action="express-tick" data-which="money">
           <span class="mm-xp-box">${tick(mmExpressMoney)}</span>
-          <span><b>Record the money</b><br><span class="ct-meta">Credits ${ckMoney(total)} to their pockets</span></span>
+          <span><b>Record the money</b><br><span class="ct-meta">Credits ${fmtMoney(total)} to their pockets</span></span>
         </button>
         <button type="button" class="mm-xp-tick" data-mm-action="express-tick" data-which="met">
           <span class="mm-xp-box">${tick(mmExpressMet)}</span>
@@ -768,7 +768,7 @@ function mmCatchUpBanner() {
       ? `<div class="mm-catchup-row mm-catchup-more">
            <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
            <span class="mm-catchup-late">no family meeting — the Grandfather rule</span>
-           <button type="button" class="mm-catchup-go" data-mm-catch="sweep">Credit ${escapeHtml(mnyMoney(older.amount))} each ›</button>
+           <button type="button" class="mm-catchup-go" data-mm-catch="sweep">Credit ${escapeHtml(fmtMoney(older.amount))} each ›</button>
          </div>`
       : `<div class="mm-catchup-row mm-catchup-more">
            <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
@@ -1119,7 +1119,7 @@ function mmRenderReview(wk) {
        Both control is there, and it is labelled Both. */
     const kidCell = (kid) => {
       const on = mmIsDayReviewedFor(kid, d);
-      const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+      const nm = kidLabel(kid).name;
       /* A control that cannot act says why on itself. Un-ticking is always
          offered: taking a record back needs no permission. */
       const can = on ? null : mmCanReviewDay(kid, d);
@@ -1166,7 +1166,7 @@ function mmRenderReview(wk) {
       if (ahead || mmIsDayReviewedFor(kid, d)) return '';
       const can = mmCanReviewDay(kid, d);
       if (!mmOverridableRefusal(can)) return '';
-      const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+      const nm = kidLabel(kid).name;
       const n = can.pendingCount;
       return `<div class="mm-drow-offer">
           <span class="mm-drow-offer-say">${CT_PROFILE_ICON[kid]} ${escapeHtml(nm)} · `
@@ -1214,7 +1214,7 @@ function mmRenderReview(wk) {
      Same writer and same labels as step 2's pair, so the two cannot drift. */
   const openWeek = `<div class="mm-blocklink">${['jenn', 'jess'].map(k =>
     `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
-      >${CT_PROFILE_ICON[k]} Open ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}'s week ›</button>`).join('')}
+      >${CT_PROFILE_ICON[k]} Open ${escapeHtml(kidLabel(k).name)}'s week ›</button>`).join('')}
     <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
   return `${mnyChecklist(wk, mnyMeetingKid())}
     <div class="mm-h">Review the week</div>
@@ -1238,7 +1238,7 @@ function mmFamilyChoreReview(wk) {
   const rows = ['jenn', 'jess'].map(kid => {
     const st = getFamilyChoreStatus(kid, wk);
     if (!st.required) return '';
-    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const name = kidLabel(kid).name;
     const met = st.unfulfilled === 0;
     const waiting = st.waiting
       ? ` · <span class="mm-chore-wait">${st.waiting} waiting for a parent check</span>` : '';
@@ -1257,7 +1257,7 @@ function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); rend
 function mmRenderDayDetail(wk, d) {
   const col = (kid) => {
     const rows = mmReviewRows(kid, d);
-    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const name = kidLabel(kid).name;
     /* Both sections carry a footer, and it is what makes a blank week workable:
        the chores one can add a chore that was never planned, the routines one
        marks all three at once. Rendered in the empty branch too — an empty day
@@ -1313,10 +1313,10 @@ function mmRenderDayDetail(wk, d) {
       const chips = items.map(f => `<button type="button" class="mm-fine"
           data-mm-action="fine-add" data-kid="${escapeAttr(kid)}" data-day="${d}"
           data-fine="${escapeAttr(f.id)}"
-        >${escapeHtml(f.label)} <b>−${ckMoney(f.amount)}</b></button>`).join('');
+        >${escapeHtml(f.label)} <b>−${fmtMoney(f.amount)}</b></button>`).join('');
       const given = givenToday.map(f => `<div class="mm-fine-given">
           <span>${escapeHtml(names[f.itemId] || f.itemId)}</span>
-          <span class="ck-red">−${ckMoney(1)}</span>
+          <span class="ck-red">−${fmtMoney(1)}</span>
           <button type="button" class="mm-fine-x" data-mm-action="fine-undo"
             data-kid="${escapeAttr(kid)}" data-fine-id="${escapeAttr(f.id)}"
             aria-label="Take this fine back">×</button>
@@ -1341,7 +1341,7 @@ function mmRenderDayDetail(wk, d) {
           ? (CK_QUALITY.find(q => q.g === row.claim) || {}).word || ''
           : '';
         const tag = row.kind === 'chore'
-          ? (row.on ? `<span class="mm-item-pay">${mnyMoney(row.pay)}</span>`
+          ? (row.on ? `<span class="mm-item-pay">${fmtMoney(row.pay)}</span>`
              : said ? `<span class="mm-item-said">she said: ${escapeHtml(said.toLowerCase())}</span>`
              : `<span class="mm-item-said">not answered</span>`)
           : '';
@@ -1524,7 +1524,7 @@ function mm2b(kid, scaleMax) {
         <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${Math.round(p / maxMin * 100)}%"></span><span class="mm-2b-done" style="width:${Math.round(dn / maxMin * 100)}%;background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span></span>
         <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
   }).join('') || `<div class="ct-meta">No scheduled blocks this week.</div>`;
-  return `<div class="mm-2b-kid"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(h.completed)} completed / ${fmtHrsMin(h.planned)} planned</div>${rows}</div>`;
+  return `<div class="mm-2b-kid"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${escapeHtml(kidLabel(kid).name)} — ${fmtHrsMin(h.completed)} completed / ${fmtHrsMin(h.planned)} planned</div>${rows}</div>`;
 }
 /* One scale for both girls, computed before either card is drawn. */
 function mm2bScale(wk) {
@@ -1543,11 +1543,11 @@ function mmRenderQuarterly() {
   const rows = ['jenn','jess'].map(kid => {
     const y = mrYearToDate(kid);
     const ch = y.channels;
-    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const name = kidLabel(kid).name;
     if (!y.weeks) return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${name} — no recorded weeks yet.</div>`;
-    return `<div class="ct-meta" style="margin-top:0.3rem">${CT_PROFILE_ICON[kid]} <b>${name}</b> — $${y.paidTotal.toFixed(2)} over ${y.weeks} week${y.weeks === 1 ? '' : 's'}
-        · on this pace <b>$${y.projected.toFixed(2)}/yr</b> against a $${y.target.toFixed(0)} target (<b>${y.pctOfTarget}%</b>)</div>
-      <div class="ct-meta">chores $${ch.chores.toFixed(2)} · learning $${ch.learning.toFixed(2)} · streak $${ch.streak.toFixed(2)} · competition $${ch.competition.toFixed(2)} · fines −$${ch.fines.toFixed(2)}</div>`;
+    return `<div class="ct-meta" style="margin-top:0.3rem">${CT_PROFILE_ICON[kid]} <b>${name}</b> — ${fmtMoney(y.paidTotal)} over ${y.weeks} week${y.weeks === 1 ? '' : 's'}
+        · on this pace <b>${fmtMoney(y.projected)}/yr</b> against a $${y.target.toFixed(0)} target (<b>${y.pctOfTarget}%</b>)</div>
+      <div class="ct-meta">chores ${fmtMoney(ch.chores)} · learning ${fmtMoney(ch.learning)} · streak ${fmtMoney(ch.streak)} · competition ${fmtMoney(ch.competition)} · fines −${fmtMoney(ch.fines)}</div>`;
   }).join('');
   return `<div class="mm-recorded" style="margin-top:0.6rem">
       <div><b>📅 Quarterly review — ${mrQuarterOf(todayKey())}</b></div>
@@ -1785,7 +1785,7 @@ function mmWeekPosition(wk) {
 function mmCloseSummary(wk) {
   const keys = mrWeekDayKeys(wk);
   return `<div class="mm-close-sum">${['jenn', 'jess'].map(kid => {
-    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const name = kidLabel(kid).name;
     /* Only days that COULD be reviewed count against her — a day that has not
        happened is not a day anybody failed to review. A day still RUNNING is a
        different matter and counts: this used to exclude it exactly as the close
@@ -1873,7 +1873,7 @@ function mmRenderPlan(wk) {
     closeBtn = `<button type="button" class="btn-confirm" onclick="mmCloseWeekNow()">🔒 Close the week</button>`;
   } else {
     const why = gate.missing.map(m => {
-      const who = m.kid === 'jenn' ? 'Jenn' : 'Jess';
+      const who = kidLabel(m.kid).name;
       if (m.reason === 'days') return `${who} has ${m.n} day${m.n === 1 ? '' : 's'} still to review`;
       if (m.reason === 'reflection') return `${who}'s reflection is not finished or skipped`;
       if (m.reason === 'reflection-talk') return `nobody has recorded talking through ${who}'s reflection`;
@@ -1962,7 +1962,7 @@ function mmOpenNextWeek() {
 function mmKidSettled(wk, kid) {
   return {
     kid,
-    name: kid === 'jenn' ? 'Jenn' : 'Jess',
+    name: kidLabel(kid).name,
     /* `old` was "earned under the retired group model", which counted such a
        week as settled so it could not block the meeting forever. There is one
        model now and every week has something to agree and decide, so nothing
@@ -2038,7 +2038,7 @@ function commitKidWeek(wk, kid) {
   const parts = [];
   {
     const w = ensureWallet(kid);
-    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const name = kidLabel(kid).name;
     // The breakdown is frozen HERE, before anything moves. Recomputing it later
     // would read today's rules and today's grades, so a price edit or a late
     // regrade would silently rewrite what a past week said it paid. History has
@@ -2057,7 +2057,7 @@ function commitKidWeek(wk, kid) {
       if (prelim > 0) evSettleLines(kid, wk, prelim, true);
       evMirror(kid, { kind: 'settle', amount: 0, dayKey: wk, weekKey: wk, ref: wk,
                       note: 'Week of ' + wk + ' settled' });
-      if (prelim > 0) parts.push(`${name} +$${prelim.toFixed(2)}`);
+      if (prelim > 0) parts.push(`${name} +${fmtMoney(prelim)}`);
     }
     // XP is computed all week but only credited here — awarding it on render
     // would multiply it by however many times the screen redrew. Idempotent
@@ -2080,7 +2080,7 @@ function commitKidWeek(wk, kid) {
       }
     }
     const adv = moneyAdvanceMonth(kid);
-    adv.matured.forEach(m => parts.push(`${name} unlocked +$${m.payout.toFixed(2)}`));
+    adv.matured.forEach(m => parts.push(`${name} unlocked +${fmtMoney(m.payout)}`));
   }
   saveAll();
   return { parts, ledger: (c.moneyLedger[wk] || {})[kid] || null };

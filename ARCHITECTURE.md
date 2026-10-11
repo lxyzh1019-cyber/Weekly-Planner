@@ -433,6 +433,7 @@ Kid-facing copy is a product surface, not filler. The rules:
 
 ## UI rules
 
+- **Where styles live (Stage 33).** Each screen's own rules go in its file — `css/today.css`, `css/week-day.css`, `css/money.css`, `css/parent.css`, `css/social.css`, linked after `css/app.css` in that order; shared parts (kit, header, tokens) and the sheets stay in `css/app.css`; `css/floors.css` (the minimum-size floors) is linked last so the minimum sizes win, and every file in `css/` must be linked in `index.html` and listed in `sw.js` SHELL. (checked by tests/check-sw-shell.js, tests/check-dead-css.js, tests/check-look-tokens.js)
 - **Touch targets ≥ 44×44px** on every interactive element, including week
   arrows and small chips. Enforced on the four kid screens by
   `kidScreensMeetTheHouseRules` in `tests/smoke.js`, which probes the real hit
@@ -466,7 +467,7 @@ Kid-facing copy is a product surface, not filler. The rules:
 - **Minimum font size 13px**; 15px for anything a child must read to act. Also
   enforced by the same check. Roughly 147 declarations in `css/app.css` compute
   below 13px, but most are print, dark-mode or parent surfaces where the kid floor
-  does not apply — the floor is a scoped block at the end of `css/app.css` listing
+  does not apply — the floor is a scoped block in `css/floors.css` (linked last) listing
   only what actually rendered too small. (checked by smoke: kidScreensMeetTheHouseRules)
 - **No word budget** — see *Writing for children*. The count and its per-screen
   ratchets are gone from `tests/smoke.js`; the 44px and 13px floors stay,
@@ -3199,6 +3200,28 @@ idea straight back, putting the whole backlog out of reach again. (text only)
 a delete inside `state.shared.chore` cannot propagate (`deepMergeObj` iterates
 the keys the remote has), so tidying them would churn the document on every sync
 to no effect. Same reasoning as the retired `unlockedActs`.
+
+## One money and day format — fmtMoney, fmtDay, kidLabel (Consistency PR 6)
+
+Money on screen is written by `fmtMoney` only, days by `fmtDay` only (both in
+`js/05-helpers.js`), and a girl's name and icon come from `kidLabel`
+(`js/01-config.js`). D2: "$3" for whole dollars, "$2.50" otherwise, "−$3"
+(U+2212) for a negative, "+$3" when signed. Days: 'short' "27 Sep", 'long'
+"Sat 3 Oct", 'weekday' "Sat", 'month' "Oct 2026", 'dated' "27 Sep" with the
+year added when it is not this year. Do not write a local formatter, a
+`'$' + x.toFixed(2)`, a `toLocaleDateString` or a `kid === 'jenn' ? 'Jenn' :
+'Jess'` — `tests/check-money-words.js` fails on each, outside
+`js/05-helpers.js`, unless named in its FMT_ALLOW with why. (checked by tests/check-money-words.js)
+
+Two named exceptions: `sdBook$` (js/43-sunday-core.js) keeps "$100 and up
+shown rounded" on the passbook and the forecast — an owner decision still
+open (Stage 32), fmtMoney below $100 — and `sdOff$`, which only puts the
+minus of "taken off" in front of fmtMoney. `js/43-sunday-core.js` is required
+by Node tests, where fmtMoney and fmtDay are not globals: its existing
+`module.exports` guard takes them from `js/05-helpers.js`'s guard (inert in the
+browser), so there is still one formatter. Stored records are never rewritten:
+a note saved with the old words ("$3.00", "Jul 28") keeps them; only new
+notes and every figure drawn from stored numbers use the new style.
 
 ## One money model, for every week
 

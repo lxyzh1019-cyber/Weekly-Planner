@@ -59,7 +59,7 @@ function mnyStrip(wk, kid, liveIdx) {
   return `<div class="mny-strip">${cells.map((c, i) =>
     `<div class="mny-strip-cell${i === liveIdx ? ' on' : ''}">
        <div class="mny-label">${escapeHtml(c.label)}</div>
-       <div class="mny-strip-val">${mnyMoney(c.value)}</div>
+       <div class="mny-strip-val">${fmtMoney(c.value)}</div>
      </div>`).join('<span class="mny-strip-arrow">→</span>')}</div>`;
 }
 
@@ -74,37 +74,37 @@ function mnyWorking(wk, kid, channel, b) {
   const dayName = (k) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(k).getDay()];
   if (channel === 'chores') {
     const c = b.chores;
-    return c.days.map(d => line(dayName(d.dayKey), d.taken ? 'paid the week before' : mnyMoney(d.paid))).join('')
+    return c.days.map(d => line(dayName(d.dayKey), d.taken ? 'paid the week before' : fmtMoney(d.paid))).join('')
       + (c.freeUsed.length ? `<div class="mny-note">${c.freeUsed.length} free job${c.freeUsed.length > 1 ? 's' : ''} used — always your lowest-paying ones.</div>` : '')
       + (c.overflowChores ? `<div class="mny-note">${c.overflowChores} job${c.overflowChores > 1 ? 's' : ''} past your daily most — those earned XP.</div>` : '');
   }
   if (channel === 'learning') {
     return b.learning.lines.map(l => line(
       l.label + (l.voided ? ' (' + l.voided + ' did not count)' : ''),
-      l.xp ? l.xp + ' XP' : mnyMoney(l.amount))).join('')
+      l.xp ? l.xp + ' XP' : fmtMoney(l.amount))).join('')
       || `<div class="mny-note">Nothing counted this week.</div>`;
   }
   if (channel === 'streak') {
     return line('Longest run of days with all three routines kept', b.streak.days + ' days')
-      + (b.streak.tier ? line('That pays the ' + b.streak.tier + '-day step', mnyMoney(b.streak.bonus))
+      + (b.streak.tier ? line('That pays the ' + b.streak.tier + '-day step', fmtMoney(b.streak.bonus))
                        : `<div class="mny-note">Three days in a row with morning, afternoon and evening all closed is the first step.</div>`);
   }
   if (channel === 'comp') {
     const entries = mrCompetitions(kid).filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk));
     return entries.length
-      ? entries.map(c => line(mnySportIcon(c.sport) + ' ' + (c.name || mnySportLabel(c.sport)) + ' · ' + mnyShortDate(c.dayKey), mnyMoney(c.awarded))).join('')
+      ? entries.map(c => line(mnySportIcon(c.sport) + ' ' + (c.name || mnySportLabel(c.sport)) + ' · ' + fmtDay(c.dayKey, 'dated'), fmtMoney(c.awarded))).join('')
       : `<div class="mny-note">No competition days this week.</div>`;
   }
   if (channel === 'sessions') {
     const s = b.sessions || { sessions: [] };
     return (s.sessions || []).map(x => line(dayName(x.dayKey),
-        x.attended === true ? '✓ ' + mnyMoney(s.rate) : x.attended === false ? 'missed · $0' : '? not ticked')).join('')
+        x.attended === true ? '✓ ' + fmtMoney(s.rate) : x.attended === false ? 'missed · $0' : '? not ticked')).join('')
       || `<div class="mny-note">No club sessions this week.</div>`;
   }
   if (channel === 'fines') {
     const rows = b.fines.perDay.filter(d => d.raw > 0);
     return rows.length
-      ? rows.map(d => line(dayName(d.dayKey), '−' + mnyMoney(d.applied).slice(1) +
+      ? rows.map(d => line(dayName(d.dayKey), '−' + fmtMoney(d.applied).slice(1) +
           (d.applied < d.raw ? ' (a day never goes below $0)' : ''))).join('')
       : `<div class="mny-note">Nothing taken off this week.</div>`;
   }
@@ -224,7 +224,7 @@ function mnyRecordCompZero(kid, dayKey, name, sport) {
   mnyReopenWeek(kid, wk);
   saveAll();
   renderMeetingMode();
-  showToast(`Recorded — ${mnyMoney(0)}, no criteria met`);
+  showToast(`Recorded — ${fmtMoney(0)}, no criteria met`);
 }
 
 /* The parent's before-we-start list. Collapsed, because on a good week it is
@@ -435,7 +435,7 @@ function mnyDoCommit(kidArg, wkArg) {
   if (f.advManual > 0) {
     mnyAddRequest(kid, { kind: 'adv', amount: f.advManual, status: 'yes', dayKey: mnyWeekEnd(wk),
                          why: 'Forgot to ask — added on payday',
-                         text: `Drew ${mnyMoney(f.advManual)} early · added on payday` });
+                         text: `Drew ${fmtMoney(f.advManual)} early · added on payday` });
   }
   let advLeft = money2(sg.adv);
   mnyEnsureRequests(kid)

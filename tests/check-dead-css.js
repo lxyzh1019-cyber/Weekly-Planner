@@ -1,6 +1,7 @@
 // Weekly-Planner — dead CSS guard.
 //
-// Fails when css/app.css defines a class selector that appears nowhere in
+// Fails when a file in css/ (css/app.css, the screen files, css/floors.css)
+// defines a class selector that appears nowhere in
 // index.html, js/ or tests/ as a whole word. Such a rule cannot ever match:
 // the name is not in the markup, not in a template, not in a classList call.
 //
@@ -30,7 +31,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const css = fs.readFileSync(path.join(ROOT, 'css', 'app.css'), 'utf8');
+// Every stylesheet in css/ (Stage 33: one file per screen, floors last), not only app.css.
+const css = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css')).sort()
+  .map(f => fs.readFileSync(path.join(ROOT, 'css', f), 'utf8')).join('\n');
 
 // Classes assembled at runtime, by builder (file:line where the name is glued).
 // Full names only, never a prefix.
@@ -93,7 +96,7 @@ for (const [where, names] of Object.entries(BUILT_AT_RUNTIME)) {
   const builder = fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : '';
   for (const n of names) {
     const prefix = n.replace(/[a-zA-Z0-9]+$/, '');
-    if (!classes.has(n)) stale.push(`.${n} (listed under ${where}) is no longer in css/app.css`);
+    if (!classes.has(n)) stale.push(`.${n} (listed under ${where}) is no longer in any css/ file`);
     else if (!builder.includes(prefix)) stale.push(`.${n}: ${file} no longer builds '${prefix}...'`);
     built.add(n);
   }

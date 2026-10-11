@@ -1069,7 +1069,7 @@ function openEditSheet(blockId) {
   const me = activeProfile();
   const isKid = me === 'jenn' || me === 'jess';
   const sister = me === 'jenn' ? 'jess' : 'jenn';
-  const sisterName = sister === 'jenn' ? 'Jenn' : 'Jess';
+  const sisterName = kidLabel(sister).name;
 
   /* 💌 share — any ordinary block, but NOT a watching one: passing somebody
      else's meet on as a plain invite would clone her competition block onto
@@ -1839,12 +1839,12 @@ function renderParentChoreStrip() {
   // empty state to explain, it is simply a day without chores on it.
   if (!rows.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
   const r = mrRulesForWeek(rows[0].wk);
-  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(who).name;
   bar.style.display = 'flex';
   bar.innerHTML = `<span class="pc-cap">🧺 ${escapeHtml(name)}'s chores today</span>`
     + rows.map(row => {
       const paid = row.grade > 0 ? ckGradePay(r, row.grade) : 0;
-      const said = row.grade > 0 ? mnyMoney(paid) : (row.notDone ? '$0 · didn\'t happen' : 'not graded');
+      const said = row.grade > 0 ? fmtMoney(paid) : (row.notDone ? '$0 · didn\'t happen' : 'not graded');
       return `<button type="button" class="pc-chore${row.grade > 0 ? ' on' : ''}"
           data-pc-chore="${escapeAttr(row.choreId)}" data-pc-block="${escapeAttr(row.blockId)}"
           title="Tap to cycle $3 → $2 → $1 → $0"
@@ -1917,7 +1917,7 @@ function notDoneWouldWipeARoutine(block, kid) {
 /* The one confirmation. Says what the mark means, names every grade coming
    back and the total, and says plainly what it does NOT undo. */
 async function confirmNotDone(blocks, dayKey, kid) {
-  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(kid).name;
   const n = blocks.length;
   const { rows, total } = notDoneBlocksWouldCost(blocks, dayKey, kid);
   let msg = `Record ${n} block${n === 1 ? '' : 's'} as not done for ${name}?\n\n`
@@ -1925,8 +1925,8 @@ async function confirmNotDone(blocks, dayKey, kid) {
     + `Nothing is marked done.`;
   if (rows.length) {
     msg += `\n\nThis money comes back:\n`
-      + rows.map(r => `  ${r.label} — ${mnyMoney(r.pay)}`).join('\n')
-      + `\n  Total — ${mnyMoney(total)}`;
+      + rows.map(r => `  ${r.label} — ${fmtMoney(r.pay)}`).join('\n')
+      + `\n  Total — ${fmtMoney(total)}`;
   }
   // XP is forward-only by design: xpCredit is its single writer and there is no
   // path back into the ledger. Say so rather than let it be discovered.
@@ -2008,13 +2008,13 @@ async function toggleNotDone() {
     return;
   }
   if (notDoneWouldWipeARoutine(blk, who)) {
-    const nm = who === 'jenn' ? 'Jenn' : 'Jess';
+    const nm = kidLabel(who).name;
     showToast(`${nm} ticked every step — untick the routine first`);
     return;
   }
   const frozen = notDoneIsFrozenFor([blk], currentDayKey, who);
   if (frozen) {
-    showToast(`That week's money is settled — ${mnyMoney(frozen.total)} cannot come back`);
+    showToast(`That week's money is settled — ${fmtMoney(frozen.total)} cannot come back`);
     return;
   }
   if (!(await confirmNotDone([blk], currentDayKey, who))) return;
@@ -2035,7 +2035,7 @@ async function markRemainingNotDoneForChild(kid, dayKey) {
   if (!isParent()) { showToast('Only a grown-up records this 🔒'); return; }
   const who = kid || parentViewing;
   const key = dayKey || currentDayKey;
-  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(who).name;
   const waiting = dayBlocksAwaitingAccount(who, key);
   if (!waiting.length) { showToast(`Nothing left to answer for ${name}`); return 0; }
 
@@ -2051,7 +2051,7 @@ async function markRemainingNotDoneForChild(kid, dayKey) {
        be recorded, which is what lets a settled week's review finish. */
     const free = doable.filter(b => !notDoneBlocksWouldCost([b], key, who).rows.length);
     if (!free.length) {
-      showToast(`${name}'s money for that week is settled — ${mnyMoney(frozenBulk.total)} cannot come back`);
+      showToast(`${name}'s money for that week is settled — ${fmtMoney(frozenBulk.total)} cannot come back`);
       return 0;
     }
     if (!(await showConfirm(
@@ -2122,7 +2122,7 @@ async function confirmAllBlocksForChild(kid, dayKey) {
   if (!isParent()) return;
   const who = kid || parentViewing;
   const key = dayKey || currentDayKey;
-  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(who).name;
   const eligible = dayBlocksEligibleToConfirm(key, who);
   if (!eligible.length) {
     showToast(key > todayKey() ? 'That day has not happened yet' : `Nothing to confirm for ${name}`);
@@ -2133,7 +2133,7 @@ async function confirmAllBlocksForChild(kid, dayKey) {
   if (!(await showConfirm(
     `Confirm ${pending.length} block${pending.length === 1 ? '' : 's'} for ${name}?`
     + `\n\nThey are marked done and confirmed. This does not mark the day reviewed, `
-    + `and it does not touch ${who === 'jenn' ? 'Jess' : 'Jenn'}.`,
+    + `and it does not touch ${kidLabel(who === 'jenn' ? 'jess' : 'jenn').name}.`,
     { okLabel: 'Confirm them', cancelLabel: 'Not now' }))) return;
 
   // Complete first, through the owner — it writes and saves per block.
@@ -2169,7 +2169,7 @@ async function markDayReviewedForChild(kid, dayKey) {
   if (!isParent()) return;
   const who = kid || parentViewing;
   const key = dayKey || currentDayKey;
-  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(who).name;
   if (isDayReviewed(who, key)) {
     markDayReviewed(who, key, false);
     saveAll(); renderParentBanners();
@@ -2219,7 +2219,7 @@ function renderParentBanners() {
    them in the label). */
 function parentDayActionsHtml() {
   const who = parentViewing;
-  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(who).name;
   const key = currentDayKey;
   const eligible = dayBlocksEligibleToConfirm(key, who);
   const left = eligible.filter(b => !isBlockConfirmed(b)).length;

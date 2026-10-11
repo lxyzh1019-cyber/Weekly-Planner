@@ -1522,7 +1522,7 @@ function tdRenderToday() {
   const payTag = pay
     ? (pay.capReached
         ? `<span class="td-row-pay xp">+XP</span>`
-        : `<span class="td-row-pay">up to ${mnyMoney(pay.amount)}</span>`)
+        : `<span class="td-row-pay">up to ${fmtMoney(pay.amount)}</span>`)
     : '';
   /* Every job on today, with where each one has got to — not only the ones
      still claimable. Filtering to claimable meant the card went blank on the
@@ -1800,13 +1800,13 @@ function tdMoneyChart(kid, wk) {
 
   const bar = total > 0
     ? `<span class="td-bar">${segs.map(s => `<span class="td-bar-seg" style="width:${(s.amount / total * 100).toFixed(2)}%;background:${s.colour}"
-            title="${escapeAttr(s.label + ' ' + mnyMoney(s.amount))}"></span>`).join('')}</span>`
+            title="${escapeAttr(s.label + ' ' + fmtMoney(s.amount))}"></span>`).join('')}</span>`
     : `<span class="td-bar td-bar--empty"></span>`;
 
   // The key doubles as the numbers, so the picture needs no separate table.
   const key = segs.map(s => `<span class="td-key">
       <span class="td-key-dot" style="background:${s.colour}"></span>
-      ${escapeHtml(s.label)} ${escapeHtml(mnyMoney(s.amount))}</span>`).join('');
+      ${escapeHtml(s.label)} ${escapeHtml(fmtMoney(s.amount))}</span>`).join('');
 
   const hist = tdMoneyHistory(kid);
   const spark = hist.length >= TD_MONEY_SPARK_MIN_WEEKS ? tdMoneySparkline(hist) : '';
@@ -1818,11 +1818,11 @@ function tdMoneyChart(kid, wk) {
      answer to it. */
   const earn = mnyEarnLeftToday(kid, wk);
   const earnCap = earn.left == null ? 'Earned today' : 'Still to earn today';
-  const earnAmt = mnyMoney(earn.left == null ? earn.done : earn.left);
+  const earnAmt = fmtMoney(earn.left == null ? earn.done : earn.left);
 
   return `<button type="button" class="td-money" data-td-action="money">
-      <span class="td-money-total">${escapeHtml(mnyMoney(total))}${owing > 0
-        ? ` <span class="td-money-owing">owes ${escapeHtml(mnyMoney(owing))}</span>` : ''}</span>
+      <span class="td-money-total">${escapeHtml(fmtMoney(total))}${owing > 0
+        ? ` <span class="td-money-owing">owes ${escapeHtml(fmtMoney(owing))}</span>` : ''}</span>
       ${bar}
       <span class="td-keys">${key || '<span class="td-key">Nothing yet</span>'}</span>
       ${spark}

@@ -122,8 +122,6 @@ function sdBeep(f) {
 function sdReducedMotion() {
   try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
 }
-function sdM(v) { return sdMoney(v); }
-function sdD(v) { const n = money2(v); return (n < 0 ? '−$' : '$') + (Math.abs(n) % 1 ? Math.abs(n).toFixed(2) : String(Math.abs(n))); }
 
 /* ════════════════════════════════════════════════════════════════
    THE INPUT — one girl's Sunday, read from the app's own owners
@@ -250,7 +248,7 @@ function sdPendingItems(kid, wk) {
     || (!r.blockId && String(r.dayKey) === String(p.dayKey) && String(r.name || '').trim().toLowerCase() === String(p.name || '').trim().toLowerCase()));
   mmUnrecordedCompetitions(wk, kid).filter(p => !told(p)).forEach(p => items.push({
     id: 'meet:' + p.dayKey + ':' + (p.name || ''), kind: 'meet', icon: p.icon || '🏆', open: true, meet: p,
-    text: (p.name || mnySportLabel(p.sport) || 'Competition') + ' · ' + mnyShortDate(p.dayKey) }));
+    text: (p.name || mnySportLabel(p.sport) || 'Competition') + ' · ' + fmtDay(p.dayKey, 'dated') }));
   return items;
 }
 function sdNewRows(kid, wk) {
@@ -273,7 +271,7 @@ function sdContext(kid, wk) {
   const inp = sdBuildInput(kid, wk);
   const P = sdPile(inp.w, inp.rules);
   const words = Number(mrRuleOr(inp.rules, 'words.' + kid)) || 1;
-  return Object.assign(inp, { kid, wk, P, words, name: mnyKidName(kid) });
+  return Object.assign(inp, { kid, wk, P, words, name: kidLabel(kid).name });
 }
 function sdRenderMoneyStep(wk) {
   const kid = mnyMeetingKid();
@@ -307,7 +305,7 @@ function sdMeetingAvatars(wk) {
   const cur = mnyMeetingKid();
   return `<span class="sd-avs" role="group" aria-label="Whose Sunday">${['jenn', 'jess'].map(k => {
     const signed = mnyIsCommitted(wk, k);
-    return `<button type="button" class="sd-av${k === cur ? ' on' : ''}" data-mny-action="sd-kid" data-sd-kid="${k}" aria-pressed="${k === cur}" aria-label="${escapeAttr(mnyKidName(k) + (signed ? ' ✓ signed' : ''))}">
+    return `<button type="button" class="sd-av${k === cur ? ' on' : ''}" data-mny-action="sd-kid" data-sd-kid="${k}" aria-pressed="${k === cur}" aria-label="${escapeAttr(kidLabel(k).name + (signed ? ' ✓ signed' : ''))}">
         <span class="sd-av-pic" aria-hidden="true">${CT_PROFILE_ICON[k]}</span>${signed ? '<span class="sd-av-ok" aria-hidden="true">✓</span>' : ''}</button>`;
   }).join('')}</span>`;
 }
@@ -319,7 +317,7 @@ function sdMeetingSteps(wk) {
     const word = l.split(' · ')[1] || l;
     return `${i ? '<span class="sd-stepsep" aria-hidden="true">›</span>' : ''}<span class="sd-stepchip${i === step ? ' on' : i < step ? ' done' : ''}"${i === step ? ' aria-current="step"' : ''}>${i < step ? '✓ ' : ''}${escapeHtml(word)}</span>`;
   }).join('');
-  return `<span class="visually-hidden">The money for ${escapeHtml(mnyKidName(kid))}:</span>
+  return `<span class="visually-hidden">The money for ${escapeHtml(kidLabel(kid).name)}:</span>
       <span class="sd-steps" role="group" aria-label="Sunday steps">${steps}</span>`;
 }
 function sdMeetingActions() {
@@ -368,7 +366,7 @@ function sdGuessMain(c) {
   const d = c.d, s = mrSessionsWeek(c.wk, c.kid);
   const rate = sdRule(c.rules, 'sessions.perSession');
   const open = s.sessions.filter(x => x.attended == null).length;
-  const paState = open ? `${open} to tick` : (s.attended ? `✓ ${s.attended} × ${sdD(rate)}` : '$0 · missed');
+  const paState = open ? `${open} to tick` : (s.attended ? `✓ ${s.attended} × ${fmtMoney(rate)}` : '$0 · missed');
   const chips = s.sessions.map(x => {
     const v = x.attended;
     return `<button type="button" class="sd-att${v == null ? ' open' : v ? ' yes' : ' no'}" data-mny-action="sd-att" data-sd-block="${escapeAttr(x.blockId)}" data-sd-day="${escapeAttr(x.dayKey)}">${escapeHtml(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(x.dayKey).getDay()] + ' ' + formatDayKey(x.dayKey).getDate())} ${v == null ? '?' : v ? '✓' : '✗'}</button>`;
@@ -393,12 +391,12 @@ function sdGuessMain(c) {
                   hist.length && Math.round(avg / 5) * 5 === g ? 'my avg' : ''].filter(Boolean).join(' ');
     return `<button type="button" class="sd-rung${on ? ' on' : ''}" data-mny-action="sd-guess" data-sd-v="${g}" aria-pressed="${on}" style="--f:${(0.2 + i * 0.08).toFixed(2)}">
         <span class="sd-rung-mark">${escapeHtml(mark)}</span><span class="sd-rung-pin">${on ? '▼' : ''}</span>
-        <span class="sd-rung-bar${i % 2 ? ' alt' : ''}"><b>$${g}</b></span></button>`;
+        <span class="sd-rung-bar${i % 2 ? ' alt' : ''}"><b>${fmtMoney(g)}</b></span></button>`;
   }).join('');
   const hint = u.total
     ? [u.asks ? `parents: ${u.asks} to answer` : '', u.sessions ? `my club sessions: ${u.sessions} to tick` : '', u.rows ? 'a new row on my wall' : ''].filter(Boolean).join(' · ') + ' first →'
-    : d.guess ? `My guess: $${d.guess}${Object.keys(d.cat).filter(k => d.cat[k] != null).length ? ` · ${Object.keys(d.cat).filter(k => d.cat[k] != null).length} of 4 sources picked` : ''}. Let's see.`
-    : hist.length ? `Last week was $${lastWeek}. There is no wrong guess.` : 'There is no wrong guess.';
+    : d.guess ? `My guess: ${fmtMoney(d.guess)}${Object.keys(d.cat).filter(k => d.cat[k] != null).length ? ` · ${Object.keys(d.cat).filter(k => d.cat[k] != null).length} of 4 sources picked` : ''}. Let's see.`
+    : hist.length ? `Last week was ${fmtMoney(lastWeek)}. There is no wrong guess.` : 'There is no wrong guess.';
   const ready = d.guess && !u.total;
   return `<div class="sd-title">🎲 Payday guessing game!</div>
     <div class="sd-script">${escapeHtml(sdStory(c))}</div>
@@ -407,7 +405,7 @@ function sdGuessMain(c) {
       <div class="sd-job">
         <div class="sd-job-head"><span class="sd-cat-icon">⛸️</span><span class="sd-nowrap">Club job</span><b class="sd-pill">${escapeHtml(paState)}</b></div>
         <div class="sd-atts">${chips}</div>
-        <div class="sd-note">✓ = ${escapeHtml(sdD(rate))} · missed = $0, not a fine</div>
+        <div class="sd-note">✓ = ${escapeHtml(fmtMoney(rate))} · missed = $0, not a fine</div>
       </div>
       ${cats}
     </div>
@@ -425,7 +423,7 @@ function sdAskRow(c, it) {
     : it.open ? (it.status === 'talk' ? '💬 Parents want to talk' : '⏳ waiting for parents')
     : ({ goal: '✓ new goal starts today', move: '✓ moved', deposit: '✓ in the bank', gift: '✓ in the bank',
          adv: '✓ already spent · comes off today', skip: '✓ marked missed', dispute: '✓ fine taken away' }[it.kind]
-       || (q && q.record && q.record.compId ? `✓ yes · ${sdD(mrCompAward(mrCompetitions(c.kid).find(x => x.id === q.record.compId)))} today` : '✓ yes'));
+       || (q && q.record && q.record.compId ? `✓ yes · ${fmtMoney(mrCompAward(mrCompetitions(c.kid).find(x => x.id === q.record.compId)))} today` : '✓ yes'));
   let btns = '';
   if (it.kind === 'meet') {
     const p = it.meet;
@@ -440,7 +438,7 @@ function sdAskRow(c, it) {
     if (field) {
       const asked = mnyRequestAsked(q.store, q.record);
       const agreed = q.agreed != null ? q.agreed : asked;
-      const fig = v => (it.kind === 'adv' ? sdOff$(v, sdD) : sdD(v));   // early cash is taken off (Plan v18 §W)
+      const fig = v => (it.kind === 'adv' ? sdOff$(v) : fmtMoney(v));   // early cash is taken off (Plan v18 §W)
       btns = `<div class="sd-agree">
           <span class="sd-agree-asked">asked ${escapeHtml(fig(asked))}</span>
           <span class="sd-agree-set"><span>agreed</span><button type="button" class="sd-step" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="A dollar less">−</button><b>${escapeHtml(fig(agreed))}</b><button type="button" class="sd-step" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="A dollar more">+</button></span>
@@ -463,11 +461,11 @@ function sdAskRow(c, it) {
     if (it.kind === 'comp') {
       // Her figure, as the Approve card reads it (guCompCalc) — Dad starts there.
       const rule = rec.pay != null ? money2(rec.pay) : guCompCalc(rec).amt;
-      nums = `<div class="sd-adj-row"><span>A parent makes it</span><button type="button" class="sd-step" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(sdD(rule))}</b><button type="button" class="sd-step" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
+      nums = `<div class="sd-adj-row"><span>A parent makes it</span><button type="button" class="sd-step" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(rule))}</b><button type="button" class="sd-step" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
     } else if ((it.kind === 'gift' || it.kind === 'deposit') && rec.pendingApproval) {
-      nums = `<div class="sd-adj-row"><span>How much</span><button type="button" class="sd-step" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(sdD(rec.amount))}</b><button type="button" class="sd-step" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
+      nums = `<div class="sd-adj-row"><span>How much</span><button type="button" class="sd-step" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(rec.amount))}</b><button type="button" class="sd-step" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
     } else if (it.kind === 'adv' || it.kind === 'move') {
-      nums = `<div class="sd-adj-row"><span>Amount</span><b>${escapeHtml(it.kind === 'adv' ? sdOff$(q.amount, sdD) : sdD(q.amount))}</b></div>`;
+      nums = `<div class="sd-adj-row"><span>Amount</span><b>${escapeHtml(it.kind === 'adv' ? sdOff$(q.amount) : fmtMoney(q.amount))}</b></div>`;
     }
     adjust = `<div class="sd-adj">${nums}<button type="button" class="sd-ans no" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">✗ Not this time</button></div>`;
   }
@@ -508,7 +506,7 @@ function sdGuessSide(c) {
     <div class="sd-panel sd-panel--green">
       <div class="sd-panel-head"><span class="sd-panel-title">🎯 My earning target</span><span class="sd-note">set by parents</span></div>
       <div class="sd-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
-      <div class="sd-line">${escapeHtml(`$${Math.round(earnedYr)} of $${Math.round(target)} earned so far · about ${sdM(target / 52)} a week keeps me on pace`)}</div>
+      <div class="sd-line">${escapeHtml(`${fmtMoney(Math.round(earnedYr))} of ${fmtMoney(Math.round(target))} earned so far · about ${fmtMoney(target / 52)} a week keeps me on pace`)}</div>
     </div>
     <div class="sd-panel sd-panel--amber">
       <div class="sd-panel-head"><span class="sd-panel-title">⏳ Parents answer first · ${open} / ${items.length} open</span><span class="sd-note">a parent taps</span></div>
@@ -544,15 +542,15 @@ function sdTiles(c) {
   const place = e => ((e.placement || {}).group ? ` · group ${rqOrd(e.placement.group)}` : '');
   return [
     { id: 'home', group: 'earned', name: '🏠 Home', every: true, amount: money2(b.chorePaid + b.learnPaid + b.streakBonus),
-      note: `chores ${sdD(money2(b.chorePaid + b.learnPaid))} · routine ${sdD(b.streakBonus)}`, coin: 'earned', badge: 'NICE!' },
+      note: `chores ${fmtMoney(money2(b.chorePaid + b.learnPaid))} · routine ${fmtMoney(b.streakBonus)}`, coin: 'earned', badge: 'NICE!' },
     { id: 'club', group: 'earned', name: '⛸️ Club job', every: true, amount: money2(b.sessionsPaid),
-      note: `${ses} session${ses === 1 ? '' : 's'} × ${sdD(sdRule(c.rules, 'sessions.perSession'))}`, coin: 'earned', badge: 'WOW' },
+      note: `${ses} session${ses === 1 ? '' : 's'} × ${fmtMoney(sdRule(c.rules, 'sessions.perSession'))}`, coin: 'earned', badge: 'WOW' },
     { id: 'comp', group: 'earned', name: '🏆 Competitions', amount: c.f.compIn,
       note: (b.comp.entries || []).map(e => (e.name || mnySportLabel(e.sport)) + place(e)).join(' · ') || (c.f.lateIn ? 'a competition from a settled week' : 'none this week'), coin: 'earned', badge: 'BRAVO!' },
     { id: 'gifts', group: 'given', name: '🎁 Gifts', amount: c.f.giftsIn,
-      note: c.f.deps.filter(x => !sdIsHomeCash(x)).map(x => `${x.giver || x.from} ${sdD(x.amount)}`).filter(Boolean).join(' · ') || 'only after a parent says yes', coin: 'given', badge: 'THANKS!' },
+      note: c.f.deps.filter(x => !sdIsHomeCash(x)).map(x => `${x.giver || x.from} ${fmtMoney(x.amount)}`).filter(Boolean).join(' · ') || 'only after a parent says yes', coin: 'given', badge: 'THANKS!' },
     { id: 'made', group: 'made', name: '🌱 My pots earned', amount: money2(Math.max(0, passive)), noCoins: true,
-      note: passive < 0 ? `companies ${sdD(passive)} this week` : `Savings interest · ${sdRule(c.rules, 'pots.rates.ready')}% a year`, coin: null },
+      note: passive < 0 ? `companies ${fmtMoney(passive)} this week` : `Savings interest · ${sdRule(c.rules, 'pots.rates.ready')}% a year`, coin: null },
     { id: 'fines', group: 'off', name: '📦 Fines', amount: money2(-(c.f.b.gross - c.f.b.net)), free: true,
       note: sdFinesNote(b), coin: 'off' },
   ];
@@ -585,7 +583,7 @@ function sdTileHtml(c, t, idx) {
   const v = t.amount;
   return `<button type="button" class="sd-tile${on ? ' on' : ''}${v === 0 ? ' zero' : v < 0 ? ' neg' : ''}" data-mny-action="sd-line" data-sd-tile="${t.id}">
       ${on && v > 0 && t.badge ? `<span class="sd-badge">${escapeHtml(t.badge)}</span>` : ''}
-      <span class="sd-tile-name"><span class="sd-nowrap">${escapeHtml(t.name)}</span> · <b>${escapeHtml(sdM(v))}</b></span>
+      <span class="sd-tile-name"><span class="sd-nowrap">${escapeHtml(t.name)}</span> · <b>${escapeHtml(fmtMoney(v))}</b></span>
     </button>`;
 }
 /* A payday line's working, in a sheet (#sundayOverlay): its channels, the
@@ -603,8 +601,8 @@ function sdTileDetail(c, id, edit) {
   const b = c.f.b;
   const cur = { chores: b.chorePaid, learning: b.learnPaid, streak: b.streakBonus, sessions: b.sessionsPaid, comp: b.compPaid, fines: b.fines.total };
   const ov = mnyOverrides(c.kid, c.wk);
-  const rows = chans.map(ch => `<div class="sd-adj-row"><span>${escapeHtml(SD_CHANNEL_LABEL[ch])}${ov[ch] ? ` <s>${escapeHtml(sdM(b.original[ch]))}</s>` : ''}</span>
-      <button type="button" class="sd-step" data-mny-action="sd-ov" data-sd-ch="${ch}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(sdM(cur[ch]))}</b>
+  const rows = chans.map(ch => `<div class="sd-adj-row"><span>${escapeHtml(SD_CHANNEL_LABEL[ch])}${ov[ch] ? ` <s>${escapeHtml(fmtMoney(b.original[ch]))}</s>` : ''}</span>
+      <button type="button" class="sd-step" data-mny-action="sd-ov" data-sd-ch="${ch}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(cur[ch]))}</b>
       <button type="button" class="sd-step" data-mny-action="sd-ov" data-sd-ch="${ch}" data-sd-d="1" aria-label="More">+</button>
       ${ov[ch] ? `<button type="button" class="sd-step" data-mny-action="sd-ovreset" data-sd-ch="${ch}" aria-label="Back to the planner's number">↺</button>` : ''}</div>`).join('');
   const reason = mnyWeekReason(c.kid, c.wk);
@@ -655,7 +653,7 @@ function sdLayPile() {
   if (axis) {
     axis.style.left = (W - AX) + 'px';
     let t = '';
-    for (let v = 10; v / 5 * rowH < H - 8; v += 10) t += `<span class="sd-tick" style="bottom:${(v / 5 * rowH).toFixed(1)}px">$${v}</span>`;
+    for (let v = 10; v / 5 * rowH < H - 8; v += 10) t += `<span class="sd-tick" style="bottom:${(v / 5 * rowH).toFixed(1)}px">${fmtMoney(v)}</span>`;
     axis.innerHTML = t;
   }
   const must = box.querySelector('.sd-minline');
@@ -681,12 +679,12 @@ function sdPaydayMain(c) {
   const earned = money2(tiles.filter(t => t.group === 'earned').reduce((a, t) => a + t.amount, 0));
   const made = tile('made').amount;
   const adv = P.advW;
-  const advNote = f.advOwed && d.advMan ? `asked + $${d.advMan} I forgot to ask`
+  const advNote = f.advOwed && d.advMan ? `asked + ${fmtMoney(d.advMan)} I forgot to ask`
     : f.advOwed ? `${f.advReqs.map(r => r.why || r.day).filter(Boolean).join(' · ') || 'asked parents'} · spent`
     : d.advMan ? 'I forgot to ask · a parent checks it' : 'forgot to ask? tap +';
   const savingsFree = Math.floor(Math.max(0, mnySavedTotal(c.kid) - sdRule(c.rules, 'pots.safety')) + 1e-9);
   const pull = (k, name, sub) => `<div class="sd-pull"><div class="sd-pull-name"><span class="sd-nowrap">${escapeHtml(name)}</span><span class="sd-note">${escapeHtml(sub)}</span></div>
-      <button type="button" class="sd-step" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="-1" aria-label="Less">−</button><b>$${Number(d.pull[k]) || 0}</b>
+      <button type="button" class="sd-step" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="-1" aria-label="Less">−</button><b>${fmtMoney(Number(d.pull[k]) || 0)}</b>
       <button type="button" class="sd-step sd-step--gold" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="1" aria-label="More">+</button></div>`;
   // 📥 Money that came in since last Sunday joins the pile on its own
   // (Deviation 37); it is one line of the box, so the box adds up to its total.
@@ -694,8 +692,8 @@ function sdPaydayMain(c) {
   const bankNote = f.unlocked > 0 ? 'a lock came back' : 'only if I need it';
   const mustRows = isParent() ? `<button type="button" class="sd-step" data-mny-action="sd-must" data-sd-d="-1" aria-label="A parent: pay less this week">−</button><button type="button" class="sd-step" data-mny-action="sd-must" data-sd-d="1" aria-label="A parent: back toward the schedule">+</button>` : '';
   const reduced = f.due.filter(x => x.reduced);
-  const impact = reduced.length ? ` A parent made it ${sdM(money2(reduced.reduce((a, x) => a + x.scheduled - x.amount, 0)))} less — still owed next Sunday, no interest.` : '';
-  const short = P.shortfall > 0 ? ` 🚨 ${sdM(P.shortfall)} is carried to next Sunday — no interest on it.` : '';
+  const impact = reduced.length ? ` A parent made it ${fmtMoney(money2(reduced.reduce((a, x) => a + x.scheduled - x.amount, 0)))} less — still owed next Sunday, no interest.` : '';
+  const short = P.shortfall > 0 ? ` 🚨 ${fmtMoney(P.shortfall)} is carried to next Sunday — no interest on it.` : '';
   const takenOff = money2(-P.income.fine + P.advTaken);
   const inTotal = money2(earned + f.giftsIn + P.pullTot);
   const gp = sdPercents([earned, f.giftsIn, P.pullTot], inTotal);
@@ -709,26 +707,26 @@ function sdPaydayMain(c) {
   const fineDays = sdFinesDays(c);
   // The daily floor (Plan v18, last round): fines that took less than they cost say so.
   const fineRaw = money2(((c.f.b.fines || {}).perDay || []).reduce((a, x) => a + (Number(x.raw) || 0), 0));
-  const fineFloor = sdFineFloorNote(fineRaw, money2((c.f.b.fines || {}).total), sdM);
+  const fineFloor = sdFineFloorNote(fineRaw, money2((c.f.b.fines || {}).total));
   return `<div class="sd-titlerow"><span class="sd-title">☀️ My payday</span><span class="sd-script">${escapeHtml(sdGuessResult(c))}</span></div>
     <div class="sd-pay">
       <div class="sd-pay-groups">
         <div class="sd-box sd-box--in">
-          <div class="sd-box-head"><span class="sd-box-title">💰 Money in</span><b class="sd-teal">${escapeHtml(sdM(inTotal))}</b></div>
-          <div class="sd-group sd-group--earned"><div class="sd-group-head"><span>${escapeHtml(g.earned)}</span><b>${escapeHtml(sdM(earned))}</b></div>
+          <div class="sd-box-head"><span class="sd-box-title">💰 Money in</span><b class="sd-teal">${escapeHtml(fmtMoney(inTotal))}</b></div>
+          <div class="sd-group sd-group--earned"><div class="sd-group-head"><span>${escapeHtml(g.earned)}</span><b>${escapeHtml(fmtMoney(earned))}</b></div>
             ${line('home')}${line('club')}${line('comp')}</div>
           <div class="sd-group-pair">
-            <div class="sd-group sd-group--given"><div class="sd-group-head"><span>${escapeHtml(g.given)}</span><b>${escapeHtml(sdM(f.giftsIn))}</b></div>
+            <div class="sd-group sd-group--given"><div class="sd-group-head"><span>${escapeHtml(g.given)}</span><b>${escapeHtml(fmtMoney(f.giftsIn))}</b></div>
               ${tileOf('gifts')}<span class="sd-group-note">${escapeHtml(tile('gifts').note)}</span></div>
-            <div class="sd-group sd-group--made"><div class="sd-group-head"><span>${escapeHtml(g.made)}</span><b>${escapeHtml(sdM(made))}</b></div>
+            <div class="sd-group sd-group--made"><div class="sd-group-head"><span>${escapeHtml(g.made)}</span><b>${escapeHtml(fmtMoney(made))}</b></div>
               ${tileOf('made')}<span class="sd-group-note">${escapeHtml(tile('made').note)}</span></div>
           </div>
           <div class="sd-bank">
-            <div class="sd-group-head"><span class="sd-nowrap">🏦 From my bank</span><span class="sd-note sd-bank-note">${escapeHtml(bankNote)}</span><b>${escapeHtml(sdM(P.pullTot))}</b></div>
+            <div class="sd-group-head"><span class="sd-nowrap">🏦 From my bank</span><span class="sd-note sd-bank-note">${escapeHtml(bankNote)}</span><b>${escapeHtml(fmtMoney(P.pullTot))}</b></div>
             <div class="sd-pulls">
-              ${pull('ready', '🏦 From Savings', `$${savingsFree} free`)}
+              ${pull('ready', '🏦 From Savings', `${fmtMoney(savingsFree)} free`)}
               ${pull('cash', '🏠 From home', 'cash I bring in')}
-              ${waiting > 0 ? `<div class="sd-pull"><div class="sd-pull-name"><span class="sd-nowrap">📥 Waiting for Sunday</span><span class="sd-note">came in this week</span></div><b>${escapeHtml(sdM(waiting))}</b></div>` : ''}
+              ${waiting > 0 ? `<div class="sd-pull"><div class="sd-pull-name"><span class="sd-nowrap">📥 Waiting for Sunday</span><span class="sd-note">came in this week</span></div><b>${escapeHtml(fmtMoney(waiting))}</b></div>` : ''}
             </div>
           </div>
         </div>
@@ -746,11 +744,11 @@ function sdPaydayMain(c) {
         </div>
       </div>
       <div class="sd-pile">
-        <div class="sd-pile-head"><span class="sd-box-title">💰 My pile</span><b class="mny-total mny-total--pile">${escapeHtml(sdM(done || sdReducedMotion() ? P.tp : 0))}</b></div>
+        <div class="sd-pile-head"><span class="sd-box-title">💰 My pile</span><b class="mny-total mny-total--pile">${escapeHtml(fmtMoney(done || sdReducedMotion() ? P.tp : 0))}</b></div>
         <div class="sd-pilebox">
           <div class="sd-stack">${sdCoins(c)}</div>
           <div class="sd-ruler"></div>
-          <span class="sd-minline" data-sd-v="${P.mustPay}"><span>📌 loan first ${escapeHtml(sdM(P.mustPay))}</span></span>
+          <span class="sd-minline" data-sd-v="${P.mustPay}"><span>📌 loan first ${escapeHtml(fmtMoney(P.mustPay))}</span></span>
         </div>
         <div class="sd-pile-note">${shares}</div>
       </div>
@@ -758,7 +756,7 @@ function sdPaydayMain(c) {
     <div class="sd-row sd-payfoot">
       <button type="button" class="sd-btn" data-mny-action="sd-back" data-sd-to="0">◀ Guess</button>
       <span class="sd-payfoot-text">${needReason ? 'A parent changed a line — pick why first.'
-        : `📌 Loan first <b>${escapeHtml(sdM(P.minNow))}</b> (${escapeHtml(sdD(monthly))} a month) · then <b>${escapeHtml(sdM(money2(P.tp - P.minNow)))}</b> is mine.${escapeHtml(impact + short)}`}</span>
+        : `📌 Loan first <b>${escapeHtml(fmtMoney(P.minNow))}</b> (${escapeHtml(fmtMoney(monthly))} a month) · then <b>${escapeHtml(fmtMoney(money2(P.tp - P.minNow)))}</b> is mine.${escapeHtml(impact + short)}`}</span>
       ${mustRows}
       <button type="button" class="sd-go${needReason || !done ? ' off' : ''}" data-mny-action="sd-tochoose" aria-disabled="${needReason || !done}">Now I choose →</button>
     </div>`;
@@ -768,7 +766,7 @@ function sdGuessResult(c) {
   if (d.guess == null) return '';
   const cats = sdCats(c).filter(([k]) => d.cat[k] != null);
   const right = cats.filter(([k, , , real]) => d.cat[k] === real).length;
-  return (Math.abs(d.guess - Pd) <= 5 ? `$${d.guess} — really close!` : d.guess > Pd ? `$${d.guess} — it's less.` : `$${d.guess} — it's more!`)
+  return (Math.abs(d.guess - Pd) <= 5 ? `${fmtMoney(d.guess)} — really close!` : d.guess > Pd ? `${fmtMoney(d.guess)} — it's less.` : `${fmtMoney(d.guess)} — it's more!`)
     + (cats.length ? ` · ${right} of ${cats.length} sources right` : '');
 }
 /* 📊 My last 4 Sundays reads each frozen row through `sdHistGroups` (js/43,
@@ -781,10 +779,10 @@ function sdPaydaySide(c) {
     const asked = x.taken ? [] : routineSessionsForDay(c.kid, x.wk, x.d);
     const kept = asked.length && asked.every(s => ctGetMandatory(x.wk, x.d, s, c.kid));
     const paid = money2(x.paid);
-    return `<div class="sd-day"><span>${L}</span><span class="sd-dot${kept ? ' kept' : ''}">${kept ? '🔥' : '·'}</span><span>${paid > 0 ? sdD(paid) : '—'}</span></div>`;
+    return `<div class="sd-day"><span>${L}</span><span class="sd-dot${kept ? ' kept' : ''}">${kept ? '🔥' : '·'}</span><span>${paid > 0 ? fmtMoney(paid) : '—'}</span></div>`;
   }).join('');
   const hist = c.f.hist;
-  const f = v => v == null ? '' : v === 0 ? '—' : Math.abs(v) < 1 ? (v < 0 ? '−' : '') + Math.abs(Math.round(v * 100)) + '¢' : (v < 0 ? '−$' : '$') + Math.abs(Math.round(v));
+  const f = v => v == null ? '' : v === 0 ? '—' : fmtMoney(v);
   const done = c.d.shown >= sdTiles(c).length;
   const tiles = sdTiles(c);
   const amt = id => tiles.find(t => t.id === id).amount;
@@ -801,20 +799,20 @@ function sdPaydaySide(c) {
   const avgT = avgOf('total');
   const noBank = money2(c.P.tp - c.P.pullTot);
   const avgNoBank = (() => { const have = cols.filter(Boolean); return have.length ? have.reduce((a, x) => a + x.total - (x.bank || 0), 0) / have.length : null; })();
-  const res = [...(b.comp.entries || []).map(e => ({ n: '🏆 ' + (e.name || mnySportLabel(e.sport)), s: '✓ recorded', a: sdD(mrCompAward(e)), ok: true })),
-    ...c.f.deps.filter(x => !sdIsHomeCash(x)).map(x => ({ n: '🎁 ' + (x.giver || x.from || 'A gift'), s: '✓ yes', a: sdD(x.amount), ok: true })),
+  const res = [...(b.comp.entries || []).map(e => ({ n: '🏆 ' + (e.name || mnySportLabel(e.sport)), s: '✓ recorded', a: fmtMoney(mrCompAward(e)), ok: true })),
+    ...c.f.deps.filter(x => !sdIsHomeCash(x)).map(x => ({ n: '🎁 ' + (x.giver || x.from || 'A gift'), s: '✓ yes', a: fmtMoney(x.amount), ok: true })),
     ...mnyComingUp(c.kid).filter(x => x.kind === 'soon').map(x => ({ n: (x.icon || '🏆') + ' ' + x.name, s: x.when, a: '' }))].slice(0, 4);
   return `<div class="sd-panel sd-panel--week">
       <div class="sd-panel-title">🔥 My week · chores + routine</div>
       <div class="sd-days">${days}</div>
-      <div class="sd-line">${escapeHtml(`${b.streak.days} routine days · chores ${sdM(b.chorePaid)} graded`)}</div>
+      <div class="sd-line">${escapeHtml(`${b.streak.days} routine days · chores ${fmtMoney(b.chorePaid)} graded`)}</div>
     </div>
     <div class="sd-panel sd-panel--l4">
       <div class="sd-panel-title">📊 My last 4 Sundays</div>
       <table class="sd-l4"><thead><tr><th></th><th>4 wk</th><th>3 wk</th><th>2 wk</th><th>last</th><th class="sd-l4-now sd-red">now</th><th class="sd-l4-avg">avg</th></tr></thead>
         <tbody>${table}
         <tr class="sd-l4-tot"><td>= Total</td>${cols.map(x => `<td>${x ? f(x.total) : ''}</td>`).join('')}<td class="sd-l4-now sd-red">${done ? f(now.total) : '…'}</td><td class="sd-l4-avg">${f(avgT)}</td></tr></tbody></table>
-      <div class="sd-line">${escapeHtml(!done ? 'filling in as the coins fall…' : avgNoBank == null ? 'My first Sunday on the record.' : noBank >= avgNoBank ? `📈 ${sdM(noBank - avgNoBank)} above my 4-week average (before bank)` : `📉 ${sdM(avgNoBank - noBank)} below my 4-week average (before bank)`)}</div>
+      <div class="sd-line">${escapeHtml(!done ? 'filling in as the coins fall…' : avgNoBank == null ? 'My first Sunday on the record.' : noBank >= avgNoBank ? `📈 ${fmtMoney(noBank - avgNoBank)} above my 4-week average (before bank)` : `📉 ${fmtMoney(avgNoBank - noBank)} below my 4-week average (before bank)`)}</div>
     </div>
     <div class="sd-panel sd-panel--pink">
       <div class="sd-panel-title">🏆 🎁 Results &amp; gifts</div>
@@ -853,8 +851,8 @@ function sdHints(c, k) {
   const can = sdCan(c, k);
   if (k === 'fixed') return '📌 taken first, every week';
   if (!can.ok) return can.why;
-  const base = { extra: `each $1 = $${(1 + b).toFixed(2)} off the wall`, spend: 'turns into real money',
-    ready: `keep 🛟 $${sdRule(r, 'pots.safety')} · take out any time`, goal: 'its own jar · counts in what I own · earns nothing',
+  const base = { extra: `each $1 = ${fmtMoney((1 + b))} off the wall`, spend: 'turns into real money',
+    ready: `keep 🛟 ${fmtMoney(sdRule(r, 'pots.safety'))} · take out any time`, goal: 'its own jar · counts in what I own · earns nothing',
     gic: `locked ${sdRule(r, 'pots.lockWeeks')} weeks · back on a Saturday`, stock: `about ${sdRule(r, 'pots.rates.stock')}% a year · can go down` }[k];
   return (c.d.pick === k ? 'tap = $1 · hold 2 s = $5 · ' : 'tap to pick · ') + base;
 }
@@ -869,12 +867,12 @@ function sdGetGive(c, k) {
   const cap = sdFloor(P.hers * sdRule(r, 'spend.capPct') / 100);
   return {
     fixed: ['taken first, every week', 'nothing; it is the deal we made'],
-    extra: [a ? `${sdM(a * (1 + b))} off the wall · free ${weeksSooner(a)} weeks sooner` : `each $1 counts as $${(1 + b).toFixed(2)} off the wall`, 'having it. It can’t come back out.'],
-    gic: [`${sdM(a)} comes back as ${sdM(a * (1 + gicR * lockW / 52))} on ${sdShortDay(sdLockMaturesOn(c.wk, lockW))}, promised`, `touching it for ${lockW} weeks`],
-    stock: [`${sdM(a)} could be ${sdM(a * (1 + stR))} in a year`, 'knowing what it will be worth. It can go down.'],
-    ready: [aR >= safety ? `money I can reach any time · ${sdM(aR)} in Savings` : `money I can reach any time · ${sdM(safety - aR)} more to fill 🛟 $${safety}`, `the ${Math.round(b * 100)}% wall bonus`],
-    goal: [`${sdM(Math.max(0, goalLeft - a))} left to my goal`, 'using it for anything else until I buy it'],
-    spend: [a ? `${sdBuysOf(a, ((r.buys || {}).items) || [])} this week` : `up to $${cap} now — ${sdCapWords(sdRule(r, 'spend.capPct'))}`, 'it leaves the bank. No interest, and it is gone once spent.'],
+    extra: [a ? `${fmtMoney(a * (1 + b))} off the wall · free ${weeksSooner(a)} weeks sooner` : `each $1 counts as ${fmtMoney((1 + b))} off the wall`, 'having it. It can’t come back out.'],
+    gic: [`${fmtMoney(a)} comes back as ${fmtMoney(a * (1 + gicR * lockW / 52))} on ${fmtDay(sdLockMaturesOn(c.wk, lockW), 'long')}, promised`, `touching it for ${lockW} weeks`],
+    stock: [`${fmtMoney(a)} could be ${fmtMoney(a * (1 + stR))} in a year`, 'knowing what it will be worth. It can go down.'],
+    ready: [aR >= safety ? `money I can reach any time · ${fmtMoney(aR)} in Savings` : `money I can reach any time · ${fmtMoney(safety - aR)} more to fill 🛟 ${fmtMoney(safety)}`, `the ${Math.round(b * 100)}% wall bonus`],
+    goal: [`${fmtMoney(Math.max(0, goalLeft - a))} left to my goal`, 'using it for anything else until I buy it'],
+    spend: [a ? `${sdBuysOf(a, ((r.buys || {}).items) || [])} this week` : `up to ${fmtMoney(cap)} now — ${sdCapWords(sdRule(r, 'spend.capPct'))}`, 'it leaves the bank. No interest, and it is gone once spent.'],
   }[k] || null;
 }
 const SD_LEGEND = ['fixed', 'extra', 'spend', 'ready', 'goal', 'gic', 'stock'];
@@ -889,12 +887,12 @@ function sdChooseMain(c) {
   const cols = SD_COLS.map(([id, title, keys], i) => {
     const v = gv[i], start = TP ? cum / TP * 100 : 0, h = TP ? v / TP * 100 : 0; cum += v;
     const segs = keys.filter(k => sdVal(c, k) > 0).map(k => `<i class="sd-seg ${'sd-seg--' + k}" style="flex:${sdVal(c, k)} 0 0">${TP && sdVal(c, k) / TP > 0.06 ? SD_SUBS[k].split(' ')[0] : ''}</i>`).join('');
-    const note = id === 'loan' ? `🧱 each $1 extra = $${(1 + sdRule(r, 'loan.extraBonusPct') / 100).toFixed(2)} off`
-      : id === 'spend' ? (d.alloc.spend >= cap ? `👛 full · ${sdCapWords(capPct)}` : `👛 up to $${cap} · ${sdCapWords(capPct)}`)
-      : `🏦 $${sdRule(r, 'pots.safety')} safety first`;
+    const note = id === 'loan' ? `🧱 each $1 extra = ${fmtMoney((1 + sdRule(r, 'loan.extraBonusPct') / 100))} off`
+      : id === 'spend' ? (d.alloc.spend >= cap ? `👛 full · ${sdCapWords(capPct)}` : `👛 up to ${fmtMoney(cap)} · ${sdCapWords(capPct)}`)
+      : `🏦 ${fmtMoney(sdRule(r, 'pots.safety'))} safety first`;
     return `<div class="sd-col ${'sd-col--' + id}">
         <div class="sd-col-head"><span class="sd-col-title">${escapeHtml(title)}</span></div>
-        <div class="sd-col-amt"><b>${escapeHtml(sdM(v))}</b><span class="sd-pill">${escapeHtml(sdPercentLabel(pc[i], v))}</span><span class="sd-col-start">starts at ${Math.round(start)}%</span><button type="button" class="sd-ask-q" data-mny-action="sd-help" data-sd-col="${id}" aria-label="What is this?"><span>?</span></button></div>
+        <div class="sd-col-amt"><b>${escapeHtml(fmtMoney(v))}</b><span class="sd-pill">${escapeHtml(sdPercentLabel(pc[i], v))}</span><span class="sd-col-start">starts at ${Math.round(start)}%</span><button type="button" class="sd-ask-q" data-mny-action="sd-help" data-sd-col="${id}" aria-label="What is this?"><span>?</span></button></div>
         <div class="sd-fall"><span class="sd-fall-top" style="bottom:${Math.min(100, start + h).toFixed(2)}%"></span>
           <span class="sd-fall-bar${h >= 1 ? ' edge' : ''}" style="bottom:${start.toFixed(2)}%;height:${h.toFixed(2)}%">${segs}</span></div>
         <div class="sd-colnote">${escapeHtml(note)}</div>
@@ -905,7 +903,7 @@ function sdChooseMain(c) {
     const can = sdCan(c, k);
     const shut = !fixed && !can.ok && SD_GATE_STAGE[k] && !sdIsOpen(k, c.w, r);
     const vk = sdVal(c, k);
-    const amt = shut ? '🔒' : sdM(vk);
+    const amt = shut ? '🔒' : fmtMoney(vk);
     return `<button type="button" class="sd-cell ${'sd-cell--' + k}${d.pick === k && !fixed ? ' sel' : ''}${!can.ok && !fixed ? ' lock' : ''}${fixed ? ' fixed' : ''}${d.last && d.last.k === k ? ' hot' : ''}" data-sd-cell="${k}" aria-label="${escapeAttr(SD_SUBS[k] + ' ' + amt)}">
         <span class="sd-cell-look"><i class="sd-cell-strip"></i><span class="sd-cell-label">${escapeHtml(SD_SUBS[k])}</span><b>${escapeHtml(amt)}</b></span>
         <span class="sd-cell-hold" style="width:${sdPress && sdPress.k === k ? Math.round(sdPress.p || 0) : 0}%"></span></button>`;
@@ -913,19 +911,19 @@ function sdChooseMain(c) {
   const presets = sdPresets(c.w, r).map(p => `<button type="button" class="sd-chip${d.presetId === p.id ? ' on' : ''}${p.locked ? ' lock' : ''}" data-mny-action="sd-preset" data-sd-p="${p.id}">${escapeHtml(p.label)}</button>`).join('');
   const lk = d.last ? d.last.k : null;
   const gg0 = lk ? sdGetGive(c, lk) : null;
-  const gg = gg0 && d.last && d.last.d < 0 ? [`↩ $${d.last.n} back in my pile. ` + gg0[0], gg0[1]] : gg0;
+  const gg = gg0 && d.last && d.last.d < 0 ? [`↩ ${fmtMoney(d.last.n)} back in my pile. ` + gg0[0], gg0[1]] : gg0;
   const tip = d.tried ? sdHints(c, d.tried) : lk ? sdHints(c, lk) : 'tap a box to pick it · tap again = $1 · hold 2 s = $5';
   const nudge = Date.now() < sdNudgeUntil;
   const signing = sdSignHold ? sdSignHold.p : 0;
   const centsTxt = P.cents ? ` · ${Math.round(P.cents * 100)}¢ change → ${P.centsTo === 'ready' ? 'Savings' : '🧱 loan'}` : '';
-  const sum = `🧱 ${sdM(gv[0])} + 👛 ${sdM(gv[1])} + 🌱 ${sdM(gv[2])} = ${sdM(money2(gv[0] + gv[1] + gv[2]))}${pile > 0 ? ` · $${pile} still in my pile` : ' ✓'}${centsTxt}`;
+  const sum = `🧱 ${fmtMoney(gv[0])} + 👛 ${fmtMoney(gv[1])} + 🌱 ${fmtMoney(gv[2])} = ${fmtMoney(money2(gv[0] + gv[1] + gv[2]))}${pile > 0 ? ` · ${fmtMoney(pile)} still in my pile` : ' ✓'}${centsTxt}`;
   const minusOk = d.pick && d.pick !== 'fixed' && (d.alloc[d.pick] || 0) > 0;
   return `<div class="sd-choosehead">
-      <button type="button" class="sd-pilechip" data-mny-action="sd-back" data-sd-to="1" aria-label="${escapeAttr('My pile ' + sdM(TP) + (pile > 0 ? ` · $${pile} left` : ''))}"><span class="sd-pilecoins" aria-hidden="true">💰</span><b>${escapeHtml(sdM(TP))}</b>${pile > 0 ? `<span class="sd-note">$${pile} left</span>` : ''}</button>
+      <button type="button" class="sd-pilechip" data-mny-action="sd-back" data-sd-to="1" aria-label="${escapeAttr('My pile ' + fmtMoney(TP) + (pile > 0 ? ` · ${fmtMoney(pile)} left` : ''))}"><span class="sd-pilecoins" aria-hidden="true">💰</span><b>${escapeHtml(fmtMoney(TP))}</b>${pile > 0 ? `<span class="sd-note">${fmtMoney(pile)} left</span>` : ''}</button>
       <span class="sd-title">🤝 What I do with it</span>
-      <button type="button" class="sd-sign${pile > 0 ? '' : ' ready'}${nudge ? ' shake' : ''}" data-sd-sign="1" aria-label="${escapeAttr(pile > 0 ? `Place $${pile} first` : 'Hold to sign my plan')}">
+      <button type="button" class="sd-sign${pile > 0 ? '' : ' ready'}${nudge ? ' shake' : ''}" data-sd-sign="1" aria-label="${escapeAttr(pile > 0 ? `Place ${fmtMoney(pile)} first` : 'Hold to sign my plan')}">
         <span class="sd-sign-fill" style="width:${signing}%"></span>
-        <b>${escapeHtml(pile > 0 ? (nudge ? `👇 place $${pile} first` : '✍️ Hold to sign') : (signing > 0 ? 'Keep holding…' : '✍️ Hold to sign'))}</b>
+        <b>${escapeHtml(pile > 0 ? (nudge ? `👇 place ${fmtMoney(pile)} first` : '✍️ Hold to sign') : (signing > 0 ? 'Keep holding…' : '✍️ Hold to sign'))}</b>
       </button>
     </div>
     <div class="sd-presets">
@@ -973,7 +971,7 @@ function sdChooseSide(c) {
     }).join('');
   }
   const perPlan = w.loan.weekly + extra * (1 + b);
-  const free = perPlan > 0 && left > 0 ? sdMonthYear(c.wk, Math.ceil(left / perPlan)) : '—';
+  const free = perPlan > 0 && left > 0 ? fmtDay(sdSundayIn(c.wk, Math.ceil(left / perPlan)), 'month') : '—';
   const rate = sdRule(r, 'loan.ratePct'), every = sdRule(r, 'loan.interestEverySundays');
   const nLoans = facts.rows.filter(x => x.left > 0).length;
   const maxA = d.scaleMax || Math.max(20, Math.ceil((Math.max(w.pots.ready + w.pots.goal, w.pots.gic, w.pots.stock) + P.hers + 1) / 10) * 10);
@@ -989,7 +987,7 @@ function sdChooseSide(c) {
     return `<div class="sd-own${shut ? ' dim' : ''}">
         <span class="sd-own-name">${escapeHtml(name)}</span>
         <span class="sd-ownbar">${id === 'ready' ? `<span class="sd-safe" style="left:${Math.min(100, safety / maxA * 100).toFixed(1)}%"></span>` : ''}<i class="now" style="width:${Math.min(100, (up ? a0 : a1) / maxA * 100).toFixed(1)}%"></i><i class="${up ? 'plan' : 'out'}" style="width:${Math.min(100, Math.abs(dd) / maxA * 100).toFixed(1)}%"></i></span>
-        <b class="sd-own-d${up ? ' sd-green' : ' sd-red'}">${dd > 0 ? '+' + sdM(dd) : dd < 0 ? sdM(dd) : ''}</b><b class="sd-own-v">${escapeHtml(sdM(a1))}</b></div>`;
+        <b class="sd-own-d${up ? ' sd-green' : ' sd-red'}">${dd > 0 ? '+' + fmtMoney(dd) : dd < 0 ? fmtMoney(dd) : ''}</b><b class="sd-own-v">${escapeHtml(fmtMoney(a1))}</b></div>`;
   };
   const club = mnyClubOwes(c.kid);
   const clubA = money2(club.amount + c.f.b.sessionsPaid);
@@ -1003,26 +1001,26 @@ function sdChooseSide(c) {
   const loanPicked = d.pick === 'extra' || d.pick === 'fixed';
   return `<div class="sd-sidehead">${escapeHtml(words >= 3 ? '💼 Assets & debt' : '💼 What I have & owe')}</div>
     <div class="sd-panel sd-wall${hot('loan') ? ' hot' : ''}${loanPicked ? ' picked' : ''}">${burst('loan')}
-      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '🧱 Debt' : '🧱 What I owe')}</span><b class="mny-total mny-total--owe">${escapeHtml(payNow ? `${sdM(left)} → ${sdM(oweAfter)}` : sdM(left))}</b></div>
+      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '🧱 Debt' : '🧱 What I owe')}</span><b class="mny-total mny-total--owe">${escapeHtml(payNow ? `${fmtMoney(left)} → ${fmtMoney(oweAfter)}` : fmtMoney(left))}</b></div>
       ${PR > 0 ? `<div class="sd-bricks" role="img" aria-label="${escapeAttr(Math.round(sdPaidPct(w.loan)) + '% of the loan paid')}">${bricks}</div>` : '<div class="sd-note">Nothing to pay back.</div>'}
       <span class="sd-line sd-teal">${escapeHtml(`🟩 paid · 🟨 this plan · free by ${free}${nLoans ? ` · ${nLoans} loan${nLoans === 1 ? '' : 's'}` : ''}`)}</span>
-      <span class="sd-line">📌 <b>${escapeHtml(sdM(P.minNow))}</b> must pay${extra ? ` + 🧱 <b>${escapeHtml(sdM(extra))}</b> extra (counts <b>${escapeHtml(sdM(extra * (1 + b)))}</b>)` : ''}</span>
-      <span class="sd-line sd-red">${escapeHtml(facts.lastInterest > 0 ? `🟥 +${sdM(facts.lastInterest)} interest added (${rate}% a year, every ${every} Sundays)` : `🟥 ${rate}% a year interest, added every ${every} Sundays`)}</span>
+      <span class="sd-line">📌 <b>${escapeHtml(fmtMoney(P.minNow))}</b> must pay${extra ? ` + 🧱 <b>${escapeHtml(fmtMoney(extra))}</b> extra (counts <b>${escapeHtml(fmtMoney(extra * (1 + b)))}</b>)` : ''}</span>
+      <span class="sd-line sd-red">${escapeHtml(facts.lastInterest > 0 ? `🟥 +${fmtMoney(facts.lastInterest)} interest added (${rate}% a year, every ${every} Sundays)` : `🟥 ${rate}% a year interest, added every ${every} Sundays`)}</span>
     </div>
     <div class="sd-panel sd-ownbox${['ready', 'gic', 'stock', 'goal'].some(hot) && hk ? ' hot' : ''}">${burst('ready') || burst('gic') || burst('stock')}
-      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '✅ Assets' : '✅ What I own')}</span><b class="mny-total mny-total--own">${escapeHtml(ownNow === ownAfter ? sdM(ownNow) : `${sdM(ownNow)} → ${sdM(ownAfter)}`)}</b></div>
-      <div class="sd-key"><span><i class="sd-sw now"></i>now</span><span><i class="sd-sw plan"></i>this plan</span><span><i class="sd-sw out"></i>taken out</span><span><i class="sd-sw safe"></i>$${safety} safety</span></div>
+      <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '✅ Assets' : '✅ What I own')}</span><b class="mny-total mny-total--own">${escapeHtml(ownNow === ownAfter ? fmtMoney(ownNow) : `${fmtMoney(ownNow)} → ${fmtMoney(ownAfter)}`)}</b></div>
+      <div class="sd-key"><span><i class="sd-sw now"></i>now</span><span><i class="sd-sw plan"></i>this plan</span><span><i class="sd-sw out"></i>taken out</span><span><i class="sd-sw safe"></i>${fmtMoney(safety)} safety</span></div>
       ${arow('ready', '🏦 Savings', money2(w.pots.ready + goalNow), money2(aR + goalTo))}
       ${arow('gic', '🔒 Locked away', w.pots.gic, aG)}
       ${arow('stock', '📈 Companies', w.pots.stock, aS)}
-      <div class="sd-line sd-teal">${escapeHtml(`${aR >= safety ? `$${safety} safety + ${sdM(aR - safety)} I can use` : `fill Savings to $${safety} first`}${goalTo > 0 ? ` · 🎯 goal jar${c.f.goals.length > 1 ? 's' : ''} ${sdM(goalTo)} counted in the total` : ''}${clubA > 0 ? ` · 🧾 Club owes me ${sdM(clubA)}` : ''}`)}</div>
+      <div class="sd-line sd-teal">${escapeHtml(`${aR >= safety ? `${fmtMoney(safety)} safety + ${fmtMoney(aR - safety)} I can use` : `fill Savings to ${fmtMoney(safety)} first`}${goalTo > 0 ? ` · 🎯 goal jar${c.f.goals.length > 1 ? 's' : ''} ${fmtMoney(goalTo)} counted in the total` : ''}${clubA > 0 ? ` · 🧾 Club owes me ${fmtMoney(clubA)}` : ''}`)}</div>
     </div>
     <div class="sd-panel sd-panel--pink sd-goaljar${hot('goal') ? ' hot' : ''}">${burst('goal')}
       <span class="sd-jar" aria-hidden="true"><i class="to" style="height:${gPrice ? Math.min(100, gTo / gPrice * 100).toFixed(1) : 0}%"></i><i class="now" style="height:${gPrice ? Math.min(100, gSaved / gPrice * 100).toFixed(1) : 0}%"></i></span>
       <div class="sd-jar-body">
         <span class="sd-jar-head"><span class="sd-panel-title sd-jar-title">${escapeHtml(g ? (g.icon || '🎯') + ' ' + g.name : '🎯 No goal yet')}</span>${goalMore}</span>
-        <b class="sd-red">${escapeHtml(g ? (gSaved === gTo ? `${sdM(gTo)} of ${sdM(gPrice)}` : `${sdM(gSaved)} → ${sdM(gTo)} of ${sdM(gPrice)}`) : '')}</b>
-        <span class="sd-note">${escapeHtml(!g ? '＋ on My money asks my parents for one' : !sdIsOpen('ready', w, r) ? `🔒 Goal jars open with Savings, at ${sdRule(r, 'school.stagePct.ready')}% paid` : gTo >= gPrice ? '🎉 reached! ask parents' : `${sdM(gPrice - gTo)} to go · earns nothing`)}</span>
+        <b class="sd-red">${escapeHtml(g ? (gSaved === gTo ? `${fmtMoney(gTo)} of ${fmtMoney(gPrice)}` : `${fmtMoney(gSaved)} → ${fmtMoney(gTo)} of ${fmtMoney(gPrice)}`) : '')}</b>
+        <span class="sd-note">${escapeHtml(!g ? '＋ on My money asks my parents for one' : !sdIsOpen('ready', w, r) ? `🔒 Goal jars open with Savings, at ${sdRule(r, 'school.stagePct.ready')}% paid` : gTo >= gPrice ? '🎉 reached! ask parents' : `${fmtMoney(gPrice - gTo)} to go · earns nothing`)}</span>
       </div>
     </div>`;
 }
@@ -1043,8 +1041,8 @@ function sdVerdictSummary(k, v, sg) {
   if (k === 'income') {
     const bonus = money2((sg.inBonus || 0) + (sg.inBank || 0));
     const h = (sg.hist || []), avg = h.length ? h.reduce((a, x) => a + x, 0) / h.length : 0;
-    return (bonus > 0.004 ? `${sdM(bonus)} came from competitions, gifts and my bank.` : 'All of it came from steady work.')
-      + (avg > 0 ? ` My usual week is about ${sdD(Math.round(avg))}.` : '');
+    return (bonus > 0.004 ? `${fmtMoney(bonus)} came from competitions, gifts and my bank.` : 'All of it came from steady work.')
+      + (avg > 0 ? ` My usual week is about ${fmtMoney(Math.round(avg))}.` : '');
   }
   return v.why;
 }
@@ -1086,9 +1084,9 @@ function sdSignedMain(c) {
   const cashOut = money2(sg.wallet - (sg.adv || 0));
   const goalName = (w.goal && w.goal.name) || '🎯 Goal';
   const outList = [['📦 Fine', -(sg.outFine || 0), 'fine'], ['⏪ Drawn early', sg.adv || 0, 'adv'],
-    [sg.extra ? `🧱 Loan · counts ${sdM(sg.pay)}` : '🧱 Loan', sg.loanCash, 'wall'], ['💵 Cash out', cashOut, 'cash'],
+    [sg.extra ? `🧱 Loan · counts ${fmtMoney(sg.pay)}` : '🧱 Loan', sg.loanCash, 'wall'], ['💵 Cash out', cashOut, 'cash'],
     ['🏦 Savings', sg.ready, 'saved'], [goalName, sg.goal || 0, 'goal', true],
-    [`🔒 Locked · back ${sdShortDay(sdLockMaturesOn(c.wk, lockW))}`, sg.gic, 'locked'], ['📈 Companies', sg.stock, 'stock']]
+    [`🔒 Locked · back ${fmtDay(sdLockMaturesOn(c.wk, lockW), 'long')}`, sg.gic, 'locked'], ['📈 Companies', sg.stock, 'stock']]
     .filter(x => x[1] > 0.004);
   const mx = Math.max(0.01, ...inRows.filter(x => !x.nobar).map(x => x.v), ...outList.map(x => x[1]));
   const pc = val => Math.round(val / incT * 100) + '%';
@@ -1096,7 +1094,7 @@ function sdSignedMain(c) {
       <span class="sd-flow-k">${escapeHtml(k)}</span>
       <span class="sd-flow-out">${dir < 0 ? `<i class="sd-fill--${cls}" style="width:${(val / mx * 100).toFixed(1)}%"></i>` : ''}</span>
       <span class="sd-flow-in">${dir > 0 && !o.nobar ? `<i class="sd-fill--${cls}" style="width:${(val / mx * 100).toFixed(1)}%"></i>` : ''}</span>
-      <span class="sd-flow-pct">${o.nopct ? '' : pc(val)}</span><b${o.off ? ' class="sd-red"' : ''}>${escapeHtml(o.off ? sdOff$(val) : sdM(val))}</b></div>`;
+      <span class="sd-flow-pct">${o.nopct ? '' : pc(val)}</span><b${o.off ? ' class="sd-red"' : ''}>${escapeHtml(o.off ? sdOff$(val) : fmtMoney(val))}</b></div>`;
   const io = sdCheckInOut(sg);
   const tone = { good: 'good', warn: 'warn', bad: 'bad', neutral: 'neutral' };
   const verdict = (k, x) => `<div class="sd-verdict ${'sd-verdict--' + (tone[x.tone] || 'neutral')}"><b>${escapeHtml(x.head)}</b>
@@ -1104,12 +1102,12 @@ function sdSignedMain(c) {
       ${x.lines.length ? `<button type="button" class="sd-btn sd-more" data-mny-action="sd-verdict" data-sd-v="${k}">▸ Why</button>` : ''}</div>`;
   const milestone = s.crossed ? `<div class="sd-milestone">${escapeHtml(`🔓 ${sdRule(r, 'school.stagePct.' + SD_GATE_STAGE[s.crossed])}% paid back! "${{ ready: 'Savings', gic: 'Locked away', stock: 'Companies' }[s.crossed]}" is open. Next Sunday I can put money there.`)}</div>` : '';
   const stick = (sg.stickers || sdStickersFor(sg)).map(id => SD_STICKERS.find(x => x[0] === id)).filter(Boolean);
-  const say = `I put ${sdM(sg.loanCash)} on my loan${sg.extra ? ` (it counted as ${sdM(sg.pay)})` : ''}, so I owe ${sdM(s.after.left)} now. ${sdM(money2(sg.ready + (sg.goal || 0) + sg.gic + sg.stock))} is saved${cashOut > 0 ? ` and ${sdM(cashOut)} comes out as cash today` : ', and no cash this week'}.`;
+  const say = `I put ${fmtMoney(sg.loanCash)} on my loan${sg.extra ? ` (it counted as ${fmtMoney(sg.pay)})` : ''}, so I owe ${fmtMoney(s.after.left)} now. ${fmtMoney(money2(sg.ready + (sg.goal || 0) + sg.gic + sg.stock))} is saved${cashOut > 0 ? ` and ${fmtMoney(cashOut)} comes out as cash today` : ', and no cash this week'}.`;
   const redo = isParent() && mmUndoHeld(c.kid);
   const gone = mmUndoKidGone[c.kid];
   const at = Number(row.updatedAt || row.at) || 0;
   const when = at ? new Date(at) : null;
-  const signedLine = `✓ signed ${mnyDayName(sdSundayOf(c.wk))}${when ? ' · ' + when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase() : ''}`;
+  const signedLine = `✓ signed ${fmtDay(sdSundayOf(c.wk), 'long')}${when ? ' · ' + when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase() : ''}`;
   const nSigned = mnyLedgerRows(c.kid).filter(x => x && x.sunday && String(x.weekKey) <= String(c.wk)).length;
   const weekLine = `money week ${mrMoneyWeekLabel(c.wk, c.kid)} · Week ${Math.max(1, nSigned)}`;
   return `<div class="sd-sighead">
@@ -1130,7 +1128,7 @@ function sdSignedMain(c) {
       <div class="sd-inout-head"><span class="sd-box-title">${escapeHtml(words >= 2 ? '⇅ Cash flow' : '⇅ Money in & out')}</span><span class="sd-note">where every dollar came from and went</span></div>
       <div class="sd-inout-part">
         <div class="sd-flows">
-          <div class="sd-flow sd-flow--title"><span class="sd-box-title">💰 Money in</span><span class="sd-note">◀ out</span><span class="sd-note">in ▶</span><span></span><b class="sd-teal">${escapeHtml(sdM(io.in))}</b></div>
+          <div class="sd-flow sd-flow--title"><span class="sd-box-title">💰 Money in</span><span class="sd-note">◀ out</span><span class="sd-note">in ▶</span><span></span><b class="sd-teal">${escapeHtml(fmtMoney(io.in))}</b></div>
           ${inRows.map(x => flow(x.k, x.v, x.cls, 1, x)).join('')}
         </div>
         ${verdict('income', v.income)}
@@ -1138,7 +1136,7 @@ function sdSignedMain(c) {
       <div class="sd-dash"></div>
       <div class="sd-inout-part">
         <div class="sd-flows">
-          <div class="sd-flow sd-flow--title"><span class="sd-box-title">💸 Money out</span><span></span><span></span><span></span><b>${escapeHtml(sdM(io.out))}${io.ok ? ' ✓' : ''}</b></div>
+          <div class="sd-flow sd-flow--title"><span class="sd-box-title">💸 Money out</span><span></span><span></span><span></span><b>${escapeHtml(fmtMoney(io.out))}${io.ok ? ' ✓' : ''}</b></div>
           ${outList.map(x => flow(x[0], x[1], x[2], -1, { sub: !!x[3], off: x[2] === 'fine' || x[2] === 'adv' })).join('')}
         </div>
         ${verdict('strategy', v.strategy)}
@@ -1169,8 +1167,8 @@ function sdOweOwnChart(c, sg, s) {
   const all0 = sdOweOwnRows(c.kid, c.wk);
   const ser = sdOweOwnSeries(all0, { weekKey: c.wk, owed: s.after.left, owned: own0 }, pay, save);
   const skipped = all0.filter(r => r.owed == null || r.owned == null).length;
-  const sun = (wk, k) => mnyDayMonth(sdDayKeyAdd(sdSundayOf(wk), 7 * k));
-  const pts = [...ser.past.map((p, i) => ({ owe: p.owed, own: p.owned, label: i === ser.past.length - 1 ? 'signed ✓' : mnyDayMonth(sdSundayOf(p.weekKey)) })),
+  const sun = (wk, k) => fmtDay(sdDayKeyAdd(sdSundayOf(wk), 7 * k), 'short');
+  const pts = [...ser.past.map((p, i) => ({ owe: p.owed, own: p.owned, label: i === ser.past.length - 1 ? 'signed ✓' : fmtDay(sdSundayOf(p.weekKey), 'short') })),
     ...ser.forecast.points.map((p, i) => ({ owe: p[0], own: p[1], f: true, label: sun(c.wk, i + 1) }))];
   if (ser.forecast.toFree) pts[pts.length - 1].label = 'free by ' + pts[pts.length - 1].label;
   const pi = ser.past.length - 1;
@@ -1179,7 +1177,7 @@ function sdOweOwnChart(c, sg, s) {
   const x = i => Lm + (pts.length > 1 ? i * (W - Lm - Rm) / (pts.length - 1) : 0);
   const y = v => T + (1 - v / max) * (H - T - B);
   let g = '';
-  for (let v = 0; v <= max; v += max / 4) g += `<line x1="${Lm}" x2="${W - Rm}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="sd-nw-grid"/><text x="${Lm - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" class="sd-nw-tick">$${Math.round(v)}</text>`;
+  for (let v = 0; v <= max; v += max / 4) g += `<line x1="${Lm}" x2="${W - Rm}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="sd-nw-grid"/><text x="${Lm - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" class="sd-nw-tick">${fmtMoney(Math.round(v))}</text>`;
   g += `<rect x="${x(pi).toFixed(1)}" y="${T}" width="${Math.max(0, x(pts.length - 1) - x(pi)).toFixed(1)}" height="${H - T - B}" class="sd-nw-future"/>`;
   const past = pts.slice(0, pi + 1);
   if (past.length > 1) {
@@ -1198,10 +1196,10 @@ function sdOweOwnChart(c, sg, s) {
   // The two end labels never sit on top of each other: owe above, own below.
   let yo = y(ld.owe) + 4, yw = y(ld.own) + 4;
   if (Math.abs(yo - yw) < 13) { const mid = (yo + yw) / 2, up = ld.owe >= ld.own; yo = mid + (up ? -7 : 7); yw = mid + (up ? 7 : -7); }
-  g += `<text x="${lx.toFixed(1)}" y="${yo.toFixed(1)}" class="sd-nw-end owe">$${Math.round(ld.owe)}</text><text x="${lx.toFixed(1)}" y="${yw.toFixed(1)}" class="sd-nw-end own">$${Math.round(ld.own)}</text>`;
+  g += `<text x="${lx.toFixed(1)}" y="${yo.toFixed(1)}" class="sd-nw-end owe">${fmtMoney(Math.round(ld.owe))}</text><text x="${lx.toFixed(1)}" y="${yw.toFixed(1)}" class="sd-nw-end own">${fmtMoney(Math.round(ld.own))}</text>`;
   g += `<text x="${W - Rm - 4}" y="${T + 12}" text-anchor="end" class="sd-nw-note">${escapeHtml(ser.forecast.toFree ? 'dashed: to the Sunday the loan is free' : 'dashed: next 6 Sundays, if every week is like this')}</text>`;
   const now = pts[pi];
-  const gapText = `gap $${Math.round(Math.abs(now.owe - now.own))}`;
+  const gapText = `gap ${fmtMoney(Math.round(Math.abs(now.owe - now.own)))}`;
   const lines = [[0, pi], [pi, pts.length - 1]].flatMap(([a, b]) => ['owe', 'own'].map(k => pts.slice(a, b + 1).map((p, j) => [x(a + j), y(p[k])])));
   const spot = pi < 1 ? null : sdGapLabelSpot(pts.slice(0, pi + 1).map((p, i) => ({ x: x(i), owe: y(p.owe), own: y(p.own) })), lines,
     { w: gapText.length * 6.6, h: 12 }, { l: Lm, r: W - Rm, t: T, b: H - B });
@@ -1247,7 +1245,7 @@ function sdSignedSide(c) {
       <div class="sd-panel-head"><span class="sd-panel-title">📅 My timeline</span>
         <span class="sd-key"><span><i class="sd-sw st"></i>earned</span><span><i class="sd-sw bn"></i>given</span><span><i class="sd-sw avg"></i>avg</span></span></div>
       <div class="sd-tl-ev">${rows.map(x => `<span>${escapeHtml(x.ev)}</span>`).join('')}</div>
-      <div class="sd-tl">${hist.length ? `<span class="sd-tl-avg" style="bottom:${(avgW / tMax * 100).toFixed(1)}%"><span>avg ${escapeHtml(sdM(avgW))}</span></span>` : ''}${tl}</div>
+      <div class="sd-tl">${hist.length ? `<span class="sd-tl-avg" style="bottom:${(avgW / tMax * 100).toFixed(1)}%"><span>avg ${escapeHtml(fmtMoney(avgW))}</span></span>` : ''}${tl}</div>
       <div class="sd-tl-k">${rows.map(x => `<span class="${x.kind}">${escapeHtml(x.k)}</span>`).join('')}</div>
     </div>
     <div class="sd-panel sd-ifcard">
@@ -1290,7 +1288,7 @@ function sdLastAnswerCard(kid, wk) {
   if (!a || !a.said) return '';
   return `<div class="sd-panel">
       <div class="sd-panel-head"><span class="sd-panel-title">💬 Her answer last week</span><span class="sd-note">for parents</span></div>
-      <div class="sd-line">${escapeHtml(MNY_REFLECT.question)} “${escapeHtml(a.said)}”${a.guess != null ? escapeHtml(` · she guessed $${a.guess}`) : ''}</div>
+      <div class="sd-line">${escapeHtml(MNY_REFLECT.question)} “${escapeHtml(a.said)}”${a.guess != null ? escapeHtml(` · she guessed ${fmtMoney(a.guess)}`) : ''}</div>
       <div class="sd-note">Ask: did this week's plan match it?</div>
     </div>`;
 }
@@ -1312,12 +1310,12 @@ function sdNewRowCard(c) {
   const LOW = 'not enough steady money yet';
   const left = mnyTotalOwing(c.kid);
   const lines = isSur
-    ? [['I had to borrow', sdM(row.principal), 'red'], ['Savings now', sdM(mnySavedTotal(c.kid)), '']]
-    : [['10% down from my 🏦 Savings', sdM(row.paid), ''], ['My loan payment a week', `${sdM(p0)} → ${sdM(p1)}`, ''],
+    ? [['I had to borrow', fmtMoney(row.principal), 'red'], ['Savings now', fmtMoney(mnySavedTotal(c.kid)), '']]
+    : [['10% down from my 🏦 Savings', fmtMoney(row.paid), ''], ['My loan payment a week', `${fmtMoney(p0)} → ${fmtMoney(p1)}`, ''],
        ['Part of my steady money', S.lowSteady ? LOW : `${pct(S.r0)} → ${pct(S.r1)}`, S.lowSteady ? '' : S.over ? 'red' : 'teal'],
-       ['Left for me to choose a week', S.lowSteady ? LOW : `${sdM(Math.max(0, steady - p0))} → ${sdM(Math.max(0, steady - p1))}`, ''],
-       ['This row is paid off by', mnyWeeklyDue(row) > 0 ? sdMonthYear(c.wk, Math.ceil(loanBalance(c.kid, row.id) / mnyWeeklyDue(row))) : '—', ''],
-       ['All my loans free by', p1 > 0 ? sdMonthYear(c.wk, Math.ceil(left / p1)) : '—', '']];
+       ['Left for me to choose a week', S.lowSteady ? LOW : `${fmtMoney(Math.max(0, steady - p0))} → ${fmtMoney(Math.max(0, steady - p1))}`, ''],
+       ['This row is paid off by', mnyWeeklyDue(row) > 0 ? fmtDay(sdSundayIn(c.wk, Math.ceil(loanBalance(c.kid, row.id) / mnyWeeklyDue(row))), 'month') : '—', ''],
+       ['All my loans free by', p1 > 0 ? fmtDay(sdSundayIn(c.wk, Math.ceil(left / p1)), 'month') : '—', '']];
   const over = !isSur && S.over;
   /* 💡 Does it earn back? (owner's review S8-4, the prototype's line): her
      meets' average pay over her last Sundays, and how many meets pay the
@@ -1325,7 +1323,7 @@ function sdNewRowCard(c) {
   const meets = c.f.hist.map(h => h.comp).filter(v => v > 0);
   const meetAvg = meets.length ? money2(meets.reduce((a, v) => a + v, 0) / meets.length) : 0;
   const payback = isSur ? '' : `<div class="sd-newrow-payback">${escapeHtml(meetAvg > 0
-    ? `💡 Does it earn back? My competitions pay me about ${sdM(meetAvg)} each. This row is paid back by about ${Math.ceil(money2(row.principal) / meetAvg)} competitions.`
+    ? `💡 Does it earn back? My competitions pay me about ${fmtMoney(meetAvg)} each. This row is paid back by about ${Math.ceil(money2(row.principal) / meetAvg)} competitions.`
     : '💡 Does it earn back? No competition has paid me in my last Sundays yet, so my steady money pays it back.')}</div>`;
   // How could I get back under half? — the prototype's three ideas.
   const rate = sdRule(c.rules, 'sessions.perSession');
@@ -1333,14 +1331,14 @@ function sdNewRowCard(c) {
   const choresMax = sdRule(c.rules, 'chores.dailyCap') * 5;
   const clubShare = sdSteadyShare(p1, steady + rate);
   const ideas = [['club', `⛸️ One more club session → ${clubShare == null ? '—' : pct(clubShare)}`, false],
-    ['chores', choresAvg >= choresMax ? `🧹 More chores · already at ${sdM(choresMax)}` : '🧹 More chores', choresAvg >= choresMax],
+    ['chores', choresAvg >= choresMax ? `🧹 More chores · already at ${fmtMoney(choresMax)}` : '🧹 More chores', choresAvg >= choresMax],
     ['dad', '👨 Ask parents: smaller share or longer time', false]];
-  const verdict = isSur ? `My safety money wasn't enough, so ${sdM(row.principal)} went on my wall. 🏦 Savings fills first until it's back to $${sdRule(c.rules, 'pots.safety')}.`
+  const verdict = isSur ? `My safety money wasn't enough, so ${fmtMoney(row.principal)} went on my wall. 🏦 Savings fills first until it's back to ${fmtMoney(sdRule(c.rules, 'pots.safety'))}.`
     : S.lowSteady ? '⚠️ Not enough steady money yet to judge it. My parents check it with me first.'
     : over ? `⚠️ My loan takes ${pct(S.r1)} of my steady money, more than half. My parents' limit is 50%.` : '✅ Still under half of my steady money. My parents\' limit is 50%.';
   return `<div class="sd-scrim"><div class="sd-newrow" role="dialog" aria-modal="true" aria-label="${escapeAttr(isSur ? 'A surprise cost' : 'New row on my wall')}">
       <div class="sd-title">${isSur ? '🌧️ A surprise cost' : '🆕 New row on my wall'}</div>
-      <div class="sd-newrow-what">${escapeHtml(row.name + ' · ' + sdM(row.principal) + ' added')}</div>
+      <div class="sd-newrow-what">${escapeHtml(row.name + ' · ' + fmtMoney(row.principal) + ' added')}</div>
       ${lines.map(([k, v, cls]) => `<div class="sd-newrow-line"><span>${escapeHtml(k)}</span><b class="${cls ? 'sd-' + cls : ''}">${escapeHtml(v)}</b></div>`).join('')}
       <div class="sd-newrow-verdict${over || isSur || S.lowSteady ? ' warn' : ''}">${escapeHtml(verdict)}</div>
       ${payback}
@@ -1359,10 +1357,10 @@ function sdDadScript(c) {
     [...(sdSundayRoutine(c).asked ? [['ASK', "Tonight's routine still counts — it is marked for you."]] : []),
      ['ASK', 'Tick your club sessions first. That is your biggest money. Then tap the rest.'],
      ['SAY', 'Only what parents said yes to counts today. Anything still waiting stays out of your guess.'],
-     ['ASK', hist.length ? `Last week was $${lastWeek}. More or less this week? Why?` : 'More or less than you think? Why?']],
+     ['ASK', hist.length ? `Last week was ${fmtMoney(lastWeek)}. More or less this week? Why?` : 'More or less than you think? Why?']],
     [['SAY', 'Watch the coins fall. Every line is something you did.'],
-     ['ASK', `Look at the table: which line is bigger than your average (${sdM(avg)} total)?`],
-     ['SAY', `The loan takes its ${sdM(P.minNow)} first — that's the deal we made.`],
+     ['ASK', `Look at the table: which line is bigger than your average (${fmtMoney(avg)} total)?`],
+     ['SAY', `The loan takes its ${fmtMoney(P.minNow)} first — that's the deal we made.`],
      ['ASK', 'Need money from your bank, or cash from home? Use 🏦 From my bank below.']],
     [['ASK', 'What is this money for? Pick a start, or tap a box: tap again = $1, hold = $5.'],
      ['SAY', 'Watch the tile on the right glow — that is what each coin changes.'],
@@ -1381,7 +1379,7 @@ function sdOpenDad() {
   const sun = sdSundayRoutine(c);
   const check = [c.d.guess ? '✓ She picked a guess' : '○ Waiting for her guess',
     c.d.shown >= sdTiles(c).length ? '✓ Payday is all in' : '○ Let the coins finish falling',
-    c.P.pile <= 0 ? '✓ 100% placed — she can sign' : `○ $${c.P.pile} still to place`,
+    c.P.pile <= 0 ? '✓ 100% placed — she can sign' : `○ ${fmtMoney(c.P.pile)} still to place`,
     '✓ Done — talk about next week'][step];
   const body = document.getElementById('sundayBody');
   if (!body) return;
@@ -1428,7 +1426,7 @@ function sdRenderLineSheet() {
   const t = sdTiles(c).find(x => x.id === sdSheet.tile);
   if (!t) return;
   sdSheet.shown = true;
-  sdSheetOpen(`${t.name} · ${sdM(t.amount)}`, sdTileDetail(c, sdSheet.tile, sdSheet.edit));
+  sdSheetOpen(`${t.name} · ${fmtMoney(t.amount)}`, sdTileDetail(c, sdSheet.tile, sdSheet.edit));
 }
 function sdSetStep(d, step) {
   d.step = step; d.tried = null;

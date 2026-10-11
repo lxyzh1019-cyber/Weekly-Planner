@@ -567,7 +567,7 @@ async function loanPayExtraPrompt(kid, debtId) {
   const d = loanState(kid, debtId);
   const bonus = Number(d.bonusRate) || 0;
   const v = await showPrompt(
-    `Pay extra off ${d.name} ${d.icon}\nAnything you pay early earns ${bonus}% — $100 clears $${(100 * (1 + bonus / 100)).toFixed(0)}.\nHow much? (you have $${w.cash.toFixed(2)})`,
+    `Pay extra off ${d.name} ${d.icon}\nAnything you pay early earns ${bonus}% — $100 clears $${(100 * (1 + bonus / 100)).toFixed(0)}.\nHow much? (you have ${fmtMoney(w.cash)})`,
     { value: '', type: 'number' });
   if (v == null || v === '') return;
   const amt = money2(Math.min(parseFloat(v) || 0, w.cash));
@@ -576,7 +576,7 @@ async function loanPayExtraPrompt(kid, debtId) {
   evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: amt,
                   ref: d.id, note: 'Extra off ' + (d.name || 'her loan') });
   const rec = loanRecordPayment(kid, amt, 'early', d.id);
-  showToast(`${d.icon} Paid $${amt.toFixed(2)} — cleared $${(rec ? rec.credited : amt).toFixed(2)} with the ${bonus}% bonus`);
+  showToast(`${d.icon} Paid ${fmtMoney(amt)} — cleared ${fmtMoney(rec ? rec.credited : amt)} with the ${bonus}% bonus`);
   if (typeof mnyRerenderMoney === 'function') mnyRerenderMoney();
 }
 

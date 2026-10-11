@@ -324,7 +324,7 @@ function renderWeekSignature(keys) {
   const bar = document.getElementById('weekSignatureBar');
   if (!bar) return;
   const p = activeProfile();
-  const name = p==='jenn' ? 'Jenn' : 'Jess';
+  const name = kidLabel(p).name;
   const sig = getWeekSignature(keys, p);
   if (sig) {
     const when = new Date(sig.signedAt);
@@ -348,7 +348,7 @@ function renderWeekSignature(keys) {
 async function signWeek() {
   const keys = getDayKeys(weekOffset);
   const p = activeProfile();
-  const defName = p==='jenn' ? 'Jenn' : 'Jess';
+  const defName = kidLabel(p).name;
   const entered = await showPrompt('Sign your week ✍️ — write your name:', { value: defName });
   if (entered == null) return;                 // cancelled
   const name = String(entered).trim() || defName;
@@ -405,7 +405,7 @@ function weekRenderHeader() {
        child mid-meeting loses the sitting, so the meeting lock hides Switch
        rather than leaving a control that quietly discards your place. */
     sub: parentViewSub('week', 'parentWeekActions',
-      `<button type="button" class="pv-btn no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${parentViewing === 'jenn' ? 'Jess' : 'Jenn'}">Switch</button>`),
+      `<button type="button" class="pv-btn no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${escapeHtml(kidLabel(parentViewing === 'jenn' ? 'jess' : 'jenn').name)}">Switch</button>`),
   });
   /* A week across two months ("Sep 28 – Oct 4") is wider than a phone's room
      at 20px; css/app.css sizes it down only on the widths where it does not
@@ -717,7 +717,7 @@ function openWeeklyWins() {
         <div class="wins-stat"><div class="wins-num">${w.topStreak}</div><div class="wins-lbl">day streak</div></div>
       </div>
       <div class="wins-stat-row">
-        ${(activeProfile()==='jenn'||activeProfile()==='jess'||isParent()) ? `<div class="wins-stat"><div class="wins-num">$${(w.money||0).toFixed(2)}</div><div class="wins-lbl">earned</div></div>` : ''}
+        ${(activeProfile()==='jenn'||activeProfile()==='jess'||isParent()) ? `<div class="wins-stat"><div class="wins-num">${fmtMoney((w.money||0))}</div><div class="wins-lbl">earned</div></div>` : ''}
         <div class="wins-stat"><div class="wins-num">${w.stickers}</div><div class="wins-lbl">stickers</div></div>
       </div>
       ${catLines ? `<div class="wins-cats">${catLines}</div>` : ''}

@@ -36,7 +36,6 @@ function mnyViewKid() {
   const p = activeProfile();
   return (p === 'jenn' || p === 'jess') ? p : 'jess';
 }
-function mnyKidName(kid) { return kid === 'jenn' ? 'Jenn' : 'Jess'; }
 
 function mnyOpenMyMoney(kid) {
   ctPrepareRead();
@@ -181,7 +180,7 @@ function mnyHead(title, tab, screen, fallback) {
   const parent = isParent();
   const kids = parent
     ? `<div class="ui-kids" role="group" aria-label="Whose money">${['jenn', 'jess'].map(k =>
-        `<button type="button" data-mny-action="kid" data-mny-kid="${k}" aria-pressed="${k === kid}" aria-label="${escapeAttr(mnyKidName(k))}">${CT_PROFILE_ICON[k]}<span class="hdr-tab-word"> ${escapeHtml(mnyKidName(k))}</span></button>`).join('')}</div>`
+        `<button type="button" data-mny-action="kid" data-mny-kid="${k}" aria-pressed="${k === kid}" aria-label="${escapeAttr(kidLabel(k).name)}">${CT_PROFILE_ICON[k]}<span class="hdr-tab-word"> ${escapeHtml(kidLabel(k).name)}</span></button>`).join('')}</div>`
     : '';
   return pageHeader({
     variant: 'money',
@@ -198,28 +197,9 @@ function mnyHead(title, tab, screen, fallback) {
 
 /* "Wed 7 Oct" — the day, after the title. */
 function mnyTodayLine() {
-  return mnyDayName(todayKey());
+  return fmtDay(todayKey(), 'long');
 }
 
-/* "$3" for whole dollars, "$2.50" otherwise — the prototype's money on a
-   small label. */
-function mnyShort$(v) { const n = money2(v); return (n < 0 ? '−$' : '$') + (Math.abs(n) % 1 ? Math.abs(n).toFixed(2) : String(Math.abs(n))); }
-/* The passbook's figures: "$140" from $100 up, "$16.15" below (prototype `mk`). */
-function mnyBook$(v) { const n = money2(v); return n >= 100 ? '$' + Math.round(n) : mnyMoney(n); }
-/* "27 Sep" — how the passbook and Coming up name a day. */
-function mnyDayMonth(dayKey) {
-  const d = formatDayKey(dayKey);
-  return d.getDate() + ' ' + MONTH_SHORT[d.getMonth()];
-}
-/* "Sat 24 Oct" */
-function mnyDayLabel(dayKey) {
-  return formatDayKey(dayKey).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
-}
-/* "Sat 3 Oct" — how the money screens name a day (owner's review). */
-function mnyDayName(dayKey) {
-  const d = formatDayKey(dayKey);
-  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()] + ' ' + d.getDate() + ' ' + MONTH_SHORT[d.getMonth()];
-}
 /* A door: a dashed-underlined line with ▸ and a 44px hit area (Plan v17 §0). */
 function mnyDoor(action, html, attrs) {
   return `<button type="button" class="mv2-door" data-mny-action="${escapeAttr(action)}"${attrs || ''}>${html} <span class="mv2-chev" aria-hidden="true">▸</span></button>`;
@@ -255,7 +235,7 @@ function mnyCountdownData(kid) {
     return {
       d: 'SMTWTFS'[formatDayKey(k).getDay()], dayKey: k, past, paid,
       mark: !past ? '' : (cap > 0 && paid >= cap ? '✓' : paid > 0 ? '½' : '·'),
-      chore: !past ? '' : (paid > 0 ? mnyShort$(paid) : '—'),
+      chore: !past ? '' : (paid > 0 ? fmtMoney(paid) : '—'),
     };
   });
   return {
@@ -308,13 +288,13 @@ function mnyCountdownCard(kid) {
           <span class="mv2-sun-title">${escapeHtml(c.label)}</span>
           <span class="mv2-sun-sub">payday guessing game, together on the iPad</span>
         </div>
-        <div class="mv2-days" role="list">${c.days.map(d => `<div class="mv2-day${d.past ? '' : ' ahead'}${d.dayKey === today ? ' today' : ''}" role="listitem" aria-label="${escapeAttr(d.dayKey + (d.past ? ' · chores ' + (d.paid > 0 ? mnyMoney(d.paid) : 'nothing') : ' · still ahead'))}">
+        <div class="mv2-days" role="list">${c.days.map(d => `<div class="mv2-day${d.past ? '' : ' ahead'}${d.dayKey === today ? ' today' : ''}" role="listitem" aria-label="${escapeAttr(d.dayKey + (d.past ? ' · chores ' + (d.paid > 0 ? fmtMoney(d.paid) : 'nothing') : ' · still ahead'))}">
             <span>${d.d}</span><span class="mv2-dot${d.past ? (d.paid > 0 ? ' paid' : ' none') : ''}">${d.mark}</span><span>${escapeHtml(d.chore)}</span>
           </div>`).join('')}</div>
       </div>
       <div class="mv2-sun-foot">
-        ${mnyDoor('info-week', `📊 This week so far <b>${escapeHtml(mnyMoney(w.soFar))}</b>`)}
-        <span class="mv2-sun-chores">🧹 about ${escapeHtml(mnyMoney(c.soFar))} of chores so far. The guess is on Sunday.</span>
+        ${mnyDoor('info-week', `📊 This week so far <b>${escapeHtml(fmtMoney(w.soFar))}</b>`)}
+        <span class="mv2-sun-chores">🧹 about ${escapeHtml(fmtMoney(c.soFar))} of chores so far. The guess is on Sunday.</span>
       </div>
     </div>`;
 }
@@ -387,22 +367,22 @@ function mnyLoanWallCard(kid) {
   }).join('');
   const pct = f.principal > 0 ? (f.paid / f.principal) * 100 : 100;
   const freeBy = f.left <= 0 ? 'paid off 🎉'
-    : f.freeBy ? formatDayKey(f.freeBy).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
+    : fmtDay(f.freeBy, 'month');
   const open = f.rows.filter(r => r.left > 0).sort((a, b) => b.left - a.left);
   const top = open.slice(0, 2);
   const rows = top.map(r => `<button type="button" class="mv2-loanrow" data-mny-action="info-loan" data-mny-id="${escapeAttr(r.id)}">
       <span class="mv2-loanrow-name">${escapeHtml(r.icon + ' ' + r.name)}</span>
       <span class="mv2-bar"><i style="width:${Math.round(r.paidPct)}%"></i></span>
-      <b>${escapeHtml(mnyMoney(r.left))} left</b><span class="mv2-chev" aria-hidden="true">▸</span>
+      <b>${escapeHtml(fmtMoney(r.left))} left</b><span class="mv2-chev" aria-hidden="true">▸</span>
     </button>`).join('');
   const n = f.rows.length, rest = Math.max(0, open.length - top.length);
   return `<div class="mv2-card mv2-wall">
-      <div class="mv2-cardhead"><span class="mv2-title">🧱 My loan wall</span><b class="mv2-left mny-total mny-total--owe">${escapeHtml(mnyMoney(f.left))} left</b></div>
+      <div class="mv2-cardhead"><span class="mv2-title">🧱 My loan wall</span><b class="mv2-left mny-total mny-total--owe">${escapeHtml(fmtMoney(f.left))} left</b></div>
       <div class="mv2-bricks" role="img" aria-label="${escapeAttr(Math.round(pct) + '% of the loan paid back')}">${bricks}</div>
       <div class="mv2-sum">
-        <div class="mv2-sumrow"><span>✅ paid <b>${escapeHtml(mnyMoney(f.paid))}</b> · ${Math.round(pct)}%</span><span>📅 <b>${escapeHtml(mnyMoney(f.weekly))}</b> a week</span></div>
-        <div class="mv2-sumrow"><span>🏁 free by <b>${escapeHtml(freeBy)}</b></span><span${f.lateCosts > 0 ? ' class="mv2-late"' : ''}>late costs <b>${escapeHtml(mnyMoney(f.lateCosts))}</b></span></div>
-        <div class="mv2-sumrow mv2-int">🟥 interest ${f.ratePct}% a year${f.lastInterest > 0 ? ` · +${escapeHtml(mnyMoney(f.lastInterest))} added last time` : ''}</div>
+        <div class="mv2-sumrow"><span>✅ paid <b>${escapeHtml(fmtMoney(f.paid))}</b> · ${Math.round(pct)}%</span><span>📅 <b>${escapeHtml(fmtMoney(f.weekly))}</b> a week</span></div>
+        <div class="mv2-sumrow"><span>🏁 free by <b>${escapeHtml(freeBy)}</b></span><span${f.lateCosts > 0 ? ' class="mv2-late"' : ''}>late costs <b>${escapeHtml(fmtMoney(f.lateCosts))}</b></span></div>
+        <div class="mv2-sumrow mv2-int">🟥 interest ${f.ratePct}% a year${f.lastInterest > 0 ? ` · +${escapeHtml(fmtMoney(f.lastInterest))} added last time` : ''}</div>
       </div>
       <div class="mv2-loanrows">${rows}
         <div class="mv2-loanfoot"><span class="mv2-line">${rest ? `＋ ${rest} more loan${rest === 1 ? '' : 's'}` : ''}</span>${mnyDoor('info-loans', `${n} loan${n === 1 ? '' : 's'} · Details · side by side`)}</div>
@@ -436,23 +416,23 @@ function mnyTileHint(kid, t, jarTotal) {
   const R = mrSundayRules(ctThisWeekKey());
   const rate = { ready: mrRuleOr(R, 'pots.rates.ready'), gic: mrRuleOr(R, 'pots.rates.gic'), stock: mrRuleOr(R, 'pots.rates.stock') }[t.k];
   if (!t.open) return `🔒 opens at ${t.gate}% paid`;
-  if (t.k === 'ready') return `${jarTotal > 0 ? `🎯 ${mnyShort$(jarTotal)} inside · ` : ''}${rate}% a year`;
+  if (t.k === 'ready') return `${jarTotal > 0 ? `🎯 ${fmtMoney(jarTotal)} inside · ` : ''}${rate}% a year`;
   if (t.k === 'gic' && t.value > 0) {
     const next = mnyEnsureHoldings(kid).filter(h => h && h.kind === 'gic' && h.maturesOn)
       .map(h => String(h.maturesOn)).sort()[0];
-    return `back ${next ? mnyDayName(next) : 'soon'} · ${rate}% a year`;
+    return `back ${next ? fmtDay(next, 'long') : 'soon'} · ${rate}% a year`;
   }
   return `${rate}% a year`;
 }
 function mnyOwnCard(kid) {
   const p = mnyEverythingParts(kid);
   return `<div class="mv2-card mv2-have">
-      <div class="mv2-cardhead"><span class="mv2-title">✅ What I own</span><b class="mv2-total mny-total mny-total--own">${escapeHtml(mnyMoney(p.own))}${p.jarTotal > 0 ? ' with 🎯' : ''}</b></div>
+      <div class="mv2-cardhead"><span class="mv2-title">✅ What I own</span><b class="mv2-total mny-total mny-total--own">${escapeHtml(fmtMoney(p.own))}${p.jarTotal > 0 ? ' with 🎯' : ''}</b></div>
       ${p.tiles.map(t => `<div class="mv2-acct${t.open ? '' : ' shut'}" data-mny-tile="${t.k}">
-          <span class="mv2-acct-name">${t.icon} ${escapeHtml(t.label)}</span><b class="mv2-tile-val">${escapeHtml(mnyMoney(t.value))}</b>
+          <span class="mv2-acct-name">${t.icon} ${escapeHtml(t.label)}</span><b class="mv2-tile-val">${escapeHtml(fmtMoney(t.value))}</b>
           <span class="mv2-acct-hint">${escapeHtml(t.hint)}</span>
         </div>`).join('')}
-      ${p.waiting > 0 ? `<div class="mv2-waiting">${mnyDoor('info-waiting', `📥 Waiting for Sunday <b>${escapeHtml(mnyMoney(p.waiting))}</b>`)}</div>` : ''}
+      ${p.waiting > 0 ? `<div class="mv2-waiting">${mnyDoor('info-waiting', `📥 Waiting for Sunday <b>${escapeHtml(fmtMoney(p.waiting))}</b>`)}</div>` : ''}
     </div>`;
 }
 
@@ -483,9 +463,9 @@ function mnyGoalLine(kid, g, saved) {
   const shut = mnyGoalJarRefusal(kid);
   if (pace.reached) return isParent() ? null : '🎉 Saved! Tell a grown-up.';
   if (shut) return shut;
-  if (pace.late) return `The day has passed and there is ${mnyMoney(pace.left)} to go.`;
-  if (pace.neededPerWeek != null) return `about ${mnyMoney(pace.neededPerWeek)} a week · by ${mnyShortDate(g.targetDate)}`;
-  return `${mnyMoney(pace.left)} to go · earns nothing`;
+  if (pace.late) return `The day has passed and there is ${fmtMoney(pace.left)} to go.`;
+  if (pace.neededPerWeek != null) return `about ${fmtMoney(pace.neededPerWeek)} a week · by ${fmtDay(g.targetDate, 'dated')}`;
+  return `${fmtMoney(pace.left)} to go · earns nothing`;
 }
 function mnyGoalCard(kid) {
   const g = mnyGoalOnCard(kid);
@@ -495,7 +475,7 @@ function mnyGoalCard(kid) {
       <button type="button" class="mv2-q" data-mny-action="info-goals" aria-label="My goals — pick one for this card"><span>⋯</span></button></span>`;
   const askedText = !asked ? '' : asked.status === 'yes'
     ? '✓ parents said yes: ' + (asked.icon || '🎯') + ' ' + asked.name + ' · starts Sunday'
-    : '⏳ asked parents: ' + (asked.icon || '🎯') + ' ' + asked.name + ' · ' + mnyShort$(asked.target);
+    : '⏳ asked parents: ' + (asked.icon || '🎯') + ' ' + asked.name + ' · ' + fmtMoney(asked.target);
   const askedLine = asked ? `<span class="mv2-goal-asked">${escapeHtml(askedText)}</span>` : '';
   if (!g) {
     return `<div class="mv2-card mv2-goals">
@@ -516,7 +496,7 @@ function mnyGoalCard(kid) {
       <span class="mv2-jarpic${mnyGoalJarRefusal(kid) ? ' shut' : ''}" aria-hidden="true"><i style="height:${Math.round(pct)}%"></i></span>
       <div class="mv2-jarbody">
         <div class="mv2-goalhead"><span class="mv2-jarname">${escapeHtml((g.icon || '🎯') + ' ' + g.name)}</span>${icons}</div>
-        <span class="mv2-jarfig"><b>${escapeHtml(mnyMoney(saved))}</b> <span>of ${escapeHtml(mnyMoney(target))}</span></span>
+        <span class="mv2-jarfig"><b>${escapeHtml(fmtMoney(saved))}</b> <span>of ${escapeHtml(fmtMoney(target))}</span></span>
         ${line ? `<span class="mv2-goal-line">${escapeHtml(line)}</span>` : done}
         ${askedLine}
       </div>
@@ -534,7 +514,7 @@ function mnyActionRow() {
     `<button type="button" class="mv2-act ${cls}" data-mny-action="${action}"><span class="mv2-act-t">${escapeHtml(label)}</span><span class="mv2-act-s">${escapeHtml(sub)}</span></button>`;
   return `<div class="mv2-actions">
       ${btn('act-result', 'mv2-act--result', '🏆 Tell a result', 'from my planner')}
-      ${btn('act-club', 'mv2-act--club', '⛸️ Club sessions', `${mnyShort$(rate)} each I go to`)}
+      ${btn('act-club', 'mv2-act--club', '⛸️ Club sessions', `${fmtMoney(rate)} each I go to`)}
       ${btn('act-move', 'mv2-act--move', '🔀 Move · 💵 Cash', 'move · out · in · early')}
       ${btn('gift-add', 'mv2-act--gift', '🎁 I was given', 'a gift or cash')}
     </div>`;
@@ -600,22 +580,22 @@ function mnyPassbookCard(kid) {
     return tot > 0 ? parts.filter(x => x[1] > 0).map(([cls, v]) => `<i class="${cls}" style="width:${(v / tot * 100).toFixed(1)}%"></i>`).join('') : '';
   };
   const rows = p.last4.map((r, i) => `<button type="button" class="mv2-bookrow mv2-sunday-door${i === 0 ? ' latest' : ''}" data-mny-week="${escapeAttr(r.weekKey)}" ${mnySundayDoorAttrs(r.weekKey)}>
-      <span class="mv2-bookdate">${escapeHtml(mnyDayMonth(r.sunday))}</span>
-      <b class="mv2-bookin">${escapeHtml(mnyBook$(r.inAmt))}</b><span class="mv2-bookv">${escapeHtml(mnyBook$(r.wall))}</span><span class="mv2-bookv">${escapeHtml(mnyBook$(r.saved))}</span><span class="mv2-bookv">${escapeHtml(mnyBook$(r.cash))}</span>
+      <span class="mv2-bookdate">${escapeHtml(fmtDay(r.sunday, 'short'))}</span>
+      <b class="mv2-bookin">${escapeHtml(sdBook$(r.inAmt))}</b><span class="mv2-bookv">${escapeHtml(sdBook$(r.wall))}</span><span class="mv2-bookv">${escapeHtml(sdBook$(r.saved))}</span><span class="mv2-bookv">${escapeHtml(sdBook$(r.cash))}</span>
       ${r.split ? `<span class="mv2-bookbar mv2-bookbar--in">${bar([['mv2-sw--earned', r.earned], ['mv2-sw--given', r.given], ['mv2-sw--made', r.made]])}</span>` : '<span></span>'}
       <span class="mv2-bookbar mv2-bookbar--out">${bar([['mv2-sw--wall', r.wall], ['mv2-sw--saved', r.saved], ['mv2-sw--cash', r.cash]])}</span>
     </button>`).join('');
   const t = p.total, n = p.last4.length;
   const pf = (i, v) => sdPercentLabel(p.shares[i], v);
-  const note = `These ${n} Sunday${n === 1 ? '' : 's'}: I earned ${mnyBook$(t.inAmt)}, about ${mnyMoney(t.inAmt / n)} a week.${p.placed > 0 ? ` ${pf(0, t.wall)} to the wall · ${pf(1, t.saved)} saved · ${pf(2, t.cash)} cash.` : ''}`;
+  const note = `These ${n} Sunday${n === 1 ? '' : 's'}: I earned ${sdBook$(t.inAmt)}, about ${fmtMoney(t.inAmt / n)} a week.${p.placed > 0 ? ` ${pf(0, t.wall)} to the wall · ${pf(1, t.saved)} saved · ${pf(2, t.cash)} cash.` : ''}`;
   return `<div class="mv2-card mv2-book">${head}${key}
       <div class="mv2-booktable ${'mv2-booktable--n' + n}">
         <div class="mv2-bookrow mv2-bookhead"><span>Sunday</span><span>💰 in</span><span>${sw('mv2-sw--wall')}wall</span><span>${sw('mv2-sw--saved')}saved</span><span>${sw('mv2-sw--cash')}cash</span></div>
         ${rows}
-        <div class="mv2-bookrow mv2-booktotal"><b>= Total</b><b class="mv2-bookin">${escapeHtml(mnyBook$(t.inAmt))}</b><b class="mv2-bookv">${escapeHtml(mnyBook$(t.wall))}</b><b class="mv2-bookv">${escapeHtml(mnyBook$(t.saved))}</b><b class="mv2-bookv">${escapeHtml(mnyBook$(t.cash))}</b></div>
+        <div class="mv2-bookrow mv2-booktotal"><b>= Total</b><b class="mv2-bookin">${escapeHtml(sdBook$(t.inAmt))}</b><b class="mv2-bookv">${escapeHtml(sdBook$(t.wall))}</b><b class="mv2-bookv">${escapeHtml(sdBook$(t.saved))}</b><b class="mv2-bookv">${escapeHtml(sdBook$(t.cash))}</b></div>
       </div>
       <div class="mv2-booknote">${escapeHtml(note)}</div>
-      <div class="mv2-bookline">${escapeHtml(`${mnyKidName(kid)} ✓ · ${p.all.length} Sunday${p.all.length === 1 ? '' : 's'} signed`)}</div>
+      <div class="mv2-bookline">${escapeHtml(kidLabel(kid).name)} ✓ · ${p.all.length} Sunday${p.all.length === 1 ? '' : 's'} signed</div>
     </div>`;
 }
 
@@ -638,18 +618,18 @@ function mnyComingUp(kid) {
   const wk = ctThisWeekKey();
   [wk, mrDayKeyAdd(wk, 7)].forEach(w => ((mrSessionsWeek(w, kid) || {}).sessions || [])
     .filter(s => String(s.dayKey) > today && s.attended !== false)
-    .forEach(s => out.push({ kind: 'session', icon: '⛸️', name: 'Club job session', when: mnyDayName(s.dayKey) })));
+    .forEach(s => out.push({ kind: 'session', icon: '⛸️', name: 'Club job session', when: fmtDay(s.dayKey, 'long') })));
   const months = [0, 1, 2].map(i => { const d = formatDayKey(month + '-01'); d.setMonth(d.getMonth() + i); return ctDateToKey(d).slice(0, 7); });
   months.forEach(m => rqPlannedInMonth(kid, m).filter(p => p.st === 'soon')
-    .forEach(p => out.push({ kind: 'soon', icon: p.icon, name: p.title, when: mnyDayName(p.dayKey) })));
+    .forEach(p => out.push({ kind: 'soon', icon: p.icon, name: p.title, when: fmtDay(p.dayKey, 'long') })));
   mnyEnsureExpected(kid).filter(e => e && e.month >= month && !/🏆|🏊|⛸️/.test(e.label || ''))
     .sort((a, b) => (a.month < b.month ? -1 : 1))
     .forEach(e => out.push({ kind: 'expect', icon: '', name: e.label,
-      when: `${MONTH_SHORT[Number(e.month.slice(5, 7)) - 1]} · parents expect ~${mnyShort$(e.amount)}` }));
+      when: `${MONTH_SHORT[Number(e.month.slice(5, 7)) - 1]} · parents expect ~${fmtMoney(e.amount)}` }));
   mrCompetitions(kid).filter(c => c && String(c.dayKey || '').slice(0, 7) === month)
     .sort((a, b) => (a.dayKey < b.dayKey ? -1 : 1))
     .forEach(c => out.push({ kind: 'done', icon: mnySportIcon(c.sport), name: c.name || mnySportLabel(c.sport),
-      when: `${mnyDayLabel(c.dayKey)} · ✓ ${mnyShort$(mrCompAward(c))}` }));
+      when: `${fmtDay(c.dayKey, 'long')} · ✓ ${fmtMoney(mrCompAward(c))}` }));
   return out.slice(0, 6);
 }
 function mnyComingCard(kid) {
@@ -684,12 +664,12 @@ function mnyCalendarBody(kid) {
     const isToday = key === today ? ' today' : '';
     const attrs = `data-mny-action="cal-day" data-daykey="${key}"`;
     if (hit.rec) {
-      cells += `<button type="button" class="mv2-cal-cell rec${isToday}" ${attrs} aria-label="${escapeAttr((hit.rec.name || mnySportLabel(hit.rec.sport)) + ' · ✓ ' + mnyMoney(mrCompAward(hit.rec)))}"><span class="mv2-cal-icon">${escapeHtml(mnySportIcon(hit.rec.sport))}</span><small>✓ ${escapeHtml(mnyShort$(mrCompAward(hit.rec)))}</small></button>`;
+      cells += `<button type="button" class="mv2-cal-cell rec${isToday}" ${attrs} aria-label="${escapeAttr((hit.rec.name || mnySportLabel(hit.rec.sport)) + ' · ✓ ' + fmtMoney(mrCompAward(hit.rec)))}"><span class="mv2-cal-icon">${escapeHtml(mnySportIcon(hit.rec.sport))}</span><small>✓ ${escapeHtml(fmtMoney(mrCompAward(hit.rec)))}</small></button>`;
     } else if (hit.plan) {
       const p = hit.plan;
       cells += `<button type="button" class="mv2-cal-cell plan${p.st === 'open' ? ' open' : ''}${isToday}" ${attrs} data-mny-id="${escapeAttr(p.blockId || '')}" aria-label="${escapeAttr((p.st === 'open' ? '🏆 Tell a result for ' : '') + p.title + (p.st === 'sent' ? ' · sent to parents' : p.st === 'soon' ? ' · coming up' : ''))}"><span class="mv2-cal-icon">${escapeHtml(p.icon)}</span><small>${d}</small></button>`;
     } else {
-      cells += `<button type="button" class="mv2-cal-cell${isToday}" ${attrs} aria-label="${escapeAttr(mnyDayName(key) + ' — add a competition')}">${d}</button>`;
+      cells += `<button type="button" class="mv2-cal-cell${isToday}" ${attrs} aria-label="${escapeAttr(fmtDay(key, 'long') + ' — add a competition')}">${d}</button>`;
     }
   }
   const label = ['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1] + ' ' + y;
@@ -699,10 +679,10 @@ function mnyCalendarBody(kid) {
         <span class="mv2-title">🏆 ${escapeHtml(label)}</span>
         <button type="button" class="mv2-step" data-mny-action="cal" data-mny-dir="1" aria-label="Next month">›</button>
       </div>
-      ${cal.expected.length ? `<div class="mv2-expect">${cal.expected.map(e => `<span>${escapeHtml(e.label)} · parents expect ~${escapeHtml(mnyShort$(e.amount))}</span>`).join('')}</div>` : ''}
+      ${cal.expected.length ? `<div class="mv2-expect">${cal.expected.map(e => `<span>${escapeHtml(e.label)} · parents expect ~${escapeHtml(fmtMoney(e.amount))}</span>`).join('')}</div>` : ''}
       <div class="mv2-dow">${['M','T','W','T','F','S','S'].map(x => `<span>${x}</span>`).join('')}</div>
       <div class="mv2-calgrid">${cells}</div>
-      <div class="mv2-row2"><span>This month's results</span><b>${escapeHtml(mnyMoney(total))}</b></div>
+      <div class="mv2-row2"><span>This month's results</span><b>${escapeHtml(fmtMoney(total))}</b></div>
       <div class="mv2-line">Tap a day: a result, a competition still to come, or "add a competition?". We never talk about money before or during a competition. That is a promise, not a rule.</div>
     </div>`;
 }
@@ -722,11 +702,11 @@ function mnyCalDay(kid, dayKey) {
   const plan = cal.planned.find(p => String(p.dayKey) === String(dayKey));
   if (rec) {
     if (isParent()) { rqClose(); openRecordSheet({ kind: 'meet', kid, id: rec.id }); return; }
-    showToast(`${mnySportIcon(rec.sport)} ${rec.name || mnySportLabel(rec.sport)} · ✓ ${mnyMoney(mrCompAward(rec))} — it is on my record`);
+    showToast(`${mnySportIcon(rec.sport)} ${rec.name || mnySportLabel(rec.sport)} · ✓ ${fmtMoney(mrCompAward(rec))} — it is on my record`);
     return;
   }
   if (plan) {
-    if (plan.st === 'soon') { showToast(`${plan.icon} ${plan.title} is on ${mnyDayName(dayKey)} — results after the day`); return; }
+    if (plan.st === 'soon') { showToast(`${plan.icon} ${plan.title} is on ${fmtDay(dayKey, 'long')} — results after the day`); return; }
     if (plan.st === 'sent') {
       const q = mnyRequestsFor(kid).find(x => x.kind === 'comp' && x.record && x.record.blockId === plan.blockId);
       showToast(`${plan.icon} ${plan.title} · ${q ? rqStatusText(q) : '⌛ sent to parents'}`);
@@ -736,7 +716,7 @@ function mnyCalDay(kid, dayKey) {
     else mnyOpenRequestSheet('result', { kid, blockId: plan.blockId, dayKey });
     return;
   }
-  showConfirm(`Add a competition on ${mnyDayName(dayKey)}?`, { okLabel: '🏆 Add it' }).then(ok => {
+  showConfirm(`Add a competition on ${fmtDay(dayKey, 'long')}?`, { okLabel: '🏆 Add it' }).then(ok => {
     if (!ok) return;
     const act = findActivity('competition', kid);
     if (!act) { showToast('There is no 🏆 Competition activity to add.'); return; }
@@ -803,7 +783,7 @@ function mnyInfoSheetTitle(d) {
     const c = mnyConceptCard(d.id, d.kid);
     return c ? `${c.icon} ${c.title}` : '💡 An idea';
   }
-  if (d.kind === 'sunday') return d.id ? `📒 Sunday ${mnyDayMonth(sdSundayOf(d.id))} · Week of ${mrMoneyWeekLabel(d.id, d.kid)}` : '📒 A Sunday';
+  if (d.kind === 'sunday') return d.id ? `📒 Sunday ${fmtDay(sdSundayOf(d.id), 'short')} · Week of ${mrMoneyWeekLabel(d.id, d.kid)}` : '📒 A Sunday';
   return { week: '📊 This week so far', loans: '🧱 All my loans · side by side', waiting: '📥 Waiting for Sunday',
            goals: '🎯 My goals · pick one for the card', month: '🗓️ My month' }[d.kind] || '';
 }
@@ -815,17 +795,17 @@ function mnyInfoSheetBody(d) {
     const get = k => (w.parts.find(p => p.k === k) || {}).v || 0;
     const earned = money2(get('home') + get('club') + get('comp'));
     const unpaidTotal = money2(c.unpaid.reduce((a, r) => a + r.amount, 0));
-    return li('💪 Money I earned', escapeHtml(mnyMoney(earned)), 'g')
-      + li('&nbsp;&nbsp;🏠 Home · chores and routine', escapeHtml(mnyMoney(get('home'))))
-      + li('&nbsp;&nbsp;⛸️ Club job', escapeHtml(mnyMoney(get('club'))))
-      + li('&nbsp;&nbsp;🏆 Competitions', escapeHtml(mnyMoney(get('comp'))))
-      + li('🎁 Money I was given', escapeHtml(mnyMoney(get('given'))), 'g')
-      + li('🌱 Money my money made', escapeHtml(mnyMoney(get('made'))), 'g')
-      + li('➖ Taken off', escapeHtml(w.data.fines > 0 ? '−' + mnyMoney(w.data.fines) : '$0.00'), 'g')
+    return li('💪 Money I earned', escapeHtml(fmtMoney(earned)), 'g')
+      + li('&nbsp;&nbsp;🏠 Home · chores and routine', escapeHtml(fmtMoney(get('home'))))
+      + li('&nbsp;&nbsp;⛸️ Club job', escapeHtml(fmtMoney(get('club'))))
+      + li('&nbsp;&nbsp;🏆 Competitions', escapeHtml(fmtMoney(get('comp'))))
+      + li('🎁 Money I was given', escapeHtml(fmtMoney(get('given'))), 'g')
+      + li('🌱 Money my money made', escapeHtml(fmtMoney(get('made'))), 'g')
+      + li('➖ Taken off', escapeHtml(w.data.fines > 0 ? '−' + fmtMoney(w.data.fines) : fmtMoney(0)), 'g')
       + mnyFineRows(kid, mnyWeekKey())
-      + `<div class="mv2-line mv2-teal">About ${escapeHtml(mnyShort$(w.bySunday))} by Sunday if the rest goes well.${c.routineDays ? ` 🔥 ${c.routineDays} routine day${c.routineDays === 1 ? '' : 's'} kept.` : ''}</div>`
-      + (c.unpaid.length ? `<div class="mv2-line">${escapeHtml(`${mnyMoney(unpaidTotal)} still to come · ${c.unpaid.length} week${c.unpaid.length === 1 ? '' : 's'} not settled yet`)}</div>` : '')
-      + (w.data.passive < 0 ? `<div class="mv2-line">My companies are worth ${escapeHtml(mnyMoney(-w.data.passive))} less than last Sunday. That happens — it can go back up.</div>` : '')
+      + `<div class="mv2-line mv2-teal">About ${escapeHtml(fmtMoney(w.bySunday))} by Sunday if the rest goes well.${c.routineDays ? ` 🔥 ${c.routineDays} routine day${c.routineDays === 1 ? '' : 's'} kept.` : ''}</div>`
+      + (c.unpaid.length ? `<div class="mv2-line">${escapeHtml(`${fmtMoney(unpaidTotal)} still to come · ${c.unpaid.length} week${c.unpaid.length === 1 ? '' : 's'} not settled yet`)}</div>` : '')
+      + (w.data.passive < 0 ? `<div class="mv2-line">My companies are worth ${escapeHtml(fmtMoney(-w.data.passive))} less than last Sunday. That happens — it can go back up.</div>` : '')
       + mnyStrip(mnyWeekKey(), kid, -1)
       + `<button type="button" class="mv2-btn" data-mny-action="prices-sheet">💷 What things pay ▸</button>`;
   }
@@ -834,40 +814,39 @@ function mnyInfoSheetBody(d) {
     const by = (r) => {
       if (r.left <= 0) return 'paid off';
       if (!(r.weekly > 0)) return '—';
-      const t = formatDayKey(sdSundayOf(ctThisWeekKey())); t.setDate(t.getDate() + Math.ceil(r.left / r.weekly) * 7);
-      return t.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      return fmtDay(sdSundayIn(ctThisWeekKey(), Math.ceil(r.left / r.weekly)), 'month');
     };
     if (d.kind === 'loan') {
       const r = f.rows.find(x => x.id === d.id);
       if (!r) return `<div class="mv2-line">That loan is not on the wall any more.</div>`;
-      return li('Left', `${escapeHtml(mnyMoney(r.left))} <span class="mv2-note">of ${escapeHtml(mnyMoney(r.principal))}</span>`)
-        + li('Each month', escapeHtml(mnyMoney(r.monthly))) + li('Paid off by', escapeHtml(by(r)))
-        + li('Interest so far', escapeHtml(mnyMoney(r.interestAdded))) + li('Early bonus earned', escapeHtml(mnyMoney(r.bonus)))
-        + li('Late costs', escapeHtml(mnyMoney(r.lateCosts)), r.lateCosts > 0 ? 'mv2-late' : '')
+      return li('Left', `${escapeHtml(fmtMoney(r.left))} <span class="mv2-note">of ${escapeHtml(fmtMoney(r.principal))}</span>`)
+        + li('Each month', escapeHtml(fmtMoney(r.monthly))) + li('Paid off by', escapeHtml(by(r)))
+        + li('Interest so far', escapeHtml(fmtMoney(r.interestAdded))) + li('Early bonus earned', escapeHtml(fmtMoney(r.bonus)))
+        + li('Late costs', escapeHtml(fmtMoney(r.lateCosts)), r.lateCosts > 0 ? 'mv2-late' : '')
         + `<div class="mv2-li"><span class="mv2-bar"><i style="width:${Math.round(r.paidPct)}%"></i></span><span class="mv2-note">${Math.round(r.paidPct)}% paid</span></div>`
         + mnyDoor('info-loans', 'All loans side by side');
     }
     const head = `<tr><th></th>${f.rows.map(r => `<th><span class="mv2-th-ico">${escapeHtml(r.icon)}</span>${escapeHtml(r.name)}</th>`).join('')}<th>All</th></tr>`;
     const all = { left: f.left, principal: f.principal, monthly: f.monthly, interestAdded: f.interestAdded, bonus: f.bonus, lateCosts: f.lateCosts };
-    const freeAll = f.left <= 0 ? 'paid off' : f.freeBy ? formatDayKey(f.freeBy).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
+    const freeAll = f.left <= 0 ? 'paid off' : fmtDay(f.freeBy, 'month');
     const rows = [['Left', 'left'], ['Borrowed', 'principal'], ['Each month', 'monthly'], ['Paid off by', null], ['Interest so far', 'interestAdded'], ['Early bonus', 'bonus'], ['Late costs', 'lateCosts']]
-      .map(([label, k]) => `<tr><td>${escapeHtml(label)}</td>${f.rows.map(r => `<td>${escapeHtml(k ? mnyMoney(r[k]) : by(r))}</td>`).join('')}<td class="mv2-all">${escapeHtml(k ? mnyMoney(all[k]) : freeAll)}</td></tr>`).join('');
+      .map(([label, k]) => `<tr><td>${escapeHtml(label)}</td>${f.rows.map(r => `<td>${escapeHtml(k ? fmtMoney(r[k]) : by(r))}</td>`).join('')}<td class="mv2-all">${escapeHtml(k ? fmtMoney(all[k]) : freeAll)}</td></tr>`).join('');
     const scale = Math.max(1, ...f.rows.map(r => r.principal));
-    const bars = f.rows.map(r => `<div class="mv2-li"><span>${escapeHtml(r.icon + ' ' + r.name)}</span><span class="mv2-sbar"><i class="mv2-sw--earned" style="width:${(money2(r.principal - Math.max(0, r.left)) / scale * 100).toFixed(1)}%"></i><i class="mv2-sw--wall" style="width:${(Math.max(0, r.left) / scale * 100).toFixed(1)}%"></i></span><b>${escapeHtml(mnyMoney(r.left))}</b></div>`).join('');
+    const bars = f.rows.map(r => `<div class="mv2-li"><span>${escapeHtml(r.icon + ' ' + r.name)}</span><span class="mv2-sbar"><i class="mv2-sw--earned" style="width:${(money2(r.principal - Math.max(0, r.left)) / scale * 100).toFixed(1)}%"></i><i class="mv2-sw--wall" style="width:${(Math.max(0, r.left) / scale * 100).toFixed(1)}%"></i></span><b>${escapeHtml(fmtMoney(r.left))}</b></div>`).join('');
     // On the phone the names stay put while the table scrolls sideways, with a hint and a fade (Plan v18, last round).
     return `<div class="mv2-scrollhint" aria-hidden="true">scroll →</div><div class="mv2-tablebox"><div class="mv2-tablewrap"><table class="mv2-loantable">${head}${rows}</table></div></div>
       <div class="mv2-title mv2-title--sm">Left and paid on each loan</div>${bars}
-      <div class="mv2-line"><i class="mv2-sw mv2-sw--earned"></i>paid <i class="mv2-sw mv2-sw--wall"></i>left · bars drawn to the same scale (${escapeHtml(mnyShort$(scale))})</div>`;
+      <div class="mv2-line"><i class="mv2-sw mv2-sw--earned"></i>paid <i class="mv2-sw mv2-sw--wall"></i>left · bars drawn to the same scale (${escapeHtml(fmtMoney(scale))})</div>`;
   }
   if (d.kind === 'waiting') {
     const wk = ctThisWeekKey();
     const deps = mnyDepositsForWeek(kid, wk).filter(x => x && !x.pendingApproval && !x.rejectedAt && x.appliedAt && !x.appliedWeek);
     const prevSun = mrDayKeyAdd(wk, -1);
     const locks = evList(kid).filter(e => e && e.from === 'locked' && e.to === 'cash' && String(e.dayKey || '') >= prevSun);
-    const listed = deps.map(x => li(escapeHtml(`${sdIsHomeCash(x) ? '🏠' : '🎁'} ${x.giver || x.from || 'A gift'}`), escapeHtml(mnyMoney(x.amount))))
-      .concat(locks.map(e => li('🔓 A lock came back', escapeHtml(mnyMoney(e.amount))))).join('');
+    const listed = deps.map(x => li(escapeHtml(`${sdIsHomeCash(x) ? '🏠' : '🎁'} ${x.giver || x.from || 'A gift'}`), escapeHtml(fmtMoney(x.amount))))
+      .concat(locks.map(e => li('🔓 A lock came back', escapeHtml(fmtMoney(e.amount))))).join('');
     const idea = mnyConceptCard('waiting', kid);
-    return `${listed || li('📥 Waiting for Sunday', escapeHtml(mnyMoney(mnyCash(kid))))}
+    return `${listed || li('📥 Waiting for Sunday', escapeHtml(fmtMoney(mnyCash(kid))))}
       <div class="mv2-line">${escapeHtml(idea ? idea.risk + ' ' + idea.why : '')}</div>`;
   }
   if (d.kind === 'idea') {
@@ -880,12 +859,12 @@ function mnyInfoSheetBody(d) {
       const saved = mnyGoalJarValue(kid, g);
       const line = mnyGoalLine(kid, g, saved);
       return `<div class="mv2-li mv2-li--pick"><span>${escapeHtml((g.icon || '🎯') + ' ' + g.name)} <span class="mv2-note">${escapeHtml(line || '🎉 saved')}</span></span>
-          <b>${escapeHtml(mnyMoney(saved))} of ${escapeHtml(mnyMoney(g.target))}</b>
+          <b>${escapeHtml(fmtMoney(saved))} of ${escapeHtml(fmtMoney(g.target))}</b>
           <button type="button" class="mv2-btn${on && on.id === g.id ? ' on' : ''}" data-mny-action="goal-show" data-mny-goal="${escapeAttr(g.id)}">${on && on.id === g.id ? '✓ on my card' : 'Show on card'}</button></div>`;
     }).join('');
     const asked = mnyGoalAsked(kid);
     return (rows || `<div class="mv2-line">No goal yet.</div>`)
-      + (asked ? li(escapeHtml(`⏳ asked parents: ${asked.icon || '🎯'} ${asked.name}`), escapeHtml(mnyMoney(asked.target))) : '')
+      + (asked ? li(escapeHtml(`⏳ asked parents: ${asked.icon || '🎯'} ${asked.name}`), escapeHtml(fmtMoney(asked.target))) : '')
       + `<div class="mv2-line">Goal jars are inside Savings. ＋ asks parents for a new goal.</div>`
       + `<button type="button" class="mv2-btn" data-mny-action="goal-new">＋ New goal</button>`;
   }
@@ -901,7 +880,7 @@ function mnyInfoSheetBody(d) {
    early), 🧱 where it went, the loan left after, and the note for a week
    settled without a sign. Parents' full record stays `guWeekRecord` (js/46). */
 function mnySundayDoorAttrs(wk) {
-  return `data-mny-action="sunday-sheet" data-mny-id="${escapeAttr(wk)}" aria-label="${escapeAttr('Sunday ' + mnyDayMonth(sdSundayOf(wk)))}"`;
+  return `data-mny-action="sunday-sheet" data-mny-id="${escapeAttr(wk)}" aria-label="${escapeAttr('Sunday ' + fmtDay(sdSundayOf(wk), 'short'))}"`;
 }
 function mnySundayBody(kid, wk) {
   const row = mnyLedgerRows(kid).find(r => r.weekKey === wk);
@@ -914,18 +893,18 @@ function mnySundayBody(kid, wk) {
   const liveCharge = mnyFineRowsCharge(kid, wk);
   const fineRows = money2(liveCharge) === money2(t.fines) ? mnyFineRows(kid, wk, true) : '';
   return `<div class="mv2-sunday-sheet">` + head('💰 Came in')
-    + li('💪 Money I earned', mnyMoney(c.earned), 'g')
-    + (c.home != null ? li('&nbsp;&nbsp;🏠 Home · chores and routine', mnyMoney(c.home)) + li('&nbsp;&nbsp;⛸️ Club job', mnyMoney(c.club)) + li('&nbsp;&nbsp;🏆 Competitions', mnyMoney(c.comp)) : '')
-    + li('🎁 Money I was given', mnyMoney(c.given), 'g')
-    + li('🌱 Money my money made', mnyMoney(c.made), 'g')
-    + li('📥 From my bank', mnyMoney(c.bank), 'g')
+    + li('💪 Money I earned', fmtMoney(c.earned), 'g')
+    + (c.home != null ? li('&nbsp;&nbsp;🏠 Home · chores and routine', fmtMoney(c.home)) + li('&nbsp;&nbsp;⛸️ Club job', fmtMoney(c.club)) + li('&nbsp;&nbsp;🏆 Competitions', fmtMoney(c.comp)) : '')
+    + li('🎁 Money I was given', fmtMoney(c.given), 'g')
+    + li('🌱 Money my money made', fmtMoney(c.made), 'g')
+    + li('📥 From my bank', fmtMoney(c.bank), 'g')
     + head('➖ Taken off')
-    + li('➖ Taken off', sdOff$(t.total, mnyMoney), 'g')
-    + (fineRows || (t.fines > 0 ? li('&nbsp;&nbsp;📦 Fines', sdOff$(t.fines, mnyMoney)) : ''))
-    + (t.advance > 0 ? li('&nbsp;&nbsp;⏪ Drawn early', sdOff$(t.advance, mnyMoney)) : '')
+    + li('➖ Taken off', sdOff$(t.total), 'g')
+    + (fineRows || (t.fines > 0 ? li('&nbsp;&nbsp;📦 Fines', sdOff$(t.fines)) : ''))
+    + (t.advance > 0 ? li('&nbsp;&nbsp;⏪ Drawn early', sdOff$(t.advance)) : '')
     + head('🧱 Where it went')
-    + rec.went.map(x => li(escapeHtml(x.label), mnyMoney(x.v))).join('')
-    + (rec.loanLeftAfter != null ? li('🧱 Loan left after', mnyMoney(rec.loanLeftAfter), 'g mv2-sunday-left') : '')
+    + rec.went.map(x => li(escapeHtml(x.label), fmtMoney(x.v))).join('')
+    + (rec.loanLeftAfter != null ? li('🧱 Loan left after', fmtMoney(rec.loanLeftAfter), 'g mv2-sunday-left') : '')
     + (rec.noSign ? `<div class="mv2-line mv2-sunday-nosign">✍️ Settled without a sign — a parent entered this week, or the Grandfather rule paid it.</div>` : '')
     + `</div>`;
 }
@@ -951,8 +930,8 @@ function mnyFineRows(kid, weekKey, readOnly) {
     const q = mnyFineDispute(kid, f.id);
     const right = readOnly ? '' : q ? `<span class="mv2-finestate${q.open ? ' wait' : ''}">${escapeHtml(rqStatusText(q))}</span>`
       : `<button type="button" class="mv2-finebtn" data-mny-action="fine-dispute" data-mny-id="${escapeAttr(f.id)}">📦 This fine is wrong</button>`;
-    return `<div class="mv2-li mv2-fine"><span>&nbsp;&nbsp;📦 ${escapeHtml(guFineLabel(f.itemId))} <span class="mv2-note">${escapeHtml(mnyDayName(f.dayKey))}</span></span>
-        <b class="${cost > 0 ? 'mv2-late' : ''}">${escapeHtml(cost > 0 ? sdOff$(cost, mnyMoney) : 'free')}${floor ? `<span class="mv2-floor"> · ${escapeHtml(floor)}</span>` : ''}</b>${right}</div>`;
+    return `<div class="mv2-li mv2-fine"><span>&nbsp;&nbsp;📦 ${escapeHtml(guFineLabel(f.itemId))} <span class="mv2-note">${escapeHtml(fmtDay(f.dayKey, 'long'))}</span></span>
+        <b class="${cost > 0 ? 'mv2-late' : ''}">${escapeHtml(cost > 0 ? sdOff$(cost) : 'free')}${floor ? `<span class="mv2-floor"> · ${escapeHtml(floor)}</span>` : ''}</b>${right}</div>`;
   }).join('');
 }
 /* What the daily floor did to one fine's day (`sdFineFloorNote`), read from
@@ -961,7 +940,7 @@ function mnyFineRows(kid, weekKey, readOnly) {
 function mnyFineFloorNote(kid, f, weekKey) {
   const wk = weekKey || mrMoneyWeekOf(f.dayKey, kid);
   const day = ((((mrWeekBreakdown(wk, kid) || {}).fines) || {}).perDay || []).find(x => x.dayKey === f.dayKey);
-  return day ? sdFineFloorNote(day.raw, day.applied, mnyMoney) : '';
+  return day ? sdFineFloorNote(day.raw, day.applied) : '';
 }
 
 /* An idea's body — What / Why / Watch, the Chinese line, and what opens it
@@ -974,7 +953,7 @@ function mnyIdeaBody(c, kid) {
         <b class="mv2-idea-watch">Watch</b><span>${escapeHtml(c.risk)}</span>
       </div>
       ${c.cn ? `<div class="mv2-idea-cn" lang="zh">${escapeHtml(c.cn)}</div>` : ''}
-      ${c.open ? '' : `<div class="mv2-idea-lock">🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.${toGo > 0 ? ` Pay off ${escapeHtml(mnyMoney(toGo))} more and this one opens.` : ''}</div>`}`;
+      ${c.open ? '' : `<div class="mv2-idea-lock">🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.${toGo > 0 ? ` Pay off ${escapeHtml(fmtMoney(toGo))} more and this one opens.` : ''}</div>`}`;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1044,24 +1023,24 @@ function mnySundaysPage(kid) {
   // One scale for every bar on the page: the biggest Sunday shown.
   const peak = Math.max(1, ...groups.map(x => Math.max(0, x.g.earned) + Math.max(0, x.g.given) + Math.max(0, x.g.made || 0)));
   const seg = (cls, v, label) => v > 0
-    ? `<i class="${cls}" style="width:${(v / peak * 100).toFixed(1)}%" title="${escapeAttr(label + ' ' + mnyMoney(v))}"></i>` : '';
+    ? `<i class="${cls}" style="width:${(v / peak * 100).toFixed(1)}%" title="${escapeAttr(label + ' ' + fmtMoney(v))}"></i>` : '';
   const list = groups.map(({ r, g }) => {
     const earnedSegs = g.home != null
       ? seg('mv2-sw--earned', g.home, '🏠 Home') + seg('mv2-sw--earned', g.club, '⛸️ Club job') + seg('mv2-sw--earned', g.comp, '🏆 Competitions')
       : seg('mv2-sw--earned', g.earned, '💪 Money I earned');
     /* The four groups on every Sunday, ➖ included when nothing was taken
        off; 💪 with its 🏠 / ⛸️ / 🏆 split where the row kept it (as drawn). */
-    const earnedLine = `💪 ${mnyMoney(g.earned)}` + (g.home != null
-      ? ` (🏠 ${mnyMoney(g.home)} · ⛸️ ${mnyMoney(g.club)} · 🏆 ${mnyMoney(g.comp)})` : '');
-    const restLine = [`🎁 ${mnyMoney(g.given)}`, `🌱 ${mnyMoney(g.made || 0)}`,
-      `➖ ${g.off < 0 ? sdOff$(-g.off, mnyMoney) : mnyMoney(0)}`].join(' · ');
+    const earnedLine = `💪 ${fmtMoney(g.earned)}` + (g.home != null
+      ? ` (🏠 ${fmtMoney(g.home)} · ⛸️ ${fmtMoney(g.club)} · 🏆 ${fmtMoney(g.comp)})` : '');
+    const restLine = [`🎁 ${fmtMoney(g.given)}`, `🌱 ${fmtMoney(g.made || 0)}`,
+      `➖ ${g.off < 0 ? sdOff$(-g.off) : fmtMoney(0)}`].join(' · ');
     const words = earnedLine + ' · ' + restLine;
     const note = r.defaulted
       ? (r.defaultReason === 'grandma' ? '👴 Grandfather rule: every week got the same amount.' : '🕰️ Nobody sat down for this week, so it got a flat amount.')
       : (r.weeksLate ? `🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after it finished.` : '');
     return `<button type="button" class="mv2-hist-row mv2-sunday-door" data-mny-week="${escapeAttr(r.weekKey)}" ${mnySundayDoorAttrs(r.weekKey)}>
         <span class="mv2-hist-week">Week of ${escapeHtml(mrMoneyWeekLabel(r.weekKey, kid))}</span>
-        <b class="mv2-hist-amt">${escapeHtml(mnyMoney(g.total))}</b>
+        <b class="mv2-hist-amt">${escapeHtml(fmtMoney(g.total))}</b>
         <span class="mv2-histbar" role="img" aria-label="${escapeAttr(words)}">${earnedSegs}${seg('mv2-sw--given', g.given, '🎁 given')}${seg('mv2-sw--made', g.made || 0, '🌱 made')}</span>
         <span class="mv2-hist-words"><span>${escapeHtml(earnedLine)}</span><span>${escapeHtml(restLine)}</span></span>
         ${note ? `<span class="mv2-note mv2-hist-note">${escapeHtml(note)}</span>` : ''}
@@ -1081,9 +1060,9 @@ function mnySundaysPage(kid) {
         <div class="mv2-cardhead"><span class="mv2-title">📖 All my Sundays</span><span class="mv2-hist-modes">${modeBtns}</span></div>
         ${monthNav}
         <div class="mv2-hist-sums">
-          ${li('Came in, ' + period, mnyMoney(came), 'mv2-hist-came')}
-          ${bank > 0 ? li('📥 From my bank', mnyMoney(bank), 'mv2-hist-bank') : ''}
-          ${li('➖ Taken off', off < 0 ? sdOff$(-off, mnyMoney) : mnyMoney(0), 'mv2-hist-off')}
+          ${li('Came in, ' + period, fmtMoney(came), 'mv2-hist-came')}
+          ${bank > 0 ? li('📥 From my bank', fmtMoney(bank), 'mv2-hist-bank') : ''}
+          ${li('➖ Taken off', off < 0 ? sdOff$(-off) : fmtMoney(0), 'mv2-hist-off')}
         </div>
         <div class="mv2-hist-rows">${list}</div>
         <div class="mv2-note">Each Sunday as it was signed: what it paid then, not what today's prices would pay.</div>

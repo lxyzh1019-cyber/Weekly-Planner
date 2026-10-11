@@ -68,7 +68,6 @@ const SD_STICKERS = [
 
 /* ── Small pure helpers ── */
 function sdR2(v) { return Math.round((Number(v) || 0) * 100) / 100; }
-function sdMoney(v) { const n = Number(v) || 0; return (n < 0 ? '−$' : '$') + Math.abs(n).toFixed(2); }
 function sdRule(rules, path) {
   const v = String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), rules || {});
   return Number(v) || 0;
@@ -100,15 +99,12 @@ function sdSundayOf(weekKey) { return sdDayKeyAdd(weekKey, 6); }
 function sdLockMaturesOn(weekKey, weeks) {
   return sdDayKeyAdd(weekKey, 5 + 7 * Math.max(1, Math.floor(Number(weeks) || 0)));
 }
-// "Oct 2026" — the prototype's dateIn(), counted in Sundays from this one.
-function sdMonthYear(weekKey, sundaysAhead) {
-  if (!weekKey || !isFinite(sundaysAhead)) return '—';
-  return sdDayDate(sdDayKeyAdd(sdSundayOf(weekKey), 7 * sundaysAhead))
-    .toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
-}
-// "Sat, Oct 31" — the prototype's sunDate(w, 1).
-function sdShortDay(dayKey) {
-  return sdDayDate(dayKey).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+/* The Sunday `sundaysAhead` Sundays after this week's — the prototype's
+   dateIn(), shown as fmtDay(…, 'month') "Oct 2026". '' when there is none
+   (no week, or never: a loan nothing pays), which fmtDay reads as "—". */
+function sdSundayIn(weekKey, sundaysAhead) {
+  if (!weekKey || !isFinite(sundaysAhead)) return '';
+  return sdDayKeyAdd(sdSundayOf(weekKey), 7 * sundaysAhead);
 }
 /* "a fifth" at 20%: the spend cap said in words, from the rule. */
 function sdCapWords(capPct) {
@@ -257,7 +253,7 @@ function sdIsOpen(k, w, rules) {
 }
 function sdCanPlace(k, w, rules) {
   if (k === 'extra' || k === 'spend' || k === 'adv') return { ok: true, why: null };
-  const fill = `🛟 fill Savings to $${sdRule(rules, 'pots.safety')} first`;
+  const fill = `🛟 fill Savings to ${fmtMoney(sdRule(rules, 'pots.safety'))} first`;
   if (k === 'goal') {
     if (!sdIsOpen('ready', w, rules)) {
       return { ok: false, why: `🔒 opens at ${sdRule(rules, 'school.stagePct.ready')}% paid` };
@@ -287,7 +283,7 @@ function sdPlace(w, k, d, n, rules) {
     moved = Math.max(0, Math.min(want, room));
     if (!moved) {
       let why = '💰 nothing left to place';
-      if (k === 'adv') why = `up to $${sdRule(rules, 'advance.maxPerWeek')} early, from next Sunday`;
+      if (k === 'adv') why = `up to ${fmtMoney(sdRule(rules, 'advance.maxPerWeek'))} early, from next Sunday`;
       else if (k === 'spend' && P.pile > 0) why = `full · ${sdCapWords(sdRule(rules, 'spend.capPct'))} of my share`;
       return { ok: false, alloc: a, moved: 0, why };
     }
@@ -310,7 +306,7 @@ function sdSetPull(w, k, d, rules) {
   const cap = k === 'ready' ? sdFloor(Math.max(0, ((x.pots || {}).ready || 0) - sdRule(rules, 'pots.safety')))
             : k === 'stock' ? sdFloor((x.pots || {}).stock || 0) : Infinity;
   if (nv === p[k]) return { ok: false, pull: p };
-  if (d > 0 && nv > cap) return { ok: false, pull: p, why: `$${cap} free` };
+  if (d > 0 && nv > cap) return { ok: false, pull: p, why: `${fmtMoney(cap)} free` };
   const next = Object.assign({}, p, { [k]: nv });
   const H2 = sdHers(Object.assign({}, x, { pull: next }), rules);
   if (d < 0 && H2 < sdPlacedOf(x.alloc)) return { ok: false, pull: p, why: 'Place every dollar first' };
@@ -325,7 +321,7 @@ function sdSetAdvance(w, d, rules) {
   const tot = sdR2(adv.owed + nv);
   const max = sdRule(rules, 'advance.maxPerWeek');
   if (nv === adv.manual) return { ok: false, adv };
-  if (tot > max) return { ok: false, adv, why: `up to $${max} early, from next Sunday` };
+  if (tot > max) return { ok: false, adv, why: `up to ${fmtMoney(max)} early, from next Sunday` };
   const H2 = sdHers(Object.assign({}, x, { adv: { owed: adv.owed, manual: nv } }), rules);
   if (H2 < sdPlacedOf(x.alloc)) return { ok: false, adv, why: 'Place every dollar first' };
   return { ok: true, adv: { owed: adv.owed, manual: nv } };
@@ -390,7 +386,7 @@ function sdCheckInOut(sg) {
   const out = sdR2(-(s.outFine || 0) + adv + (s.loanCash || 0) + cashOut + (s.ready || 0)
     + (s.goal || 0) + (s.gic || 0) + (s.stock || 0));
   const ok = Math.abs(inn - out) < 0.005;
-  return { in: inn, out, ok, why: ok ? null : `In ${sdMoney(inn)} ≠ Out ${sdMoney(out)} — nothing was signed.` };
+  return { in: inn, out, ok, why: ok ? null : `In ${fmtMoney(inn)} ≠ Out ${fmtMoney(out)} — nothing was signed.` };
 }
 
 /* The loan and the goal jar under her plan as it stands — the one answer
@@ -450,11 +446,11 @@ function sdOweAfterPlan(w, rules) {
 function sdSign(w, rules) {
   const x = w || {};
   const P = sdPile(x, rules);
-  if (P.pile > 0) return { ok: false, why: `place $${P.pile} first` };
+  if (P.pile > 0) return { ok: false, why: `place ${fmtMoney(P.pile)} first` };
   const a = sdAlloc(x.alloc);
   // A placement is dollars put somewhere; a negative one is not a plan.
   if (SD_ALLOC_KEYS.some(k => !(Number(a[k]) >= 0))) return { ok: false, why: 'Every box needs $0 or more — nothing was signed.' };
-  if (P.pile < 0) return { ok: false, why: `That is $${-P.pile} more than my pile — nothing was signed.` };
+  if (P.pile < 0) return { ok: false, why: `That is ${fmtMoney(-P.pile)} more than my pile — nothing was signed.` };
   const pull = Object.assign({ ready: 0, stock: 0, cash: 0 }, x.pull || {});
   const week = Number(x.week) || 0;
   const { pots, loan, left0, toGoal, goalOver, readyOpen, overToLoan, extraUsed, spill, loanAfter, nl, pay } = sdLoanPlan(x, P, rules);
@@ -521,7 +517,6 @@ function sdSign(w, rules) {
    ⚖️ Balanced · 🚨 Risky · 🎉 Loan free. Sentences are the prototype's. */
 function sdVerdicts(res, w, rules) {
   const sg = res.signed, after = res.after, x = w || {};
-  const m = sdMoney;
   const L = sg.lines || [];
   const amtOf = k => sdR2(L.filter(l => l[0] === k).reduce((a, l) => a + l[2], 0));
   const incT = sdR2((sg.inSteady || 0) + (sg.inBonus || 0) + (sg.inBank || 0)) || 1;
@@ -548,15 +543,15 @@ function sdVerdicts(res, w, rules) {
   const dAvg = sdR2(earnedW - avg4);
   const inLines = L.filter(l => [...SD_STEADY_KEYS, ...SD_BONUS_KEYS].includes(l[0]) && l[2] >= 0.005);
   const bonusNames = inLines.filter(l => SD_BONUS_KEYS.includes(l[0]))
-    .map(l => String(l[1]).replace(/^\S+ /, '').toLowerCase() + ' ' + m(l[2])).join(', ');
+    .map(l => String(l[1]).replace(/^\S+ /, '').toLowerCase() + ' ' + fmtMoney(l[2])).join(', ');
   const nextEv = (x.coming || [])[0];
   const incomeLines = [
-    '📅 Steady ' + m(sg.inSteady) + ' (' + sP + '%): the money I earn every week from chores, routine and club sessions.',
-    '🧱 My loan needs ' + m(minW) + ' first, every week. Steady covers it ' + cover.toFixed(1) + '×' + (cover < 1 ? ', not enough on its own.' : cover < 1.5 ? ', with little to spare.' : '.'),
-    ...(bP > 0 ? ['🎲 Bonus ' + m(sg.inBonus) + ' (' + bP + '%) came from ' + bonusNames + '. ' + (nextEv ? 'Next chance: ' + nextEv[0] + ', ' + nextEv[1] + '.' : 'No competition planned yet.')] : []),
-    ...(avg4 ? ['📊 My 4-week average is ' + m(avg4) + '. This week is ' + (dAvg >= 0 ? m(dAvg) + ' more.' : m(-dAvg) + ' less.')] : []),
+    '📅 Steady ' + fmtMoney(sg.inSteady) + ' (' + sP + '%): the money I earn every week from chores, routine and club sessions.',
+    '🧱 My loan needs ' + fmtMoney(minW) + ' first, every week. Steady covers it ' + cover.toFixed(1) + '×' + (cover < 1 ? ', not enough on its own.' : cover < 1.5 ? ', with little to spare.' : '.'),
+    ...(bP > 0 ? ['🎲 Bonus ' + fmtMoney(sg.inBonus) + ' (' + bP + '%) came from ' + bonusNames + '. ' + (nextEv ? 'Next chance: ' + nextEv[0] + ', ' + nextEv[1] + '.' : 'No competition planned yet.')] : []),
+    ...(avg4 ? ['📊 My 4-week average is ' + fmtMoney(avg4) + '. This week is ' + (dAvg >= 0 ? fmtMoney(dAvg) + ' more.' : fmtMoney(-dAvg) + ' less.')] : []),
     ...(kP >= 10 ? ['🏦 ' + kP + '% came from my bank. That is my own money moving, not earning.'] : []),
-    gap < 1 ? '👍 All from steady work. I can do this every week.' : '💪 To earn ' + m(earnedW) + ' with no bonus: ' + (parts.join(' + ') || 'keep every session') + (room < day ? '. Chores are already at the top.' : '.')];
+    gap < 1 ? '👍 All from steady work. I can do this every week.' : '💪 To earn ' + fmtMoney(earnedW) + ' with no bonus: ' + (parts.join(' + ') || 'keep every session') + (room < day ? '. Chores are already at the top.' : '.')];
 
   const b = sdBonusRate(rules), counts = sdR2(1 + b);
   const safety = sdRule(rules, 'pots.safety');
@@ -568,21 +563,21 @@ function sdVerdicts(res, w, rules) {
   const perExtra = wk + sg.extra * counts;
   const freePn = perExtra > 0 ? Math.ceil(left / perExtra) : Infinity, freeNn = wk > 0 ? Math.ceil(left / wk) : Infinity;
   const sooner = isFinite(freeNn) && isFinite(freePn) ? Math.max(0, freeNn - freePn) : 0;
-  const dateIn = n => sdMonthYear(x.weekKey, n);
+  const dateIn = n => fmtDay(sdSundayIn(x.weekKey, n), 'month');
   const safeLow = after.pots.ready < safety;
   const st = left <= 0 ? ['🎉 Loan free', 'The wall is done. Every payday is all mine now.', 'Next: grow my pots and enjoy.', 'good']
-    : cover < 1 ? ['🚨 Risky', `If bonus weeks stop, I can't make my ${m(minW)} payment. That is how people go broke.`, `Next: keep 🛟 $${safety} safe and add steady work: chores and club sessions.`, 'bad']
-    : exP >= 35 ? ['🚀 Fast track', `${exP}% of my choice went on the wall. Every week like this, I'm free by ${dateIn(freePn)}${sooner ? `, ${sooner} weeks sooner` : ''}. Pay now, enjoy later.`, safeLow ? `Next: fill 🛟 $${safety} too, in case a week goes wrong.` : 'Next: keep the steady money coming.', 'good']
-    : cashP >= 15 && exP < 10 ? ['🎈 Enjoy now', `I took ${m(cash)} as cash. Fun is OK! The loan still gets its ${m(minW)}, but stays till ${dateIn(freeNn)}.`, `Next: try a few $ on the wall. Each $1 counts as $${counts.toFixed(2)}.`, 'warn']
+    : cover < 1 ? ['🚨 Risky', `If bonus weeks stop, I can't make my ${fmtMoney(minW)} payment. That is how people go broke.`, `Next: keep 🛟 ${fmtMoney(safety)} safe and add steady work: chores and club sessions.`, 'bad']
+    : exP >= 35 ? ['🚀 Fast track', `${exP}% of my choice went on the wall. Every week like this, I'm free by ${dateIn(freePn)}${sooner ? `, ${sooner} weeks sooner` : ''}. Pay now, enjoy later.`, safeLow ? `Next: fill 🛟 ${fmtMoney(safety)} too, in case a week goes wrong.` : 'Next: keep the steady money coming.', 'good']
+    : cashP >= 15 && exP < 10 ? ['🎈 Enjoy now', `I took ${fmtMoney(cash)} as cash. Fun is OK! The loan still gets its ${fmtMoney(minW)}, but stays till ${dateIn(freeNn)}.`, `Next: try a few $ on the wall. Each $1 counts as ${fmtMoney(counts)}.`, 'warn']
     : saveP >= 40 ? ['🌱 Saver', `${saveP}% went into my pots. I'm building a cushion and my goal.`, 'Next: a little extra on the wall gets me free sooner.', 'good']
     : ['⚖️ Balanced', `${exP}% wall · ${saveP}% saved · ${cashP}% cash. A bit of everything.`, 'Next: pick one thing to push a little more.', 'neutral'];
   const target = x.goal ? Number(x.goal.target) || 0 : 0;
   const goalLeft2 = sdR2(Math.max(0, target - after.pots.goal));
   const capAmt = sdFloor((sg.hers || 0) * sdRule(rules, 'spend.capPct') / 100);
   const strategyLines = [
-    '🧱 Loan ' + m(sg.loanCash) + ' (' + pc0(sg.loanCash) + ')' + (sg.extra ? ' = ' + m(minW) + ' must-pay + ' + m(sg.extra) + ' extra (counted ' + m(sdR2(sg.extra * counts)) + ').' : ' = must-pay only.') + ' Free by ' + dateIn(freePn) + (sooner ? ', ' + sooner + ' weeks sooner.' : '.'),
-    '🌱 Saved ' + m(saveAmt) + ' (' + pc0(saveAmt) + ')' + ((sg.goal || 0) > 0 ? ' · 🎯 ' + (goalLeft2 > 0 ? m(goalLeft2) + ' to my goal' : 'goal reached!') : '') + (after.pots.ready < safety ? ` · 🛟 safety $${safety} not full yet` : ' · 🛟 safety full') + '.',
-    '💵 Cash ' + m(sdR2(cash + (sg.adv || 0))) + ' (' + pc0(sdR2(cash + (sg.adv || 0))) + ')' + (cash + (sg.adv || 0) > 0.004 ? ' to enjoy. Fun is part of the plan.' : ', no treat this week (up to $' + capAmt + ' allowed).'),
+    '🧱 Loan ' + fmtMoney(sg.loanCash) + ' (' + pc0(sg.loanCash) + ')' + (sg.extra ? ' = ' + fmtMoney(minW) + ' must-pay + ' + fmtMoney(sg.extra) + ' extra (counted ' + fmtMoney(sdR2(sg.extra * counts)) + ').' : ' = must-pay only.') + ' Free by ' + dateIn(freePn) + (sooner ? ', ' + sooner + ' weeks sooner.' : '.'),
+    '🌱 Saved ' + fmtMoney(saveAmt) + ' (' + pc0(saveAmt) + ')' + ((sg.goal || 0) > 0 ? ' · 🎯 ' + (goalLeft2 > 0 ? fmtMoney(goalLeft2) + ' to my goal' : 'goal reached!') : '') + (after.pots.ready < safety ? ` · 🛟 safety ${fmtMoney(safety)} not full yet` : ' · 🛟 safety full') + '.',
+    '💵 Cash ' + fmtMoney(sdR2(cash + (sg.adv || 0))) + ' (' + pc0(sdR2(cash + (sg.adv || 0))) + ')' + (cash + (sg.adv || 0) > 0.004 ? ' to enjoy. Fun is part of the plan.' : ', no treat this week (up to $' + capAmt + ' allowed).'),
     st[2]];
   return {
     income: { head: hd[0], tone: hd[1], lines: incomeLines, cover, steadyPct: sP, bonusPct: bP, bankPct: kP },
@@ -598,7 +593,7 @@ function sdVerdicts(res, w, rules) {
    Savings is shut), and a paid-off loan sends its payments to Savings. */
 function sdForecast(res, w, rules, nW) {
   const sg = res.signed, after = res.after, x = w || {};
-  const m = sdMoney, n = Number(nW) || 4;
+  const n = Number(nW) || 4;
   const earnW = sdR2(sg.inSteady + sg.inBonus + sg.outFine);
   const wk = sdR2((x.loan || {}).weekly);
   const b = sdBonusRate(rules), irate = sdRule(rules, 'loan.ratePct') / 100;
@@ -613,11 +608,11 @@ function sdForecast(res, w, rules, nW) {
   const overLoan = readyOpen ? 0 : goalOver;
   const leftP = sdR2(Math.max(0, left * (1 + irate * n / 52) - perP * n - overLoan * (1 + b)));
   const mxL = Math.max(1, left);
-  const fwLoan = [['now', left], ['my plan', leftP]].map(([k, v]) => ({ k, value: v, v: m(v), w: v / mxL * 100 }));
-  const fwAssume = sg.extra ? `paying ${m(wk)} + my ${m(sg.extra)} extra each week` : `paying ${m(wk)} each week, no extra`;
+  const fwLoan = [['now', left], ['my plan', leftP]].map(([k, v]) => ({ k, value: v, v: fmtMoney(v), w: v / mxL * 100 }));
+  const fwAssume = sg.extra ? `paying ${fmtMoney(wk)} + my ${fmtMoney(sg.extra)} extra each week` : `paying ${fmtMoney(wk)} each week, no extra`;
   const fwFree = left <= 0 ? '🎉 done' : leftP <= 0
     ? `🎉 paid off within ${n === 1 ? 'a week' : n === 4 ? 'a month' : '5 months'}`
-    : `free by ${sdMonthYear(x.weekKey, perP > 0 ? Math.ceil(left / perP) : Infinity)}`;
+    : `free by ${fmtDay(sdSundayIn(x.weekKey, perP > 0 ? Math.ceil(left / perP) : Infinity), 'month')}`;
   const toReady = readyOpen ? goalOver : 0;
   // A goal named with its own picture keeps it; only a bare name gets 🎯 (Plan v18: no "🎯 🛼").
   const goalLabel = /^\p{Extended_Pictographic}/u.test(String(gName)) ? String(gName) : '🎯 ' + gName;
@@ -631,17 +626,16 @@ function sdForecast(res, w, rules, nW) {
   const loanSpill = sdR2(Math.max(0, perP * n + overLoan * (1 + b) - left * (1 + irate * n / 52)));
   rows[0].put = sdR2(rows[0].put + toReady + loanSpill);
   rows[0].earn = sdR2((rows[0].bal + rows[0].put / 2) * sdRate(rules, 'ready') * n / 52);
-  const mk = v => v >= 100 ? '$' + Math.round(v) : m(v).replace('.00', '');
-  const fwSave = rows.map(r => ({ k: r.name, key: r.k, put: r.put ? '+' + mk(r.put) : '—',
-    earn: r.k === 'goal' ? 'none' : r.locked ? '🔒' : r.earn ? '+' + m(r.earn) : '$0',
-    then: mk(sdR2(r.bal + r.put + r.earn)), locked: r.locked, value: sdR2(r.bal + r.put + r.earn) }));
+  const fwSave = rows.map(r => ({ k: r.name, key: r.k, put: r.put ? '+' + sdBook$(r.put) : '—',
+    earn: r.k === 'goal' ? 'none' : r.locked ? '🔒' : r.earn ? '+' + fmtMoney(r.earn) : '$0',
+    then: sdBook$(sdR2(r.bal + r.put + r.earn)), locked: r.locked, value: sdR2(r.bal + r.put + r.earn) }));
   const pT = sdR2(rows.reduce((a, r) => a + r.put, 0)), eT = sdR2(rows.reduce((a, r) => a + r.earn, 0));
   const tT = sdR2(rows.reduce((a, r) => a + r.bal + r.put + r.earn, 0));
   return {
-    weeks: n, fwEarn: m(earnW), fwTimes: n === 1 ? 'same again next week' : `× ${n} weeks, I'd earn`,
-    fwEarnT: m(sdR2(earnW * n)), fwLoan, leftPlan: leftP, fwAssume, fwFree, fwSave,
-    fwPutT: '+' + mk(pT), fwEarnI: '+' + m(eT), fwThenT: mk(tT), toReady, overLoan, loanSpill,
-    fwNote: `🎯 The goal jar earns no interest. It waits for what I'm buying.${toReady ? ` Goal full → ${mk(toReady)} goes to 🏦 Savings.` : ''}${overLoan ? ` Goal full → ${mk(overLoan)} goes on the 🧱 loan.` : ''}${loanSpill ? ` Loan done → ${mk(loanSpill)} of payments goes to 🏦 Savings.` : ''}`,
+    weeks: n, fwEarn: fmtMoney(earnW), fwTimes: n === 1 ? 'same again next week' : `× ${n} weeks, I'd earn`,
+    fwEarnT: fmtMoney(sdR2(earnW * n)), fwLoan, leftPlan: leftP, fwAssume, fwFree, fwSave,
+    fwPutT: '+' + sdBook$(pT), fwEarnI: '+' + fmtMoney(eT), fwThenT: sdBook$(tT), toReady, overLoan, loanSpill,
+    fwNote: `🎯 The goal jar earns no interest. It waits for what I'm buying.${toReady ? ` Goal full → ${sdBook$(toReady)} goes to 🏦 Savings.` : ''}${overLoan ? ` Goal full → ${sdBook$(overLoan)} goes on the 🧱 loan.` : ''}${loanSpill ? ` Loan done → ${sdBook$(loanSpill)} of payments goes to 🏦 Savings.` : ''}`,
   };
 }
 
@@ -653,13 +647,19 @@ function sdNewGoal(pots, goal, keep) {
   return { pots: p, goal: { name: (goal || {}).name || '', target: Number((goal || {}).target) || 0 } };
 }
 
+/* The passbook's and the forecast's figures: "$140" from $100 up (rounded to
+   the dollar, the prototype's `mk`), fmtMoney below ("$16.15"). The rounded
+   branch is an open owner decision (Consistency Stage 32): it stays exactly
+   as it was until the owner answers, and tests/check-money-words.js allows
+   this one wrapper by name. My money's passbook (js/22) reads it too. */
+function sdBook$(v) { const n = sdR2(v); return n >= 100 ? '$' + Math.round(n) : fmtMoney(n); }
+
 /* ── 🔥 The routine streak, said (Sunday's clue line, the Grown-ups "she"
    line) ── "7 days = $3 · 6 with a forgiving day = $3" at the default rules
    (Plan v5 Deviation 30: the forgiving day counts as kept). Read from the
    rules: without `graceCounts` the six-day run pays the tier it reaches
    ("= $2", the prototype's words); with no grace day the second half goes.
    "Forgiving day" is her word; "grace" stays in code. */
-function sdWhole$(v) { const n = sdR2(v); return '$' + (n % 1 ? n.toFixed(2) : String(n)); }
 function sdStreakForgiving(rules) {
   const st = (rules || {}).streak || {};
   const tiers = (st.tiers || []).slice().sort((a, b) => a.days - b.days);
@@ -668,20 +668,20 @@ function sdStreakForgiving(rules) {
   const six = Number(top.days) - 1;
   const pay = st.graceCounts === true ? Number(top.bonus) || 0
     : tiers.reduce((p, t) => (Number(t.days) <= six ? Number(t.bonus) || 0 : p), 0);
-  return `${six} with a forgiving day = ${sdWhole$(pay)}`;
+  return `${six} with a forgiving day = ${fmtMoney(pay)}`;
 }
 function sdStreakClue(rules) {
   const tiers = ((((rules || {}).streak || {}).tiers) || []).slice().sort((a, b) => a.days - b.days);
   const top = tiers[tiers.length - 1];
   if (!top) return '';
   const tail = sdStreakForgiving(rules);
-  return `${top.days} days = ${sdWhole$(top.bonus)}${tail ? ' · ' + tail : ''}`;
+  return `${top.days} days = ${fmtMoney(top.bonus)}${tail ? ' · ' + tail : ''}`;
 }
 /* Sunday's four clues beside "How much came in" (prototype `clues`), each
    figure read from the rules. */
 function sdClues(rules) {
   return [
-    ['🧹 Chores · ⛸️ job', `${sdWhole$(sdRule(rules, 'chores.dailyCap'))} a day · ${sdWhole$(sdRule(rules, 'sessions.perSession'))} a session`],
+    ['🧹 Chores · ⛸️ job', `${fmtMoney(sdRule(rules, 'chores.dailyCap'))} a day · ${fmtMoney(sdRule(rules, 'sessions.perSession'))} a session`],
     ['🔥 Routine', sdStreakClue(rules)],
     ['🏆 Competitions', 'points + placing'],
     ['🎁 Gifts', 'only after a parent says yes'],
@@ -712,18 +712,17 @@ function sdImpactWeekly(R, kid, k) {
   return sdR2(monthly * 12 / 52);
 }
 function sdImpact(saved, pending, kids, weekKey) {
-  const m = sdMoney;
   const arrow = (a, b) => a === b ? a : `${a} → ${b}`;
   const freeBy = (R, kid, k) => {
     const wkly = sdImpactWeekly(R, kid, k);
-    return sdMonthYear(weekKey, wkly > 0 ? Math.ceil((Number(k.left) || 0) / wkly) : Infinity);
+    return fmtDay(sdSundayIn(weekKey, wkly > 0 ? Math.ceil((Number(k.left) || 0) / wkly) : Infinity), 'month');
   };
-  const most = (R, kid, k) => m(sdR2(Math.max(0, sdImpactWeek(R, k) - sdImpactWeekly(R, kid, k)) * sdRule(R, 'spend.capPct') / 100));
+  const most = (R, kid, k) => fmtMoney(sdR2(Math.max(0, sdImpactWeek(R, k) - sdImpactWeekly(R, kid, k)) * sdRule(R, 'spend.capPct') / 100));
   return Object.keys(kids || {}).map(kid => {
     const k = kids[kid];
     const rows = [
-      ['Typical week', arrow(m(sdImpactWeek(saved, k)), m(sdImpactWeek(pending, k)))],
-      ['Loan a week', arrow(m(sdImpactWeekly(saved, kid, k)), m(sdImpactWeekly(pending, kid, k)))],
+      ['Typical week', arrow(fmtMoney(sdImpactWeek(saved, k)), fmtMoney(sdImpactWeek(pending, k)))],
+      ['Loan a week', arrow(fmtMoney(sdImpactWeekly(saved, kid, k)), fmtMoney(sdImpactWeekly(pending, kid, k)))],
       ['Free by', arrow(freeBy(saved, kid, k), freeBy(pending, kid, k))],
       ['Most to spend', arrow(most(saved, kid, k), most(pending, kid, k))],
     ].map(([key, v]) => ({ k: key, v, changed: v.indexOf('→') >= 0 }));
@@ -772,7 +771,7 @@ function sdSavingLine(rows, loanOpen, rules) {
   const pct = Math.round(saved / placed * 1000) / 10;
   const word = pct < 10 ? 'a little' : pct > 50 ? 'a lot' : 'steady';
   const extra = (word === 'a lot' && loanOpen)
-    ? `extra on the loan counts ${sdWhole$(1 + sdBonusRate(rules))} per $1` : '';
+    ? `extra on the loan counts ${fmtMoney(1 + sdBonusRate(rules))} per $1` : '';
   return { pct, word, sundays: list.length, extra };
 }
 
@@ -876,21 +875,20 @@ function sdRequestTag(kind, to) {
 
 /* ── Taken off is always negative (Plan v18 §W) ──
    A fine, money drawn early, agreed early cash: whatever sign the caller
-   holds it in, it is shown with a minus. Nothing is "−$0.00". `fmt` is the
-   screen's own money format (whole dollars or cents). */
-function sdOff$(v, fmt) {
-  const f = typeof fmt === 'function' ? fmt : sdMoney;
+   holds it in, it is shown with a minus ("−$3"). Nothing is "−$0". One money
+   format (fmtMoney) since Consistency PR 6, so no screen passes its own. */
+function sdOff$(v) {
   const a = Math.abs(sdR2(v));
-  return a > 0.004 ? '−' + f(a) : f(0);
+  return a > 0.004 ? '−' + fmtMoney(a) : fmtMoney(0);
 }
 
 /* ── A fine the daily floor took less of (Plan v18, last round) ──
    Fines can zero a day, never create debt (`fines.dailyFloorZero`), so a
-   fine listed at "−$1.00" can take nothing when its day earned $0. The row
+   fine listed at "−$1" can take nothing when its day earned $0. The row
    keeps its minus and says so, so it never contradicts the ➖ total:
    `raw` is what the day's fines cost, `applied` what was actually taken. */
-function sdFineFloorNote(raw, applied, fmt) {
-  const f = typeof fmt === 'function' ? fmt : sdMoney;
+function sdFineFloorNote(raw, applied) {
+  const f = fmtMoney;
   const r = sdR2(raw), a = Math.max(0, sdR2(applied));
   if (!(r > 0) || a >= r - 0.004) return '';
   return a <= 0.004 ? 'nothing taken — the day was $0' : `only ${f(a)} taken — the day earned ${f(a)}`;
@@ -1009,14 +1007,22 @@ function sdCommitPlan(o) {
 }
 
 // Inert in the browser; lets tests/sunday.test.js hold the pure core in Node.
+// The core writes money and dates with fmtMoney and fmtDay (js/05-helpers.js),
+// globals in the browser; in Node they come from that file's own guard, so
+// there is still one formatter.
 if (typeof module !== 'undefined' && module.exports) {
+  if (typeof fmtMoney === 'undefined') {
+    const helpers05 = require('./05-helpers.js');
+    global.fmtMoney = helpers05.fmtMoney;
+    global.fmtDay = helpers05.fmtDay;
+  }
   module.exports = {
     SD_STEADY_KEYS, SD_BONUS_KEYS, SD_ALLOC_KEYS, SD_POT_KEYS, SD_GATE_STAGE, SD_PRESETS, SD_STICKERS,
-    sdR2, sdMoney, sdRule, sdPlacedOf, sdDayKeyAdd, sdSundayOf, sdLockMaturesOn, sdMonthYear, sdShortDay,
+    sdR2, sdRule, sdPlacedOf, sdDayKeyAdd, sdSundayOf, sdLockMaturesOn, sdSundayIn,
     sdCapWords, sdPercents, sdPercentLabel, sdBuysOf, sdIncome, sdWeekCat, sdSessionsLine,
     sdLeft, sdPaidPct, sdMustPay, sdLoanInterest, sdMatured, sdPile, sdHers, sdSafeOk, sdIsOpen,
     sdCanPlace, sdPlace, sdSetPull, sdSetAdvance, sdPresets, sdStickersFor, sdCheckInOut, sdSign,
-    sdVerdicts, sdForecast, sdNewGoal, sdWhole$, sdStreakForgiving, sdStreakClue, sdClues,
+    sdVerdicts, sdForecast, sdNewGoal, sdBook$, sdStreakForgiving, sdStreakClue, sdClues,
     sdImpactWeek, sdImpactWeekly, sdImpact, sdWithAgreed, sdAgreeInto, sdSavingLine,
     sdOweOwnForecast, sdOweOwnSeries, sdThinLabels, SD_CHART_LABELS,
     sdSegHitsBox, sdGapLabelSpot, SD_REQUEST_TAGS, sdRequestTag, sdOff$, sdFineFloorNote,

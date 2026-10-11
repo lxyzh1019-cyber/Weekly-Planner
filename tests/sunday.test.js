@@ -427,7 +427,7 @@ function fill(w, k) {
   const res = s.sdSign(w, R);
   check('money still in the pile: "place $X first"', !res.ok && res.why === `place $${P.pile} first`);
   const bad = s.sdCheckInOut({ inSteady: 10, inBonus: 0, inBank: 0, outFine: 0, adv: 0, loanCash: 5, wallet: 0, ready: 4, goal: 0, gic: 0, stock: 0 });
-  check('In ≠ Out is refused with the figures', !bad.ok && bad.why === 'In $10.00 ≠ Out $9.00 — nothing was signed.');
+  check('In ≠ Out is refused with the figures', !bad.ok && bad.why === 'In $10 ≠ Out $9 — nothing was signed.');
 }
 
 /* ── Gates and the 🛟 line ── */
@@ -547,13 +547,13 @@ function fill(w, k) {
   check('the income verdict reads as the prototype wrote it',
     v.income.head === '🎲 A lucky week, not every week'
     && v.income.lines[1] === '🧱 My loan needs $16.15 first, every week. Steady covers it 1.9×.'
-    && v.income.lines[2] === '🎲 Bonus $23.00 (40%) came from competitions $18.00, gifts $5.00. Next chance: Club time trials, Sun 18 Oct.'
+    && v.income.lines[2] === '🎲 Bonus $23 (40%) came from competitions $18, gifts $5. Next chance: Club time trials, Sun 18 Oct.'
       ? true : JSON.stringify(v.income.lines));
   check('the strategy verdict reads as the prototype wrote it',
     v.strategy.head === '🧭 🚀 Fast track' && /^\d+% of my choice went on the wall\. Every week like this, I'm free by [A-Z][a-z]{2} \d{4}, \d+ weeks sooner\. Pay now, enjoy later\.$/.test(v.strategy.why)
       ? true : v.strategy.why);
   check('a locked 4 weeks comes back on the Saturday before the 4th-next Sunday',
-    s.sdLockMaturesOn('2026-09-28', 4) === '2026-10-31' && s.sdShortDay('2026-10-31') === 'Sat, Oct 31');
+    s.sdLockMaturesOn('2026-09-28', 4) === '2026-10-31' && fmtDay('2026-10-31', 'long') === 'Sat 31 Oct');
   for (const n of [1, 4, 20]) {
     const f = s.sdForecast(res, Object.assign({}, w, { alloc }), R, n);
     check(`forecast ${n === 1 ? '1 wk' : n === 4 ? '1 mo' : '5 mo'}: the goal jar earns none, the totals add up`,
@@ -581,7 +581,7 @@ function fill(w, k) {
   const moved = s.sdImpact(R, R2, kids, '2026-09-28');
   const row = k => moved[0].rows.find(r => r.k === k);
   check('a change shows before → after on every row it moves',
-    row('Typical week').v === '$33.00 → $39.00' && row('Loan a week').v === '$16.15 → $20.77'
+    row('Typical week').v === '$33 → $39' && row('Loan a week').v === '$16.15 → $20.77'
     && row('Typical week').changed && row('Most to spend').changed ? true : JSON.stringify(moved[0].rows));
 }
 
@@ -762,10 +762,9 @@ function fill(w, k) {
   check('floor note: a partly floored day says what was taken', F(2, 0.5) === 'only $0.50 taken — the day earned $0.50');
   check('floor note: a fine taken in full says nothing', F(1, 1) === '' && F(0, 0) === '');
   const O = s.sdOff$;
-  check('taken off: a positive amount shows with a minus', O(1) === '−$1.00');
+  check('taken off: a positive amount shows with a minus', O(1) === '−$1');
   check('taken off: a negative amount shows with one minus', O(-2.5) === '−$2.50');
-  check('taken off: nothing taken off is $0.00, never −$0.00', O(0) === '$0.00' && O(0.001) === '$0.00');
-  check("taken off: the screen's own format", O(3, v => '$' + v) === '−$3');
+  check('taken off: nothing taken off is $0, never −$0', O(0) === '$0' && O(0.001) === '$0');
 }
 
 /* ── Money fit and logic, PR 1 (2026-10-05) ───────────────────────── */

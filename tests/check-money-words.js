@@ -45,6 +45,33 @@
 // ('D' + 'ad'), words in attributes of index.html (placeholder, aria-label,
 // title), and other files (css content:, sw.js, tests/) — they hold no money
 // words today.
+//
+// ── One money, day and kid-name format (Consistency PR 6, decision D2) ──
+// The app once wrote money with eighteen local formatters that disagreed
+// ("$-3.00" beside "−$3"), days with eight, and the girls' names with a
+// hand-written ternary in about ten files. fmtMoney and fmtDay
+// (js/05-helpers.js) and kidLabel (js/01-config.js) are the one answer, so a
+// new local one fails the build. In js/*.js outside js/05-helpers.js:
+//   formatter   — a top-level function (or `const x = (…) =>`) named like a
+//                 formatter (…Money, …Dollar(s), …Signed, …DayName, …DayLabel,
+//                 …DayMonth, …ShortDate, …ShortDay, …MonthYear, …KidName) whose
+//                 body writes "$", a day or month name, a girl's name, or calls
+//                 toFixed / toLocaleDateString / MONTH_SHORT; and ANY top-level
+//                 function whose name ends in "$" (the house mark for "returns
+//                 dollars as text").
+//   toFixed $   — `.toFixed(2)` on a line whose string text holds a "$".
+//   raw $${     — a template that writes "$" straight before a hole (`$${n}`):
+//                 it prints "$2.5" and "$-3" (Stage 32). Put the number through
+//                 fmtMoney instead. A hole with no "$" before it (`${n} weeks`)
+//                 is not money and passes.
+//   $N.00       — a hard-coded "$0.00"-style literal in string text: D2 writes
+//                 whole dollars without cents ("$0"); use fmtMoney(0).
+//   toLocaleDateString — anywhere in code (the device's locale and zone pick
+//                 the words; fmtDay does not).
+//   kid ternary — `x === 'jenn' ? '…Jenn…' : '…Jess…'` (either order).
+// FMT_ALLOW names the few that are right where they are, each with why; an
+// entry that no longer matches FAILS as stale, like ALLOW above. It does not
+// see a formatter nested inside another function, nor '$' + n with no toFixed.
 
 const fs = require('fs');
 const path = require('path');
@@ -76,6 +103,25 @@ const ALLOW = [
   { file: 'js/45-requests.js', text: 'up to 4 at one meet', word: 'meet',
     why: 'the swim request\'s race picker: a swim meet, kept deliberately in PR 2' },
 ];
+
+/* Local formatters that are right where they are (see the header). */
+const FMT_HOME = 'js/05-helpers.js';
+const FMT_ALLOW = [
+  { file: 'js/43-sunday-core.js', name: 'sdBook$', rule: 'formatter',
+    why: 'owner decision pending (Stage 32): "$100 and up shown rounded" on the passbook and the forecast; below $100 it is fmtMoney' },
+  { file: 'js/43-sunday-core.js', name: 'sdOff$', rule: 'formatter',
+    why: 'not a format: "taken off is always negative" (Plan v18 §W), the minus put in front of fmtMoney' },
+  { file: 'js/15-meeting.js', name: '$${y.target.toFixed(0)}', rule: 'raw $${',
+    why: 'owner decision pending (Stage 32): whole-dollar display (the yearly target), same as sdBook$' },
+  { file: 'js/20-loan.js', name: '$${(100 * (1 + bonus / 100)).toFixed(0)}', rule: 'raw $${',
+    why: 'owner decision pending (Stage 32): whole-dollar display (what $100 paid early clears), same as sdBook$' },
+];
+const FMT_NAME = /(?:Money|Dollars?|Signed|DayName|DayLabel|DayMonth|ShortDate|ShortDay|MonthYear|KidName)$/;
+const FMT_CODE = /\.toFixed\(|toLocaleDateString|MONTH_SHORT/;
+const FMT_TEXT = /\$|\bJe(?:nn|ss)\b|\b(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/;
+const KID_TERNARY = /['"]je(?:nn|ss)['"]\s*\?\s*['"`][^'"`\n]*\bJe(?:nn|ss)\b/;
+const fmtHits = new Map(FMT_ALLOW.map(x => [x, 0]));
+let fmtScanned = 0, fmtAllowed = 0;
 
 /* Known hits a later PR fixes — each goes when its words change. */
 const EXEMPT = [
@@ -200,6 +246,49 @@ function scan(file, rawLines, strLines, skipLines, fills) {
   });
 }
 
+// A local money, day or kid-name formatter (see the header). The lexer's three
+// views, split into lines: `code`, `str` (string and template text only) and
+// `text` (comments blanked).
+function scanFormatters(file, rawLines, codeLines, strLines, textLines) {
+  if (file === FMT_HOME) return;
+  fmtScanned++;
+  const report = (idx, rule, found) => {
+    const a = FMT_ALLOW.find(x => x.file === file && x.rule === rule && x.name === found);
+    if (a) { fmtHits.set(a, fmtHits.get(a) + 1); fmtAllowed++; return; }
+    problems.push({ where: `${file}:${idx + 1}`, word: rule, found, line: rawLines[idx].trim().slice(0, 110) });
+  };
+  const noHole = (s) => s.replace(/\$\{/g, '  ');   // a template hole is not a "$"
+  codeLines.forEach((line, idx) => {
+    const decl = line.match(/^(?:async\s+)?function\s+([\w$]+)\s*\(/)
+      || line.match(/^(?:const|let)\s+([\w$]+)\s*=\s*(?:\([^)]*\)|[\w$]+)\s*=>/);
+    if (decl) {
+      const name = decl[1];
+      let end = idx;
+      if ((line.match(/\{/g) || []).length > (line.match(/\}/g) || []).length) {
+        end = idx + 1;
+        while (end < codeLines.length && !/^\}/.test(codeLines[end])) end++;
+      }
+      let formats = false;
+      for (let k = idx; k <= end && k < codeLines.length && !formats; k++) {
+        formats = FMT_CODE.test(codeLines[k]) || FMT_TEXT.test(noHole(strLines[k]));
+      }
+      if (/\$$/.test(name) || (FMT_NAME.test(name) && formats)) report(idx, 'formatter', name);
+    }
+    if (/\.toFixed\(2\)/.test(line) && /\$/.test(noHole(strLines[idx]))) report(idx, 'toFixed $', '.toFixed(2)');
+    for (let k = strLines[idx].indexOf('$${'); k >= 0; k = strLines[idx].indexOf('$${', k + 1)) {
+      const raw = rawLines[idx];
+      let d = 1, j = k + 3;
+      while (j < raw.length && d) { if (raw[j] === '{') d++; else if (raw[j] === '}') d--; j++; }
+      report(idx, 'raw $${', raw.slice(k, j));
+    }
+    const lit = strLines[idx].match(/\$\d+\.00(?!\d)/);
+    if (lit) report(idx, '$N.00', lit[0]);
+    if (/\btoLocaleDateString\b/.test(line)) report(idx, 'toLocaleDateString', 'toLocaleDateString');
+    const kt = textLines[idx].match(KID_TERNARY);
+    if (kt) report(idx, 'kid ternary', kt[0]);
+  });
+}
+
 // js/*.js — string and template text only: where the code view is blank and
 // the text view is not.
 for (const name of fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith('.js')).sort()) {
@@ -228,6 +317,7 @@ for (const name of fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith(
     }
   }
   scan(file, rawLines, str.split('\n'), skip, fills);
+  scanFormatters(file, rawLines, code.split('\n'), str.split('\n'), text.split('\n'));
   scanned++;
 }
 
@@ -247,13 +337,16 @@ for (const [list, hits, name] of [[ALLOW, allowHits, 'ALLOW'], [EXEMPT, exemptHi
   for (const x of list) if (!hits.get(x)) problems.push({ where: `tests/check-money-words.js ${name}`, word: x.word, found: 'stale',
     line: `${x.file} "${x.text}" no longer has a "${x.word}" hit — delete the entry` });
 }
+for (const x of FMT_ALLOW) if (!fmtHits.get(x)) problems.push({ where: 'tests/check-money-words.js FMT_ALLOW', word: x.rule, found: 'stale',
+  line: `${x.file} ${x.name} is no longer a ${x.rule} hit — delete the entry` });
 
 if (!problems.length) {
   console.log(`OK  ${scanned} js/html file(s): no retired money word and no unfilled {placeholder} on screen — `
-    + `${allowed} allowed by ${ALLOW.length} named allowance(s), ${swapped} concept placeholder(s) mnyConceptSwap fills, ${exempted} known hit(s) left for PR 4 (${EXEMPT.length} exemption(s))`);
+    + `${allowed} allowed by ${ALLOW.length} named allowance(s), ${swapped} concept placeholder(s) mnyConceptSwap fills, ${exempted} known hit(s) left for PR 4 (${EXEMPT.length} exemption(s)); `
+    + `${fmtScanned} js file(s) with no local money, day or kid-name formatter outside ${FMT_HOME} — ${fmtAllowed} allowed by ${FMT_ALLOW.length} named allowance(s)`);
   process.exit(0);
 }
 console.error(`FAIL  ${problems.length} money word problem(s):\n`);
 for (const p of problems) console.error(`  ${p.where}  [${p.word}]  "${p.found}"\n      ${p.line}\n`);
-console.error('A retired word or a raw {placeholder} reaches a child\'s screen. Reword it, or add a named ALLOW/EXEMPT entry with the reason.');
+console.error('A retired word or a raw {placeholder} reaches a child\'s screen, or a local money, day or kid-name formatter is back. Reword it or use fmtMoney / fmtDay / kidLabel, or add a named ALLOW/EXEMPT/FMT_ALLOW entry with the reason.');
 process.exit(1);
