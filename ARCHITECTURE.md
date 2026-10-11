@@ -4300,11 +4300,15 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   counts one build per render. (checked by smoke: theGrandfatherRuleReadsAsItselfEverywhere)
 - **Two selected fills, two meanings (PR 5, decision 5 kept both).** Teal
   `--sel-opt` marks **a picked option** (`.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
-  `.fl-col.on`; Sunday's picked chips are the kit's
-  `.ui-chip[aria-pressed="true"]` on `--pill-on` since PR 9); red `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
+  `.fl-col.on`) on money's own parts. A kit chip shows the same meaning in
+  the kit's own picked fill: `.ui-chip[aria-pressed="true"]` is `--pill-on`
+  (Pop `--accent-strong`, Calm `--ink`), which Sunday's picked chips use since
+  PR 9 — the kit's drawing of "a picked option", not a third meaning. Red
+  `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
   `.mm-step-cur`, `.sd-rung.on`, `.pn-segbtn.on`, `.gu-toggle.on`); ink
   `--sel-tab` is a Grown-ups tab. A new selected state picks the one that
-  says what it means; it never invents a third. (text only)
+  says what it means (on a kit chip, `--pill-on`); it never invents a third.
+  (text only)
 
 ### Money fit and logic, PR 4 part B — the old money pages read the new rules (build 2026-10-06b)
 
@@ -4350,8 +4354,14 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   button. (text only)
 - **Tap buttons vs information boxes.** Inside the money markers a tap button
   has `--bw-btn` and `--mny-shadow-btn`; an information box, a door or a list
-  row keeps a thin edge or none (BUILD-SPEC §0). The two selected meanings are
-  under PR 3 above. (text only)
+  row keeps a thin edge or none (BUILD-SPEC §0). Since PR 9 the rule also
+  covers Sunday's own tap parts, the ones the kit has no part for: `.sd-tile`,
+  `.sd-off`, `.sd-sign` and `.sd-pilechip` keep `--mny-shadow-btn` and the
+  heavy edge (`--bw-btn`; `--bw-card`, the same 2.5px, on `.sd-tile` and
+  `.sd-pilechip`). Sunday's other controls follow the kit instead: `.ui-btn`,
+  `.ui-chip` and `.ui-stepper` buttons carry no money shadow, and the chips
+  and steppers use `--bw-chip`. The two selected meanings are under PR 3
+  above. (text only)
 - **The sheet scrim** `--mny-v15-scrim` is 0.62 in both looks, so the page's
   numbers do not read beside a sheet. (text only)
 - **Held by** smoke `aSundayRowOpensItsSheet` and the unit case in

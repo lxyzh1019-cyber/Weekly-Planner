@@ -494,8 +494,9 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
      button, chip, stepper and girl the four steps draw — the girls in the
      meeting's head, Guess with its questions open (✏️ Adjust's and Talk
      first's steppers, the new-row card), Payday as a grown-up (the bank,
-     drawn-early and must-pay steppers, and Home's ✏️ sheet), I choose, and
-     Signed (the 1 wk / 1 mo / 5 mo chips, ▸ Why) — is at least 44×44 and lies
+     drawn-early and must-pay steppers, Home's ✏️ sheet before and after a
+     line edit with its "Why" reason chips, the parent's card and its "Back to
+     her"), I choose (and the which-goal sheet's chips), and Signed (the 1 wk / 1 mo / 5 mo chips, ▸ Why) — is at least 44×44 and lies
      whole inside every box that clips it (overflow hidden or clip: the step's
      card, an I choose column), at 390×844 and 1194×834, in Pop and in Calm.
      Each stage names controls that must be drawn, so a stage that did not
@@ -572,10 +573,23 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
             d.step = 1; d.shown = 99; d.guess = 40; sdSave(d); await draw();
             measure('Payday', [step()], ['.sd-pull.ui-stepper > button', '.sd-off--adv.ui-stepper > button', '.sd-payfoot .ui-stepper > button', '.sd-row > .ui-btn--primary']);
             sdOpenLine('home', true); await wait(350);
-            measure('Payday · 🏠 Home changed by a parent', [sheet()], ['.sd-adj-row.ui-stepper > button']);
+            measure('Payday · 🏠 Home changed by a parent', [sheet()], ['.sd-adj-row.ui-stepper > button', '[data-mny-action="sd-dadclose"]']);
+            // A line edit brings the "Why" reason chips (sdTileDetail).
+            const more = document.querySelector('#sundayBody [data-mny-action="sd-ov"][data-sd-d="1"]');
+            if (more) { more.click(); await wait(60); } else out.push(`${tag} Payday · line edit: no + to change a line`);
+            measure('Payday · 🏠 Home after a line edit', [sheet()], ['.sd-reasons > .ui-chip', '[data-mny-action="sd-dadclose"]']);
+            sdSheet = null; closeSheet('sundayOverlay'); await wait(60);
+            sdOpenDad(); await wait(350);
+            measure("Payday · 🗣️ Parent's card", [sheet()], ['[data-mny-action="sd-dadclose"]']);
             sdSheet = null; closeSheet('sundayOverlay'); await wait(60);
             d.step = 2; sdSave(d); await draw();
             measure('I choose', [step()], ['.sd-presets > .ui-chip', '.sd-presets > .ui-btn', '.sd-minus.ui-btn']);
+            // The goal-pick sheet needs two goals to choose between.
+            mnyAddGoal(kid, { name: 'Skates', icon: '⛸️', target: 80 });
+            mnyAddGoal(kid, { name: 'Book', icon: '📚', target: 15 });
+            sdHandleAction('sd-goalmenu', document.body); await wait(350);
+            measure('I choose · 🎯 which goal', [sheet()], ['.sd-goalpick > .ui-chip', '[data-mny-action="sd-dadclose"]']);
+            sdSheet = null; closeSheet('sundayOverlay'); await wait(60);
             const signed = sdSignHer(kid, wk);
             if (!signed || signed.ok === false) out.push(`${tag} Signed: the sign refused (${JSON.stringify(signed)})`);
             mnyMeetKid = kid; mmGoTo('money'); await draw();

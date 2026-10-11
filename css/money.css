@@ -226,6 +226,8 @@
 .sd-off-foot .sd-note { flex: 1; min-width: 0; }
 .sd-off-foot b { font-weight: 700; font-size: calc(1.1875rem * var(--text-scale, 1)); }
 .sd-off--adv { flex-direction: row; align-items: center; gap: 4px; background: var(--mny-v15-peach); border-style: dashed; padding-right: 3px; cursor: default; }
+/* The kit − / + inside a pull or the advance chip keep their 44px: never shrink. */
+.sd-pull > button, .sd-off--adv > button { flex: none; }
 .sd-work { display: flex; flex-direction: column; gap: 4px; }
 .sd-work-head { font-weight: 700; font-size: calc(0.9375rem * var(--text-scale, 1)); }
 .sd-reasons { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }

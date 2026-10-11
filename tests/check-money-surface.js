@@ -22,11 +22,13 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const CSS = path.join(ROOT, 'css', 'app.css');
+// Every stylesheet in css/ (Stage 33: one file per screen, floors last), not
+// only app.css: a list planted in css/money.css counts as much as one in app.css.
+const CSS_FILES = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css')).sort();
 const SURFACE = '[data-money-surface]';
 const WATCHED = ['--text-scale', '--font-round'];
 
-const css = fs.readFileSync(CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
+const stripComments = src => src.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
 
 /* Walk the blocks: each block's own declarations (nested blocks left out),
    with its selector and the line it starts on. */
@@ -54,18 +56,21 @@ function blocks(src) {
 
 const problems = [];
 const surfaceSets = new Set();
-for (const b of blocks(css)) {
-  if (b.prelude.startsWith('@')) continue;
-  for (const prop of WATCHED) {
-    if (!new RegExp('(^|[;\\s])' + prop + '\\s*:').test(b.own)) continue;
-    const sel = b.prelude.replace(/\s+/g, ' ');
-    if (sel === SURFACE) { surfaceSets.add(prop); continue; }
-    if (/^:root\b/.test(sel)) continue;   // the look blocks and print own the token
-    problems.push(`css/app.css:${b.line}: "${sel}" sets ${prop} — money roots carry data-money-surface and only "${SURFACE}" sets it`);
+for (const file of CSS_FILES) {
+  const css = stripComments(fs.readFileSync(path.join(ROOT, 'css', file), 'utf8'));
+  for (const b of blocks(css)) {
+    if (b.prelude.startsWith('@')) continue;
+    for (const prop of WATCHED) {
+      if (!new RegExp('(^|[;\\s])' + prop + '\\s*:').test(b.own)) continue;
+      const sel = b.prelude.replace(/\s+/g, ' ');
+      if (sel === SURFACE) { surfaceSets.add(prop); continue; }
+      if (/^:root\b/.test(sel)) continue;   // the look blocks and print own the token
+      problems.push(`css/${file}:${b.line}: "${sel}" sets ${prop} — money roots carry data-money-surface and only "${SURFACE}" sets it`);
+    }
   }
 }
 for (const prop of WATCHED) {
-  if (!surfaceSets.has(prop)) problems.push(`css/app.css: no "${SURFACE}" rule sets ${prop}`);
+  if (!surfaceSets.has(prop)) problems.push(`css/*.css: no "${SURFACE}" rule sets ${prop}`);
 }
 
 const markup = [path.join(ROOT, 'index.html'), ...fs.readdirSync(path.join(ROOT, 'js')).filter(n => n.endsWith('.js')).map(n => path.join(ROOT, 'js', n))];
