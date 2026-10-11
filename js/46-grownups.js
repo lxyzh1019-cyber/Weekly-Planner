@@ -1295,7 +1295,7 @@ function guWeeksMain() {
    version. A row from before the ledger kept these keeps what it kept. */
 function guWeekRecord(kid, wk, r) {
   const head = `<div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(kidLabel(kid).name)} · Sunday ${escapeHtml(fmtDay(sdSundayOf(wk), 'short'))}</span></div>`;
-  if (!r) return `<div class="gu-card gu-record gu-record--none ${'gu-tint--' + kid}"><div class="gu-line">${escapeHtml(`${escapeHtml(kidLabel(kid).name)} · no Sunday on record for ${fmtDay(sdSundayOf(wk), 'short')}.`)}</div></div>`;
+  if (!r) return `<div class="gu-card gu-record gu-record--none ${'gu-tint--' + kid}"><div class="gu-line">${escapeHtml(kidLabel(kid).name)} · no Sunday on record for ${escapeHtml(fmtDay(sdSundayOf(wk), 'short'))}.</div></div>`;
   const kv = (k, v, sub) => `<div class="gu-kv"><span>${escapeHtml(k)}${sub ? `<span class="gu-she">${escapeHtml(sub)}</span>` : ''}</span><b>${escapeHtml(v)}</b></div>`;
   const sec = (title, html) => html ? `<div class="gu-rec-sec"><div class="gu-rec-title">${escapeHtml(title)}</div>${html}</div>` : '';
   const m = (v) => fmtMoney(Number(v) || 0);

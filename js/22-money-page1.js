@@ -595,7 +595,7 @@ function mnyPassbookCard(kid) {
         <div class="mv2-bookrow mv2-booktotal"><b>= Total</b><b class="mv2-bookin">${escapeHtml(sdBook$(t.inAmt))}</b><b class="mv2-bookv">${escapeHtml(sdBook$(t.wall))}</b><b class="mv2-bookv">${escapeHtml(sdBook$(t.saved))}</b><b class="mv2-bookv">${escapeHtml(sdBook$(t.cash))}</b></div>
       </div>
       <div class="mv2-booknote">${escapeHtml(note)}</div>
-      <div class="mv2-bookline">${escapeHtml(`${escapeHtml(kidLabel(kid).name)} ✓ · ${p.all.length} Sunday${p.all.length === 1 ? '' : 's'} signed`)}</div>
+      <div class="mv2-bookline">${escapeHtml(kidLabel(kid).name)} ✓ · ${p.all.length} Sunday${p.all.length === 1 ? '' : 's'} signed</div>
     </div>`;
 }
 
