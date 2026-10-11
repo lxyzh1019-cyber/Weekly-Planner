@@ -32,6 +32,11 @@ Single working record for this repository. Updated by the main session at the en
 - [agreed] Owner 2026-10-11 answer 4: Part 9 opens now; it adds no new private girl switch, day row or green button; order Part 9, then Kit 1.1, then Part 11 — search: Part 9 then Kit 1.1
 - [agreed] Owner 2026-10-11 answer 5: dark mode removal and its guard go into Kit 1.1 — search: dark mode in Kit 1.1
 - [agreed] Owner 2026-10-11 answer 6: copy D9–D14 (app-consistency-plan-v1.md), header-exact-values.md and kit-gaps-pr7-10.md into docs/handoff/, notes only, in Kit 1.1 — search: copy D9–D14
+- [agreed] Owner 2026-10-11 v11 answer 1 (A): the seven-day row goes on Now, She told me and Meeting; Today's ribbon stays as it is (kit-gaps note corrected) — search: Today's ribbon stays
+- [agreed] Owner 2026-10-11 v11 answer 2 (B): hiding colour emoji in the picture test waits for Part 13; until then a rerun caused only by emoji edges is not a failure — search: emoji edges is not a failure
+- [agreed] Owner 2026-10-11 v11 answer 3: build the Part 8 stopwatch and open Part 9's pull request now; merge nothing before Plan v11 is approved — search: merge nothing before Plan v11
+- [agreed] Owner 2026-10-11 v11 answer 4: the iPad read and one Sunday per girl at the same stop as the Parts 7, 8, 10 merges, before Kit 1.1 starts — search: iPad read at the same stop
+- [agreed] Owner 2026-10-11 v11 answer 5: the app's header exact-values copy stands, with a dated note; kit-gaps-pr7-10.md is the owner's corrected copy of 11 October — search: corrected copy
 - [agreed] Owner 2026-10-10: PR 5 differences 1, 2, 3, 5, 6, 7, 8 and 10 accepted as built — search: accept 1, 2, 3, 5, 6, 7, 8 and 10
 - [agreed] Owner 2026-10-10: Day keeps both ways back — "◀ Week" in row 1 (the kid's) and "◀ Hub" in the sub-bar (the parent's); Week keeps its single "◀ Hub" — search: keep both buttons on Day
 - [agreed] Owner 2026-10-10: when a parent views a girl, the avatar is that girl's (🐥 Jenn / 🦊 Jess, 52px pink circle), not the family emoji; aria-label "Viewing Jenn, switch profile"; measured by the check — search: avatar shows that girl's avatar
