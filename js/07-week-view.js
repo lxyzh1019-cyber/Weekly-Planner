@@ -401,6 +401,11 @@ function weekRenderHeader() {
     tools,
     actions: weekView === 'preview' ? [{ label: 'Print', aria: 'Print this week', cls: 'hdr-print', data: { 'hdr-action': 'print-open' } }] : [],
     badge: kidHeadBadge('weekProfileBadge', isParent() ? parentViewing : activeProfile(), isParent()),
+    /* A parent viewing a girl: the purple sub-bar (js/11-parent.js). Switching
+       child mid-meeting loses the sitting, so the meeting lock hides Switch
+       rather than leaving a control that quietly discards your place. */
+    sub: parentViewSub('week', 'parentWeekActions',
+      `<button type="button" class="pv-btn no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${parentViewing === 'jenn' ? 'Jess' : 'Jenn'}">Switch</button>`),
   });
   /* A week across two months ("Sep 28 – Oct 4") is wider than a phone's room
      at 20px; css/app.css sizes it down only on the widths where it does not
@@ -410,21 +415,9 @@ function weekRenderHeader() {
 }
 
 function renderWeek() {
+  // The header first: a parent's sub-bar is in it, and applyMeetingLock below hides by id.
   weekRenderHeader();
-  // parent banner
-  const parentBanner = document.getElementById('parentBannerWeek');
-  if (isParent()) {
-    parentBanner.style.display = 'block';
-    document.getElementById('parentViewingName').textContent = parentViewing==='jenn'?'🐥 Jenn':'🦊 Jess';
-    document.getElementById('parentBackWeek').innerHTML = parentBannerBackButton();
-    // Switching child mid-meeting loses the sitting, so the meeting lock hides
-    // this rather than leaving a control that quietly discards your place.
-    document.getElementById('parentWeekActions').innerHTML =
-      `<button type="button" class="btn-icon no-print pb-switch" onclick="parentSwitchView()">Switch</button>`;
-  } else {
-    parentBanner.style.display = 'none';
-  }
-  /* Outside the isParent() branch on purpose. While it was inside, nothing ever
+  /* Outside any isParent() branch on purpose. While it was inside, nothing ever
      called this with the lock OFF, so a sitting hid the switcher and a child's
      render had no way to put it back. */
   applyMeetingLock();

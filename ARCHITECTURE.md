@@ -2634,10 +2634,14 @@ existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 
 `Now · Meeting · History · Money · Setup · App`, declared in `PARENT_DESTS`
 (`js/11-parent.js`). 💰 Money became its own destination in Plan v9 §N
-(Stage 6d, "Header space"); it was Setup › Money rules. The header is one
-row (`.parent-bar`): 🔒 Parent ▾ (`parentMenuToggle` — PIN, the look's
-`#parentLookBtn`, Exit), the destinations, the day, ⚙️ App, the switcher. It was ten flat tabs in a wrapping row, which on a phone
-was three lines and no order worth learning. (checked by smoke: everyOldTabIsStillReachable)
+(Stage 6d, "Header space"); it was Setup › Money rules. The header is one purple
+`pageHeader({variant:'parent'})` drawn by `parentRenderHeader` (`js/11-parent.js`):
+🔒 Parent ▾ (`parentMenuToggle` — PIN, the look's `#parentLookBtn`, Exit), six
+destination tabs (icon only on the current one), the girl switch (hidden on Now),
+and on a phone the destination's name as title. A parent viewing a girl's
+Week/Day gets the kid row plus a 44px purple sub-bar (`parentViewSub`); Monthly
+uses `parentMonthlyHeader`. It was ten flat tabs in a wrapping row, which on a
+phone was three lines and no order worth learning. (checked by smoke: everyOldTabIsStillReachable)
 
 **One panel renders at a time.** `renderParentHome()` used to call all ten panel
 renderers on every invocation, including every kid switch, in an app where a

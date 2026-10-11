@@ -16,7 +16,9 @@
    everyHeaderMeasuresToTheExactValues (tests/smoke.js). PR 4 moves the kid
    screens onto it — Today, Week, Day, Sister Sync and Print (hdrMount below),
    the money pages (mnyHead, js/22) and the family meeting (mmHead, js/15) —
-   and PR 5 the parent portal's .parent-bar.
+   and PR 5 the parent portal (parentRenderHeader, js/11) and Parent Monthly
+   (parentMonthlyHeader); a parent viewing a girl's Week or Day gets a purple
+   sub-bar under the kid's row (parentViewSub, js/11).
 
    Variants (row heights from the table; a 2.5px ink rule ends the header):
      standard  64px on the iPad, 60px on a phone (≤699px); the kid screens,
@@ -24,7 +26,8 @@
      money     72px / 64px, one row; 54px buttons and badge, 52px on a phone
      meeting   two rows, 62px / 60px + 44px under a 1.5px dashed rule in the
                page's grid colour; `sub` fills the second row
-     parent    standard height on the portal's purple (--accent-purple)
+     parent    standard height on the portal's purple (--accent-purple);
+               a grown-up's 44px buttons and badge
 
    Slots, every text escaped here (ARCHITECTURE.md, Escaping):
      back     { to, data, named }    ◀ with aria-label "Back to <to>"; `named`
@@ -152,7 +155,7 @@ function pageHeader(o) {
    kidHeadClick below — bound once per screen in js/99-main.js
    (KID_HEAD_SCREENS), delegated like every rebuilt surface here. */
 const KID_HEAD_SCREENS = ['screen-today', 'screen-week', 'screen-day', 'screen-sync', 'screen-print',
-  'screen-mymoney', 'screen-moneyschool', 'screen-moneystory'];
+  'screen-mymoney', 'screen-moneyschool', 'screen-moneystory', 'screen-parent-monthly'];
 
 function hdrMount(screenId, o) {
   const old = document.querySelector('#' + screenId + ' > header.hdr');
@@ -163,7 +166,7 @@ function hdrMount(screenId, o) {
    width, as the owner's pictures draw it (D25), far right, opening the
    switcher. Its words are the one wording (profileBadgeParts, the two parts
    of profileBadgeText) in the aria-label: "Jenn, switch profile",
-   "Parent (Jenn), switch profile". `id` is the screen's own badge id —
+   "Viewing Jenn, switch profile" (a parent sees the girl's own avatar). `id` is the screen's own badge id —
    applyMeetingLock hides the week's and the day's by id, so a header is
    mounted before the lock is applied. */
 function kidHeadBadge(id, kid, asParent) {
@@ -178,6 +181,8 @@ function kidHeadClick(e) {
   switch (el.dataset.hdrAction) {
     case 'profile': openProfileSwitcher(); break;
     case 'back': navReturnBack(el.dataset.hdrFallback || 'week'); break;
+    // A parent's Day: the kid's way back, the girl's Week (owner 2026-10-10).
+    case 'back-week': { const top = navReturnPeek(); if (top && top.screen === 'week') navReturnStack.pop(); goWeek(); break; }
     case 'week-prev': changeWeek(-1); break;
     case 'week-next': changeWeek(1); break;
     case 'view-full': setWeekView('full'); break;
@@ -187,6 +192,11 @@ function kidHeadClick(e) {
     case 'day-prev': navDay(-1); break;
     case 'day-next': navDay(1); break;
     case 'day-copy': openTemplateSheet(); break;
+    // Parent Monthly (PR 5): its header shares this listener.
+    case 'parent-home': showScreen('parent'); break;
+    case 'month-prev': changeParentMonth(-1); break;
+    case 'month-next': changeParentMonth(1); break;
+    case 'month-kid': setParentMonthlyKid(el.dataset.hdrKid); break;
     default: break;
   }
 }

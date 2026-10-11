@@ -40,9 +40,11 @@ once (`node tools/smoke-times.js` on the run's artifacts: "453 of 453 checks —
 OK").
 
 **One test on this PC** (2026-10-10, `SMOKE_ONLY=<one check> npm run test:smoke`,
-default date): 33 s for a check declared in `SETUP_NEEDS`
-(`theComponentKitHoldsItsSizes`), 99 s for one that is not
-(`todayShowsWhatAChoreWouldPay`, which gets both house-rules walks).
+default date): 34 s for a check declared in `SETUP_NEEDS`
+(`theComponentKitHoldsItsSizes`), 34-38 s for one that is not
+(`todayShowsWhatAChoreWouldPay`; before, 99 s, because it got both house-rules
+walks). Neither walk runs unless a chosen check declares it; the run prints
+each walk it skipped. `kidScreensMeetTheHouseRules` alone: 79 s (its walk runs).
 
 The parts, individually:
 
@@ -121,11 +123,11 @@ under CI. Give a new check the same `if (want('name'))` prefix as its
 neighbours. A subset still runs the setup between checks, except the steps
 `SETUP_NEEDS` in `smoke.js` lets it skip: the kid and parent house-rules walks
 (about 85 s and 30 s on the owner's PC) run only when a chosen check needs
-them or a chosen check is not declared there — an undeclared check gets every
-step. The run prints each step it skipped. Declared checks alone: about 33 s
-wall (theComponentKitHoldsItsSizes and weekOpensOnTheLayoutYouCanPlanIn, 149 s
-before); a list with an undeclared check: about two and a half minutes. Add a
-check to `SETUP_NEEDS` only after reading what it relies on.
+them (SMOKE_ONLY is refused under CI, so CI never takes this path; an
+undeclared check gets no walk). The run prints each step it skipped. One check,
+declared or not: about 34-38 s wall. If an undeclared check fails only because
+a walk was skipped, add the walk to its `SETUP_NEEDS` entry after reading what
+it relies on.
 `SMOKE_ONLY=everyHeaderMeasuresToTheExactValues` alone (declared; every kid
 header in both looks at 1194 and 390, and the screens whose sizes step by
 width at 375 and 360, read against `docs/handoff/header-exact-values.md`):

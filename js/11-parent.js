@@ -159,7 +159,47 @@ function parentRenderLanding(destId) {
   wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>${build}`;
 }
 
-/* One switcher, in the top bar, replacing the three that each drew their own. */
+/* ── The parent header (PR 5, D35) ──
+   pageHeader({variant:'parent'}) on the portal: 🔒 Parent ▾ (PIN, the look,
+   Exit), the six destinations and the girl switch, one purple row
+   (docs/handoff/header-exact-values.md, the Parent portal rows). Drawn once:
+   the tabs keep their focus and the menu its state, and setParentTab only
+   moves the selection and the phone's title (the destination's name). */
+function parentRenderHeader() {
+  const screen = document.getElementById('screen-parent');
+  if (!screen || document.getElementById('parentMenuBtn')) return;
+  const dest = PARENT_DESTS.find(d => d.id === parentDest) || PARENT_DESTS[0];
+  const lookTo = LOOK_NAMES[lookOther(document.documentElement.getAttribute('data-look') || LOOK_DEFAULT)];
+  const menu = `<div class="parent-menu">
+      <button type="button" class="parent-menu-btn" id="parentMenuBtn" aria-expanded="false" aria-controls="parentMenu" onclick="parentMenuToggle()">🔒<span class="pm-word"> Parent</span> ▾</button>
+      <div class="parent-menu-pop" id="parentMenu" hidden>
+        <button class="btn-icon" onclick="parentMenuToggle(false);changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+        <button class="btn-icon" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the ${escapeAttr(lookTo)} look" aria-label="Switch to the ${escapeAttr(lookTo)} look">🎨 ${escapeHtml(lookTo)}</button>
+        <button class="btn-icon" onclick="parentMenuToggle(false);goProfile()">Exit to the girls</button>
+      </div>
+    </div>`;
+  const panelOf = { now: 'now', meeting: 'review', history: 'history', money: 'money', setup: 'setup', app: 'app' };
+  const tabs = PARENT_DESTS.map(d => {
+    const on = d.id === dest.id;
+    const isApp = d.id === 'app';
+    const badge = d.id === 'now' ? '<span class="pn-badge" id="pnTabBadge" hidden></span>' : '';
+    const inner = isApp ? escapeHtml(d.icon)
+      : `<span class="parent-tab-icon">${escapeHtml(d.icon)} </span>${escapeHtml(d.label)}${badge}`;
+    return `<button class="parent-tab${isApp ? ' parent-tab--icon' : ''}${on ? ' active' : ''}" role="tab" id="pdestbtn-${d.id}" data-pdest="${d.id}"
+        aria-selected="${on}" aria-controls="ptab-${panelOf[d.id]}" tabindex="${on ? 0 : -1}"
+        data-parent-dest="${d.id}"${isApp ? ' aria-label="App"' : ''}>${inner}</button>`;
+  }).join('');
+  hdrMount('screen-parent', {
+    variant: 'parent',
+    lead: `${menu}<div class="parent-tabs" role="tablist" aria-label="Parent sections">${tabs}</div>`,
+    title: dest.label,
+    tools: '<div class="parent-scope" id="parentScopePills" role="group" aria-label="Which child"></div>',
+  });
+}
+
+/* One switcher, in the top bar, replacing the three that each drew their own:
+   one joined switch, Both · 🐥 Jenn · 🦊 Jess (All · 🐥 · 🦊 on a phone,
+   the names in the labels). */
 function parentRenderScope() {
   const wrap = document.getElementById('parentScopePills');
   if (!wrap) return;
@@ -167,10 +207,11 @@ function parentRenderScope() {
      the portal's switcher hides there — one girl switch per screen (Plan v17
      item 6). History and Copy a plan, which read `parentScope`, still show it. */
   wrap.hidden = parentTab === 'now';
-  const opts = [['both', 'Both'], ['jenn', '🐥 Jenn'], ['jess', '🦊 Jess']];
-  wrap.innerHTML = opts.map(([id, label]) =>
-    `<button type="button" class="pill-btn${parentScope === id ? ' active' : ''}"
-       data-parent-scope="${id}">${label}</button>`).join('');
+  const opts = [['both', 'Both', '<span class="ps-word">Both</span><span class="ps-short">All</span>'],
+    ['jenn', 'Jenn', '🐥<span class="ps-word"> Jenn</span>'], ['jess', 'Jess', '🦊<span class="ps-word"> Jess</span>']];
+  wrap.innerHTML = opts.map(([id, name, inner]) =>
+    `<button type="button" class="pill-btn${parentScope === id ? ' active' : ''}" aria-pressed="${parentScope === id}"
+       aria-label="${name}" data-parent-scope="${id}">${inner}</button>`).join('');
 }
 
 function setParentScope(scope) {
@@ -301,12 +342,14 @@ function parentMenuToggle(open) {
 }
 function setParentTab(tab) {
   parentTab = tab;
-  const dateEl = document.getElementById('parentDate');
-  if (dateEl) dateEl.textContent = mnyDayName(todayKey());
+  parentRenderHeader();
   // The one-row header's switcher, drawn with every panel (it was drawn only by renderParentHome).
   parentRenderScope();
   parentDest = PARENT_PANEL_DEST[tab] || parentDest;
   const dest = PARENT_DESTS.find(d => d.id === parentDest);
+  // A phone's row names the destination (its tabs are the bottom bar).
+  const title = document.querySelector('#screen-parent > .hdr .hdr-title');
+  if (title && dest) title.textContent = dest.label;
   document.querySelectorAll('#screen-parent .parent-tab').forEach(t => {
     const on = t.dataset.pdest === parentDest;
     t.classList.toggle('active', on);
@@ -1386,10 +1429,23 @@ async function deleteRoutine(id) {
    they came to carry different controls in the first place. */
 function parentBannerBackButton() {
   if (typeof mmHasReturn === 'function' && mmHasReturn()) {
-    return `<button type="button" class="btn-icon no-print pb-back-btn" onclick="mmReturnToMeeting()">`
-         + `◀ Back to weekly meeting</button>`;
+    return `<button type="button" class="pv-btn no-print pb-back-btn" onclick="mmReturnToMeeting()" aria-label="Back to weekly meeting">`
+         + `◀<span class="pv-word"> Back to weekly meeting</span></button>`;
   }
-  return `<button type="button" class="btn-icon no-print pb-back-btn" onclick="showScreen('parent')">◀ Hub</button>`;
+  return `<button type="button" class="pv-btn no-print pb-back-btn" onclick="showScreen('parent')" aria-label="Back to the parent hub">◀<span class="pv-word"> Hub</span></button>`;
+}
+
+/* A parent viewing a girl's Week or Day: the purple 44px sub-bar under the
+   kid's header (PR 5, D21, D35; header-exact-values.md, the Parent sub-bar
+   rows) — the way back, whose week or day it is, then the screen's own
+   actions (`actionsHtml`, in a span with `actionsId` so its owner can redraw
+   them). The kid's row above keeps its 52px avatar (D25). '' for a child. */
+function parentViewSub(what, actionsId, actionsHtml) {
+  if (!isParent()) return '';
+  const name = parentViewing === 'jenn' ? 'Jenn' : 'Jess';
+  return parentBannerBackButton()
+    + `<span class="pv-name" id="parentViewingName"><span class="pv-word">Reviewing </span>${escapeHtml(name)}<span class="pv-word">'s ${escapeHtml(what)}</span></span>`
+    + `<span class="pv-actions" id="${escapeAttr(actionsId)}">${actionsHtml || ''}</span>`;
 }
 
 /* While a meeting is waiting, the back button is the ONLY way out of the week
@@ -1457,10 +1513,27 @@ function changeParentMonth(delta) {
   renderParentMonthly();
 }
 
+/* The Monthly header (PR 5; no reference picture, difference 3): the parent
+   header with ◀ back to the portal, "Monthly", ◀ month ▶ in the middle like
+   the kids' week, and the Jenn / Jess switch where the portal has its girl
+   switch. Its buttons carry data-hdr-action, answered by kidHeadClick. */
+function parentMonthlyHeader() {
+  const kids = [['jenn', '🐥', 'Jenn'], ['jess', '🦊', 'Jess']].map(([id, icon, name]) =>
+    `<button type="button" class="pill-btn${parentMonthlyKid === id ? ' active' : ''}" id="pmKid${name}" aria-pressed="${parentMonthlyKid === id}"
+       aria-label="${name}" data-hdr-action="month-kid" data-hdr-kid="${id}">${icon}<span class="ps-word"> ${name}</span></button>`).join('');
+  hdrMount('screen-parent-monthly', {
+    variant: 'parent',
+    back: { to: 'Parent', named: true, data: { 'hdr-action': 'parent-home' } },
+    title: 'Monthly',
+    step: { prev: { aria: 'Previous month', data: { 'hdr-action': 'month-prev' } },
+            next: { aria: 'Next month', data: { 'hdr-action': 'month-next' } }, labelId: 'pmMonthLabel' },
+    context: ' ',
+    tools: `<div class="parent-scope pm-kids" role="group" aria-label="Which child">${kids}</div>`,
+  });
+}
+
 function renderParentMonthly() {
-  // Update kid-pill active state
-  document.getElementById('pmKidJenn').classList.toggle('active', parentMonthlyKid==='jenn');
-  document.getElementById('pmKidJess').classList.toggle('active', parentMonthlyKid==='jess');
+  parentMonthlyHeader();
 
   // Compute month — anchor "current month" to the app timezone (America/Edmonton)
   // so it matches the day keys, not the device clock, near month boundaries.
@@ -1470,10 +1543,9 @@ function renderParentMonthly() {
   const month = monthStart.getMonth();
   const lastDay = new Date(year, month + 1, 0).getDate();
 
-  document.getElementById('pmTitle').textContent =
-    (parentMonthlyKid==='jenn'?'🐥 Jenn':'🦊 Jess') + ' — Monthly';
-  document.getElementById('pmMonthLabel').textContent =
-    `${MONTH_LONG[month]} ${year}`;
+  // "October 2026" on the iPad, "Oct 2026" on a phone (css/app.css).
+  document.getElementById('pmMonthLabel').innerHTML =
+    `<span class="pm-month-long">${escapeHtml(MONTH_LONG[month])}</span><span class="pm-month-short">${escapeHtml(MONTH_SHORT[month])}</span> ${year}`;
 
   // Compute weekday-of-first (Mon=0…Sun=6)
   const firstDow = (monthStart.getDay() + 6) % 7;

@@ -86,9 +86,15 @@ function paSetAge(kid, value) {
    using it. Per-device, so localStorage and never synced state — every write to
    synced state is a full-document upload. */
 const PA_SCALE_KEY = 'wp.parentTextScale';
-const PA_SCALES = [['1', 'Standard'], ['1.15', 'Larger'], ['1.3', 'Largest']];
+/* 1.2 when nothing is stored (D14, PR 5), and it is the listed Larger; an
+   older device's stored 1.15 (the Larger before) reads as Larger too. */
+const PA_SCALE_DEFAULT = '1.2';
+const PA_SCALES = [['1', 'Standard'], ['1.2', 'Larger'], ['1.3', 'Largest']];
 function paTextScale() {
-  try { return localStorage.getItem(PA_SCALE_KEY) || '1'; } catch (e) { return '1'; }
+  let v = null;
+  try { v = localStorage.getItem(PA_SCALE_KEY); } catch (e) {}
+  if (v === '1.15') return '1.2';
+  return v || PA_SCALE_DEFAULT;
 }
 function paApplyTextScale() {
   const el = document.getElementById('screen-parent');
