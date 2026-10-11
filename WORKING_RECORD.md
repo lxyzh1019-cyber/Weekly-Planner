@@ -37,6 +37,14 @@ Single working record for this repository. Updated by the main session at the en
 - [agreed] Owner 2026-10-11 v11 answer 3: build the Part 8 stopwatch and open Part 9's pull request now; merge nothing before Plan v11 is approved — search: merge nothing before Plan v11
 - [agreed] Owner 2026-10-11 v11 answer 4: the iPad read and one Sunday per girl at the same stop as the Parts 7, 8, 10 merges, before Kit 1.1 starts — search: iPad read at the same stop
 - [agreed] Owner 2026-10-11 v11 answer 5: the app's header exact-values copy stands, with a dated note; kit-gaps-pr7-10.md is the owner's corrected copy of 11 October — search: corrected copy
+- [agreed] Owner 2026-10-11 Part 8 Q10 (A): the ✓ and ⏱ start at 48px blocks (50px pinned); 46–47px blocks show neither; a check proves a short block can be ticked from its sheet — search: ticked from its sheet
+- [agreed] Owner 2026-10-11 Part 8 Q11 (B): on narrow blocks show only the ✓ and start the stopwatch from the sheet; under 60px of name room hide the ✓ too — search: 60px of name room
+- [agreed] Owner 2026-10-11 Part 8: Q8 closed (dark mode goes in Kit 1.1); Q3's heading says 48px — search: Q3's heading 48px
+- [agreed] Owner 2026-10-11 Part 9: questions 1, 3, 5–8, 10–12 and the kept Sunday parts accepted; Q2, Q4, Q9 accepted for now and fixed in Kit 1.1 as K10, K12, K11 — search: K10, K12 and K11
+- [agreed] Owner 2026-10-11 K10: Grown-ups steppers move to the kit stepper; no round stepper left — search: no round stepper left
+- [agreed] Owner 2026-10-11 K11: --pill-on equals --sel in both looks; one selected colour app-wide — search: one selected colour
+- [agreed] Owner 2026-10-11 K12: kit chip side padding 0.6rem at 699px and below; the Sunday choose row fits 2 rows at 390px in Pop — search: choose row fits 2 rows
+- [agreed] Owner 2026-10-11: kit-gaps-pr7-10.md is replaced by the owner's copy (3) of 11 October (K1–K12) — search: owner's copy (3)
 - [agreed] Owner 2026-10-10: PR 5 differences 1, 2, 3, 5, 6, 7, 8 and 10 accepted as built — search: accept 1, 2, 3, 5, 6, 7, 8 and 10
 - [agreed] Owner 2026-10-10: Day keeps both ways back — "◀ Week" in row 1 (the kid's) and "◀ Hub" in the sub-bar (the parent's); Week keeps its single "◀ Hub" — search: keep both buttons on Day
 - [agreed] Owner 2026-10-10: when a parent views a girl, the avatar is that girl's (🐥 Jenn / 🦊 Jess, 52px pink circle), not the family emoji; aria-label "Viewing Jenn, switch profile"; measured by the check — search: avatar shows that girl's avatar
