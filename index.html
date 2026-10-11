@@ -601,8 +601,8 @@
     <h3 class="parent-h3">📅 Monthly overview</h3>
     <p class="parent-hint">Planned-density heatmap by month. Tap a day to open it.</p>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
-      <button class="pill-btn" onclick="openParentMonthly('jenn')">🐥 Jenn's Month</button>
-      <button class="pill-btn" onclick="openParentMonthly('jess')">🦊 Jess's Month</button>
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentMonthly('jenn')">🐥 Jenn's Month</button>
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentMonthly('jess')">🦊 Jess's Month</button>
     </div>
   </div>
 
@@ -611,7 +611,7 @@
     <h3 class="parent-h3">🌅 Routines</h3>
     <p class="parent-hint">Built-in (Morning / After-School / Evening) and custom routines. All shared with both girls.</p>
     <div id="routinesList"></div>
-    <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewRoutine()">＋ Add Routine</button>
+    <button type="button" class="ui-btn ui-btn--primary pn-wide" style="margin-top:0.6rem" onclick="openNewRoutine()">＋ Add Routine</button>
   </div>
 
   <!-- TAB: Tasks -->
@@ -627,11 +627,11 @@
     <h3 class="parent-h3">🎨 All activities</h3>
     <p class="parent-hint">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
     <div id="parentActivitiesList"></div>
-    <button class="btn-confirm" style="margin-top:0.6rem" onclick="openParentActivityEditor()">＋ Add Activity</button>
+    <button type="button" class="ui-btn ui-btn--primary pn-wide" style="margin-top:0.6rem" onclick="openParentActivityEditor()">＋ Add Activity</button>
     <!-- Sports are shared by both girls and tag training blocks rather than
          being activities of their own, so they are managed here rather than in
          the activity list above. -->
-    <button class="btn-template" style="margin-top:0.6rem" onclick="openCustomSport()">🤸 Sports for training</button>
+    <button type="button" class="ui-btn ui-btn--secondary" style="margin-top:0.6rem" onclick="openCustomSport()">🤸 Sports for training</button>
   </div>
 
   <!-- TAB: Level-Up Rules -->
@@ -645,7 +645,7 @@
     <h3 class="parent-h3">⚙️ Level-Up Rules</h3>
     <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
     <div id="levelRulesList"></div>
-    <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewLevelRule()">＋ Add Rule</button>
+    <button type="button" class="ui-btn ui-btn--primary pn-wide" style="margin-top:0.6rem" onclick="openNewLevelRule()">＋ Add Rule</button>
   </div>
 
   <!-- TAB: Copy a week — one week's plan onto another, or onto her sister's.

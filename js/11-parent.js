@@ -191,7 +191,7 @@ function parentRenderHeader() {
   }).join('');
   hdrMount('screen-parent', {
     variant: 'parent',
-    lead: `${menu}<div class="ui-tabs" id="parentDests" role="tablist" aria-label="Parent sections">${tabs}</div>`,
+    lead: `${menu}<div class="ui-tabs parent-dests" id="parentDests" role="tablist" aria-label="Parent sections">${tabs}</div>`,
     title: dest.label,
     tools: '<div class="parent-scope ui-kids" id="parentScopePills" role="group" aria-label="Which child"></div>',
   });

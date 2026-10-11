@@ -1,8 +1,9 @@
-// Smoke group: the parent portal on the component kit (Consistency PR 10). thePortalKitHolds44px: every kit tab, button, chip and kid switch the portal draws (js/11-parent.js, js/32-parent-now.js) is at least 44×44 at 390×844 and 1194×834, in Pop and in Calm. tests/smoke.js calls it near the end of the run, on its one shared page; it seeds nothing and puts back the look, the size and the profile.
+// Smoke group: the parent portal on the component kit (Consistency PR 10). thePortalKitHolds44px: every kit tab, button, chip and kid switch the portal draws (js/11-parent.js, js/32-parent-now.js) is at least 44×44 at 390×844 and 1194×834, in Pop and in Calm — the day squares, her rating's chips and the learning steppers included (She told me… is opened on every day it offers until each has been drawn). tests/smoke.js calls it near the end of the run, on its one shared page; it gives Jenn's today a training block while She told me… is open (her rating shows only on a training day) and takes it off again, and puts back the look, the size, the profile and the portal's place (unlocked, scope, viewing, tab, History's view), as everyHeaderMeasuresToTheExactValues does.
 module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
   if (!want('thePortalKitHolds44px')) return;
   const before = page.viewportSize();
   const problems = [];
+  const was = await page.evaluate(() => ({ profile, unlocked: parentUnlockedThisSession, scope: parentScope, viewing: parentViewing, tab: parentTab, history: parentHistoryView, answerDay: pnAnswerDay, answerKid: pnAnswerKid }));
   try {
     for (const look of ['pop', 'calm']) {
       await setLook(look);
@@ -14,7 +15,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           const tag = `${look} ${size}`;
           const wait = (ms) => new Promise(r => setTimeout(r, ms));
           const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
-          const KIT = '.ui-btn, .ui-chip, .ui-tabs > button, .ui-kids > button';
+          const KIT = '.ui-btn, .ui-chip, .ui-tabs > button, .ui-kids > button, .ui-stepper > button';
           /* Measure every kit control on show in `root`; `want` names a kind that
              must be there, so a screen that did not open cannot measure clean. */
           const measure = (where, root, wantSel) => {
@@ -38,10 +39,30 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           measure('Setup', document.getElementById('screen-parent'), '.parent-scope.ui-kids > button');
           if (phone) measure('the bottom bar', document.getElementById('parentNav'), '.ui-btn');
           setParentTab('now'); await wait(60);
-          measure('Now', document.getElementById('pnWrap'), '.ui-kids > button');
-          pnOpenToldSheet(); await wait(350);
-          measure('Now › She told me', document.getElementById('pnToldBody'), '.pn-answer-kids > button');
-          pnSheetOpen = false; closeSheet('pnToldOverlay'); await wait(50);
+          measure('Now', document.getElementById('pnWrap'), '.pn-days > .pn-day.ui-chip');
+          // Her rating shows only on a day with training: give Jenn's today one, put back after.
+          const tk = todayKey(), heldBlocks = JSON.stringify(getDayBlocks(tk, 'jenn') || []);
+          if (!ckTrainingBlockOn('jenn', tk)) setDayBlocks(tk, [...JSON.parse(heldBlocks), { id: 'kit44-tr', actId: 'training', tag: 'skating', startMin: 6 * 60, durationMin: 30 }], 'jenn');
+          try {
+            pnOpenToldSheet(); await wait(350);
+            measure('Now › She told me', document.getElementById('pnToldBody'), '.pn-answer-kids > button');
+            // Each girl, every day she can be answered for, until her rating and a learning stepper have been drawn.
+            let rated = false, stepped = false;
+            const days = () => [...document.querySelectorAll('#pnToldBody .pn-days > .pn-day.ui-chip:not(:disabled)')];
+            for (const kid of ['jenn', 'jess']) {
+              document.querySelector(`#pnToldBody [data-pn-action="answer-kid"][data-kid="${kid}"]`).click(); await wait(60);
+              for (let i = 0; i < days().length && !(rated && stepped); i++) {
+                days()[i].click(); await wait(60);
+                const body = document.getElementById('pnToldBody');
+                rated = rated || !!body.querySelector('.pn-rates > .pn-rate.ui-chip');
+                stepped = stepped || !!body.querySelector('.pn-learn .ui-stepper > button');
+                measure('Now › She told me', body, '.pn-days > .pn-day.ui-chip');
+              }
+            }
+            if (!rated) out.push(`${tag} Now › She told me: no day drew her rating's chips, so none was measured`);
+            if (!stepped) out.push(`${tag} Now › She told me: no day drew a learning stepper, so none was measured`);
+            pnSheetOpen = false; closeSheet('pnToldOverlay'); await wait(50);
+          } finally { setDayBlocks(tk, JSON.parse(heldBlocks), 'jenn'); }
           setParentDest('meeting'); await wait(60);
           measure('Meeting', document.getElementById('ptab-review'), '.review-day-row > .ui-btn');
           setParentDest('history'); await wait(60);
@@ -58,7 +79,12 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
   } finally {
     await page.setViewportSize(before);
     await clearLooks();
-    await page.evaluate(() => { profile = 'jenn'; goToday(); });
+    await page.evaluate((was) => {
+      profile = was.profile; parentUnlockedThisSession = was.unlocked; parentViewing = was.viewing;
+      if (was.tab) parentTab = was.tab;
+      parentScope = was.scope; parentHistoryView = was.history; pnAnswerDay = was.answerDay; pnAnswerKid = was.answerKid;
+      goToday();
+    }, was);
   }
-  checks.thePortalKitHolds44px = problems.length ? problems : true;
+  checks.thePortalKitHolds44px = problems.length ? [...new Set(problems)] : true;
 };

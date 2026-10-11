@@ -233,7 +233,7 @@ function pnBoughtCards(kids) {
       <div class="gu-req-top">${guKidChip(kid)}<span class="gu-kind">jar is full</span><span class="gu-amt"><b>${escapeHtml(fmtMoney(mnyGoalJarValue(kid, g)))}</b></span></div>
       <div class="gu-req-text">${escapeHtml((g.icon || '🎯') + ' ' + g.name)} — did she buy it?</div>
       <div class="gu-check">🔎 Takes it out of the jar and writes a line</div>
-      <div class="gu-answer"><button type="button" class="ui-btn ui-btn--primary" data-mnyp-action="guboughtit" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(g.id)}">✓ She bought it</button></div>
+      <div class="gu-answer"><button type="button" class="gu-yes" data-mnyp-action="guboughtit" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(g.id)}">✓ She bought it</button></div>
     </div>`));
 }
 /* The questions: open ones, yeses Sunday has not used, and the last 7 days'
@@ -278,7 +278,7 @@ function pnSundayCard() {
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
-    days += `<button type="button" class="pn-day${mmIsDayConfirmed(d) ? ' ok' : ''}${k === todayKey() ? ' now' : ''}"
+    days += `<button type="button" class="ui-chip pn-day${mmIsDayConfirmed(d) ? ' ok' : ''}${k === todayKey() ? ' now' : ''}"
         data-pn-action="day" data-day="${d}" aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate())}">
         <span class="pn-day-dow">${DAY_SHORT[d]}</span>
         <span class="pn-day-date">${date.getDate()}</span></button>`;
@@ -412,7 +412,7 @@ function pnAnswerCard() {
   const mon = formatDayKey(wk);
   const days = [0, 1, 2, 3, 4, 5, 6].map(i => {
     const date = new Date(mon); date.setDate(mon.getDate() + i);
-    return `<button type="button" class="pn-day${i === d ? ' on' : ''}" data-pn-action="answer-day" data-day="${i}"
+    return `<button type="button" class="ui-chip pn-day${i === d ? ' on' : ''}" data-pn-action="answer-day" data-day="${i}"
         aria-pressed="${i === d}"${i > todayIdx ? ' disabled' : ''}
         aria-label="${escapeAttr(DAY_SHORT[i] + ' ' + date.getDate())}">
         <span class="pn-day-dow">${DAY_SHORT[i]}</span>
@@ -467,7 +467,7 @@ function pnAnswerCard() {
   if (t) {
     const a = mrGetAttitude(kid, wk, d);
     training = `<p class="pn-answer-h">${escapeHtml((t.act && t.act.name) || 'Training')} — her own rating</p>
-      <div class="pn-rates">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="pn-rate${a.self === n ? ' on' : ''}"
+      <div class="pn-rates">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="ui-chip pn-rate"
         data-pn-action="answer-attitude" data-n="${n}" aria-pressed="${a.self === n}">${n}</button>`).join('')}</div>`;
   }
 
@@ -477,10 +477,10 @@ function pnAnswerCard() {
     const units = mrGetLearning(kid, wk, d, it.id);
     return `<div class="pn-learn"><span class="pn-text"><span class="pn-title">${escapeHtml(it.label)}</span>
         <span class="pn-sub">${units} ${escapeHtml(it.unit || '')}</span></span>
-      <button type="button" class="pn-step" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="-1"
+      <span class="ui-stepper"><button type="button" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="-1"
         aria-label="${escapeAttr('Less ' + it.label)}">−</button>
-      <button type="button" class="pn-step" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="1"
-        aria-label="${escapeAttr('More ' + it.label)}">+</button></div>`;
+      <button type="button" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="1"
+        aria-label="${escapeAttr('More ' + it.label)}">+</button></span></div>`;
   }).join('');
 
   const section = (title, html) => html ? `<p class="pn-answer-h">${title}</p>${html}` : '';
