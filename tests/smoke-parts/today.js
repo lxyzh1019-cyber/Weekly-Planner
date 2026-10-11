@@ -13,8 +13,13 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
   const seeded = await page.evaluate(() => {
     const kid = 'jenn', wk = ctThisWeekKey(), d = tdTodayIndex(), day = todayKey();
     if (d == null) return 'precondition: today is not in the planner week';
+    /* Whether the week's earnings entry existed before this check: if
+       mrEnsureEarnings makes it here, the restore deletes it again rather than
+       leaving an empty week behind. */
+    const p0 = getProfData(kid);
+    const hadWeek = !!(p0 && p0.earnings && Object.prototype.hasOwnProperty.call(p0.earnings, wk));
     const e = mrEnsureEarnings(kid, wk);
-    window.__withMumHad = { wk, day, e: JSON.stringify(e), today: JSON.stringify(getDayBlocks(day, kid) || []),
+    window.__withMumHad = { wk, day, hadWeek, e: JSON.stringify(e), today: JSON.stringify(getDayBlocks(day, kid) || []),
       who: [profile, parentViewing, parentUnlockedThisSession] };
     profile = 'jenn'; parentViewing = 'jenn'; parentUnlockedThisSession = false;
     setDayBlocks(day, [...(getDayBlocks(day, kid) || []),
@@ -91,7 +96,8 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
       const h = window.__withMumHad;
       if (!h) return;
       const kid = 'jenn', p = getProfData(kid);
-      p.earnings[h.wk] = JSON.parse(h.e);
+      if (h.hadWeek) p.earnings[h.wk] = JSON.parse(h.e);
+      else if (p.earnings) delete p.earnings[h.wk];
       setDayBlocks(h.day, JSON.parse(h.today), kid);
       [profile, parentViewing, parentUnlockedThisSession] = h.who;
       window.__withMumHad = null;

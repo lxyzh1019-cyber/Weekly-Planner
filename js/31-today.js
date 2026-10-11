@@ -769,7 +769,7 @@ function tdProgressRibbon(kid, blocks) {
      .td-ribbon container rather than a child of the button: a button inside a
      button is not a thing a browser will build, and the hero carries its own —
      the level, which opens "My level" (R5 §5 C2, row 10). */
-  return `<div class="td-ribbon">
+  return `<div class="ui-card td-ribbon">
       <button type="button" class="td-rib-btn" data-td-action="plan"
         aria-label="${escapeAttr(done + ' of ' + total + ' done today. Open the day.')}">
         <span class="td-rib-strip" aria-hidden="true">${cells}${marker}</span>

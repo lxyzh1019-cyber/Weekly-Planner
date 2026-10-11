@@ -509,11 +509,11 @@
      background, which was right while it was a readout and wrong the moment it
      became the door onto the day: an unlabelled strip with no edges does not
      read as something you can press, least of all to a nine-year-old. */
+  /* The card itself is the kit's .ui-card (PR 7), so the column has one corner
+     radius; the ribbon keeps its own, tighter padding. */
   .td-ribbon {
     display: flex; flex-direction: column; gap: 0.45rem;
-    border: 2.5px solid var(--ink); border-radius: var(--radius, 18px);
-    background: var(--paper); padding: 0.2rem 0.8rem 0.7rem;
-    box-shadow: var(--shadow-card);
+    padding: 0.2rem 0.8rem 0.7rem;
   }
   /* The strip is the tap target and opens the DAY SCREEN — the one surface that
      already draws today at absolute times with its breaks and free stretches,
@@ -617,13 +617,8 @@
     padding: 0 0.8rem;
     display: flex; flex-direction: column; gap: var(--space-3, 0.75rem);
   }
-  .td-fold-btn {
-    min-height: 44px; padding: 0.5rem 0.8rem; text-align: left;
-    border: 2px dashed var(--ink); border-radius: var(--radius-sm, 12px);
-    background: transparent; color: var(--ink); font: inherit;
-    font-size: calc(0.94rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; cursor: pointer;
-  }
-  .td-fold-btn:hover { background: var(--bg2); }
+  /* #tdExtrasBtn, the To-dos and goals fold, is the kit's .ui-btn--secondary
+     (PR 7); the old dashed fold rule had no other user and is gone. */
 
   /* ── Answering chores on Today (R5 §5, C1) ────────────────────────────────
      Catch up, routines, her own things, her training rating and what Mum
