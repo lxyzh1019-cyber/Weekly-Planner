@@ -433,6 +433,7 @@ Kid-facing copy is a product surface, not filler. The rules:
 
 ## UI rules
 
+- **Where styles live (Stage 33).** Each screen's own rules go in its file — `css/today.css`, `css/week-day.css`, `css/money.css`, `css/parent.css`, `css/social.css`, linked after `css/app.css` in that order; shared parts (kit, header, tokens) and the sheets stay in `css/app.css`; `css/floors.css` (the minimum-size floors) is linked last so the minimum sizes win, and every file in `css/` must be linked in `index.html` and listed in `sw.js` SHELL. (checked by tests/check-sw-shell.js, tests/check-dead-css.js, tests/check-look-tokens.js)
 - **Touch targets ≥ 44×44px** on every interactive element, including week
   arrows and small chips. Enforced on the four kid screens by
   `kidScreensMeetTheHouseRules` in `tests/smoke.js`, which probes the real hit
@@ -466,7 +467,7 @@ Kid-facing copy is a product surface, not filler. The rules:
 - **Minimum font size 13px**; 15px for anything a child must read to act. Also
   enforced by the same check. Roughly 147 declarations in `css/app.css` compute
   below 13px, but most are print, dark-mode or parent surfaces where the kid floor
-  does not apply — the floor is a scoped block at the end of `css/app.css` listing
+  does not apply — the floor is a scoped block in `css/floors.css` (linked last) listing
   only what actually rendered too small. (checked by smoke: kidScreensMeetTheHouseRules)
 - **No word budget** — see *Writing for children*. The count and its per-screen
   ratchets are gone from `tests/smoke.js`; the 44px and 13px floors stay,
