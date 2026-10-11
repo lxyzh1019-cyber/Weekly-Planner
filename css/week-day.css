@@ -1,3 +1,819 @@
-/* css/week-day.css — styles for Week and Day (js/07-week-view.js, js/08-day-view.js) — PR 8. Empty until that PR fills it.
+/* css/week-day.css — styles for Week and Day (js/07-week-view.js, js/08-day-view.js) — filled by PR 8 (Stage 36): the Week and Day rules moved here from css/app.css, order kept.
    Shared parts and sheets stay in css/app.css; css/floors.css loads after this
    file, so the minimum sizes win. */
+
+  .tg-legend-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  /* Twelve subgroups read as six ideas: each category's chips sit together
+     behind its own name, so the key explains every hue on the grid without
+     becoming a wall of dots. */
+  .tg-legend-group { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+  /* At the kid floor (13.1px), not below it. Set smaller first and
+     kidScreensMeetTheHouseRules refused it at every width — this is a kid
+     screen, and "it is only a heading" is not an exemption. It stays quieter
+     than the chips through case, colour and tracking rather than size. */
+  .tg-legend-cat {
+    font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-muted); font-weight: 800;
+  }
+  .tg-legend-dot {
+    width: 12px; height: 12px; border-radius: 4px; display: inline-block;
+    border: 1.5px solid var(--ink);
+  }
+  .tg-legend-dot--free { background: var(--paper); border-style: dashed; }
+  /* This week at a glance */
+  .week-glance {
+    margin: 0.3rem 0.8rem 0;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 var(--ink);
+    padding: 0.7rem 0.9rem;
+  }
+/* Row 14 — Chores this week, on the Week tab. Scrolls inside itself at phone
+   width, like the chore tab's grid, so the page never goes sideways. */
+  .week-chores { margin-top: 0.6rem; }
+  .week-glance-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.4rem;
+  }
+  .week-glance-header h3 { font-size: calc(1.25rem * var(--text-scale, 1)); margin: 0; }
+  /* .week-glance-age and its number input were here, and the 🎂 Age question
+     with them. A row per category instead of a wrap of pills: pills have no
+     column to read down, so comparing two of them meant hunting across a
+     paragraph. Nothing here is under the 13px floor, and the figure a child
+     actually reads — the per-day average — is at 15px. */
+  .glance-window { font-size: calc(max(13px, calc(0.82rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light); margin-bottom: 0.45rem; }
+  .glance-rows { display: flex; flex-direction: column; gap: 0.2rem; }
+  .glance-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 0.6rem; padding: 0.18rem 0;
+    border-bottom: 1.5px dashed var(--paper-line);
+  }
+  .glance-row:last-child { border-bottom: 0; }
+  .glance-row-label {
+    display: inline-flex; align-items: center; gap: 0.35rem; min-width: 0;
+    font-size: calc(max(13px, calc(0.86rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 700; color: var(--ink);
+  }
+  .glance-row-figs {
+    display: flex; align-items: baseline; gap: 0.45rem;
+    flex: 0 0 auto; text-align: right; white-space: nowrap;
+  }
+  .glance-per-day { font-size: calc(max(15px, calc(0.94rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; color: var(--ink); }
+  .glance-total { font-size: calc(max(13px, calc(0.8rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light); }
+  .glance-dot {
+    width: 12px; height: 12px; border-radius: 3px; display: inline-block;
+    flex-shrink: 0; border: 1px solid var(--border-ink-35);
+  }
+  .glance-sleep {
+    margin-top: 0.5rem; font-size: calc(max(13px, calc(0.86rem * var(--fs-scale, 1))) * var(--text-scale, 1)); padding: 0.4rem 0.55rem;
+    background: var(--surface-sleep); border-radius: 8px;
+  }
+  .glance-notes { margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1.5px dashed var(--paper-line); }
+  .glance-notes-title { font-weight: 800; font-size: calc(max(13px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1)); margin-bottom: 0.25rem; }
+  .glance-note { font-size: calc(max(13px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink); margin-bottom: 0.15rem; }
+  /* Placed blocks */
+  .placed-block {
+    position: absolute;
+    border-radius: 12px;
+    padding: 5px 10px;
+    font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700;
+    color: var(--ink-on-strong); z-index: 10;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--ink);
+    border: 2px solid var(--ink);
+    overflow: hidden;
+    display: flex; flex-direction: column; gap: 1px;
+    transition: box-shadow 0.15s, transform 0.15s;
+    font-family: var(--font-text);
+    min-height: 22px;
+  }
+  .placed-block:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
+  .placed-block.parent-pinned { border-style: dashed; border-width: 3px; }
+
+  .placed-block.has-grip { padding-left: 34px; }
+
+  /* Mid-drag. The transition would otherwise lag every pointermove by 150ms,
+     and the hover translate would compose against the drag's own transform —
+     neutralised without !important, which would beat the inline transform the
+     drag is steering with. */
+  .placed-block.is-block-dragging {
+    transition: none; z-index: 30; opacity: 0.92;
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+  .placed-block.is-block-dragging:hover { transform: translate(0,0); }
+  /* Pale block colours (e.g. Routine's mint) need dark text to stay readable. */
+  .placed-block.light-bg { color: var(--ink); }
+  /* Pending invitation from sister (not yet accepted) */
+  .placed-block.invitation {
+    border-style: dashed;
+    border-width: 3px;
+    background: repeating-linear-gradient(
+      45deg,
+      var(--surface-invite) 0 10px,
+      var(--surface-invite-stripe) 10px 20px
+    ) !important;
+    color: var(--ink) !important;
+    text-shadow: none !important;
+    opacity: 0.95;
+  }
+    .placed-block.placed-block--completed {
+    filter: brightness(0.9) saturate(0.6);
+    border-style: solid;
+  }
+  /* Compact single-line variant for short blocks (<45px tall) */
+  .placed-block.compact {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+  }
+  /* The shortest blocks the app allows. A 15-minute break is 22px tall, and
+     borders + padding take 8 of them — the ordinary compact line needs ~18px in
+     the 14 that leaves, so its one line overflowed. 13px is the house minimum
+     and this is the only place that reaches it: a quarter-hour block is a label
+     you glance at, not text you act on. */
+  .placed-block.compact.compact-tight {
+    padding: 0 6px;
+    gap: 4px;
+  }
+  .placed-block.travel-buf {
+    opacity: 0.35;
+    z-index: 5;
+    cursor: default;
+    border-style: dotted;
+    box-shadow: none;
+    /* ITS OWN FLOOR, matching the one renderBlockPixel applies (6px). The JS
+       there reasons that a buffer is never inflated because clampBufferMin's
+       five-minute minimum is 7px at 1.4px/min — but .placed-block above sets
+       min-height: 22px and that applies here too, so EVERY strip under about
+       seventeen minutes was silently grown to 22px and pushed past the block it
+       abuts. A pre-side strip is bottom-anchored, so the extra height spilled
+       forward over the activity it belongs to; a post-side one ran into the
+       next card. That is the overlap the comment in js/08-day-view.js calls
+       impossible by construction, made possible by a floor in another file. */
+    min-height: 6px;
+  }
+  .placed-block.travel-buf.travel-buf-ready {
+    z-index: 6;
+    opacity: 0.42;
+  }
+  .placed-block.travel-buf.travel-buf-warmup {
+    z-index: 7;
+    opacity: 0.48;
+    background: repeating-linear-gradient(-45deg,
+      var(--status-warmup-stripe) 0 5px, var(--status-warmup-stripe-soft) 5px 10px) !important;
+  }
+  .placed-block.travel-buf:hover { transform: none; box-shadow: none; }
+  /* Buffer overlaps an adjacent activity — not enough real time to travel or
+     get ready. Full opacity + red dashed border so it can't be missed. */
+  .placed-block.travel-buf.travel-buf--conflict {
+    opacity: 0.85;
+    background: repeating-linear-gradient(-45deg,
+      var(--status-clash-stripe) 0 5px, var(--status-clash-stripe-soft) 5px 10px) !important;
+    border-color: var(--status-clash);
+    border-width: 2px;
+    color: var(--status-clash-ink);
+    animation: wf-conflict-pulse 1.6s ease-in-out infinite;
+  }
+  /* Activity itself touched by a conflicting buffer (its own or a neighbour's) */
+  .placed-block.placed-block--conflict { outline: 2px solid var(--status-clash); outline-offset: -1px; }
+  /* Recorded as not having happened. A RING, never a fade: --missed was removed
+     deliberately because an unconfirmed block must not be drawn as though the
+     child failed it, and this is the opposite case — a fact a grown-up wrote
+     down. So the fill stays at full strength and the frame carries it.
+     box-shadow rather than outline so a block that is also in a clash keeps
+     both signals. */
+  .placed-block.placed-block--notdone { box-shadow: inset 0 0 0 2.5px var(--ink); }
+  /* The four training checks folded to one line, for a block too short for the
+     2x2 grid. Tapping opens the sheet. */
+  .placed-block .block-train-chip {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    margin-top: 3px; width: 100%; padding: 2px 6px;
+    font-family: inherit; font-size: calc(0.74rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
+    color: inherit; text-align: left; cursor: pointer; min-width: 0;
+    background: var(--surface-glass-22);
+    border: 1.5px solid var(--border-glass-65); border-radius: 8px; box-shadow: none;
+  }
+  .placed-block.light-bg .block-train-chip { border-color: var(--border-ink-35); background: var(--surface-glass-40); }
+  .placed-block .block-train-chip.complete { background: var(--surface-chip-done); }
+  .block-train-chip-go { font-weight: 700; opacity: 0.8; white-space: nowrap; }
+  .wf-corner {
+    background: var(--bg2);
+    border-bottom: 2px solid var(--ink);
+    border-right: 2px solid var(--ink);
+  }
+  .wf-day-header {
+    background: var(--bg2);
+    padding: 0.55rem 0.3rem;
+    text-align: center;
+    border-bottom: 2px solid var(--ink);
+    border-right: 1px dashed var(--paper-line);
+    cursor: pointer;
+    position: sticky; top: 0; z-index: 4;
+  }
+  .wf-day-header:last-child { border-right: none; }
+  .wf-day-header:hover { background: var(--accent-yellow); }
+  .wf-day-header.today { background: var(--today-mark); }
+  .wf-day-header.today .wf-col-dow, .wf-day-header.today .wf-col-date { color: var(--today-mark-ink); }
+  .wf-col-dow { font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; text-transform: uppercase; color: var(--ink); letter-spacing: 1.2px; }
+  .wf-col-date { font-size: calc(1.35rem * var(--text-scale, 1)); font-weight: 800; font-family: var(--font-display); color: var(--ink); }
+  /* Continuous single-column-per-day timeline: hour labels live in a slim
+     gutter; each day is one tall lane where cards are absolutely positioned by
+     real start time, so an activity is never sliced at a band boundary. */
+  .wf-gutter {
+    position: relative;
+    background: var(--bg2);
+    border-right: 2px solid var(--ink);
+  }
+  .wf-gutter-hour {
+    position: absolute; right: 4px; transform: translateY(-50%);
+    font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
+    color: var(--ink-light);
+    pointer-events: none; white-space: nowrap;
+  }
+  .wf-day-col {
+    background: var(--paper);
+    border-right: 1px dashed var(--paper-line);
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    /* Its own stacking context, so the hour grid inside it can outrank the
+       cards without also outranking the sticky day header outside it. */
+    z-index: 0;
+    overflow: hidden;
+  }
+  .wf-day-col:last-child { border-right: none; }
+  .wf-day-col.today { box-shadow: inset 0 0 0 2px var(--today-mark); }
+  /* Left sideband: the day view's Before School / School / After School /
+     Evening axis, rendered once for the whole week. */
+  .wf-sideband {
+    position: relative;
+    background: var(--bg2);
+  }
+  .wf-sideband-seg {
+    position: absolute;
+    left: 1px; right: 1px;
+    border-radius: 6px;
+    border: 1.5px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-family: var(--font-text);
+    font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.8px;
+    overflow: hidden;
+    padding: 3px 0;
+    box-sizing: border-box;
+  }
+  /* "Now" marker on today's column */
+  .wf-now-line {
+    position: absolute; left: 0; right: 0; height: 0;
+    /* Above .hour-grid--wf (4): where you are now beats what o'clock it is. */
+    border-top: 2px solid var(--border-now-line); z-index: 5; pointer-events: none;
+  }
+  .wf-now-line::before {
+    content: ''; position: absolute; left: 0; top: -3px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--status-now-dot);
+  }
+  .wf-card {
+    position: absolute;
+    padding: 0.12rem 0.45rem;
+    border-radius: 9px;
+    border: 2px solid var(--ink);
+    color: var(--ink-on-strong);
+    cursor: pointer;
+    box-shadow: 1.5px 1.5px 0 var(--ink);
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    /* Centre the single content row on both axes (like the print blocks) so
+       text/icon sit in the middle instead of clipping at the bottom edge. */
+    align-items: center;
+    align-content: center;
+    gap: 6px;
+    font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    line-height: 1.1;
+    transition: transform 0.1s;
+    text-shadow: 0 1px 1px var(--shadow-black-25);
+    overflow: hidden;
+    box-sizing: border-box;
+    /* Floor so even a 15-min block stays tall enough to tap & read (W2).
+       Must equal WF_CARD_MIN_PX in js/07-week-view.js, which is what
+       blockContentTier is asked about — they were 18 and 16, so the ladder
+       judged a card 2px shorter than it drew and refused it its own name. */
+    min-height: 20px;
+    z-index: 2;
+  }
+  .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
+  .wf-card-time { font-weight: 800; font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); line-height: 1; }
+  .wf-card-icon { font-size: calc(1rem * var(--text-scale, 1)); line-height: 1; text-shadow: none; }
+  .wf-card-name { font-weight: 800; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  /* One line, always. It carries a counts summary ("1h30m · 2 goals") when
+     there is no room to list them, and that wrapped to two lines on a narrow
+     column — 13px of budget spending 26, which is the whole overflow on a
+     90-minute card. */
+  .wf-card-dur { font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; line-height: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  /* Columns are narrow: below the tall threshold the time/duration chips are
+     dropped so the NAME gets the room (start time still reads off the grid
+     position + tooltip). Tall cards stack everything centered, like a printed
+     block, instead of one cramped row pinned to the top. */
+  .wf-card:not(.wf-card--tall) { grid-template-columns: auto 1fr auto; }
+  .wf-card:not(.wf-card--tall) .wf-card-time,
+  .wf-card:not(.wf-card--tall) .wf-card-dur { display: none; }
+  .wf-card--tall {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    align-content: center;
+    gap: 2px;
+    text-align: center;
+  }
+  .wf-card--tall .wf-card-icon { font-size: calc(1.25rem * var(--text-scale, 1)); }
+  /* overflow:hidden matters as much as the max-height: without it a name that
+     wraps past two lines spilled over the summary row underneath instead of
+     being clipped, which is what made a training card read as overlapping text. */
+  /* max-width matters as much as max-height, for the same reason one row
+     down: a centred name carrying an inline buffer tag is one unbreakable
+     token wider than the card, so without it the whole line overflowed on
+     BOTH sides and "School Day" rendered as "hool Day". */
+  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; max-width: 100%; overflow: hidden; }
+  /* A card too short to afford a second line of name keeps it to one, and a
+     card with nothing left over drops the start-time chip — the grid row it
+     sits on already says when it begins. Both are decided in wfStackPlan
+     (js/07-week-view.js) against measured row heights, because a name that
+     wraps where the budget assumed one line is what pushed the goal lines
+     through the duration below them. */
+  .wf-card--tall.wf-card--nameclamp .wf-card-name {
+    white-space: nowrap; max-height: none; text-overflow: ellipsis;
+  }
+  .wf-card--tall.wf-card--notime .wf-card-time { display: none; }
+  /* Main-category summary rows (objective/gear/note) on tall cards only —
+     shorter cards fold the same info into the duration line as a count string. */
+  .wf-card-sum {
+    font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; line-height: 1.15;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%;
+  }
+  .wf-card.light-bg { color: var(--ink); text-shadow: none; }
+  /* Inline travel/get-ready tag on the card name (compact fallback) */
+  .wf-card-travel {
+    margin-left: 4px; font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
+    opacity: 0.9; white-space: nowrap;
+  }
+  .wf-card--slim .wf-card-travel { display: none; }
+  /* A lane-split card in a seven-day column has room for its icon and nothing
+     else. One clipped letter is not a name; the icon says what it is and the
+     tooltip says it in full. */
+  .wf-card--noname .wf-card-name { font-size: 0; }
+  .wf-card--noname .wf-card-name::first-letter { font-size: 0; }
+  /* Buffer/conflict warning badge inline on the card name */
+  .wf-card-conflict-badge { margin-left: 3px; font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); filter: drop-shadow(0 1px 1px var(--shadow-black-25)); }
+  .wf-card-notdone-badge { margin-right: 3px; font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); filter: drop-shadow(0 1px 1px var(--shadow-black-25)); }
+  /* Same rule as the day view's ring, and the same reason: a record, not a
+     grading-down. Inset so it cannot be confused with the conflict outline,
+     which sits outside the card and is red. */
+  .wf-card--notdone { box-shadow: inset 0 0 0 2.5px var(--ink); }
+  /* A conflict is a real scheduling problem, so it must read at a glance without
+     hovering: bold red frame, a soft red glow, and an always-visible corner
+     flag even on the slimmest cards. */
+  .wf-card--conflict {
+    outline: 3px solid var(--status-clash); outline-offset: 1px;
+    box-shadow: 0 0 0 2px var(--status-clash-glow), 0 2px 8px var(--status-clash-glow-strong);
+    overflow: visible; /* let the corner flag sit just outside the card */
+    z-index: 3;
+  }
+  .wf-card-conflict-flag {
+    position: absolute; top: -7px; left: -7px; z-index: 5;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--status-clash-fill); color: var(--ink-on-strong);
+    font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1)); line-height: 18px; text-align: center;
+    box-shadow: 0 1px 3px var(--shadow-black-35);
+    animation: wf-conflict-pulse 1.6s ease-in-out infinite;
+  }
+  /* Carrying the minutes, it stops being a dot. Hung ABOVE the card's corner and
+     mostly outside it, so it never lands on a centred name — which a pill inside
+     the card did at every height the card comes in. 13px is the kid floor and
+     this is a figure a parent acts on. */
+  .wf-card-conflict-flag--min {
+    width: auto; height: 18px; border-radius: 999px; padding: 0 6px;
+    top: -13px; left: -4px; white-space: nowrap; font-weight: 800;
+    font-size: calc(max(13px, calc(0.7rem * var(--fs-scale, 1))) * var(--text-scale, 1)); line-height: 18px;
+  }
+  /* A card in a right-hand lane hangs it at its own right edge, or two lanes'
+     pills sit on top of each other in the middle of the day. */
+  .wf-card-conflict-flag--right { left: auto; right: -4px; }
+  /* THE MINUTES THAT DID NOT FIT, over the card they run into. A quarter
+     strength so the name and tick read through it, exactly as tall as the
+     overrun so how bad the clash is still reads at a glance — which is the one
+     thing the old full-strength overprint did well. Never takes a tap. */
+  .wf-overrun {
+    position: absolute; box-sizing: border-box; z-index: 4; pointer-events: none;
+    border-radius: 7px 7px 3px 3px;
+    border-bottom: 2px dashed var(--status-clash-edge);
+    background: repeating-linear-gradient(-45deg,
+      var(--status-clash-overrun) 0 4px, var(--status-clash-overrun-soft) 4px 8px);
+  }
+  /* The overrun on the day view. .wf-overrun carries the look; this only says
+     where it sits in the stack — over the block (z10) rather than the week
+     grid's z4, and still never taking a tap. The element carries both
+     classes at the same weight, so this must come AFTER .wf-overrun: left
+     in css/app.css, which loads first, it lost to the z4 and the hatch went
+     under the block (kitButtonsHold44pxOnWeekAndDay checks the stack). */
+  .tl-overrun { z-index: 11; }
+  /* Quick-complete tick in the card corner — check off without opening detail */
+  .wf-card-check {
+    position: absolute; top: 3px; right: 3px;
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 2px solid var(--ink); background: var(--surface-glass-90);
+    color: var(--ink); font-size: calc(1rem * var(--text-scale, 1)); font-weight: 900; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0; text-shadow: none; z-index: 2;
+  }
+  .wf-card-check:hover { background: var(--surface-card); transform: scale(1.1); }
+  /* Done reads as done without fading the words: the whole card at 60% put its
+     name at 2–3:1 on every fill (thePopLookReadsEverywhere). The fill is washed
+     toward white instead (an inset shadow paints over the inline background and
+     under the text), so the navy name reads BETTER, not worse. Only on a light
+     fill — a white-text card would lose contrast under a white wash. */
+  .wf-card--done.light-bg { box-shadow: inset 0 0 0 999px var(--surface-glass-45); }
+  .wf-card--done .wf-card-name { text-decoration: line-through; }
+  .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
+  /* W4: even the shortest block keeps a tappable tick — never leave a rendered
+     block with no way to check it off.
+
+     Below the `meta` tier the 28px square above does not fit: a 30px card with
+     a 28px box offset 3px from the top overruns by 1px, and an 18px card was
+     overrun by 13px and clipped by .wf-card's own overflow:hidden — the tick
+     was literally taller than the block it belonged to, and the name was
+     dropped to make room for it. A full-height edge strip is proportional by
+     construction, so that cannot recur at any duration. The glyph is 13px,
+     the house floor; it used to be sized inline and computed to 8px. */
+  .wf-card--stripcheck .wf-card-check {
+    top: 0; right: 0; bottom: 0;
+    width: 20px; height: auto;
+    border-radius: 0 3px 3px 0;
+    border-width: 0 0 0 2px;
+    font-size: calc(13px * var(--text-scale, 1));
+  }
+  /* Keep the name clear of the strip. */
+  .wf-card--stripcheck { padding-right: 22px; }
+  /* Short blocks: drop the duration/time chips so the name + icon still fit */
+  .wf-card.wf-card--slim { padding: 0 0.4rem; align-items: center; }
+  .wf-card.wf-card--slim .wf-card-dur { display: none; }
+  .wf-card.wf-card--slim .wf-card-icon { font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+  /* ═══════════ WEEKLY SIGNATURE (kid sign-off) ═══════════ */
+  .week-signature {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+    flex-wrap: wrap;
+    margin: 0.6rem 0.2rem 0.2rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--paper-card, var(--paper));
+    border: 2px dashed var(--ink); border-radius: 14px;
+  }
+  .wk-sig-line { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+  .wk-sig-label { font-family: var(--font-text); font-weight: 800; font-size: calc(1rem * var(--text-scale, 1)); color: var(--ink); }
+  .wk-sig-name {
+    font-family: var(--font-display); font-size: calc(1.8rem * var(--text-scale, 1)); line-height: 1;
+    color: var(--accent-strong);
+    border-bottom: 2px solid var(--ink); padding: 0 0.5rem;
+  }
+  .wk-sig-date { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); font-weight: 700; }
+  .wk-sig-line--empty .wk-sig-blank {
+    display: inline-block; min-width: 160px; border-bottom: 2px solid var(--ink); height: 1.4rem;
+  }
+  /* Sign and Unsign are kit buttons (.ui-btn primary / secondary, PR 8); the
+     bar only keeps them from shrinking beside the signature line. */
+  .week-signature > .ui-btn { flex-shrink: 0; }
+  /* ── Drag handles (js/39-block-drag.js) ──
+     THE ONLY touch-action declarations in the project, and they must stay that
+     way. `.day-workspace` is the day screen's one scroller; a finger anywhere
+     on a block that was not a handle has to keep scrolling the day, so putting
+     touch-action on .placed-block or .tl-canvas would make a planned day
+     unscrollable over most of its surface — and no automated check can see a
+     swallowed flick.
+
+     The three handles tile the block's edges and never overlap: the left strip
+     moves, the top and bottom strips resize, and everything else still opens
+     the editor.
+
+     TARGET SIZE, deliberately exempted, the same shape as .wf-card-check. The
+     grip is 32px wide rather than 44 because a 44px column on a 150px-wide
+     block takes a third of the space its name needs, and a resize strip is
+     14px because two 44px strips would consume a 46px block entirely. Both run
+     the full length of the edge they sit on, so they are generous in the
+     dimension that has room. Missing one is not a dead end: the tap lands on
+     the block and opens the edit sheet, which changes the same two facts. */
+  .block-drag-handle {
+    position: absolute; z-index: 12;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .block-grip {
+    left: 0; top: 0; bottom: 0; width: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(18px * var(--text-scale, 1)); line-height: 1; color: inherit; opacity: 0.75;
+    cursor: grab;
+  }
+  .block-grip:active { cursor: grabbing; }
+  .block-resize { left: 32px; right: 0; height: 14px; cursor: ns-resize; }
+  .block-resize--top { top: 0; }
+  .block-resize--bottom { bottom: 0; }
+  /* A short bar so the edge reads as something you can pull. Drawn inside the
+     handle, because .placed-block clips its overflow. */
+  .block-resize::after {
+    content: ''; position: absolute; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 3px; border-radius: 2px;
+    background: currentColor; opacity: 0.6;
+  }
+  .block-resize--top::after { top: 3px; }
+  .block-resize--bottom::after { bottom: 3px; }
+  /* W7: a block spilling past the selected zone's edge shows a "continues"
+     marker at that edge instead of being silently cut off. */
+  .block-clip-marker {
+    position: absolute; left: 0; right: 0;
+    text-align: center; font-size: calc(0.6rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 900;
+    letter-spacing: 0.5px; line-height: 1; padding: 1px 0;
+    background: var(--surface-ink-72); color: var(--ink-on-strong-cream);
+    pointer-events: none; z-index: 11;
+  }
+  .block-clip-marker--top { top: 0; border-radius: 10px 10px 0 0; }
+  .block-clip-marker--bottom { bottom: 0; border-radius: 0 0 10px 10px; }
+  .placed-block .block-name { font-size: calc(1.04rem * var(--text-scale, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; line-height: 1.15; }
+  /* 0.81rem is 12.96px: floored at the kid 13px (Plan v7, found by the Day view's sweep row). */
+  .placed-block .block-meta { font-size: calc(max(13px, calc(0.81rem * var(--fs-scale, 1))) * var(--text-scale, 1)); opacity: 0.98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.15; }
+  .placed-block.travel-buf .block-meta {
+    text-align: center;
+    width: 100%;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.28rem;
+  }/* Taller blocks: slightly larger type; very short blocks stay compact */
+  .placed-block.block-font-md .block-name { font-size: calc(1.12rem * var(--text-scale, 1)); }
+  .placed-block.block-font-md .block-meta { font-size: calc(0.88rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+  .placed-block.block-font-lg .block-name { font-size: calc(1.22rem * var(--text-scale, 1)); }
+  .placed-block.block-font-lg .block-meta { font-size: calc(0.95rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+  .placed-block.block-font-lg .block-note { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+  .placed-block .block-note {
+    font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    font-weight: 600;
+    opacity: 0.95;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    white-space: normal;
+  }
+  /* Goal/objective list on a block, sized to fit however many lines the
+     block's own height allows — plain text (not tappable, unlike the gear
+     checklist just below), one goal per line. */
+  .placed-block .block-objectives {
+    margin-top: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .placed-block .block-objective-row {
+    font-size: calc(0.74rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    font-weight: 700;
+    line-height: 1.2;
+    opacity: 0.95;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Tappable get-ready gear checklist on a training block. */
+  /* The four training checks (TRAINING_CHECKS) sit 2×2 rather than in a
+     column: four short labels stacked need ~165px of block height, which a
+     two-hour session does not have once the name and duration are on it. Two
+     rows of two fit, and four peers read better as a grid than as a list. */
+  .placed-block .block-gear-list {
+    margin-top: 3px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px;
+    min-width: 0;
+  }
+  .placed-block .block-gear-head { grid-column: 1 / -1; }
+  .placed-block .block-gear-head {
+    font-size: calc(0.74rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; opacity: 0.95;
+    line-height: 1.1;
+  }
+  .placed-block .block-gear-item {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface-glass-22);
+    border: 1.5px solid var(--border-glass-65);
+    border-radius: 8px;
+    padding: 2px 5px;
+    font-family: inherit;
+    font-size: calc(0.74rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700;
+    color: inherit; text-align: left;
+    cursor: pointer; min-width: 0; width: 100%;
+    box-shadow: none;
+  }
+  .placed-block.light-bg .block-gear-item { border-color: var(--border-ink-35); background: var(--surface-glass-40); }
+  .placed-block .block-gear-item .block-gear-box {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    border: 2px solid currentColor;
+    background: var(--surface-glass-85);
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(1.15rem * var(--text-scale, 1)); font-weight: 900; line-height: 1;
+  }
+  .placed-block .block-gear-item.checked .block-gear-box { background: var(--accent-green); }
+  .placed-block .block-gear-item .block-gear-label {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .placed-block .block-gear-item.checked .block-gear-label { text-decoration: line-through; opacity: 0.8; }
+  .placed-block.block-font-lg .block-gear-head { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+  .placed-block.placed-block--completed .block-name {
+    text-decoration: line-through;
+    opacity: 0.92;
+  }
+  .placed-block.compact .block-name { flex: 1; font-size: calc(0.94rem * var(--fs-scale, 1) * var(--text-scale, 1)); min-width: 0; }
+  .placed-block.compact .block-name.block-name--inline {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+  .placed-block.compact .block-name.block-name--inline .block-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .placed-block.compact .block-name.block-name--inline .block-note-inline {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    font-weight: 700;
+    opacity: 0.95;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .placed-block.compact .block-meta { font-size: calc(0.81rem * var(--fs-scale, 1) * var(--text-scale, 1)); flex-shrink: 0; }
+  .placed-block.compact.compact-tight .block-name,
+  .placed-block.compact.compact-tight .block-meta {
+    font-size: calc(13px * var(--text-scale, 1));
+    line-height: 1.05;
+  }
+  /* The block's head row: the quick-complete ✓ and, when the block's
+     stopwatch is on, an icon-only ⏱ Start stopwatch (owner answer
+     2026-10-11), both the kit's 44px icon button (PR 8; the ✓ was a 32px
+     square with an ::after for its 44px reach, the ⏱ a full-width worded
+     button). The ✓ sits flush in the block's top-right corner, the ⏱ just
+     left of it, inside the block, which clips its overflow; they cover the
+     corner of the top resize strip, which runs the rest of the block's width.
+     The row is drawn only on a block whose clip holds all 44px
+     (renderBlockPixel, js/08-day-view.js: 48px, 50px pinned): never on a
+     compact block, nor on the 46-47px ones just above. Those blocks are still
+     checkable from Today's quest cards, from the block's own sheet, and from
+     the week grid, whose short cards carry an edge-strip tick
+     (.wf-card--stripcheck) for exactly this reason; their sheet starts the
+     stopwatch. Nor on a block too narrow for it (owner answer 2026-10-11):
+     the name keeps 60px beside the row, so a narrow clash lane drops the ⏱
+     first, then the ✓ (renderBlockPixel works this out from the lane width).
+     The name and duration lines, which run beside the row, end before it
+     (44px per button less the block's 10px right padding), so the buttons
+     never cover them. */
+  .placed-block > .ui-btn--icon {
+    position: absolute; top: 0; right: 0; z-index: 14;
+    font-size: calc(1.25rem * var(--text-scale, 1)); font-weight: 900; line-height: 1;
+  }
+  .placed-block > .ui-btn--icon + .ui-btn--icon { right: 44px; }
+  .placed-block > .ui-btn--icon.done { background: var(--accent-green); color: var(--ink); }
+  .placed-block.has-head-tick > .block-name,
+  .placed-block.has-head-tick > .block-meta { padding-right: 34px; }
+  .placed-block.has-head-stopwatch > .block-name,
+  .placed-block.has-head-stopwatch > .block-meta { padding-right: 78px; }
+  /* Too short to hold a line: the hatch and the tooltip carry it, the way a
+     muted strip does on the Full week. Printing 13px of label into 10px of
+     strip is what made two stacked buffers unreadable. */
+  .placed-block.travel-buf.travel-buf--mute .block-meta { display: none; }
+  /* Weekly wins recap modal */
+  .wins-hero { text-align: center; font-family: var(--font-display); font-size: calc(1.3rem * var(--text-scale, 1)); color: var(--accent-strong); margin-bottom: 0.6rem; }
+  .wins-stat-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .wins-stat { flex: 1; text-align: center; border: 2px solid var(--ink); border-radius: 12px; padding: 0.5rem 0.25rem; background: var(--bg2); }
+  .wins-num { font-family: var(--font-display); font-size: calc(1.5rem * var(--text-scale, 1)); font-weight: 800; color: var(--ink); }
+  .wins-lbl { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); }
+  .wins-cats { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 0.4rem; }
+  .wins-chip { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); background: var(--surface-card); border: 1.5px solid var(--ink); border-radius: 999px; padding: 0.1rem 0.55rem; }
+  .block-focus-pulse {
+    animation: blockFocusPulse 1.1s ease-in-out 2;
+  }
+  .slot-pick-chip {
+    display: flex; align-items: center; gap: 0.45rem;
+    border: 2px solid var(--ink); border-radius: 12px; background: var(--surface-card);
+    box-shadow: 2px 2px 0 var(--ink); padding: 0.55rem 0.6rem;
+    font: inherit; text-align: left; cursor: pointer;
+    min-height: 56px;
+  }
+  .slot-pick-chip:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .slot-pick-chip:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
+  .slot-pick-chip.locked { opacity: 0.55; }
+  /* The one she last added from this category, lifted to the front. The tag is
+     not decoration: a chip that silently jumped to the top is a reordering a
+     child cannot learn from. 13px is the kid floor — this is a label she reads
+     to understand the list, not a footnote. */
+  .slot-pick-chip--last { border-color: var(--accent-strong); box-shadow: 2px 2px 0 var(--accent-strong); }
+  .slot-pick-add { background: var(--bg2); border-style: dashed; }
+  /* Which subgroup these belong to, spanning the grid. 13px is the kid floor —
+     this is a label she reads to find her way, not a footnote. */
+  .spc-subhead {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 0.4rem;
+    font-size: calc(max(13px, calc(0.78rem * var(--fs-scale, 1))) * var(--text-scale, 1));
+    font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--ink-light); padding-top: 0.2rem;
+  }
+  .spc-subdot {
+    width: 12px; height: 12px; border-radius: 3px;
+    border: 1.5px solid var(--ink); flex: 0 0 auto;
+  }
+  .spc-last {
+    flex-shrink: 0; font-size: calc(13px * var(--text-scale, 1)); font-weight: 800;
+    color: var(--accent-strong); white-space: nowrap;
+  }
+  .spc-icon { font-size: calc(1.4rem * var(--text-scale, 1)); flex-shrink: 0; }
+  /* Wraps rather than ellipses, and a step down from the inherited 19.5px so two
+     words fit on one line. 16.6px at the default scale — above the 15px floor
+     for text a child must read to act, which is what this is. */
+  .spc-name {
+    font-weight: 800; flex: 1; min-width: 0;
+    font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    line-height: 1.2; overflow-wrap: anywhere;
+  }
+  .spc-dur { font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); flex-shrink: 0; }
+  /* The colour this activity's blocks will actually be, on the tile's edge. A
+     picker that gives no clue what a thing looks like on the day makes a child
+     place one to find out. */
+  .spc-sw {
+    width: 8px; align-self: stretch; border-radius: 4px; flex: 0 0 auto;
+    margin: -0.55rem -0.6rem -0.55rem 0;
+  }
+  /* The glance panel's header is now a disclosure control, so it needs to look
+     and behave like one: full-width target, the caret on the right, and the h3
+     keeping its type rather than inheriting button styling. */
+  .week-glance-toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+    width: 100%; min-height: 44px; padding: 0.3rem 0.1rem;
+    background: none; border: 0; cursor: pointer;
+    font: inherit; color: var(--ink); text-align: left;
+  }
+  .week-glance-toggle h3 { margin: 0; }
+  .week-glance-caret { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; white-space: nowrap; }
+.wcr-sub { font-size: calc(max(13px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light); margin: 0 0 0.4rem; }
+.wcr-wrap { overflow-x: auto; }
+.wcr-grid { min-width: 520px; display: flex; flex-direction: column; gap: 3px; }
+.wcr-head, .wcr-row {
+  display: grid; grid-template-columns: 132px repeat(7, minmax(34px, 1fr)) 52px;
+  gap: 3px; align-items: center;
+}
+.wcr-dh { text-align: center; font-size: calc(13px * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); }
+.wcr-dh small { display: block; font-size: calc(13px * var(--text-scale, 1)); font-weight: 700; }
+.wcr-lane {
+  align-self: flex-start; margin-top: 0.4rem;
+  font-size: calc(13px * var(--text-scale, 1)); font-weight: 800; border: 1.5px solid var(--ink); border-radius: 99px;
+  background: var(--accent-yellow); color: var(--ink); padding: 1px 9px;
+}
+.wcr-label {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: calc(max(13px, calc(0.9rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.wcr-icon { flex: none; }
+.wcr-cell {
+  height: 30px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--ink); border-radius: 8px; background: var(--paper);
+  color: var(--ink-light); font-size: calc(13px * var(--text-scale, 1)); font-weight: 800;
+}
+.wcr-cell--done { background: var(--status-done); color: var(--status-done-ink); }
+.wcr-cell--claimed { background: var(--bg2); color: var(--accent-strong); box-shadow: inset 0 0 0 3px var(--shadow-highlight); }
+.wcr-cell--na { border-style: dotted; border-color: var(--border-na); color: var(--ink-na); }
+.wcr-cell--off { background: var(--surface-off); border-color: var(--border-soft); }
+.wcr-total { text-align: right; font-size: calc(13px * var(--text-scale, 1)); font-weight: 800; }
+.wcr-legend {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-top: 0.6rem;
+  font-size: calc(13px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light);
+}
+  /* Sunday weekly-review variant of the coach tip. Its ✕ is the kit's 44px
+     icon button (PR 8; it was a 22px circle with an ::after for its reach),
+     pinned to the banner's corner, so the text keeps clear of it. */
+  .kid-coach-tip.week-review-tip {
+    position: relative;
+    background: linear-gradient(135deg, var(--surface-review-tip) 0%, var(--surface-reward) 100%);
+    border-color: var(--accent-green);
+    padding-right: 56px;
+  }
+  .week-review-tip > .ui-btn--icon { position: absolute; top: 4px; right: 6px; }

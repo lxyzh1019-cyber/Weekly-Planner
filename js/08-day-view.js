@@ -51,7 +51,14 @@ function dayViewKeys() {
   }
   return out;
 }
+/* Every caller draws the timeline next, so the span the tabs show is the
+   span drawn: the focused day is brought back inside the columns (a 3-day
+   view turned to two, or a tap on 1, leaves the third column's day off
+   screen; it falls back to the leftmost), and the heading is written for
+   them, so it never names a day no longer drawn. */
 function renderDaySpanTabs() {
+  if (!dayViewKeys().includes(currentDayKey)) currentDayKey = dayViewAnchorKey || currentDayKey;
+  renderDayHeading();
   const wrap = document.getElementById('daySpanTabs');
   if (!wrap) return;
   const cur = dayViewSpan();
@@ -309,18 +316,28 @@ function buildTimeline() {
 
   const cols = document.createElement('div');
   cols.className = 'tl-cols';
+  /* The frame goes on the page BEFORE the columns are built, so the width each
+     day's canvas gets is known while its blocks are drawn: a block's head
+     buttons are chosen from the width its lane leaves its name
+     (renderBlockPixel). .tl-cols is flex:1 with min-width 0, so its width does
+     not depend on what it will hold. A timeline that is not on show measures
+     0; the viewport stands in (the 64px dayViewSpanAvailable allows for the
+     gutter and the screen's sides), and opening the Day draws it again. */
+  if (multi) tl.appendChild(headRow);
+  body.appendChild(cols);
+  tl.appendChild(body);
+  const colGap = parseFloat(getComputedStyle(cols).columnGap) || 0;
+  const colsW = cols.getBoundingClientRect().width || Math.max(0, window.innerWidth - 64);
+  const canvasW = (colsW - colGap * (keys.length - 1)) / keys.length;
   let running = false;
   const allBlocks = [];
   keys.forEach(key => {
-    const built = buildDayColumn(key, canvasHeight, multi, spanMin);
+    const built = buildDayColumn(key, canvasHeight, multi, spanMin, canvasW);
     cols.appendChild(built.el);
     if (built.head) headCols.appendChild(built.head);
     if (built.hasRunningStopwatch) running = true;
     allBlocks.push(...built.blocks);
   });
-  if (multi) tl.appendChild(headRow);
-  body.appendChild(cols);
-  tl.appendChild(body);
 
   /* THE WAY BACK TO THE REST OF THE EVENING. A trimmed canvas has to be
      reversible in one tap or it is a limit rather than a tidy-up — and it has
@@ -346,13 +363,47 @@ function buildTimeline() {
         activeStopwatchTick = null;
         return;
       }
+      // Not under a dragged block's finger; the drop draws the timeline again.
+      if (typeof blockDragActive === 'function' && blockDragActive()) return;
       buildTimeline();
     }, 1000);
   }
 
   enhanceAccessibility(tl);
   updateStopwatchGoalToasts(allBlocks);
+  dayTimelineDrawnW = window.innerWidth;
 }
+
+/* THE DAY FOLLOWS THE WINDOW. Columns and each block's head buttons are worked
+   out from the width at draw time (canvasW above), so an iPad turned to
+   portrait kept three days and ✓ buttons that left a name under 60px. A
+   width change redraws the timeline once it settles (150 ms), with the
+   schedule's scroll put back and the heading and focused day following the
+   columns (renderDaySpanTabs). Not while a block is being dragged — the
+   redraw would pull the element out from under the finger (same rule as
+   js/03-sync.js) — so it is asked again 150 ms later until the drag ends; and
+   not when the Day is not on show, since openDay draws it fresh. A
+   height-only change (a phone's address bar) draws nothing. Attached once,
+   here at load, never by a render. */
+let dayTimelineDrawnW = 0;
+let dayResizeTimer = null;
+function dayRedrawForWidth() {
+  dayResizeTimer = null;
+  if (document.querySelector('.screen.active')?.id !== 'screen-day') return;
+  if (typeof blockDragActive === 'function' && blockDragActive()) { dayQueueRedrawForWidth(); return; }
+  if (window.innerWidth === dayTimelineDrawnW) return;
+  const ws = document.querySelector('#screen-day .day-workspace');
+  const top = ws ? ws.scrollTop : 0, left = ws ? ws.scrollLeft : 0;
+  renderDaySpanTabs();
+  buildTimeline();
+  if (ws) { ws.scrollTop = top; ws.scrollLeft = left; }
+}
+function dayQueueRedrawForWidth() {
+  clearTimeout(dayResizeTimer);
+  dayResizeTimer = setTimeout(dayRedrawForWidth, 150);
+}
+window.addEventListener('resize', dayQueueRedrawForWidth);
+window.addEventListener('orientationchange', dayQueueRedrawForWidth);
 
 /* The 6am-10pm ladder, once. */
 function buildHourGutter(canvasHeight, spanMin) {
@@ -451,7 +502,7 @@ function canvasSpanMin(canvas) {
    it belongs to passed in rather than read off the global — which is what makes
    two and three columns possible at all. Each canvas carries its own dayKey, so
    a tap knows which day it landed on without anything having to guess. */
-function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
+function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan, canvasW) {
   const zMinStart = 0, zMinEnd = drawnSpan || DAY_MIN_SPAN;
   const spanMin = zMinEnd - zMinStart;
   const blocks = getDayBlocks(dayKey);
@@ -540,7 +591,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
   const canvasPx = (zMinEnd - zMinStart) * PX_PER_MIN;
   const ghosts = dayGhostItems(dayKey, visibleBlocks.map(b => ({ top: dayBlockDrawnTop(b), bot: dayBlockDrawnBot(b) })),
     canvasPx, zMinStart, zMinEnd);
-  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, clash, dayKey, ghosts, canvasPx);
+  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, clash, dayKey, ghosts, canvasPx, canvasW);
 
   if (!blocks.length) {
     const emptyState = document.createElement('div');
@@ -969,8 +1020,11 @@ function dayLaneAssignments(items) {
    renderPendingInvitesOnTimeline from the same Map. A ghost that has to share
    a lane is narrower, so its buttons wrap to two rows: it is re-placed at the
    two-row floor and the packing is run once more (a taller ghost only ever
-   overlaps more, so it still shares). */
-function renderBlocksWithCollision(canvas, blocks, zMinStart, clash, dayKey, ghosts, canvasPx) {
+   overlaps more, so it still shares).
+
+   `canvasW` is the canvas's width in px (buildTimeline), so each block knows
+   its own lane's width while it is drawn. */
+function renderBlocksWithCollision(canvas, blocks, zMinStart, clash, dayKey, ghosts, canvasPx, canvasW) {
   const blockItems = blocks.map(b => ({ id: b.id, top: dayBlockDrawnTop(b), bot: dayBlockDrawnBot(b), dur: b.durationMin }));
   const ghostItem = g => ({ id: g.id, top: g.top, bot: g.bot, dur: (g.bot - g.top) / PX_PER_MIN });
   let assignments = dayLaneAssignments(blockItems.concat((ghosts || []).map(ghostItem)));
@@ -984,12 +1038,12 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, clash, dayKey, gho
   const byId = new Map(blocks.map(b => [b.id, b]));
   assignments.forEach((slot, id) => {
     const b = byId.get(id);
-    if (b) renderBlockPixel(canvas, b, zMinStart, slot.col, slot.count, clash, dayKey);
+    if (b) renderBlockPixel(canvas, b, zMinStart, slot.col, slot.count, clash, dayKey, canvasW);
   });
   return assignments;
 }
 
-function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey) {
+function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey, canvasW) {
   // The day this block belongs to, not "whichever day the topbar names" — in a
   // 2- or 3-day view those are different, and a tick that wrote to the wrong one
   // would be a tick that silently completed another day's block.
@@ -1170,9 +1224,40 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   // Drawn from the shared answer, so a routine whose checklist is full shows a
   // tick here even though nobody pressed this button.
   const blockDone = isBlockCompleted(b, blockKid);
-  const doneHtml = !isBuffer
-    ? `<button type="button" class="block-done-btn${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
+  /* The block's head row: the ✓ and, when the block's stopwatch is on, an
+     icon-only ⏱ (owner answer 2026-10-11), both the kit's 44px .ui-btn--icon,
+     side by side in the top-right corner, the ✓ flush in the corner and the ⏱
+     to its left. The block clips at the inside of its border (2px, 3px when
+     pinned), so the row is drawn only where the clip holds all 44px: a block
+     of 48px or more (50px pinned). Every compact block, and the 46-47px ones
+     just above, draws neither; their sheet marks them done and starts the
+     stopwatch (routine and training sheets on open, other blocks with Start
+     on the edit sheet). The name and duration lines end before the row; see
+     css/week-day.css.
+     And across (owner answer Q11, 2026-10-11): the name keeps at least
+     HEAD_NAME_ROOM_MIN px beside the row. Its room is the block's inner width
+     (its lane's share of the canvas, less 4px of gap and its two borders) less
+     its left padding (34px past the drag grip attachBlockDrag adds, else 10px)
+     and 44px per head button; the 10px right padding sits under the ✓. So a
+     block shows the ✓ and the ⏱ when that leaves 60px, the ✓ alone when only
+     the ✓ does (the stopwatch then starts from its sheet), and neither below
+     that. Worked out here from the lane width the packing gave, not measured
+     after paint. On a 390px phone (canvas 314px) a clash pair is 153px wide:
+     27px beside both, 71px beside the ✓, so ✓ only; a triple is 101px wide:
+     19px beside the ✓, so neither. */
+  const HEAD_NAME_ROOM_MIN = 60;
+  const border = b.parentPinned ? 3 : 2;
+  const headTall = !isBuffer && height - 2 * border >= 44;
+  const padLeft = (height >= BLOCK_STACK_MIN && !(b.parentPinned && !isParent())) ? 34 : 10;
+  const nameRoom = n => (canvasW > 0 ? canvasW * widthPct / 100 - 4 : Infinity) - 2 * border - padLeft - 44 * n;
+  const headFits = headTall && nameRoom(1) >= HEAD_NAME_ROOM_MIN;
+  const doneHtml = headFits
+    ? `<button type="button" class="ui-btn ui-btn--icon${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
     : '';
+  const stopwatchHtml = headFits && nameRoom(2) >= HEAD_NAME_ROOM_MIN && b.stopwatch && b.stopwatch.enabled
+    ? `<button type="button" class="ui-btn ui-btn--icon" aria-label="Start stopwatch" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}')">⏱</button>`
+    : '';
+  if (headFits) blockEl.classList.add(stopwatchHtml ? 'has-head-stopwatch' : 'has-head-tick');
   // List as many objectives/goals as the block's own height can hold — same
   // "show what this block is about" idea as print/week, and the day view has
   // the most room, so a Piano block gets its whole goal list, not just the
@@ -1194,10 +1279,10 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
 
   blockEl.innerHTML = `
     ${doneHtml}
+    ${stopwatchHtml}
     ${nameHtml}
     ${metaHtml}
     ${objHtml}
-    ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
   if (showTrainingChecks) blockEl.appendChild(buildBlockTrainingChecks(b));
