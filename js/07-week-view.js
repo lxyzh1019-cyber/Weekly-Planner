@@ -405,7 +405,7 @@ function weekRenderHeader() {
        child mid-meeting loses the sitting, so the meeting lock hides Switch
        rather than leaving a control that quietly discards your place. */
     sub: parentViewSub('week', 'parentWeekActions',
-      `<button type="button" class="pv-btn no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${escapeHtml(kidLabel(parentViewing === 'jenn' ? 'jess' : 'jenn').name)}">Switch</button>`),
+      `<button type="button" class="ui-btn ui-btn--secondary no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${escapeAttr(kidLabel(parentViewing === 'jenn' ? 'jess' : 'jenn').name)}">Switch</button>`),
   });
   /* A week across two months ("Sep 28 – Oct 4") is wider than a phone's room
      at 20px; css/app.css sizes it down only on the widths where it does not

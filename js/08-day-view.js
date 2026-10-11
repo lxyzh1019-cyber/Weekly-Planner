@@ -1170,7 +1170,12 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   // Drawn from the shared answer, so a routine whose checklist is full shows a
   // tick here even though nobody pressed this button.
   const blockDone = isBlockCompleted(b, blockKid);
-  const doneHtml = !isBuffer
+  /* The tick is the kit's 44px button, flush in the top-right corner, and the
+     block clips at the inside of its border (2px, 3px when pinned). A block
+     whose clip is under 44px would cut it — every compact block, and the
+     46-47px ones just above — so it is not drawn there; see css/week-day.css. */
+  const tickFits = height - 2 * (b.parentPinned ? 3 : 2) >= 44;
+  const doneHtml = !isBuffer && tickFits
     ? `<button type="button" class="ui-btn ui-btn--icon${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
     : '';
   // List as many objectives/goals as the block's own height can hold — same
@@ -1197,7 +1202,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
     ${nameHtml}
     ${metaHtml}
     ${objHtml}
-    ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
+    ${!isBuffer && !isCompact && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
   if (showTrainingChecks) blockEl.appendChild(buildBlockTrainingChecks(b));

@@ -5394,9 +5394,10 @@ function findChromium() {
     ['screen-week',    () => { goWeek(); renderWeek(); }],
     /* The same screen on a Sunday. The weekly-review banner renders one day in
        seven (js/07-week-view.js, the `isSunday` branch) and it is the only place
-       .wins-btn and .tip-dismiss appear — so six days a week this audit walked
-       straight past them, and a 22x22 dismiss target with a 12.8px label lived
-       there until the Sunday-night CI run of 2026-08-09 happened to look.
+       its 🎉 See wins (.ui-btn--primary) and its ✕ (.ui-btn--icon, PR 8; they
+       were .wins-btn and .tip-dismiss) appear — so six days a week this audit
+       walked straight past them, and a 22x22 dismiss target with a 12.8px label
+       lived there until the Sunday-night CI run of 2026-08-09 happened to look.
 
        A rule the suite can only check on one weekday is a rule that is unenforced
        six days out of seven. Pin the clock to this week's Sunday for the length of
@@ -5416,9 +5417,10 @@ function findChromium() {
       Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
       /* The empty-week invitation outranks the Sunday review, and by the time
          this runs earlier checks have emptied the week — so without a block here
-         the audit renders the wrong branch and passes without ever seeing
-         .tip-dismiss. It measured `wins-btn@124x20` ("Start planning") instead of
-         `76x22` ("See wins"), which is how that was caught. Seed one block, then
+         the audit renders the wrong branch and passes without ever seeing the
+         review's ✕. It measured "Start planning" (then .wins-btn, 124x20) instead
+         of "See wins" (76x22), which is how that was caught; both are kit
+         buttons now (PR 8). Seed one block, then
          put the day back exactly as it was. */
       const kid = activeProfile();
       const key = getDayKeys(0)[1];
