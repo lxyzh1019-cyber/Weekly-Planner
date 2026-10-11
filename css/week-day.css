@@ -669,21 +669,32 @@
     font-size: calc(13px * var(--text-scale, 1));
     line-height: 1.05;
   }
-  /* Quick-complete tick in the block corner: the kit's 44px icon button
-     (PR 8; it was a 32px square with an ::after for its 44px reach). It sits
-     flush in the block's top-right corner, inside the block, which clips its
-     overflow; it covers the corner of the top resize strip, which runs the
-     rest of the block's width. It is drawn only on a block whose clip holds
-     all 44px of it (renderBlockPixel, js/08-day-view.js): never on a compact
-     block, nor on the 46-47px ones just above. Those blocks are still
+  /* The block's head row: the quick-complete ✓ and, when the block's
+     stopwatch is on, an icon-only ⏱ Start stopwatch (owner answer
+     2026-10-11), both the kit's 44px icon button (PR 8; the ✓ was a 32px
+     square with an ::after for its 44px reach, the ⏱ a full-width worded
+     button). The ✓ sits flush in the block's top-right corner, the ⏱ just
+     left of it, inside the block, which clips its overflow; they cover the
+     corner of the top resize strip, which runs the rest of the block's width.
+     The row is drawn only on a block whose clip holds all 44px
+     (renderBlockPixel, js/08-day-view.js: 48px, 50px pinned): never on a
+     compact block, nor on the 46-47px ones just above. Those blocks are still
      checkable from Today's quest cards, from the block's own sheet, and from
      the week grid, whose short cards carry an edge-strip tick
-     (.wf-card--stripcheck) for exactly this reason. */
+     (.wf-card--stripcheck) for exactly this reason; their sheet starts the
+     stopwatch. The name and duration lines, which run beside the row, end
+     before it (44px per button less the block's 10px right padding), so the
+     buttons never cover them; on a narrow block the name ellipsizes sooner. */
   .placed-block > .ui-btn--icon {
     position: absolute; top: 0; right: 0; z-index: 14;
     font-size: calc(1.25rem * var(--text-scale, 1)); font-weight: 900; line-height: 1;
   }
+  .placed-block > .ui-btn--icon + .ui-btn--icon { right: 44px; }
   .placed-block > .ui-btn--icon.done { background: var(--accent-green); color: var(--ink); }
+  .placed-block.has-head-tick > .block-name,
+  .placed-block.has-head-tick > .block-meta { padding-right: 34px; }
+  .placed-block.has-head-stopwatch > .block-name,
+  .placed-block.has-head-stopwatch > .block-meta { padding-right: 78px; }
   /* Too short to hold a line: the hatch and the tooltip carry it, the way a
      muted strip does on the Full week. Printing 13px of label into 10px of
      strip is what made two stacked buffers unreadable. */
@@ -696,11 +707,6 @@
   .wins-lbl { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); }
   .wins-cats { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 0.4rem; }
   .wins-chip { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); background: var(--surface-card); border: 1.5px solid var(--ink); border-radius: 999px; padding: 0.1rem 0.55rem; }
-  /* ⏱ Start stopwatch on a block: the kit's secondary button, full width.
-     Drawn only where the block holds it under its name and duration lines
-     (renderBlockPixel: Pop 105px, Calm 99px); the block's sheet starts the
-     stopwatch elsewhere. */
-  .placed-block > .ui-btn--secondary { margin-top: 0.25rem; width: 100%; }
   .block-focus-pulse {
     animation: blockFocusPulse 1.1s ease-in-out 2;
   }

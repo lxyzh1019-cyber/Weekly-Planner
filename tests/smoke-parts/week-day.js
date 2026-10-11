@@ -2,14 +2,20 @@
 module.exports = async ({ page, want, checks }) => {
   /* Every kit button and chip on the Full week and on the Day view, at the
      iPad and the phone size: at least 44 x 44, and the tap at its centre lands
-     on it. Today's Day is seeded with five of Jenn's blocks: a two-hour one
-     with its stopwatch on (so the ✓ tick, .ui-btn--icon, and ⏱ Start
-     stopwatch, .ui-btn--secondary, are both drawn), a 30-minute one with its
-     stopwatch on (40px, a compact block: neither button may show), a
-     35-minute one (47px, the shortest block that is not compact), a
-     45-minute one and a 60-minute one with its stopwatch and goals. A kit button on a block must lie inside the block's clip
-     (inside its border: .placed-block clips with overflow:hidden), or part of
-     it is cut off. The Week draws its Sign this week / Unsign button.
+     on it. Today's Day is seeded with seven of Jenn's blocks, every one with
+     its stopwatch on: a two-hour one with goals, a 30-minute one (40px, a
+     compact block), a 34-minute one (45.6px, compact), a 35-minute one (47px,
+     the shortest block that is not compact, whose 2px border leaves a 43px
+     clip), a 36-minute one (48.4px, the shortest block whose clip holds 44px),
+     a 45-minute one and a 60-minute one with goals. A block whose clip holds
+     44px draws the ✓ and the icon-only ⏱ (.ui-btn--icon, aria-label "Start
+     stopwatch", owner answer 2026-10-11) side by side in one head row at its
+     top-right, and its name and duration lines end before them; a block whose
+     clip is under 44px draws neither. No block carries a worded stopwatch
+     button (a planted one must be caught). A kit button on a block must lie
+     inside the block's clip (inside its border: .placed-block clips with
+     overflow:hidden), or part of it is cut off. The Week draws its Sign this
+     week / Unsign button.
      Then the same Day is seeded with a clash (a School Day whose travel and
      get-ready run 20 minutes into Homework) and the overrun hatch drawn over
      Homework (.wf-overrun.tl-overrun) must stack above the block. */
@@ -58,6 +64,8 @@ module.exports = async ({ page, want, checks }) => {
             { id: 'kit44-35m', actId: 'reading', startMin: 16 * 60 + 30, durationMin: 35, stopwatch: sw() },
             { id: 'kit44-45m', actId: 'reading', startMin: 17 * 60 + 30, durationMin: 45, stopwatch: sw() },
             { id: 'kit44-60m', actId: 'reading', startMin: 18 * 60 + 30, durationMin: 60, stopwatch: sw(), objectives: goals },
+            { id: 'kit44-34m', actId: 'reading', startMin: 19 * 60 + 45, durationMin: 34, stopwatch: sw() },
+            { id: 'kit44-36m', actId: 'reading', startMin: 20 * 60 + 30, durationMin: 36, stopwatch: sw() },
           ]), 'jenn');
           goWeek(); setWeekView('full');
           measure('screen-week', 'Week', [['.ui-btn', 'Sign this week / Unsign button']]);
@@ -65,7 +73,51 @@ module.exports = async ({ page, want, checks }) => {
           openDay(k, keys.indexOf(k));
           if (!document.getElementById('block-kit44-30m')) out.push(`${size} Day: the 30-minute block is not drawn`);
           else if (!document.getElementById('block-kit44-30m').classList.contains('compact')) out.push(`${size} Day: the 30-minute block is not compact`);
-          measure('screen-day', 'Day', [['.ui-btn--icon', '✓ tick'], ['.ui-btn--secondary', '⏱ Start stopwatch']]);
+          measure('screen-day', 'Day', [['.ui-btn--icon[aria-label^="Mark"]', '✓ tick'], ['.ui-btn--icon[aria-label="Start stopwatch"]', '⏱ stopwatch']]);
+          /* The head row: on a block whose clip holds 44px, the ✓ and the
+             icon-only ⏱ side by side at its top-right, clear of the name and
+             duration lines; on a shorter one, neither. */
+          const head = (id, want) => {
+            const blk = document.getElementById('block-' + id);
+            if (!blk) { out.push(`${size} Day: block ${id} is not drawn`); return; }
+            const fits = blk.clientHeight >= 44;
+            const tick = blk.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]');
+            const swb = blk.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]');
+            const where = `${size} Day: the ${blk.getBoundingClientRect().height.toFixed(1)}px block ${id} (clip ${blk.clientHeight}px)`;
+            if (want !== fits) out.push(`${where} ${fits ? 'holds' : 'does not hold'} 44px inside its border, expected ${want ? 'to' : 'not to'}`);
+            if (!fits) {
+              if (tick || swb) out.push(`${where} is under 44px inside its border but draws ${[tick && '✓', swb && '⏱'].filter(Boolean).join(' and ')}`);
+              return;
+            }
+            if (!tick) out.push(`${where} holds 44px but draws no ✓`);
+            if (!swb) { out.push(`${where} holds 44px and has its stopwatch on but draws no ⏱`); return; }
+            if (swb.textContent.trim() !== '⏱') out.push(`${where}: the ⏱ button is not icon-only (it reads "${swb.textContent.trim()}")`);
+            if (!tick) return;
+            const t = tick.getBoundingClientRect(), s = swb.getBoundingClientRect();
+            if (Math.abs(t.top - s.top) > 0.5) out.push(`${where}: the ✓ and the ⏱ are not in one row (tops ${Math.round(t.top)}, ${Math.round(s.top)})`);
+            if (s.right > t.left + 0.5) out.push(`${where}: the ⏱ is not beside the ✓ on its left (⏱ right ${Math.round(s.right)}, ✓ left ${Math.round(t.left)})`);
+            const b = blk.getBoundingClientRect();
+            if (Math.abs(t.right - (b.left + blk.clientLeft + blk.clientWidth)) > 0.5 || Math.abs(t.top - (b.top + blk.clientTop)) > 0.5) out.push(`${where}: the ✓ is not flush in the top-right corner`);
+            const btnLeft = Math.min(t.left, s.left);
+            blk.querySelectorAll(':scope > .block-name, :scope > .block-meta').forEach(line => {
+              const r = line.getBoundingClientRect();
+              const textRight = r.right - parseFloat(getComputedStyle(line).paddingRight);
+              if (r.top < s.bottom && textRight > btnLeft + 0.5) out.push(`${where}: its ${line.className} runs under the head buttons (text ends at ${Math.round(textRight - b.left)}px, buttons start at ${Math.round(btnLeft - b.left)}px)`);
+            });
+          };
+          [['kit44-day', true], ['kit44-30m', false], ['kit44-34m', false], ['kit44-35m', false], ['kit44-36m', true], ['kit44-45m', true], ['kit44-60m', true]].forEach(([id, want]) => head(id, want));
+          /* No block carries a worded stopwatch button; the check must catch
+             a planted one. */
+          const worded = () => [...document.querySelectorAll('.placed-block button')].filter(el => /stopwatch/i.test(el.textContent));
+          worded().forEach(el => out.push(`${size} Day: block ${el.closest('.placed-block').id} carries a worded stopwatch button "${el.textContent.trim()}"`));
+          const plantIn = document.getElementById('block-kit44-day');
+          if (plantIn) {
+            const planted = document.createElement('button');
+            planted.type = 'button'; planted.className = 'ui-btn ui-btn--secondary'; planted.textContent = '⏱ Start stopwatch';
+            plantIn.appendChild(planted);
+            if (!worded().includes(planted)) out.push(`${size} Day: the worded-stopwatch check missed a planted "⏱ Start stopwatch" button`);
+            planted.remove();
+          }
           // The overrun hatch over a clashing block.
           setDayBlocks(k, [
             { id: 'kit44-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
