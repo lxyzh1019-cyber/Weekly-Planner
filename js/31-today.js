@@ -623,7 +623,7 @@ function tdLoopsCard(kid) {
       <span class="td-row-name">${escapeHtml(b.label)}</span>
       <span class="td-loop-state${b.repeat ? ' td-loop-state--again' : ''}">${escapeHtml(ckLoopState(b))}</span>
     </div>`).join('');
-  return `<div class="td-card td-loops">
+  return `<div class="ui-card td-loops">
       <div class="td-cap">📦 Open loops</div>
       <div class="td-sub">Back Sunday, or sooner for one unpaid job. Money only comes into it the second time the same thing happens in a week.</div>
       ${rows}
@@ -769,7 +769,7 @@ function tdProgressRibbon(kid, blocks) {
      .td-ribbon container rather than a child of the button: a button inside a
      button is not a thing a browser will build, and the hero carries its own —
      the level, which opens "My level" (R5 §5 C2, row 10). */
-  return `<div class="td-ribbon">
+  return `<div class="ui-card td-ribbon">
       <button type="button" class="td-rib-btn" data-td-action="plan"
         aria-label="${escapeAttr(done + ' of ' + total + ' done today. Open the day.')}">
         <span class="td-rib-strip" aria-hidden="true">${cells}${marker}</span>
@@ -991,7 +991,7 @@ function tdElseBlock(kid, dayKey, when) {
   return `<div class="td-else">
       <div class="td-sub">Which one did you do? It goes to Mum the same way — she still decides what it was worth.</div>
       ${rows}
-      <button type="button" class="td-fold-btn td-else-close" data-td-action="else" data-td-day="${day}" aria-expanded="true">Never mind ▾</button>
+      <button type="button" class="ui-btn ui-btn--secondary td-else-close" data-td-action="else" data-td-day="${day}" aria-expanded="true">Never mind ▾</button>
     </div>`;
 }
 
@@ -1016,7 +1016,7 @@ function tdRoutineAllButton(dayKey, routines) {
   const n = routines.length;
   const allDone = routines.every(r => r.total > 0 && r.done >= r.total);
   const words = n === 1 ? (allDone ? 'all done ✓' : 'all done') : (allDone ? `all ${n} kept ✓` : `all ${n} done`);
-  return `<button type="button" class="td-fold-btn td-routine-all" data-td-action="routine-all"
+  return `<button type="button" class="ui-btn ui-btn--secondary td-routine-all" data-td-action="routine-all"
       data-td-day="${escapeAttr(dayKey)}" aria-pressed="${allDone}">${escapeHtml(words)}</button>`;
 }
 
@@ -1035,7 +1035,7 @@ function tdRoutinesCard(kid) {
         <span class="td-row-go">${r.done}/${r.total} ${open ? '▾' : '▸'}</span>
       </button>${open ? `<div class="td-items">${tdRoutineItemRows(today, r)}</div>` : ''}`;
   }).join('');
-  return `<div class="td-card td-routines">
+  return `<div class="ui-card td-routines">
       <div class="td-cap">Routines</div>
       ${body}
       ${tdRoutineAllButton(today, routines)}
@@ -1062,7 +1062,7 @@ function tdLanesCard(kid) {
         ${note ? `<span class="td-item-note">${escapeHtml(note)}</span>` : ''}
       </button>`;
   }).join('') : '';
-  return `<div class="td-card td-lanes">
+  return `<div class="ui-card td-lanes">
       <div class="td-cap">Own things · helping out</div>
       <div class="td-sub">Tap when it's done. Tap twice if nobody had to ask — that's the XP.</div>
       ${lane('Your own things', own)}${lane('Helping out', helping)}
@@ -1074,7 +1074,7 @@ function tdLanesCard(kid) {
    never set, here. */
 function tdAttitudeRow(kid, wk, d, dayKey) {
   const a = mrGetAttitude(kid, wk, d);
-  const btns = [1, 2, 3, 4, 5].map(n => `<button type="button" class="td-rate${a.self === n ? ' on' : ''}"
+  const btns = [1, 2, 3, 4, 5].map(n => `<button type="button" class="ui-chip"
       data-td-action="attitude" data-td-day="${escapeAttr(dayKey)}" data-td-n="${n}"
       aria-pressed="${a.self === n}" aria-label="${n} out of 5">${n}</button>`).join('');
   return `<div class="td-rates">${btns}</div>
@@ -1089,7 +1089,7 @@ function tdTrainingCard(kid) {
   const d = tdTodayIndex();
   if (d == null) return '';
   const name = tdBlockLabel(t.block, kid).name;
-  return `<div class="td-card td-training">
+  return `<div class="ui-card td-training">
       <div class="td-cap">${escapeHtml(name)} — how did you try?</div>
       ${tdAttitudeRow(kid, ctThisWeekKey(), d, today)}
     </div>`;
@@ -1183,7 +1183,7 @@ function tdCatchUpCard(kid) {
         <span class="td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
       </button>${open ? tdCatchUpPanel(kid, day) : ''}`;
   }).join('');
-  return `<div class="td-card td-catchup">
+  return `<div class="ui-card td-catchup">
       <div class="td-catchup-title">🕓 Catch up</div>
       <div class="td-sub">Earlier days still waiting for your answer. Tap one.</div>
       ${rows}
@@ -1250,10 +1250,10 @@ function tdAnsweredCard(kid) {
         <span class="td-answered-word">${escapeHtml(word.toLowerCase())} ✓</span>
       </div>`;
   }).join('');
-  return `<div class="td-card td-answered">
+  return `<div class="ui-card td-answered">
       <div class="td-cap">✨ Mum answered</div>
       ${rows || '<div class="td-empty">Nothing new since you last looked.</div>'}
-      <button type="button" class="td-fold-btn td-answered-ok" data-td-action="answered-ok">Got it</button>
+      <button type="button" class="ui-btn ui-btn--secondary td-answered-ok" data-td-action="answered-ok">Got it</button>
     </div>`;
 }
 
@@ -1331,7 +1331,7 @@ function tdRenderToday() {
     badge: kidHeadBadge('todayProfileBadge', kid, isParent()),
   });
   if (!kid || kid === 'parent') {
-    wrap.innerHTML = `<div class="td-card"><div class="td-cap">Today</div>
+    wrap.innerHTML = `<div class="ui-card"><div class="td-cap">Today</div>
       <div class="td-empty">Pick a profile to see the day.</div></div>`;
     return;
   }
@@ -1596,13 +1596,13 @@ function tdRenderToday() {
           ? `<div class="dq-list">${upNext.map(card).join('')}</div>`
           : `<div class="td-empty">That is the whole day done.</div>`}
        ${laterCount > 1
-          ? `<button type="button" class="td-fold-btn td-later-btn" data-td-action="later">
+          ? `<button type="button" class="ui-btn ui-btn--secondary td-later-btn" data-td-action="later">
                ${laterOpen ? '▾' : '▸'} Later today (${laterCount})
              </button>`
           : ''}
        ${laterCount && laterOpen ? `<div class="dq-list dq-list--quiet">${later.map(card).join('')}</div>` : ''}
        ${split.earlier.length
-          ? `<button type="button" class="td-fold-btn td-earlier-btn" data-td-action="earlier">
+          ? `<button type="button" class="ui-btn ui-btn--secondary td-earlier-btn" data-td-action="earlier">
                ${earlierOpen ? '▾' : '▸'} Earlier today (${split.earlier.length})
              </button>
              ${earlierOpen ? `<div class="dq-list dq-list--quiet">${split.earlier.map(b => tdQuestCard(b, kid)).join('')}</div>` : ''}`
@@ -1619,7 +1619,7 @@ function tdRenderToday() {
      So: one button, one destination, and the verb tells her which day she has.
      `quests` is already computed above — no second reader of the day. */
   const planHtml = `<div class="td-more">
-      <button type="button" class="td-morebtn td-plan" data-td-action="plan">
+      <button type="button" class="ui-btn ui-btn--primary td-plan" data-td-action="plan">
         ✏️ ${quests.length ? 'Modify my plan' : 'Plan my day'}</button>
     </div>`;
 
@@ -1627,7 +1627,7 @@ function tdRenderToday() {
   // can never disagree.
   let loopHtml = '';
   if (fresh.length) {
-    loopHtml += `<button type="button" class="td-chip td-chip-fresh" data-td-action="fresh">
+    loopHtml += `<button type="button" class="ui-chip td-chip-fresh" data-td-action="fresh">
       ✨ <b>${fresh.length}</b> answered</button>`;
   }
   /* The family's share of the week, while there is still a week left to put it
@@ -1641,11 +1641,11 @@ function tdRenderToday() {
   // child can act on today.
   if (family && family.stillNeedsADay > 0) {
     const n = family.stillNeedsADay;
-    loopHtml += `<button type="button" class="td-chip td-chip-family" data-td-action="chore">
+    loopHtml += `<button type="button" class="ui-chip td-chip-family" data-td-action="chore">
       🧹 <b>${n}</b> family ${n === 1 ? 'chore' : 'chores'} to plan</button>`;
   }
   if (waiting) {
-    loopHtml += `<button type="button" class="td-chip" data-td-action="waiting">
+    loopHtml += `<button type="button" class="ui-chip" data-td-action="waiting">
       ⏳ <b>${waiting}</b> with Mum</button>`;
   }
 
@@ -1664,8 +1664,8 @@ function tdRenderToday() {
      Written out rather than composed: check-dead-css.js matches literal text. */
   const heroBlock = current || (breakNow ? null : next);
   const heroCls = (heroBlock && clashes.get(heroBlock.id))
-    ? 'td-card td-now td-now--conflict'
-    : 'td-card td-now';
+    ? 'ui-card td-now td-now--conflict'
+    : 'ui-card td-now';
   /* The Now card wears the RUNNING block's colour (Pop fills it; --now-c is
      read by .td-now). Only a block that is running now, and only a colour the
      navy text reads on at 4.5:1 — a colour a grown-up picked off the sheet's
@@ -1709,7 +1709,7 @@ function tdRenderToday() {
       ${tdInviteNote()}
       ${tdReflectRow(kid)}
       ${tdTrainingCard(kid)}
-      <div class="td-card">
+      <div class="ui-card">
         <div class="td-cap">Coming up</div>${questHtml}</div>
       ${planHtml}
       ${tdCatchUpCard(kid)}
@@ -1719,12 +1719,12 @@ function tdRenderToday() {
       ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
       ${tdAnsweredCard(kid)}
       ${tdProgressRibbon(kid, quests)}
-      <div class="td-card td-jobs">
+      <div class="ui-card td-jobs">
         <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
       ${tdRoutinesCard(kid)}
       ${tdLanesCard(kid)}
       ${tdLoopsCard(kid)}
-      <div class="td-card">
+      <div class="ui-card">
         <div class="td-cap">My money</div>${moneyHtml}</div>
       <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
       ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}
