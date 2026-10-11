@@ -1,4 +1,4 @@
-// Smoke group: the money screens (noLabelIsCutOnTheMoneyScreens, everyMoneyControlClicksClean). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; since PR 14 the fit check puts back its own copy of the state it found before every row, not the shared snapshots; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names.
+// Smoke group: the money screens (noLabelIsCutOnTheMoneyScreens, everyMoneyControlClicksClean, theSundayKitHolds44pxInItsBoxes). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; since PR 14 the fit check puts back its own copy of the state it found before every row, not the shared snapshots; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names.
 async function moneyFit({ page, want, checks, setLook, clearLooks, MV2_SEED_SRC, KID_SCREENS, KID_SHEETS }) {
   /* ✂️ The money fit check (Plan v6 §M 5a, grown by Money fit and logic PR 5).
      Every money screen and sheet — My money, Money school, All my Sundays, By
@@ -489,4 +489,117 @@ async function moneyClicks({ page, want, checks }) {
     + ', ' + (Date.now() - moneySweep.started) + 'ms wall');
 }
 
-module.exports = { moneyFit, moneyClicks };
+async function sundayKit({ page, want, checks, setLook, clearLooks }) {
+  /* PR 9: the Sunday steps (js/44-sunday.js) on the component kit. Every kit
+     button, chip, stepper and girl the four steps draw — the girls in the
+     meeting's head, Guess with its questions open (✏️ Adjust's and Talk
+     first's steppers, the new-row card), Payday as a grown-up (the bank,
+     drawn-early and must-pay steppers, and Home's ✏️ sheet), I choose, and
+     Signed (the 1 wk / 1 mo / 5 mo chips, ▸ Why) — is at least 44×44 and lies
+     whole inside every box that clips it (overflow hidden or clip: the step's
+     card, an I choose column), at 390×844 and 1194×834, in Pop and in Calm.
+     Each stage names controls that must be drawn, so a stage that did not
+     open cannot measure clean. Puts back the state (sdRestore), the clock,
+     the look, the size and the profile. */
+  if (!want('theSundayKitHolds44pxInItsBoxes')) return;
+  const before = page.viewportSize();
+  const problems = [];
+  const was = await page.evaluate(() => ({ profile, unlocked: parentUnlockedThisSession, viewing: parentViewing, meetKid: mnyMeetKid }));
+  try {
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+        await page.setViewportSize({ width: w, height: h });
+        await page.waitForTimeout(100);
+        problems.push(...await page.evaluate(async ([look, size]) => {
+          const out = [], tag = `${look} ${size}`;
+          const wait = (ms) => new Promise(r => setTimeout(r, ms));
+          const KIT = '.ui-btn, .ui-chip, .ui-tabs > button, .ui-kids > button, .ui-stepper > button';
+          const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+          const name = (b) => (b.getAttribute('aria-label') || b.textContent).trim().replace(/\s+/g, ' ').slice(0, 40);
+          const measure = (where, roots, wants) => {
+            roots = roots.filter(Boolean);
+            if (!roots.length) { out.push(`${tag} ${where}: not drawn`); return; }
+            wants.forEach(sel => { if (!roots.some(r => r.querySelector(sel))) out.push(`${tag} ${where}: no ${sel} drawn, so it was not measured`); });
+            const all = roots.flatMap(r => [...r.querySelectorAll(KIT)]).filter(shown);
+            if (!all.length) out.push(`${tag} ${where}: no kit control on show`);
+            all.forEach(b => {
+              const r = b.getBoundingClientRect();
+              if (r.width < 43.5 || r.height < 43.5) out.push(`${tag} ${where}: "${name(b)}" is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+              for (let p = b.parentElement; p && p !== document.body; p = p.parentElement) {
+                const cs = getComputedStyle(p), ov = cs.overflowX + ' ' + cs.overflowY;
+                // A scroller (the meeting's .mm-body) brings what is below it into view: the boxes past it do not cut.
+                if (/auto|scroll/.test(ov)) break;
+                if (!/hidden|clip/.test(ov)) continue;
+                const q = p.getBoundingClientRect();
+                if (r.left < q.left - 1 || r.right > q.right + 1 || r.top < q.top - 1 || r.bottom > q.bottom + 1) {
+                  out.push(`${tag} ${where}: "${name(b)}" (${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}) is cut by ${p.tagName.toLowerCase()}.${[...p.classList].join('.')} (${Math.round(q.left)},${Math.round(q.top)} ${Math.round(q.width)}×${Math.round(q.height)})`);
+                  break;
+                }
+              }
+            });
+          };
+          const step = () => document.querySelector('#familyMeetingBody .sd');
+          const head = () => document.querySelector('#familyMeetingBody .sd-avs');
+          const sheet = () => (document.getElementById('sundayOverlay').classList.contains('open') ? document.getElementById('sundayBody') : null);
+          const draw = async () => { renderMeetingMode(); await wait(60); };
+          const snap = sdSnap(), unpin = sdPin(3);
+          try {
+            const kid = 'jenn', wk = sdSeedWeek(kid);
+            profile = kid;
+            mnyAddRequest(kid, { kind: 'gift', amount: 20, giver: 'Uncle Mike' });
+            mnyAddRequest(kid, { kind: 'adv', amount: 2, why: 'School book fair' });
+            profile = 'parent'; parentUnlockedThisSession = true;
+            const prev = sdDayKeyAdd(wk, -7), prev2 = sdDayKeyAdd(wk, -14);
+            const c = state.shared.chore;
+            c.moneyLedger = c.moneyLedger || {}; c.finalizedWeeks = c.finalizedWeeks || {};
+            [[prev, 10], [prev2, 14]].forEach(([w, comp]) => {
+              (c.moneyLedger[w] = c.moneyLedger[w] || {})[kid] = { at: 1, chores: 2, learning: 0, streak: 0, sessionsPaid: 0, sessions: 0,
+                competition: comp, fines: 0, gross: 2 + comp, net: 2 + comp, loan: { paid: 1 }, ready: 0, gic: 0, stock: 0, spend: 0 };
+              (c.finalizedWeeks[w] = c.finalizedWeeks[w] || {})[kid] = 2 + comp;
+            });
+            const row = mnyAddDebt(kid, { name: 'Winter entry', icon: '🆕', principal: 27, monthly: 20 });
+            row.createdAt = Date.now();
+            await draw();
+            measure('Guess · new row on my wall', [step(), head()], ['.sd-scrim > .ui-card .ui-btn--primary', '.sd-avs > button']);
+            sdClick('[data-mny-action="sd-newok"]'); await draw();
+            measure('Guess', [step()], ['.sd-ask .ui-btn--primary', '.sd-atts > .ui-btn', '.sd-adds > .ui-btn']);
+            sdClick('[data-mny-action="sd-adjust"]'); await draw();
+            measure('Guess · ✏️ Adjust', [step()], ['.sd-adj-row.ui-stepper > button']);
+            sdClick('[data-mny-action="sd-talk"]'); await draw();
+            measure('Guess · 💬 Talk first', [step()], ['.sd-agree-set.ui-stepper > button']);
+            const d = sdCur();
+            d.step = 1; d.shown = 99; d.guess = 40; sdSave(d); await draw();
+            measure('Payday', [step()], ['.sd-pull.ui-stepper > button', '.sd-off--adv.ui-stepper > button', '.sd-payfoot .ui-stepper > button', '.sd-row > .ui-btn--primary']);
+            sdOpenLine('home', true); await wait(350);
+            measure('Payday · 🏠 Home changed by a parent', [sheet()], ['.sd-adj-row.ui-stepper > button']);
+            sdSheet = null; closeSheet('sundayOverlay'); await wait(60);
+            d.step = 2; sdSave(d); await draw();
+            measure('I choose', [step()], ['.sd-presets > .ui-chip', '.sd-presets > .ui-btn', '.sd-minus.ui-btn']);
+            const signed = sdSignHer(kid, wk);
+            if (!signed || signed.ok === false) out.push(`${tag} Signed: the sign refused (${JSON.stringify(signed)})`);
+            mnyMeetKid = kid; mmGoTo('money'); await draw();
+            measure('Signed', [step(), head()], ['.sd-tm > .ui-chip', '.sd-more.ui-btn']);
+          } finally {
+            if (document.getElementById('sundayOverlay').classList.contains('open')) { sdSheet = null; closeSheet('sundayOverlay'); }
+            if (mmIsOpen()) mmHide();
+            unpin(); sdRestore(snap);
+          }
+          return out;
+        }, [look, size]));
+      }
+    }
+  } catch (e) {
+    problems.push('threw: ' + e.message);
+  } finally {
+    await page.setViewportSize(before);
+    await clearLooks();
+    await page.evaluate((was) => {
+      profile = was.profile; parentUnlockedThisSession = was.unlocked; parentViewing = was.viewing; mnyMeetKid = was.meetKid;
+      goToday();
+    }, was);
+  }
+  checks.theSundayKitHolds44pxInItsBoxes = problems.length ? [...new Set(problems)] : true;
+}
+
+module.exports = { moneyFit, moneyClicks, sundayKit };

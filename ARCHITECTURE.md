@@ -4278,7 +4278,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   per-look meaning is the R11 4A hazard. Selected fills `--sel-tab`/`--sel-tab-ink`
   (Grown-ups tabs) and `--sel-opt`/`--sel-opt-ink` (teal options); the main
   button `--btn-main`/`--btn-main-ink` and its resting state
-  `--btn-off`/`--btn-off-ink` (`.gu-save`, `.rq-send`, `.sd-go`, `.sd-sign.ready`). (text only)
+  `--btn-off`/`--btn-off-ink` (`.gu-save`, `.rq-send`, `.sd .ui-btn--primary.off`, `.sd-sign.ready`). (text only)
 - **What holds it.** `tests/check-look-tokens.js` rule 5 (the plan's "rule 6"):
   between the markers every `border-radius`, `box-shadow`, `border`,
   `border-width` and `border-<side>(-width)` value carries its size only as
@@ -4299,9 +4299,9 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
   counts one build per render. (checked by smoke: theGrandfatherRuleReadsAsItselfEverywhere)
 - **Two selected fills, two meanings (PR 5, decision 5 kept both).** Teal
-  `--sel-opt` marks **a picked option** (`.sd-btn.on`, `.sd-chip.on`,
-  `.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
-  `.fl-col.on`); red `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
+  `--sel-opt` marks **a picked option** (`.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
+  `.fl-col.on`; Sunday's picked chips are the kit's
+  `.ui-chip[aria-pressed="true"]` on `--pill-on` since PR 9); red `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
   `.mm-step-cur`, `.sd-rung.on`, `.pn-segbtn.on`, `.gu-toggle.on`); ink
   `--sel-tab` is a Grown-ups tab. A new selected state picks the one that
   says what it means; it never invents a third. (text only)
@@ -4344,9 +4344,9 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   `--own` (`--sd-own-ink`, the spec green darkened to read at 4.5:1 on the sky
   card) or `--pile` (`--mny-v15-red`) — one family for My money and the Sunday
   screens. Money in is teal wherever it shows. (text only)
-- **One stepper.** `.sd-step`, `.gu-step` and `.mny-step` (`rqOpt` / `guOpt`
+- **One stepper.** `.gu-step` and `.mny-step` (`rqOpt` / `guOpt`
   add it to a − or +) share one rule: a 44px round button, ink border, button
-  shadow. The value between them is `.mny-stepval`, plain text, never a
+  shadow. Sunday's − / + are the kit's `.ui-stepper` buttons since PR 9. The value between them is `.mny-stepval`, plain text, never a
   button. (text only)
 - **Tap buttons vs information boxes.** Inside the money markers a tap button
   has `--bw-btn` and `--mny-shadow-btn`; an information box, a door or a list

@@ -39,6 +39,7 @@ const PARTS = {
     'oneBackStackGoesWhereYouCameFrom',
     'theBuildNumberIsOnThePage',
     'everyMoneyControlClicksClean',
+    'theSundayKitHolds44pxInItsBoxes',
   ],
   2: [
     'weekOpensOnTheLayoutYouCanPlanIn',

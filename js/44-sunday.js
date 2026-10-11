@@ -287,7 +287,7 @@ function sdRenderMoneyStep(wk) {
   const newRow = d.step === 0 ? sdNewRowCard(c) : '';
   return `<div class="sd" data-money-surface data-sd-step="${d.step}">
       <div class="sd-grid">
-        <div class="sd-card sd-main">${main}</div>
+        <div class="ui-card sd-main">${main}</div>
         <div class="sd-side">${side}</div>
       </div>
       ${newRow}
@@ -303,9 +303,9 @@ function sdRenderMoneyStep(wk) {
    ◀ / → buttons move between steps. */
 function sdMeetingAvatars(wk) {
   const cur = mnyMeetingKid();
-  return `<span class="sd-avs" role="group" aria-label="Whose Sunday">${['jenn', 'jess'].map(k => {
+  return `<span class="sd-avs ui-kids" role="group" aria-label="Whose Sunday">${['jenn', 'jess'].map(k => {
     const signed = mnyIsCommitted(wk, k);
-    return `<button type="button" class="sd-av${k === cur ? ' on' : ''}" data-mny-action="sd-kid" data-sd-kid="${k}" aria-pressed="${k === cur}" aria-label="${escapeAttr(kidLabel(k).name + (signed ? ' ✓ signed' : ''))}">
+    return `<button type="button" data-mny-action="sd-kid" data-sd-kid="${k}" aria-pressed="${k === cur}" aria-label="${escapeAttr(kidLabel(k).name + (signed ? ' ✓ signed' : ''))}">
         <span class="sd-av-pic" aria-hidden="true">${CT_PROFILE_ICON[k]}</span>${signed ? '<span class="sd-av-ok" aria-hidden="true">✓</span>' : ''}</button>`;
   }).join('')}</span>`;
 }
@@ -369,7 +369,7 @@ function sdGuessMain(c) {
   const paState = open ? `${open} to tick` : (s.attended ? `✓ ${s.attended} × ${fmtMoney(rate)}` : '$0 · missed');
   const chips = s.sessions.map(x => {
     const v = x.attended;
-    return `<button type="button" class="sd-att${v == null ? ' open' : v ? ' yes' : ' no'}" data-mny-action="sd-att" data-sd-block="${escapeAttr(x.blockId)}" data-sd-day="${escapeAttr(x.dayKey)}">${escapeHtml(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(x.dayKey).getDay()] + ' ' + formatDayKey(x.dayKey).getDate())} ${v == null ? '?' : v ? '✓' : '✗'}</button>`;
+    return `<button type="button" class="ui-btn${v == null ? ' open' : v ? ' yes' : ' no'}" data-mny-action="sd-att" data-sd-block="${escapeAttr(x.blockId)}" data-sd-day="${escapeAttr(x.dayKey)}">${escapeHtml(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(x.dayKey).getDay()] + ' ' + formatDayKey(x.dayKey).getDate())} ${v == null ? '?' : v ? '✓' : '✗'}</button>`;
   }).join('') || `<span class="sd-note">No club sessions on the planner this week.</span>`;
   const sun = sdSundayRoutine(c);
   const cats = sdCats(c).map(([k, icon, name], i) => {
@@ -379,7 +379,7 @@ function sdGuessMain(c) {
         <b class="sd-pill">${v == null ? '? tap' : v ? '💰 yes' : '🚫 none'}</b></button>`;
     if (k !== 'streak' || !sun.asked) return tile;
     // Decision 15: the meeting Sunday's routine is pre-marked (counted without the tick).
-    return `<div class="sd-catwrap">${tile}<button type="button" class="sd-sunroutine${sun.done ? ' on' : ''}" data-mny-action="sd-sunroutine">${sun.premarked ? '✓ Sunday routine — marked for you' : sun.done ? '✓ Sunday routine done' : '☀️ Sunday routine? tick'}</button></div>`;
+    return `<div class="sd-catwrap">${tile}<button type="button" class="ui-btn${sun.done ? ' on' : ''}" data-mny-action="sd-sunroutine">${sun.premarked ? '✓ Sunday routine — marked for you' : sun.done ? '✓ Sunday routine done' : '☀️ Sunday routine? tick'}</button></div>`;
   }).join('');
   const u = sdUnsettled(c.kid, c.wk);
   const hist = c.f.hist;
@@ -413,7 +413,7 @@ function sdGuessMain(c) {
     <div class="sd-stairs">${rungs}</div>
     <div class="sd-row">
       <span class="sd-note">${escapeHtml(hint)}</span>
-      <button type="button" class="sd-go${ready ? '' : ' off'}" data-mny-action="sd-reveal" aria-disabled="${!ready}">Show me →</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--lg${ready ? '' : ' off'}" data-mny-action="sd-reveal" aria-disabled="${!ready}">Show me →</button>
     </div>`;
 }
 function sdAskRow(c, it) {
@@ -427,8 +427,8 @@ function sdAskRow(c, it) {
   let btns = '';
   if (it.kind === 'meet') {
     const p = it.meet;
-    btns = `<button type="button" class="sd-ans yes" data-mny-action="sd-meet" data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}" data-sport="${escapeAttr(p.sport || '')}">✓ result</button>
-      <button type="button" class="sd-ans" data-mny-action="comp-zero" data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}" data-sport="${escapeAttr(p.sport || 'swim')}">No criteria met · $0</button>`;
+    btns = `<button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-meet" data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}" data-sport="${escapeAttr(p.sport || '')}">✓ result</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="comp-zero" data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}" data-sport="${escapeAttr(p.sport || 'swim')}">No criteria met · $0</button>`;
   } else if (it.open && it.status === 'talk' && q) {
     /* 💬 Talk first, at the meeting (Plan v9 §N, Deviation 41): what she
        asked, the agreed amount a parent steps with − / +, then ✓ Agree (a yes
@@ -441,18 +441,18 @@ function sdAskRow(c, it) {
       const fig = v => (it.kind === 'adv' ? sdOff$(v) : fmtMoney(v));   // early cash is taken off (Plan v18 §W)
       btns = `<div class="sd-agree">
           <span class="sd-agree-asked">asked ${escapeHtml(fig(asked))}</span>
-          <span class="sd-agree-set"><span>agreed</span><button type="button" class="sd-step" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="A dollar less">−</button><b>${escapeHtml(fig(agreed))}</b><button type="button" class="sd-step" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="A dollar more">+</button></span>
+          <span class="sd-agree-set ui-stepper"><span>agreed</span><button type="button" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="A dollar less">−</button><b>${escapeHtml(fig(agreed))}</b><button type="button" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="A dollar more">+</button></span>
         </div>
-        <button type="button" class="sd-ans yes" data-mny-action="sd-agree" data-sd-id="${escapeAttr(it.id)}">✓ Agree</button>
-        <button type="button" class="sd-ans no" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">Not this time</button>`;
+        <button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-agree" data-sd-id="${escapeAttr(it.id)}">✓ Agree</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">Not this time</button>`;
     } else {
-      btns = `<button type="button" class="sd-ans yes" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
-        <button type="button" class="sd-ans no" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">✗ No</button>`;
+      btns = `<button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">✗ No</button>`;
     }
   } else if (it.open) {
-    btns = `<button type="button" class="sd-ans yes" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
-      <button type="button" class="sd-ans" data-mny-action="sd-adjust" data-sd-id="${escapeAttr(it.id)}" aria-expanded="${d.adjust === it.id}">✏️ Adjust</button>
-      ${it.status === 'talk' ? '' : `<button type="button" class="sd-ans" data-mny-action="sd-talk" data-sd-id="${escapeAttr(it.id)}">💬 Talk first</button>`}`;
+    btns = `<button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-adjust" data-sd-id="${escapeAttr(it.id)}" aria-expanded="${d.adjust === it.id}">✏️ Adjust</button>
+      ${it.status === 'talk' ? '' : `<button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-talk" data-sd-id="${escapeAttr(it.id)}">💬 Talk first</button>`}`;
   }
   let adjust = '';
   if (it.open && d.adjust === it.id && q) {
@@ -461,13 +461,13 @@ function sdAskRow(c, it) {
     if (it.kind === 'comp') {
       // Her figure, as the Approve card reads it (guCompCalc) — Dad starts there.
       const rule = rec.pay != null ? money2(rec.pay) : guCompCalc(rec).amt;
-      nums = `<div class="sd-adj-row"><span>A parent makes it</span><button type="button" class="sd-step" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(rule))}</b><button type="button" class="sd-step" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
+      nums = `<div class="sd-adj-row ui-stepper"><span>A parent makes it</span><button type="button" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(rule))}</b><button type="button" data-mny-action="sd-pay" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
     } else if ((it.kind === 'gift' || it.kind === 'deposit') && rec.pendingApproval) {
-      nums = `<div class="sd-adj-row"><span>How much</span><button type="button" class="sd-step" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(rec.amount))}</b><button type="button" class="sd-step" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
+      nums = `<div class="sd-adj-row ui-stepper"><span>How much</span><button type="button" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(rec.amount))}</b><button type="button" data-mny-action="sd-gift" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="More">+</button></div>`;
     } else if (it.kind === 'adv' || it.kind === 'move') {
-      nums = `<div class="sd-adj-row"><span>Amount</span><b>${escapeHtml(it.kind === 'adv' ? sdOff$(q.amount) : fmtMoney(q.amount))}</b></div>`;
+      nums = `<div class="sd-adj-row ui-stepper"><span>Amount</span><b>${escapeHtml(it.kind === 'adv' ? sdOff$(q.amount) : fmtMoney(q.amount))}</b></div>`;
     }
-    adjust = `<div class="sd-adj">${nums}<button type="button" class="sd-ans no" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">✗ Not this time</button></div>`;
+    adjust = `<div class="sd-adj">${nums}<button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">✗ Not this time</button></div>`;
   }
   return `<div class="sd-ask${it.open ? ' open' : ' done'}">
       <span class="sd-ask-icon">${escapeHtml(it.icon || '❔')}</span>
@@ -499,22 +499,22 @@ function sdGuessSide(c) {
      on top, ⏳ Dad answers first below them with "open / total" in its
      title; each clue row on one line. */
   const open = items.filter(x => x.open).length;
-  return `<div class="sd-panel">
+  return `<div class="ui-card">
       <div class="sd-panel-title">💡 Clues for my guess</div>
       ${sdClues(c.rules).map(x => `<div class="sd-clue"><span>${escapeHtml(x.k)}</span><span>${escapeHtml(x.v)}</span></div>`).join('')}
     </div>
-    <div class="sd-panel sd-panel--green">
+    <div class="ui-card sd-card--green">
       <div class="sd-panel-head"><span class="sd-panel-title">🎯 My earning target</span><span class="sd-note">set by parents</span></div>
       <div class="sd-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
       <div class="sd-line">${escapeHtml(`${fmtMoney(Math.round(earnedYr))} of ${fmtMoney(Math.round(target))} earned so far · about ${fmtMoney(target / 52)} a week keeps me on pace`)}</div>
     </div>
-    <div class="sd-panel sd-panel--amber">
+    <div class="ui-card sd-card--amber">
       <div class="sd-panel-head"><span class="sd-panel-title">⏳ Parents answer first · ${open} / ${items.length} open</span><span class="sd-note">a parent taps</span></div>
       ${groups || '<div class="sd-note">Nothing waiting.</div>'}
       <div class="sd-adds">
-        <button type="button" class="sd-btn" data-mny-action="sd-add" data-sd-kind="meet">➕ result</button>
-        <button type="button" class="sd-btn" data-mny-action="sd-add" data-sd-kind="gift">➕ gift</button>
-        <button type="button" class="sd-btn" data-mny-action="sd-add" data-sd-kind="fine">➕ fine</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-add" data-sd-kind="meet">➕ result</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-add" data-sd-kind="gift">➕ gift</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-add" data-sd-kind="fine">➕ fine</button>
       </div>
       <div class="sd-note">${escapeHtml(note)}</div>
     </div>`;
@@ -594,21 +594,21 @@ function sdTileDetail(c, id, edit) {
     const work = chans.length ? chans.map(ch => `<div class="sd-work-head">${escapeHtml(SD_CHANNEL_LABEL[ch])}</div>${mnyWorking(c.wk, c.kid, ch === 'sessions' ? 'sessions' : ch, c.f.b)}`).join('')
       : `<div class="sd-note">${escapeHtml((sdTiles(c).find(t => t.id === id) || {}).note || '')}</div>`;
     const pen = isParent() && chans.length
-      ? `<button type="button" class="sd-btn" data-mny-action="sd-edit" data-sd-tile="${id}">✏️ A parent changes this line</button>` : '';
+      ? `<button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-edit" data-sd-tile="${id}">✏️ A parent changes this line</button>` : '';
     return `<div class="sd-work">${work}${pen}</div>`;
   }
   if (!isParent()) return '';
   const b = c.f.b;
   const cur = { chores: b.chorePaid, learning: b.learnPaid, streak: b.streakBonus, sessions: b.sessionsPaid, comp: b.compPaid, fines: b.fines.total };
   const ov = mnyOverrides(c.kid, c.wk);
-  const rows = chans.map(ch => `<div class="sd-adj-row"><span>${escapeHtml(SD_CHANNEL_LABEL[ch])}${ov[ch] ? ` <s>${escapeHtml(fmtMoney(b.original[ch]))}</s>` : ''}</span>
-      <button type="button" class="sd-step" data-mny-action="sd-ov" data-sd-ch="${ch}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(cur[ch]))}</b>
-      <button type="button" class="sd-step" data-mny-action="sd-ov" data-sd-ch="${ch}" data-sd-d="1" aria-label="More">+</button>
-      ${ov[ch] ? `<button type="button" class="sd-step" data-mny-action="sd-ovreset" data-sd-ch="${ch}" aria-label="Back to the planner's number">↺</button>` : ''}</div>`).join('');
+  const rows = chans.map(ch => `<div class="sd-adj-row ui-stepper"><span>${escapeHtml(SD_CHANNEL_LABEL[ch])}${ov[ch] ? ` <s>${escapeHtml(fmtMoney(b.original[ch]))}</s>` : ''}</span>
+      <button type="button" data-mny-action="sd-ov" data-sd-ch="${ch}" data-sd-d="-1" aria-label="Less">−</button><b>${escapeHtml(fmtMoney(cur[ch]))}</b>
+      <button type="button" data-mny-action="sd-ov" data-sd-ch="${ch}" data-sd-d="1" aria-label="More">+</button>
+      ${ov[ch] ? `<button type="button" data-mny-action="sd-ovreset" data-sd-ch="${ch}" aria-label="Back to the planner's number">↺</button>` : ''}</div>`).join('');
   const reason = mnyWeekReason(c.kid, c.wk);
   return `<div class="sd-work sd-work--edit">${rows}
       ${mnyAnyEdited(c.kid, c.wk) ? `<div class="sd-reasons"><span class="sd-note">Why:</span>${MNY_REASONS.map(r =>
-        `<button type="button" class="sd-chip${reason === r.id ? ' on' : ''}" data-mny-action="sd-reason" data-sd-r="${escapeAttr(r.id)}">${escapeHtml(r.label)}</button>`).join('')}</div>` : ''}
+        `<button type="button" class="ui-chip" aria-pressed="${reason === r.id}" data-mny-action="sd-reason" data-sd-r="${escapeAttr(r.id)}">${escapeHtml(r.label)}</button>`).join('')}</div>` : ''}
     </div>`;
 }
 /* 💰 My pile: the coins in fall order, coloured by group — 💪 earned green,
@@ -683,14 +683,14 @@ function sdPaydayMain(c) {
     : f.advOwed ? `${f.advReqs.map(r => r.why || r.day).filter(Boolean).join(' · ') || 'asked parents'} · spent`
     : d.advMan ? 'I forgot to ask · a parent checks it' : 'forgot to ask? tap +';
   const savingsFree = Math.floor(Math.max(0, mnySavedTotal(c.kid) - sdRule(c.rules, 'pots.safety')) + 1e-9);
-  const pull = (k, name, sub) => `<div class="sd-pull"><div class="sd-pull-name"><span class="sd-nowrap">${escapeHtml(name)}</span><span class="sd-note">${escapeHtml(sub)}</span></div>
-      <button type="button" class="sd-step" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="-1" aria-label="Less">−</button><b>${fmtMoney(Number(d.pull[k]) || 0)}</b>
-      <button type="button" class="sd-step sd-step--gold" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="1" aria-label="More">+</button></div>`;
+  const pull = (k, name, sub) => `<div class="sd-pull ui-stepper"><div class="sd-pull-name"><span class="sd-nowrap">${escapeHtml(name)}</span><span class="sd-note">${escapeHtml(sub)}</span></div>
+      <button type="button" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="-1" aria-label="Less">−</button><b>${fmtMoney(Number(d.pull[k]) || 0)}</b>
+      <button type="button" class="sd-step--gold" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="1" aria-label="More">+</button></div>`;
   // 📥 Money that came in since last Sunday joins the pile on its own
   // (Deviation 37); it is one line of the box, so the box adds up to its total.
   const waiting = money2(f.carry + f.homeIn);
   const bankNote = f.unlocked > 0 ? 'a lock came back' : 'only if I need it';
-  const mustRows = isParent() ? `<button type="button" class="sd-step" data-mny-action="sd-must" data-sd-d="-1" aria-label="A parent: pay less this week">−</button><button type="button" class="sd-step" data-mny-action="sd-must" data-sd-d="1" aria-label="A parent: back toward the schedule">+</button>` : '';
+  const mustRows = isParent() ? `<span class="ui-stepper"><button type="button" data-mny-action="sd-must" data-sd-d="-1" aria-label="A parent: pay less this week">−</button><button type="button" data-mny-action="sd-must" data-sd-d="1" aria-label="A parent: back toward the schedule">+</button></span>` : '';
   const reduced = f.due.filter(x => x.reduced);
   const impact = reduced.length ? ` A parent made it ${fmtMoney(money2(reduced.reduce((a, x) => a + x.scheduled - x.amount, 0)))} less — still owed next Sunday, no interest.` : '';
   const short = P.shortfall > 0 ? ` 🚨 ${fmtMoney(P.shortfall)} is carried to next Sunday — no interest on it.` : '';
@@ -735,10 +735,10 @@ function sdPaydayMain(c) {
           <div class="sd-offs">
             <button type="button" class="sd-off" data-mny-action="sd-line" data-sd-tile="fines"><span>📦 ${escapeHtml(fineDays ? 'Box fine' : 'Fines')}</span>
               <span class="sd-off-foot"><span class="sd-note">${escapeHtml(fineDays || tile('fines').note)}${fineFloor ? ' · ' + escapeHtml(fineFloor) : ''}</span>${-P.income.fine > 0.004 || fineFloor ? `<b class="sd-red">${escapeHtml(sdOff$(fineFloor ? fineRaw : P.income.fine))}</b>` : ''}</span></button>
-            <div class="sd-off sd-off--adv">
+            <div class="sd-off sd-off--adv ui-stepper">
               <div class="sd-pull-name"><span class="sd-nowrap">⏪ Drawn early <b${adv ? ' class="sd-red"' : ''}>${escapeHtml(sdOff$(adv))}</b></span><span class="sd-note">${escapeHtml(advNote)}</span></div>
-              <button type="button" class="sd-step" data-mny-action="sd-adv" data-sd-d="-1" aria-label="Less">−</button>
-              <button type="button" class="sd-step sd-step--peach" data-mny-action="sd-adv" data-sd-d="1" aria-label="More">+</button>
+              <button type="button" data-mny-action="sd-adv" data-sd-d="-1" aria-label="Less">−</button>
+              <button type="button" class="sd-step--peach" data-mny-action="sd-adv" data-sd-d="1" aria-label="More">+</button>
             </div>
           </div>
         </div>
@@ -754,11 +754,11 @@ function sdPaydayMain(c) {
       </div>
     </div>
     <div class="sd-row sd-payfoot">
-      <button type="button" class="sd-btn" data-mny-action="sd-back" data-sd-to="0">◀ Guess</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-back" data-sd-to="0">◀ Guess</button>
       <span class="sd-payfoot-text">${needReason ? 'A parent changed a line — pick why first.'
         : `📌 Loan first <b>${escapeHtml(fmtMoney(P.minNow))}</b> (${escapeHtml(fmtMoney(monthly))} a month) · then <b>${escapeHtml(fmtMoney(money2(P.tp - P.minNow)))}</b> is mine.${escapeHtml(impact + short)}`}</span>
       ${mustRows}
-      <button type="button" class="sd-go${needReason || !done ? ' off' : ''}" data-mny-action="sd-tochoose" aria-disabled="${needReason || !done}">Now I choose →</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--lg${needReason || !done ? ' off' : ''}" data-mny-action="sd-tochoose" aria-disabled="${needReason || !done}">Now I choose →</button>
     </div>`;
 }
 function sdGuessResult(c) {
@@ -802,19 +802,19 @@ function sdPaydaySide(c) {
   const res = [...(b.comp.entries || []).map(e => ({ n: '🏆 ' + (e.name || mnySportLabel(e.sport)), s: '✓ recorded', a: fmtMoney(mrCompAward(e)), ok: true })),
     ...c.f.deps.filter(x => !sdIsHomeCash(x)).map(x => ({ n: '🎁 ' + (x.giver || x.from || 'A gift'), s: '✓ yes', a: fmtMoney(x.amount), ok: true })),
     ...mnyComingUp(c.kid).filter(x => x.kind === 'soon').map(x => ({ n: (x.icon || '🏆') + ' ' + x.name, s: x.when, a: '' }))].slice(0, 4);
-  return `<div class="sd-panel sd-panel--week">
+  return `<div class="ui-card sd-card--week">
       <div class="sd-panel-title">🔥 My week · chores + routine</div>
       <div class="sd-days">${days}</div>
       <div class="sd-line">${escapeHtml(`${b.streak.days} routine days · chores ${fmtMoney(b.chorePaid)} graded`)}</div>
     </div>
-    <div class="sd-panel sd-panel--l4">
+    <div class="ui-card sd-card--l4">
       <div class="sd-panel-title">📊 My last 4 Sundays</div>
       <table class="sd-l4"><thead><tr><th></th><th>4 wk</th><th>3 wk</th><th>2 wk</th><th>last</th><th class="sd-l4-now sd-red">now</th><th class="sd-l4-avg">avg</th></tr></thead>
         <tbody>${table}
         <tr class="sd-l4-tot"><td>= Total</td>${cols.map(x => `<td>${x ? f(x.total) : ''}</td>`).join('')}<td class="sd-l4-now sd-red">${done ? f(now.total) : '…'}</td><td class="sd-l4-avg">${f(avgT)}</td></tr></tbody></table>
       <div class="sd-line">${escapeHtml(!done ? 'filling in as the coins fall…' : avgNoBank == null ? 'My first Sunday on the record.' : noBank >= avgNoBank ? `📈 ${fmtMoney(noBank - avgNoBank)} above my 4-week average (before bank)` : `📉 ${fmtMoney(avgNoBank - noBank)} below my 4-week average (before bank)`)}</div>
     </div>
-    <div class="sd-panel sd-panel--pink">
+    <div class="ui-card sd-card--pink">
       <div class="sd-panel-title">🏆 🎁 Results &amp; gifts</div>
       ${res.length ? res.map(x => `<div class="sd-res"><span>${escapeHtml(x.n)}</span><span class="${x.ok ? 'sd-green' : 'sd-note'}">${escapeHtml(x.s)}</span><b>${escapeHtml(x.a)}</b></div>`).join('') : '<div class="sd-note">None this week.</div>'}
     </div>`;
@@ -908,7 +908,7 @@ function sdChooseMain(c) {
         <span class="sd-cell-look"><i class="sd-cell-strip"></i><span class="sd-cell-label">${escapeHtml(SD_SUBS[k])}</span><b>${escapeHtml(amt)}</b></span>
         <span class="sd-cell-hold" style="width:${sdPress && sdPress.k === k ? Math.round(sdPress.p || 0) : 0}%"></span></button>`;
   }).join('');
-  const presets = sdPresets(c.w, r).map(p => `<button type="button" class="sd-chip${d.presetId === p.id ? ' on' : ''}${p.locked ? ' lock' : ''}" data-mny-action="sd-preset" data-sd-p="${p.id}">${escapeHtml(p.label)}</button>`).join('');
+  const presets = sdPresets(c.w, r).map(p => `<button type="button" class="ui-chip${p.locked ? ' lock' : ''}" aria-pressed="${d.presetId === p.id}" data-mny-action="sd-preset" data-sd-p="${p.id}">${escapeHtml(p.label)}</button>`).join('');
   const lk = d.last ? d.last.k : null;
   const gg0 = lk ? sdGetGive(c, lk) : null;
   const gg = gg0 && d.last && d.last.d < 0 ? [`↩ ${fmtMoney(d.last.n)} back in my pile. ` + gg0[0], gg0[1]] : gg0;
@@ -927,14 +927,14 @@ function sdChooseMain(c) {
       </button>
     </div>
     <div class="sd-presets">
-      <button type="button" class="sd-btn" data-mny-action="sd-back" data-sd-to="1">◀ My pile</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-back" data-sd-to="1">◀ My pile</button>
       ${presets}
-      <button type="button" class="sd-chip" data-mny-action="sd-clear">↺ All back</button>
-      <button type="button" class="sd-chip${d.focus === 'all' ? ' dark' : ''}" data-mny-action="sd-all">📊 Everything</button>
+      <button type="button" class="ui-chip" data-mny-action="sd-clear">↺ All back</button>
+      <button type="button" class="ui-chip" aria-pressed="${d.focus === 'all'}" data-mny-action="sd-all">📊 Everything</button>
     </div>
     <div class="sd-cols">${cols}
       <div class="sd-col sd-col--legend">
-        <button type="button" class="sd-btn sd-minus${minusOk ? '' : ' off'}" data-mny-action="sd-minus" aria-label="Take $1 back from the picked pot">−$1</button>
+        <button type="button" class="ui-btn ui-btn--secondary sd-minus${minusOk ? '' : ' off'}" data-mny-action="sd-minus" aria-label="Take $1 back from the picked pot">−$1</button>
         <div class="sd-legend">${legend}</div>
       </div>
     </div>
@@ -1000,14 +1000,14 @@ function sdChooseSide(c) {
   const goalMore = c.f.goals.length > 1 ? `<button type="button" class="sd-ask-q sd-goalmore" data-mny-action="sd-goalmenu" aria-label="Which goal this card shows"><span>⋯</span></button>` : '';
   const loanPicked = d.pick === 'extra' || d.pick === 'fixed';
   return `<div class="sd-sidehead">${escapeHtml(words >= 3 ? '💼 Assets & debt' : '💼 What I have & owe')}</div>
-    <div class="sd-panel sd-wall${hot('loan') ? ' hot' : ''}${loanPicked ? ' picked' : ''}">${burst('loan')}
+    <div class="ui-card sd-wall${hot('loan') ? ' hot' : ''}${loanPicked ? ' picked' : ''}">${burst('loan')}
       <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '🧱 Debt' : '🧱 What I owe')}</span><b class="mny-total mny-total--owe">${escapeHtml(payNow ? `${fmtMoney(left)} → ${fmtMoney(oweAfter)}` : fmtMoney(left))}</b></div>
       ${PR > 0 ? `<div class="sd-bricks" role="img" aria-label="${escapeAttr(Math.round(sdPaidPct(w.loan)) + '% of the loan paid')}">${bricks}</div>` : '<div class="sd-note">Nothing to pay back.</div>'}
       <span class="sd-line sd-teal">${escapeHtml(`🟩 paid · 🟨 this plan · free by ${free}${nLoans ? ` · ${nLoans} loan${nLoans === 1 ? '' : 's'}` : ''}`)}</span>
       <span class="sd-line">📌 <b>${escapeHtml(fmtMoney(P.minNow))}</b> must pay${extra ? ` + 🧱 <b>${escapeHtml(fmtMoney(extra))}</b> extra (counts <b>${escapeHtml(fmtMoney(extra * (1 + b)))}</b>)` : ''}</span>
       <span class="sd-line sd-red">${escapeHtml(facts.lastInterest > 0 ? `🟥 +${fmtMoney(facts.lastInterest)} interest added (${rate}% a year, every ${every} Sundays)` : `🟥 ${rate}% a year interest, added every ${every} Sundays`)}</span>
     </div>
-    <div class="sd-panel sd-ownbox${['ready', 'gic', 'stock', 'goal'].some(hot) && hk ? ' hot' : ''}">${burst('ready') || burst('gic') || burst('stock')}
+    <div class="ui-card sd-ownbox${['ready', 'gic', 'stock', 'goal'].some(hot) && hk ? ' hot' : ''}">${burst('ready') || burst('gic') || burst('stock')}
       <div class="sd-panel-head"><span class="sd-panel-title">${escapeHtml(words >= 3 ? '✅ Assets' : '✅ What I own')}</span><b class="mny-total mny-total--own">${escapeHtml(ownNow === ownAfter ? fmtMoney(ownNow) : `${fmtMoney(ownNow)} → ${fmtMoney(ownAfter)}`)}</b></div>
       <div class="sd-key"><span><i class="sd-sw now"></i>now</span><span><i class="sd-sw plan"></i>this plan</span><span><i class="sd-sw out"></i>taken out</span><span><i class="sd-sw safe"></i>${fmtMoney(safety)} safety</span></div>
       ${arow('ready', '🏦 Savings', money2(w.pots.ready + goalNow), money2(aR + goalTo))}
@@ -1015,7 +1015,7 @@ function sdChooseSide(c) {
       ${arow('stock', '📈 Companies', w.pots.stock, aS)}
       <div class="sd-line sd-teal">${escapeHtml(`${aR >= safety ? `${fmtMoney(safety)} safety + ${fmtMoney(aR - safety)} I can use` : `fill Savings to ${fmtMoney(safety)} first`}${goalTo > 0 ? ` · 🎯 goal jar${c.f.goals.length > 1 ? 's' : ''} ${fmtMoney(goalTo)} counted in the total` : ''}${clubA > 0 ? ` · 🧾 Club owes me ${fmtMoney(clubA)}` : ''}`)}</div>
     </div>
-    <div class="sd-panel sd-panel--pink sd-goaljar${hot('goal') ? ' hot' : ''}">${burst('goal')}
+    <div class="ui-card sd-card--pink sd-goaljar${hot('goal') ? ' hot' : ''}">${burst('goal')}
       <span class="sd-jar" aria-hidden="true"><i class="to" style="height:${gPrice ? Math.min(100, gTo / gPrice * 100).toFixed(1) : 0}%"></i><i class="now" style="height:${gPrice ? Math.min(100, gSaved / gPrice * 100).toFixed(1) : 0}%"></i></span>
       <div class="sd-jar-body">
         <span class="sd-jar-head"><span class="sd-panel-title sd-jar-title">${escapeHtml(g ? (g.icon || '🎯') + ' ' + g.name : '🎯 No goal yet')}</span>${goalMore}</span>
@@ -1099,7 +1099,7 @@ function sdSignedMain(c) {
   const tone = { good: 'good', warn: 'warn', bad: 'bad', neutral: 'neutral' };
   const verdict = (k, x) => `<div class="sd-verdict ${'sd-verdict--' + (tone[x.tone] || 'neutral')}"><b>${escapeHtml(x.head)}</b>
       <span>${escapeHtml(sdVerdictSummary(k, x, sg))}</span>
-      ${x.lines.length ? `<button type="button" class="sd-btn sd-more" data-mny-action="sd-verdict" data-sd-v="${k}">▸ Why</button>` : ''}</div>`;
+      ${x.lines.length ? `<button type="button" class="ui-btn ui-btn--secondary sd-more" data-mny-action="sd-verdict" data-sd-v="${k}">▸ Why</button>` : ''}</div>`;
   const milestone = s.crossed ? `<div class="sd-milestone">${escapeHtml(`🔓 ${sdRule(r, 'school.stagePct.' + SD_GATE_STAGE[s.crossed])}% paid back! "${{ ready: 'Savings', gic: 'Locked away', stock: 'Companies' }[s.crossed]}" is open. Next Sunday I can put money there.`)}</div>` : '';
   const stick = (sg.stickers || sdStickersFor(sg)).map(id => SD_STICKERS.find(x => x[0] === id)).filter(Boolean);
   const say = `I put ${fmtMoney(sg.loanCash)} on my loan${sg.extra ? ` (it counted as ${fmtMoney(sg.pay)})` : ''}, so I owe ${fmtMoney(s.after.left)} now. ${fmtMoney(money2(sg.ready + (sg.goal || 0) + sg.gic + sg.stock))} is saved${cashOut > 0 ? ` and ${fmtMoney(cashOut)} comes out as cash today` : ', and no cash this week'}.`;
@@ -1119,7 +1119,7 @@ function sdSignedMain(c) {
       <span class="sd-stamp">MY PLAN</span>
       <div class="sd-sighead-side">
         <span class="sd-sticker"><b>⭐ Sticker:</b> ${escapeHtml(stick.length ? stick.map(x => x[1] + ' ' + x[2]).join(' · ') : 'none this week')}</span>
-        ${redo ? '<button type="button" class="sd-btn" data-mny-action="sd-redo">↺ Redo my plan</button>'
+        ${redo ? '<button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-redo">↺ Redo my plan</button>'
           : (gone && gone.wk === c.wk ? `<span class="sd-note">${escapeHtml(MM_UNDO_GONE_SENTENCE)}</span>` : '')}
       </div>
     </div>
@@ -1240,15 +1240,15 @@ function sdSignedSide(c) {
   const avgW = hist.length ? hist.reduce((a, x) => a + earnedOf(x) + (x.given || 0), 0) / hist.length : 0;
   const tl = rows.map(x => `<div class="sd-tl-col ${x.kind}"><span class="sd-tl-bars">${x.bn > 0 ? `<i class="bn" style="height:${(x.bn / tMax * 100).toFixed(1)}%"></i>` : ''}<i class="st${x.bn > 0 ? '' : ' top'}" style="height:${(x.st / tMax * 100).toFixed(1)}%"></i></span></div>`).join('');
   const fw = sdForecast({ signed: sg, after: s.after }, Object.assign({}, s.w), r, d.tmW || 4);
-  const choices = [[1, '1 wk'], [4, '1 mo'], [20, '5 mo']].map(([n, l]) => `<button type="button" class="sd-btn${(d.tmW || 4) === n ? ' on' : ''}" data-mny-action="sd-tm" data-sd-n="${n}">${l}</button>`).join('');
-  return `<div class="sd-panel sd-tlcard">
+  const choices = [[1, '1 wk'], [4, '1 mo'], [20, '5 mo']].map(([n, l]) => `<button type="button" class="ui-chip" aria-pressed="${(d.tmW || 4) === n}" data-mny-action="sd-tm" data-sd-n="${n}">${l}</button>`).join('');
+  return `<div class="ui-card sd-tlcard">
       <div class="sd-panel-head"><span class="sd-panel-title">📅 My timeline</span>
         <span class="sd-key"><span><i class="sd-sw st"></i>earned</span><span><i class="sd-sw bn"></i>given</span><span><i class="sd-sw avg"></i>avg</span></span></div>
       <div class="sd-tl-ev">${rows.map(x => `<span>${escapeHtml(x.ev)}</span>`).join('')}</div>
       <div class="sd-tl">${hist.length ? `<span class="sd-tl-avg" style="bottom:${(avgW / tMax * 100).toFixed(1)}%"><span>avg ${escapeHtml(fmtMoney(avgW))}</span></span>` : ''}${tl}</div>
       <div class="sd-tl-k">${rows.map(x => `<span class="${x.kind}">${escapeHtml(x.k)}</span>`).join('')}</div>
     </div>
-    <div class="sd-panel sd-ifcard">
+    <div class="ui-card sd-ifcard">
       <div class="sd-panel-title sd-if-title">🔮 If every week is like this</div>
       <div class="sd-tm">${choices}</div>
       <div class="sd-fw-earn"><span>💰 This week I earned</span><b>${escapeHtml(fw.fwEarn)}</b><span class="sd-note">${escapeHtml(fw.fwTimes)}</span><b class="sd-red">${escapeHtml(fw.fwEarnT)}</b></div>
@@ -1286,7 +1286,7 @@ function sdLastAnswer(kid, wk) {
 function sdLastAnswerCard(kid, wk) {
   const a = sdLastAnswer(kid, wk);
   if (!a || !a.said) return '';
-  return `<div class="sd-panel">
+  return `<div class="ui-card">
       <div class="sd-panel-head"><span class="sd-panel-title">💬 Her answer last week</span><span class="sd-note">for parents</span></div>
       <div class="sd-line">${escapeHtml(MNY_REFLECT.question)} “${escapeHtml(a.said)}”${a.guess != null ? escapeHtml(` · she guessed ${fmtMoney(a.guess)}`) : ''}</div>
       <div class="sd-note">Ask: did this week's plan match it?</div>
@@ -1336,15 +1336,15 @@ function sdNewRowCard(c) {
   const verdict = isSur ? `My safety money wasn't enough, so ${fmtMoney(row.principal)} went on my wall. 🏦 Savings fills first until it's back to ${fmtMoney(sdRule(c.rules, 'pots.safety'))}.`
     : S.lowSteady ? '⚠️ Not enough steady money yet to judge it. My parents check it with me first.'
     : over ? `⚠️ My loan takes ${pct(S.r1)} of my steady money, more than half. My parents' limit is 50%.` : '✅ Still under half of my steady money. My parents\' limit is 50%.';
-  return `<div class="sd-scrim"><div class="sd-newrow" role="dialog" aria-modal="true" aria-label="${escapeAttr(isSur ? 'A surprise cost' : 'New row on my wall')}">
+  return `<div class="sd-scrim"><div class="ui-card" role="dialog" aria-modal="true" aria-label="${escapeAttr(isSur ? 'A surprise cost' : 'New row on my wall')}">
       <div class="sd-title">${isSur ? '🌧️ A surprise cost' : '🆕 New row on my wall'}</div>
       <div class="sd-newrow-what">${escapeHtml(row.name + ' · ' + fmtMoney(row.principal) + ' added')}</div>
       ${lines.map(([k, v, cls]) => `<div class="sd-newrow-line"><span>${escapeHtml(k)}</span><b class="${cls ? 'sd-' + cls : ''}">${escapeHtml(v)}</b></div>`).join('')}
       <div class="sd-newrow-verdict${over || isSur || S.lowSteady ? ' warn' : ''}">${escapeHtml(verdict)}</div>
       ${payback}
       ${over ? `<div class="sd-q">How could I get back under half?</div>
-        <div class="sd-ideas">${ideas.map(([id, label, dis]) => `<button type="button" class="sd-chip${c.d.newIdea === id ? ' on' : ''}${dis ? ' lock' : ''}" data-mny-action="sd-newidea" data-sd-id="${id}" aria-pressed="${c.d.newIdea === id}">${escapeHtml(label)}</button>`).join('')}</div>` : ''}
-      <button type="button" class="sd-go" data-mny-action="sd-newok" data-sd-id="${escapeAttr(row.id)}">I understand →</button>
+        <div class="sd-ideas">${ideas.map(([id, label, dis]) => `<button type="button" class="ui-chip${dis ? ' lock' : ''}" data-mny-action="sd-newidea" data-sd-id="${id}" aria-pressed="${c.d.newIdea === id}">${escapeHtml(label)}</button>`).join('')}</div>` : ''}
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-newok" data-sd-id="${escapeAttr(row.id)}">I understand →</button>
     </div></div>`;
 }
 
@@ -1390,7 +1390,7 @@ function sdOpenDad() {
       ${sdDadScript(c).map(([k, v]) => `<div class="sd-script-line ${'sd-script-line--' + k.toLowerCase()}"><b>${k}</b>${escapeHtml(v)}</div>`).join('')}
       ${step === 0 && sun.asked ? `<div class="sd-note">${sun.premarked ? '✓ Sunday routine marked for her' : sun.done ? '✓ Sunday routine ticked' : '○ Sunday routine not ticked yet'}</div>` : ''}
       <div class="sd-teal">${escapeHtml(check)}</div>
-      <button type="button" class="sd-go" data-mny-action="sd-dadclose">Back to her</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>
     </div>`;
   openSheet('sundayOverlay');
 }
@@ -1411,7 +1411,7 @@ function sdSheetOpen(title, html) {
   if (!body) return;
   const t = document.getElementById('sdSheetTitle');
   if (t) t.textContent = title;
-  body.innerHTML = `${html}<button type="button" class="sd-go" data-mny-action="sd-dadclose">Back to her</button>`;
+  body.innerHTML = `${html}<button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>`;
   if (!document.getElementById('sundayOverlay').classList.contains('open')) openSheet('sundayOverlay');
 }
 function sdOpenLine(tile, edit) {
@@ -1551,7 +1551,7 @@ function sdHandleAction(a, el) {
   if (a === 'sd-goalmenu') {
     const c = sdContext(mnyMeetingKid(), mmWeekKey());
     const on = c.f.chosen;
-    sdSheetOpen('🎯 Which goal does my card show?', `<div class="sd-goalpick">${c.f.goals.map(x => `<button type="button" class="sd-chip${on && on.id === x.id ? ' on' : ''}" data-mny-action="sd-goalpick" data-sd-goal="${escapeAttr(x.id)}">${escapeHtml((x.icon || '🎯') + ' ' + x.name)}</button>`).join('')}</div>`);
+    sdSheetOpen('🎯 Which goal does my card show?', `<div class="sd-goalpick">${c.f.goals.map(x => `<button type="button" class="ui-chip" aria-pressed="${!!(on && on.id === x.id)}" data-mny-action="sd-goalpick" data-sd-goal="${escapeAttr(x.id)}">${escapeHtml((x.icon || '🎯') + ' ' + x.name)}</button>`).join('')}</div>`);
     return;
   }
   if (a === 'sd-goalpick') {
