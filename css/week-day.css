@@ -682,9 +682,12 @@
      checkable from Today's quest cards, from the block's own sheet, and from
      the week grid, whose short cards carry an edge-strip tick
      (.wf-card--stripcheck) for exactly this reason; their sheet starts the
-     stopwatch. The name and duration lines, which run beside the row, end
-     before it (44px per button less the block's 10px right padding), so the
-     buttons never cover them; on a narrow block the name ellipsizes sooner. */
+     stopwatch. Nor on a block too narrow for it (owner answer 2026-10-11):
+     the name keeps 60px beside the row, so a narrow clash lane drops the ⏱
+     first, then the ✓ (renderBlockPixel works this out from the lane width).
+     The name and duration lines, which run beside the row, end before it
+     (44px per button less the block's 10px right padding), so the buttons
+     never cover them. */
   .placed-block > .ui-btn--icon {
     position: absolute; top: 0; right: 0; z-index: 14;
     font-size: calc(1.25rem * var(--text-scale, 1)); font-weight: 900; line-height: 1;

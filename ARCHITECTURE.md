@@ -463,8 +463,12 @@ Kid-facing copy is a product surface, not filler. The rules:
   reach; the ⏱ a full-width worded button), side by side in the block's
   top-right corner, the ✓ flush in it — drawn only where the block's clip
   holds 44px (48px, 50px pinned), so never on a compact block, nor on the
-  46-47px ones just above (renderBlockPixel, js/08-day-view.js), with the
-  name and duration lines padded to end before it; and `.block-meta` at
+  46-47px ones just above (renderBlockPixel, js/08-day-view.js), and only
+  where the name keeps 60px beside it (owner answer 2026-10-11: name room =
+  the block's inner width, from its lane's share of the canvas width known at
+  render, less its left padding and 44px per button; the ⏱ drops first, then
+  the ✓; their sheet ticks and starts the stopwatch), with the name and
+  duration lines padded to end before it; and `.block-meta` at
   12.96px (floored at 13px).
   Scope target rules to the **component**, not the screen: `.ck-navbtn` is both a
   kid's week arrow and the parent portal's, and screen-scoping it left the portal

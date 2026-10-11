@@ -16,6 +16,13 @@ module.exports = async ({ page, want, checks }) => {
      inside the block's clip (inside its border: .placed-block clips with
      overflow:hidden), or part of it is cut off. The Week draws its Sign this
      week / Unsign button.
+     A 47px block and a 40px compact one are each ticked done from their own
+     sheet (tapped as a child taps them; owner answer Q10, 2026-10-11).
+     Across (owner answer Q11): a block alone, a clash pair and a clash
+     triple, at one day on both sizes and three days on the iPad: the ⏱ only
+     where the name keeps 60px beside both buttons, the ✓ only where it keeps
+     60px beside the ✓, and the name line really keeps 60px; on the phone and
+     the iPad's three days the pair draws the ✓ alone and the triple neither.
      Then the same Day is seeded with a clash (a School Day whose travel and
      get-ready run 20 minutes into Homework) and the overrun hatch drawn over
      Homework (.wf-overrun.tl-overrun) must stack above the block. */
@@ -24,8 +31,10 @@ module.exports = async ({ page, want, checks }) => {
     const problems = [];
     for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
       await page.setViewportSize({ width: w, height: h });
-      problems.push(...await page.evaluate(([size]) => {
+      problems.push(...await page.evaluate(async ([size]) => {
         const out = [];
+        const snap = JSON.stringify(state);
+        const wasSpan = localStorage.getItem(DAY_SPAN_LS_KEY);
         const wasProfile = profile, wasViewing = parentViewing, wasOffset = weekOffset, wasView = weekView;
         const k = todayKey();
         const saved = getDayBlocks(k, 'jenn').slice();
@@ -118,6 +127,76 @@ module.exports = async ({ page, want, checks }) => {
             if (!worded().includes(planted)) out.push(`${size} Day: the worded-stopwatch check missed a planted "⏱ Start stopwatch" button`);
             planted.remove();
           }
+          /* A block too short for the head row is still ticked done from its
+             own sheet (owner answer Q10, 2026-10-11): the 47px block, the
+             shortest one not compact, and the 40px compact one. Tapped the way
+             a child taps it, the sheet's done switch ticked, Save pressed. */
+          for (const id of ['kit44-35m', 'kit44-30m']) {
+            const blk = document.getElementById('block-' + id);
+            const where = `${size} Day: the ${blk ? blk.getBoundingClientRect().height.toFixed(1) : '?'}px block ${id}`;
+            if (!blk) { out.push(`${where} is not drawn`); continue; }
+            blk.click();
+            const ov = document.getElementById('editOverlay');
+            if (!ov.classList.contains('open')) { out.push(`${where}: a tap does not open its sheet`); continue; }
+            document.getElementById('editCompleteToggle').click();
+            ov.querySelector('button[onclick^="saveEditChanges"]').click();
+            for (let i = 0; i < 40 && ov.classList.contains('open'); i++) await new Promise(r => setTimeout(r, 25));
+            if (ov.classList.contains('open')) { out.push(`${where}: its sheet did not close on Save`); closeSheet('editOverlay'); }
+            const saved1 = getDayBlocks(k, 'jenn').find(b => b.id === id);
+            if (!saved1 || !isBlockCompleted(saved1, 'jenn')) out.push(`${where}: ticked done on its sheet and saved, but the block is not done`);
+            const redrawn = document.getElementById('block-' + id);
+            if (!redrawn || !redrawn.classList.contains('placed-block--completed')) out.push(`${where}: done on its sheet but not drawn done on the Day`);
+          }
+          /* Clash lanes (owner answer Q11, 2026-10-11). The name's room is the
+             block's inner width less its padding and the head buttons (44px
+             each). The ⏱ shows only when the name keeps 60px beside both
+             buttons; the ✓ only when it keeps 60px beside the ✓; and whenever
+             a head button shows, the name line really has 60px. A pair and a
+             triple of 60-minute blocks with their stopwatch on, and one alone.
+             On the phone the pair must come out ✓-only and the triple bare. */
+          setDayBlocks(k, [
+            { id: 'kit44-solo', actId: 'reading', startMin: 11 * 60, durationMin: 60, stopwatch: sw() },
+            { id: 'kit44-pa', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
+            { id: 'kit44-pb', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
+            { id: 'kit44-ta', actId: 'reading', startMin: 15 * 60, durationMin: 60, stopwatch: sw() },
+            { id: 'kit44-tb', actId: 'reading', startMin: 15 * 60, durationMin: 60, stopwatch: sw() },
+            { id: 'kit44-tc', actId: 'reading', startMin: 15 * 60, durationMin: 60, stopwatch: sw() },
+          ], 'jenn');
+          /* Each width the Day is drawn at: one day, and on the iPad three days
+             side by side, where a pair and a triple are as narrow as on the phone. */
+          for (const span of size === 'iPad' ? [1, 3] : [1]) {
+            setDayViewSpan(span);
+            openDay(k, keys.indexOf(k));
+            const at = span > 1 ? `${size} ${span}-day` : size;
+            const drawnAs = {};
+            ['kit44-solo', 'kit44-pa', 'kit44-pb', 'kit44-ta', 'kit44-tb', 'kit44-tc'].forEach(id => {
+              const blk = document.getElementById('block-' + id);
+              if (!blk) { out.push(`${at} Day: clash block ${id} is not drawn`); return; }
+              const tick = blk.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]');
+              const swb = blk.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]');
+              const pad = parseFloat(getComputedStyle(blk).paddingLeft);
+              const room = n => blk.clientWidth - pad - 44 * n;
+              const where = `${at} Day: the ${blk.getBoundingClientRect().width.toFixed(1)}px-wide block ${id} (name room ${room(2).toFixed(1)}px beside ✓ and ⏱, ${room(1).toFixed(1)}px beside ✓)`;
+              drawnAs[id] = swb ? 'both' : tick ? 'tick' : 'none';
+              if (swb && room(2) < 60) out.push(`${where} draws the ⏱ with under 60px for the name`);
+              if (tick && room(1) < 60) out.push(`${where} draws the ✓ with under 60px for the name`);
+              if (swb && !tick) out.push(`${where} draws the ⏱ without the ✓`);
+              if (!swb && room(2) >= 60) out.push(`${where} has room for the ⏱ but does not draw it`);
+              if (!tick && room(1) >= 60) out.push(`${where} has room for the ✓ but does not draw it`);
+              if (tick || swb) {
+                const name = blk.querySelector(':scope > .block-name');
+                const ncs = name && getComputedStyle(name);
+                const nameW = name ? name.clientWidth - parseFloat(ncs.paddingLeft) - parseFloat(ncs.paddingRight) : 0;
+                if (nameW < 59.5) out.push(`${where}: its name line has ${nameW.toFixed(1)}px beside the head buttons, under 60px`);
+              }
+            });
+            if (size === 'phone' || span === 3) {
+              ['kit44-pa', 'kit44-pb'].forEach(id => { if (drawnAs[id] && drawnAs[id] !== 'tick') out.push(`${at} Day: the clash pair's ${id} draws ${drawnAs[id]}, expected the ✓ only`); });
+              ['kit44-ta', 'kit44-tb', 'kit44-tc'].forEach(id => { if (drawnAs[id] && drawnAs[id] !== 'none') out.push(`${at} Day: the clash triple's ${id} draws ${drawnAs[id]}, expected no head buttons`); });
+            }
+            if (drawnAs['kit44-solo'] && drawnAs['kit44-solo'] !== 'both') out.push(`${at} Day: the block alone in its lane draws ${drawnAs['kit44-solo']}, expected the ✓ and the ⏱`);
+          }
+          if (wasSpan == null) localStorage.removeItem(DAY_SPAN_LS_KEY); else localStorage.setItem(DAY_SPAN_LS_KEY, wasSpan);
           // The overrun hatch over a clashing block.
           setDayBlocks(k, [
             { id: 'kit44-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
@@ -135,7 +214,11 @@ module.exports = async ({ page, want, checks }) => {
         } catch (e) {
           out.push(`${size}: threw ${e.message}`);
         } finally {
+          if (document.getElementById('editOverlay').classList.contains('open')) closeSheet('editOverlay');
+          if (wasSpan == null) localStorage.removeItem(DAY_SPAN_LS_KEY); else localStorage.setItem(DAY_SPAN_LS_KEY, wasSpan);
           setDayBlocks(k, saved, 'jenn');
+          // The sheet ticks may have paid XP or stars: put the whole state back.
+          const sn = JSON.parse(snap); Object.keys(state).forEach(key => { delete state[key]; }); Object.assign(state, sn); saveLocal();
           profile = wasProfile; parentViewing = wasViewing; weekOffset = wasOffset;
           if (weekView !== wasView) setWeekView(wasView);
           goToday();
