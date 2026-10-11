@@ -51,7 +51,14 @@ function dayViewKeys() {
   }
   return out;
 }
+/* Every caller draws the timeline next, so the span the tabs show is the
+   span drawn: the focused day is brought back inside the columns (a 3-day
+   view turned to two, or a tap on 1, leaves the third column's day off
+   screen; it falls back to the leftmost), and the heading is written for
+   them, so it never names a day no longer drawn. */
 function renderDaySpanTabs() {
+  if (!dayViewKeys().includes(currentDayKey)) currentDayKey = dayViewAnchorKey || currentDayKey;
+  renderDayHeading();
   const wrap = document.getElementById('daySpanTabs');
   if (!wrap) return;
   const cur = dayViewSpan();
@@ -320,7 +327,7 @@ function buildTimeline() {
   body.appendChild(cols);
   tl.appendChild(body);
   const colGap = parseFloat(getComputedStyle(cols).columnGap) || 0;
-  const colsW = cols.clientWidth || Math.max(0, window.innerWidth - 64);
+  const colsW = cols.getBoundingClientRect().width || Math.max(0, window.innerWidth - 64);
   const canvasW = (colsW - colGap * (keys.length - 1)) / keys.length;
   let running = false;
   const allBlocks = [];
@@ -356,6 +363,8 @@ function buildTimeline() {
         activeStopwatchTick = null;
         return;
       }
+      // Not under a dragged block's finger; the drop draws the timeline again.
+      if (typeof blockDragActive === 'function' && blockDragActive()) return;
       buildTimeline();
     }, 1000);
   }
@@ -369,17 +378,19 @@ function buildTimeline() {
    out from the width at draw time (canvasW above), so an iPad turned to
    portrait kept three days and ✓ buttons that left a name under 60px. A
    width change redraws the timeline once it settles (150 ms), with the
-   schedule's scroll put back. Not while a block is being dragged — the redraw
-   would pull the element out from under the finger, and the drop draws the
-   timeline again anyway (same rule as js/03-sync.js) — and not when the Day is
-   not on show, since openDay draws it fresh. A height-only change (a phone's
-   address bar) draws nothing. Attached once, here at load, never by a render. */
+   schedule's scroll put back and the heading and focused day following the
+   columns (renderDaySpanTabs). Not while a block is being dragged — the
+   redraw would pull the element out from under the finger (same rule as
+   js/03-sync.js) — so it is asked again 150 ms later until the drag ends; and
+   not when the Day is not on show, since openDay draws it fresh. A
+   height-only change (a phone's address bar) draws nothing. Attached once,
+   here at load, never by a render. */
 let dayTimelineDrawnW = 0;
 let dayResizeTimer = null;
 function dayRedrawForWidth() {
   dayResizeTimer = null;
   if (document.querySelector('.screen.active')?.id !== 'screen-day') return;
-  if (typeof blockDragActive === 'function' && blockDragActive()) return;
+  if (typeof blockDragActive === 'function' && blockDragActive()) { dayQueueRedrawForWidth(); return; }
   if (window.innerWidth === dayTimelineDrawnW) return;
   const ws = document.querySelector('#screen-day .day-workspace');
   const top = ws ? ws.scrollTop : 0, left = ws ? ws.scrollLeft : 0;
@@ -1244,7 +1255,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey,
     ? `<button type="button" class="ui-btn ui-btn--icon${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
     : '';
   const stopwatchHtml = headFits && nameRoom(2) >= HEAD_NAME_ROOM_MIN && b.stopwatch && b.stopwatch.enabled
-    ? `<button type="button" class="ui-btn ui-btn--icon" aria-label="Start stopwatch" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱</button>`
+    ? `<button type="button" class="ui-btn ui-btn--icon" aria-label="Start stopwatch" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}')">⏱</button>`
     : '';
   if (headFits) blockEl.classList.add(stopwatchHtml ? 'has-head-stopwatch' : 'has-head-tick');
   // List as many objectives/goals as the block's own height can hold — same

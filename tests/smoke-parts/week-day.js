@@ -75,6 +75,7 @@ module.exports = async ({ page, want, checks }) => {
             { id: 'kit44-60m', actId: 'reading', startMin: 18 * 60 + 30, durationMin: 60, stopwatch: sw(), objectives: goals },
             { id: 'kit44-34m', actId: 'reading', startMin: 19 * 60 + 45, durationMin: 34, stopwatch: sw() },
             { id: 'kit44-36m', actId: 'reading', startMin: 20 * 60 + 30, durationMin: 36, stopwatch: sw() },
+            { id: 'kit44-pin36', actId: 'reading', startMin: 21 * 60 + 10, durationMin: 36, stopwatch: sw(), parentPinned: true },
           ]), 'jenn');
           goWeek(); setWeekView('full');
           measure('screen-week', 'Week', [['.ui-btn', 'Sign this week / Unsign button']]);
@@ -114,7 +115,7 @@ module.exports = async ({ page, want, checks }) => {
               if (r.top < s.bottom && textRight > btnLeft + 0.5) out.push(`${where}: its ${line.className} runs under the head buttons (text ends at ${Math.round(textRight - b.left)}px, buttons start at ${Math.round(btnLeft - b.left)}px)`);
             });
           };
-          [['kit44-day', true], ['kit44-30m', false], ['kit44-34m', false], ['kit44-35m', false], ['kit44-36m', true], ['kit44-45m', true], ['kit44-60m', true]].forEach(([id, want]) => head(id, want));
+          [['kit44-day', true], ['kit44-30m', false], ['kit44-34m', false], ['kit44-35m', false], ['kit44-36m', true], ['kit44-45m', true], ['kit44-60m', true], ['kit44-pin36', false]].forEach(([id, want]) => head(id, want));
           /* No block carries a worded stopwatch button; the check must catch
              a planted one. */
           const worded = () => [...document.querySelectorAll('.placed-block button')].filter(el => /stopwatch/i.test(el.textContent));
@@ -130,7 +131,9 @@ module.exports = async ({ page, want, checks }) => {
           /* A block too short for the head row is still ticked done from its
              own sheet (owner answer Q10, 2026-10-11): the 47px block, the
              shortest one not compact, and the 40px compact one. Tapped the way
-             a child taps it, the sheet's done switch ticked, Save pressed. */
+             a child taps it, the sheet's Start starts its stopwatch, the
+             sheet's done switch ticked, Save pressed. (The 48.4px pinned
+             block above draws neither button: its 3px border leaves 42px.) */
           for (const id of ['kit44-35m', 'kit44-30m']) {
             const blk = document.getElementById('block-' + id);
             const where = `${size} Day: the ${blk ? blk.getBoundingClientRect().height.toFixed(1) : '?'}px block ${id}`;
@@ -138,6 +141,8 @@ module.exports = async ({ page, want, checks }) => {
             blk.click();
             const ov = document.getElementById('editOverlay');
             if (!ov.classList.contains('open')) { out.push(`${where}: a tap does not open its sheet`); continue; }
+            document.getElementById('editStopwatchStart').click();
+            if (!(editState.stopwatch && editState.stopwatch.running)) out.push(`${where}: Start on its sheet does not start its stopwatch`);
             document.getElementById('editCompleteToggle').click();
             ov.querySelector('button[onclick^="saveEditChanges"]').click();
             for (let i = 0; i < 40 && ov.classList.contains('open'); i++) await new Promise(r => setTimeout(r, 25));
@@ -231,63 +236,103 @@ module.exports = async ({ page, want, checks }) => {
        timeline is drawn again for the new width (debounced, about 150 ms): as
        many columns as 834px carries, every head button chosen from the new
        lane width by the same 60px name rule, and the schedule's scroll kept. */
-    await page.setViewportSize({ width: 1194, height: 834 });
-    const rotBefore = await page.evaluate(() => {
-      const k = todayKey();
-      const sw = () => ({ enabled: true, running: false, elapsedSec: 0 });
-      window.__kit44Rot = { snap: JSON.stringify(state), wasSpan: localStorage.getItem(DAY_SPAN_LS_KEY),
-        wasProfile: profile, wasViewing: parentViewing, wasOffset: weekOffset };
-      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
-      setDayBlocks(k, [
-        { id: 'kit44-pa', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
-        { id: 'kit44-pb', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
-        { id: 'kit44-late', actId: 'reading', startMin: 20 * 60 + 30, durationMin: 60 },
-      ], 'jenn');
-      setDayViewSpan(3);
-      openDay(k, getDayKeys(0).indexOf(k));
-      const ws = document.querySelector('#screen-day .day-workspace');
-      ws.scrollTop = 200;
-      const pa = document.getElementById('block-kit44-pa');
-      return { cols: document.querySelectorAll('#timeline .tl-col').length, scrollTop: ws.scrollTop,
-        pa: pa ? (pa.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]') ? 'both' : pa.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]') ? 'tick' : 'none') : 'missing' };
-    });
-    await page.setViewportSize({ width: 834, height: 1194 });
-    problems.push(...await page.evaluate(async ([was]) => {
-      const out = [];
-      const r = window.__kit44Rot;
-      try {
-        /* The redraw waits 150 ms for the resize to settle; a loaded CI
-           runner can take longer, so wait up to 3 s for the new columns. */
-        const t0 = Date.now();
-        while (Date.now() - t0 < 3000 && document.querySelectorAll('#timeline .tl-col').length !== dayViewSpanEffective()) await new Promise(res => setTimeout(res, 50));
-        const cols = document.querySelectorAll('#timeline .tl-col').length;
-        if (cols !== dayViewSpanEffective()) out.push(`iPad turned 1194→834 Day: ${cols} day columns still drawn (${was.cols} at 1194) after 3 s, the new width carries ${dayViewSpanEffective()} (screen ${document.querySelector('.screen.active')?.id}, drag ${typeof blockDragActive === 'function' && blockDragActive()}, drawn at ${dayTimelineDrawnW}px, window ${window.innerWidth}px)`);
-        ['kit44-pa', 'kit44-pb'].forEach(id => {
-          const blk = document.getElementById('block-' + id);
-          if (!blk) { out.push(`iPad turned 1194→834 Day: clash block ${id} is not drawn`); return; }
-          const tick = blk.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]');
-          const swb = blk.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]');
-          const pad = parseFloat(getComputedStyle(blk).paddingLeft);
-          const room = n => blk.clientWidth - pad - 44 * n;
-          const drawn = swb ? 'both' : tick ? 'tick' : 'none';
-          const want = room(2) >= 60 ? 'both' : room(1) >= 60 ? 'tick' : 'none';
-          if (drawn !== want) out.push(`iPad turned 1194→834 Day: the ${blk.getBoundingClientRect().width.toFixed(1)}px-wide block ${id} (name room ${room(1).toFixed(1)}px beside ✓) draws ${drawn} (it drew ${was.pa} at 1194), the new width calls for ${want}`);
-        });
+    /* Restored on the Node side (finally below): a throw in either page step
+       or in a viewport change still puts back the viewport, the state, the
+       profile and the span, and drops window.__kit44Rot. */
+    try {
+      await page.setViewportSize({ width: 1194, height: 834 });
+      const rotBefore = await page.evaluate(() => {
+        const out = [];
+        const k = todayKey();
+        const sw = () => ({ enabled: true, running: false, elapsedSec: 0 });
+        window.__kit44Rot = { snap: JSON.stringify(state), wasSpan: localStorage.getItem(DAY_SPAN_LS_KEY),
+          wasProfile: profile, wasViewing: parentViewing, wasOffset: weekOffset };
+        profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+        setDayBlocks(k, [
+          { id: 'kit44-pa', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
+          { id: 'kit44-pb', actId: 'reading', startMin: 13 * 60, durationMin: 60, stopwatch: sw() },
+          { id: 'kit44-late', actId: 'reading', startMin: 20 * 60 + 30, durationMin: 60 },
+        ], 'jenn');
+        setDayViewSpan(3);
+        openDay(k, getDayKeys(0).indexOf(k));
+        /* The ⏱ on a block in a column that is not the focused one starts
+           that block's stopwatch, on its own day, and opens its sheet. */
+        const k3 = dayViewKeys()[2];
+        setDayBlocks(k3, [{ id: 'kit44-sw3', actId: 'reading', startMin: 10 * 60, durationMin: 60, stopwatch: sw() }], 'jenn');
+        buildTimeline();
+        const swBtn = document.querySelector('#block-kit44-sw3 > .ui-btn--icon[aria-label="Start stopwatch"]');
+        if (!swBtn) out.push(`iPad 3-day Day: the block in the third column (${k3}) draws no ⏱`);
+        else {
+          swBtn.click();
+          const blk3 = getDayBlocks(k3, 'jenn').find(b => b.id === 'kit44-sw3');
+          if (!(blk3 && blk3.stopwatch && blk3.stopwatch.running)) out.push(`iPad 3-day Day: the ⏱ on the third column's block (${k3}, focused column ${currentDayKey}) does not start its stopwatch`);
+          if (!document.getElementById('editOverlay').classList.contains('open') || editingBlockId !== 'kit44-sw3') out.push(`iPad 3-day Day: the ⏱ on the third column's block does not open that block's sheet`);
+          if (document.getElementById('editOverlay').classList.contains('open')) closeSheet('editOverlay');
+          // Stopped again, so the 1-second tick does not redraw the turn below.
+          setDayBlocks(k3, getDayBlocks(k3, 'jenn').map(b => b.id === 'kit44-sw3' ? { ...b, stopwatch: sw() } : b), 'jenn');
+        }
+        /* The third column stays the focused one into the turn: the redraw
+           must bring the focus back inside the columns still drawn. */
+        focusDayColumn(k3);
+        buildTimeline();
         const ws = document.querySelector('#screen-day .day-workspace');
-        const keep = Math.min(was.scrollTop, ws.scrollHeight - ws.clientHeight);
-        if (Math.abs(ws.scrollTop - keep) > 1) out.push(`iPad turned 1194→834 Day: the schedule scrolled from ${was.scrollTop}px to ${ws.scrollTop}px, expected it kept at ${keep}px`);
-      } catch (e) {
-        out.push(`iPad turned 1194→834: threw ${e.message}`);
-      } finally {
+        ws.scrollTop = 200;
+        const pa = document.getElementById('block-kit44-pa');
+        return { out, cols: document.querySelectorAll('#timeline .tl-col').length, scrollTop: ws.scrollTop,
+          heading: dayHeadingText(),
+          pa: pa ? (pa.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]') ? 'both' : pa.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]') ? 'tick' : 'none') : 'missing' };
+      });
+      problems.push(...rotBefore.out);
+      await page.setViewportSize({ width: 834, height: 1194 });
+      problems.push(...await page.evaluate(async ([was]) => {
+        const out = [];
+        try {
+          /* The redraw waits 150 ms for the resize to settle; a loaded CI
+             runner can take longer, so wait up to 3 s for the new columns. */
+          const t0 = Date.now();
+          while (Date.now() - t0 < 3000 && document.querySelectorAll('#timeline .tl-col').length !== dayViewSpanEffective()) await new Promise(res => setTimeout(res, 50));
+          const cols = document.querySelectorAll('#timeline .tl-col').length;
+          if (cols !== dayViewSpanEffective()) out.push(`iPad turned 1194→834 Day: ${cols} day columns still drawn (${was.cols} at 1194) after 3 s, the new width carries ${dayViewSpanEffective()} (screen ${document.querySelector('.screen.active')?.id}, drag ${typeof blockDragActive === 'function' && blockDragActive()}, drawn at ${dayTimelineDrawnW}px, window ${window.innerWidth}px)`);
+          /* The heading names the columns now drawn, and the focused day is
+             one of them (it was the third column at 1194). */
+          const h = document.querySelector('#screen-day > .hdr .hdr-title-btn') || document.querySelector('#screen-day > .hdr .hdr-title');
+          const heading = h ? h.textContent.trim() : '(no heading)';
+          if (heading !== dayHeadingText()) out.push(`iPad turned 1194→834 Day: the heading still reads "${heading}" (it read "${was.heading}" at 1194), the columns drawn are "${dayHeadingText()}"`);
+          if (!dayViewKeys().includes(currentDayKey)) out.push(`iPad turned 1194→834 Day: the focused day ${currentDayKey} is no longer drawn (columns ${dayViewKeys().join(', ')})`);
+          ['kit44-pa', 'kit44-pb'].forEach(id => {
+            const blk = document.getElementById('block-' + id);
+            if (!blk) { out.push(`iPad turned 1194→834 Day: clash block ${id} is not drawn`); return; }
+            const tick = blk.querySelector(':scope > .ui-btn--icon[aria-label^="Mark"]');
+            const swb = blk.querySelector(':scope > .ui-btn--icon[aria-label="Start stopwatch"]');
+            const pad = parseFloat(getComputedStyle(blk).paddingLeft);
+            const room = n => blk.clientWidth - pad - 44 * n;
+            const drawn = swb ? 'both' : tick ? 'tick' : 'none';
+            const want = room(2) >= 60 ? 'both' : room(1) >= 60 ? 'tick' : 'none';
+            if (drawn !== want) out.push(`iPad turned 1194→834 Day: the ${blk.getBoundingClientRect().width.toFixed(1)}px-wide block ${id} (name room ${room(1).toFixed(1)}px beside ✓) draws ${drawn} (it drew ${was.pa} at 1194), the new width calls for ${want}`);
+          });
+          const ws = document.querySelector('#screen-day .day-workspace');
+          const keep = Math.min(was.scrollTop, ws.scrollHeight - ws.clientHeight);
+          if (Math.abs(ws.scrollTop - keep) > 1) out.push(`iPad turned 1194→834 Day: the schedule scrolled from ${was.scrollTop}px to ${ws.scrollTop}px, expected it kept at ${keep}px`);
+        } catch (e) {
+          out.push(`iPad turned 1194→834: threw ${e.message}`);
+        }
+        return out;
+      }, [rotBefore]));
+    } catch (e) {
+      problems.push(`iPad turned 1194→834: threw on the Node side: ${e.message}`);
+    } finally {
+      await page.evaluate(() => {
+        const r = window.__kit44Rot;
+        if (!r) return;
+        if (document.getElementById('editOverlay').classList.contains('open')) closeSheet('editOverlay');
         if (r.wasSpan == null) localStorage.removeItem(DAY_SPAN_LS_KEY); else localStorage.setItem(DAY_SPAN_LS_KEY, r.wasSpan);
         const sn = JSON.parse(r.snap); Object.keys(state).forEach(key => { delete state[key]; }); Object.assign(state, sn); saveLocal();
         profile = r.wasProfile; parentViewing = r.wasViewing; weekOffset = r.wasOffset;
         delete window.__kit44Rot;
         goToday();
-      }
-      return out;
-    }, [rotBefore]));
-    await page.setViewportSize(before);
+      }).catch(e => problems.push(`iPad turned 1194→834: putting the state back threw ${e.message}`));
+      await page.setViewportSize(before);
+    }
     checks.kitButtonsHold44pxOnWeekAndDay = problems.length ? problems : true;
   }
 };

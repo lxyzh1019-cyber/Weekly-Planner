@@ -668,9 +668,14 @@ async function sendInvite(block, to, day, opts = {}) {
   showToast(`Invite sent to ${kidLabel(to).name} 💌`);
 }
 
-function startBlockStopwatch(blockId) {
-  if (!blockId) return;
-  const blocks = getDayBlocks(currentDayKey);
+/* dayKey is the block's own day (its column's), not the currentDayKey
+   global: on a 2- or 3-day view the ⏱ on a column that is not the focused
+   one found no block. That column becomes the focused one, as a tap on the
+   block makes it, so the sheet opened below edits the block on its day. */
+function startBlockStopwatch(dayKey, blockId) {
+  if (!dayKey || !blockId) return;
+  if (typeof focusDayColumn === 'function') focusDayColumn(dayKey);
+  const blocks = getDayBlocks(dayKey);
   const blk = blocks.find(b=>b.id===blockId);
   if (!blk) return;
   if (!blk.stopwatch || !blk.stopwatch.enabled) {
@@ -685,7 +690,7 @@ function startBlockStopwatch(blockId) {
   blk.stopwatch.startedAt = Date.now();
   blk.stopwatch.elapsedSec = Math.max(0, blk.stopwatch.elapsedSec|0);
   if (blk.stopwatch.goalSec == null) blk.stopwatch.goalSec = Math.max(60, (blk.durationMin|0) * 60);
-  setDayBlocks(currentDayKey, blocks);
+  setDayBlocks(dayKey, blocks);
   buildTimeline();
   openEditSheet(blockId);
   showToast('Stopwatch started ⏱');
