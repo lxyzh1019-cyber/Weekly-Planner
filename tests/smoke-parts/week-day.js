@@ -2,12 +2,12 @@
 module.exports = async ({ page, want, checks }) => {
   /* Every kit button and chip on the Full week and on the Day view, at the
      iPad and the phone size: at least 44 x 44, and the tap at its centre lands
-     on it. Today's Day is seeded with four of Jenn's blocks: a two-hour one
+     on it. Today's Day is seeded with five of Jenn's blocks: a two-hour one
      with its stopwatch on (so the ✓ tick, .ui-btn--icon, and ⏱ Start
      stopwatch, .ui-btn--secondary, are both drawn), a 30-minute one with its
      stopwatch on (40px, a compact block: neither button may show), a
-     35-minute one (47px, the shortest block that is not compact) and a
-     45-minute one. A kit button on a block must lie inside the block's clip
+     35-minute one (47px, the shortest block that is not compact), a
+     45-minute one and a 60-minute one with its stopwatch and goals. A kit button on a block must lie inside the block's clip
      (inside its border: .placed-block clips with overflow:hidden), or part of
      it is cut off. The Week draws its Sign this week / Unsign button.
      Then the same Day is seeded with a clash (a School Day whose travel and
