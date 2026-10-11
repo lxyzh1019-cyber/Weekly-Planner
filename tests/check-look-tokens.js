@@ -79,7 +79,8 @@
 //    by a named SIZE_EXEMPT entry {selector, prop, why}, keyed by the rule's
 //    full selector path (an at-rule prelude, then the selector); a stale entry
 //    fails. Token blocks' own --custom-properties are where the sizes live and
-//    are not checked. Both markers must be there exactly once, start first —
+//    are not checked. Both markers must be there exactly once, start first, in
+//    css/app.css and again in css/money.css (the Sunday steps' rules, PR 9) —
 //    a missing marker fails, so the rule cannot switch itself off.
 //
 // What it knowingly does NOT catch:
@@ -285,16 +286,21 @@ const css = cssSrc.replace(/\/\*[\s\S]*?\*\//g, blank);
   }
 }
 }
-// Rule 5: exactly one start and one end marker over every css/ file, in one file, start first.
+// Rule 5: one start and one end marker, start first, in each file of
+// MONEY_SPAN_FILES (css/app.css's money sections; css/money.css, where the
+// Sunday steps' rules went in PR 9) and in no other css/ file.
 {
-  const starts = moneyMarks.reduce((n, m) => n + m.starts, 0);
-  const ends = moneyMarks.reduce((n, m) => n + m.ends, 0);
-  if (starts !== 1 || ends !== 1 || !moneyMarks.some(m => m.span)) {
-    const where = moneyMarks.filter(m => m.starts || m.ends).map(m => m.file).join(', ') || CSS_FILE;
-    problems.push({ where, rule: 'money markers',
-      detail: `found ${starts} money-tokens:start and ${ends} money-tokens:end marker(s)${starts === 1 && ends === 1 ? ', end before start or in different files' : ''}`,
-      fix: 'keep exactly one /* money-tokens:start … */ before the money sections and one /* money-tokens:end */ after them, in one css/ file' });
+  const MONEY_SPAN_FILES = ['css/app.css', 'css/money.css'];
+  for (const m of moneyMarks) {
+    const named = MONEY_SPAN_FILES.some(f => m.file.replace(/\\/g, '/').endsWith(f));
+    if (named ? m.span : !(m.starts || m.ends)) continue;
+    problems.push({ where: m.file, rule: 'money markers',
+      detail: `found ${m.starts} money-tokens:start and ${m.ends} money-tokens:end marker(s)${m.starts === 1 && m.ends === 1 ? ', end before start' : ''}`,
+      fix: named ? 'keep exactly one /* money-tokens:start … */ before the money rules and one /* money-tokens:end */ after them in this file'
+        : 'money markers belong in ' + MONEY_SPAN_FILES.join(' and ') + ' only' });
   }
+  MONEY_SPAN_FILES.filter(f => !moneyMarks.some(m => m.file.replace(/\\/g, '/').endsWith(f)))
+    .forEach(f => problems.push({ where: f, rule: 'money markers', detail: 'the file was not read', fix: 'keep ' + f + ' in css/' }));
 }
 
 // ── The JS lexer (comments blanked; strings, templates and regexes kept) ──

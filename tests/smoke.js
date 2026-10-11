@@ -160,6 +160,7 @@ function findChromium() {
     oneBackStackGoesWhereYouCameFrom: [],
     noLabelIsCutOnTheMoneyScreens: [],
     everyMoneyControlClicksClean: [],
+    theSundayKitHolds44pxInItsBoxes: [],
     parentReadingSizeDefaultsToLarger: [],
     withMumReadsInBothLooks: [],
   };
@@ -6341,13 +6342,13 @@ function findChromium() {
           /* PR 1 money re-check: under the $5 steady floor (chores $2 a week
              here) the card shows the "not enough steady money" wording and
              no share, so no "get back under half" ideas. */
-          const low = sdBody().querySelector('.sd-newrow');
+          const low = sdBody().querySelector('.sd-scrim > .ui-card');
           if (!low) bad.push('the new-row card did not show');
           else if (!/Not enough steady money yet to judge it/.test(low.textContent) || /How could I get back under half\?/.test(low.textContent)) bad.push('steady under $5: the card does not show the not-enough-steady wording alone (steady ' + guSteady(kid) + ')');
           // Then $6 of steady money a week (chores $2 + learning $4): the loan is over half.
           [prev, prev2].forEach(w => { const r = c.moneyLedger[w][kid]; r.learning = 4; r.gross += 4; r.net += 4; c.finalizedWeeks[w][kid] += 4; });
           renderMeetingMode();
-          const card = sdBody().querySelector('.sd-newrow');
+          const card = sdBody().querySelector('.sd-scrim > .ui-card');
           if (!card) bad.push('the new-row card did not show');
           else {
             if (!/💡 Does it earn back\? My competitions pay me about \$12 each\. This row is paid back by about 3 competitions./.test(card.textContent)) bad.push('no "Does it earn back?" line: ' + card.textContent.replace(/\s+/g, ' ').slice(0, 200));
@@ -6382,7 +6383,7 @@ function findChromium() {
           // Plan v17 §4: ▸ Why opens the verdict's working in a sheet.
           if (!document.querySelectorAll('#sundayBody .sd-whylist > div').length) bad.push('▸ Why did not open the verdict\'s working');
           closeSheet('sundayOverlay');
-          const ans = [...sdBody().querySelectorAll('.sd-side .sd-panel')].find(p => /Her answer last week/.test(p.textContent));
+          const ans = [...sdBody().querySelectorAll('.sd-side > .ui-card')].find(p => /Her answer last week/.test(p.textContent));
           if (!ans || !/Saving for something big/.test(ans.textContent) || !/she guessed \$35/.test(ans.textContent)) bad.push('Dad does not see her answer last week: ' + (ans ? ans.textContent.replace(/\s+/g, ' ') : 'none'));
         } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
         finally { unpin(); sdRestore(snap); mmHide(); document.querySelectorAll('.sd-flycoin').forEach(e => e.remove()); }
@@ -6566,8 +6567,8 @@ function findChromium() {
       if ((c.meetingsHeld || {})[wk]) problems.push('one girl signing marked the meeting held');
       // Plan v17 §0: no bottom bar on the money step; her sister is a picture in the head, and the signed girl has a ✓.
       if (document.querySelector('#familyMeetingBody .mm-nav')) problems.push('the money step still has a bottom bar');
-      if (!document.querySelector('#familyMeetingBody .sd-av[data-sd-kid="jenn"]')) problems.push('the head does not offer her sister');
-      if (!document.querySelector('#familyMeetingBody .sd-av[data-sd-kid="jess"] .sd-av-ok')) problems.push('the signed girl has no ✓ in the head');
+      if (!document.querySelector('#familyMeetingBody .sd-avs > button[data-sd-kid="jenn"]')) problems.push('the head does not offer her sister');
+      if (!document.querySelector('#familyMeetingBody .sd-avs > button[data-sd-kid="jess"] .sd-av-ok')) problems.push('the signed girl has no ✓ in the head');
     } catch (e) { problems.push('threw: ' + e.message); }
     finally { unpin(); sdRestore(snap); mmHide(); }
     return problems.length ? problems : true;
@@ -24994,7 +24995,7 @@ function findChromium() {
         const r1 = head.querySelector('.hdr-row'), r2 = head.querySelector('.hdr-r2');
         if (!r1 || !r2) bad.push('the header is not two rows');
         else {
-          if (r1.querySelectorAll('.sd-av').length !== 2) bad.push('row 1 lacks the two girls as pictures');
+          if (r1.querySelectorAll('.sd-avs > button').length !== 2) bad.push('row 1 lacks the two girls as pictures');
           if (r1.querySelectorAll('.hdr-steps > .hdr-switch-cell').length !== 3) bad.push('row 1 lacks the three steps');
           if (!r1.querySelector('[data-mny-action="sd-sound"][aria-pressed]') || !r1.querySelector('[data-mny-action="sd-dad"]')) bad.push('row 1 lacks Sound or Parent\'s card');
           if (!/Week of/.test(r2.textContent)) bad.push('row 2 lacks the week');
@@ -25003,14 +25004,14 @@ function findChromium() {
         }
       }
       if (host.querySelector('.mm-nav')) bad.push('the money step has a bottom bar');
-      const jess = host.querySelector('.sd-av[data-sd-kid="jess"]');
+      const jess = host.querySelector('.sd-avs > button[data-sd-kid="jess"]');
       jess.click();
       if (mnyMeetingKid() !== 'jess') bad.push('tapping Jess did not switch to her');
       mnySetMeetKid('jenn');
       const out = sdSignHer('jenn', wk);
       if (!out || !out.ok) bad.push('the sign refused: ' + (out && out.why));
       renderMeetingMode();
-      if (!sdBody().querySelector('.sd-av[data-sd-kid="jenn"] .sd-av-ok')) bad.push('the signed girl has no ✓');
+      if (!sdBody().querySelector('.sd-avs > button[data-sd-kid="jenn"] .sd-av-ok')) bad.push('the signed girl has no ✓');
       mmGoTo('week');
       if (!sdBody().querySelector('.mm-nav')) bad.push('the week step lost its Back / Next bar');
     } catch (e) { bad.push('threw: ' + e.message); }
@@ -27354,7 +27355,7 @@ function findChromium() {
               if (/^week/.test(open) && !(open === 'week-preview' && phone) && shown(document.getElementById('weekPagePrint'))) out.push(`${tag}: the page Print shows off the phone preview`);
               // Every header button is a kid's 52px (money 54 on the iPad); a switch's frame too.
               const minBtn = isMoney && !phone ? 54 : 52;
-              for (const b of hdr.querySelectorAll('.hdr-btn, .hdr-badge, .hdr-switch, .hdr-tab, .hdr-title-btn, .sd-av')) {
+              for (const b of hdr.querySelectorAll('.hdr-btn, .hdr-badge, .hdr-switch, .hdr-tab, .hdr-title-btn, .sd-avs > button')) {
                 if (!shown(b) || (b.classList.contains('hdr-tab') && phone)) continue;
                 const r = b.getBoundingClientRect();
                 if (r.height < minBtn - 0.5 || r.width < 44) out.push(`${tag}: "${b.getAttribute('aria-label') || b.textContent.trim()}" is ${Math.round(r.width)}×${Math.round(r.height)}, under the kids' ${minBtn}px`);
@@ -27456,14 +27457,14 @@ function findChromium() {
                   else selected(cur, want.sw.selBg, want.sw.selFg, want.sw.selWeight, 'the current step');
                   if (money && !phone && cells[0].textContent !== '✓ The week') out.push(`${tag}: the done step reads ${JSON.stringify(cells[0].textContent)}, the picture's "✓ The week"`);
                 }
-                const girls = [...start.querySelectorAll('.sd-av')];
+                const girls = [...start.querySelectorAll('.sd-avs > button')];
                 if (!money) { if (girls.length) out.push(`${tag}: the girls show on the week step`); }
                 else if (girls.length !== 2 || !want.girls) out.push(`${tag}: ${girls.length} girls in the left group, want 2`);
                 else {
                   near(px(getComputedStyle(girls[0].parentElement).columnGap), want.girlsGap, 0.01, 'the girls gap');
                   for (const g of girls) {
                     const pic = g.querySelector('.sd-av-pic'), cs = getComputedStyle(pic), r = pic.getBoundingClientRect();
-                    const on = g.classList.contains('on');
+                    const on = g.getAttribute('aria-pressed') === 'true';
                     near(r.width, want.girls.w, 0.5, 'a girl width'); near(r.height, want.girls.h, 0.5, 'a girl height');
                     if (cs.backgroundColor !== rgb(on ? want.girls.bg : want.girls.otherBg)) out.push(`${tag}: ${on ? 'the chosen' : 'the other'} girl is ${cs.backgroundColor}, the picture's ${on ? want.girls.bg : want.girls.otherBg}`);
                     if (!ruleOk(px(cs.borderTopWidth), on ? want.girls.border : want.girls.otherBorder) || cs.borderTopColor !== rgb(want.girls.ink)) out.push(`${tag}: ${on ? 'the chosen' : 'the other'} girl's border is ${cs.borderTopWidth} ${cs.borderTopColor}, the picture's ${on ? want.girls.border : want.girls.otherBorder}px ${want.girls.ink}`);
@@ -27471,7 +27472,7 @@ function findChromium() {
                     const ring = `${rgb(want.girls.ringInk)} 0px 0px 0px ${want.girls.ring}px`;
                     if (on !== cs.boxShadow.includes(ring)) out.push(`${tag}: ${on ? 'the chosen girl has no' : 'the other girl has a'} ${want.girls.ring}px ${want.girls.ringInk} ring (${cs.boxShadow})`);
                   }
-                  if (girls.filter(g => g.classList.contains('on')).length !== 1) out.push(`${tag}: not one chosen girl`);
+                  if (girls.filter(g => g.getAttribute('aria-pressed') === 'true').length !== 1) out.push(`${tag}: not one chosen girl`);
                 }
                 if (money !== !!action('🗣️')) out.push(`${tag}: 🗣️ is ${money ? 'missing on' : 'on'} the ${money ? 'money' : 'week'} step`);
                 if (r2) {
@@ -28061,6 +28062,8 @@ function findChromium() {
 
   // The money click sweep: tests/smoke-parts/money-screens.js.
   await moneyScreens.moneyClicks({ page, want, checks });
+  // The Sunday steps' kit controls hold 44px inside their boxes (PR 9): the same file.
+  await moneyScreens.sundayKit({ page, want, checks, setLook, clearLooks });
 
   checks.noConsoleErrors = errors.length === 0;
 

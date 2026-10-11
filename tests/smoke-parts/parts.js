@@ -40,6 +40,7 @@ const PARTS = {
     'theBuildNumberIsOnThePage',
     'thePortalKitHolds44px',
     'everyMoneyControlClicksClean',
+    'theSundayKitHolds44pxInItsBoxes',
   ],
   2: [
     'weekOpensOnTheLayoutYouCanPlanIn',

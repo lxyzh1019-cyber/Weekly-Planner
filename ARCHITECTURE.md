@@ -4291,7 +4291,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   per-look meaning is the R11 4A hazard. Selected fills `--sel-tab`/`--sel-tab-ink`
   (Grown-ups tabs) and `--sel-opt`/`--sel-opt-ink` (teal options); the main
   button `--btn-main`/`--btn-main-ink` and its resting state
-  `--btn-off`/`--btn-off-ink` (`.gu-save`, `.rq-send`, `.sd-go`, `.sd-sign.ready`). (text only)
+  `--btn-off`/`--btn-off-ink` (`.gu-save`, `.rq-send`, `.sd .ui-btn--primary.off`, `.sd-sign.ready`). (text only)
 - **What holds it.** `tests/check-look-tokens.js` rule 5 (the plan's "rule 6"):
   between the markers every `border-radius`, `box-shadow`, `border`,
   `border-width` and `border-<side>(-width)` value carries its size only as
@@ -4312,12 +4312,16 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
   counts one build per render. (checked by smoke: theGrandfatherRuleReadsAsItselfEverywhere)
 - **Two selected fills, two meanings (PR 5, decision 5 kept both).** Teal
-  `--sel-opt` marks **a picked option** (`.sd-btn.on`, `.sd-chip.on`,
-  `.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
-  `.fl-col.on`); red `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
+  `--sel-opt` marks **a picked option** (`.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
+  `.fl-col.on`) on money's own parts. A kit chip shows the same meaning in
+  the kit's own picked fill: `.ui-chip[aria-pressed="true"]` is `--pill-on`
+  (Pop `--accent-strong`, Calm `--ink`), which Sunday's picked chips use since
+  PR 9 — the kit's drawing of "a picked option", not a third meaning. Red
+  `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
   `.mm-step-cur`, `.sd-rung.on`, `.pn-segbtn.on`, `.gu-toggle.on`); ink
   `--sel-tab` is a Grown-ups tab. A new selected state picks the one that
-  says what it means; it never invents a third. (text only)
+  says what it means (on a kit chip, `--pill-on`); it never invents a third.
+  (text only)
 
 ### Money fit and logic, PR 4 part B — the old money pages read the new rules (build 2026-10-06b)
 
@@ -4357,14 +4361,20 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   `--own` (`--sd-own-ink`, the spec green darkened to read at 4.5:1 on the sky
   card) or `--pile` (`--mny-v15-red`) — one family for My money and the Sunday
   screens. Money in is teal wherever it shows. (text only)
-- **One stepper.** `.sd-step`, `.gu-step` and `.mny-step` (`rqOpt` / `guOpt`
+- **One stepper.** `.gu-step` and `.mny-step` (`rqOpt` / `guOpt`
   add it to a − or +) share one rule: a 44px round button, ink border, button
-  shadow. The value between them is `.mny-stepval`, plain text, never a
+  shadow. Sunday's − / + are the kit's `.ui-stepper` buttons since PR 9. The value between them is `.mny-stepval`, plain text, never a
   button. (text only)
 - **Tap buttons vs information boxes.** Inside the money markers a tap button
   has `--bw-btn` and `--mny-shadow-btn`; an information box, a door or a list
-  row keeps a thin edge or none (BUILD-SPEC §0). The two selected meanings are
-  under PR 3 above. (text only)
+  row keeps a thin edge or none (BUILD-SPEC §0). Since PR 9 the rule also
+  covers Sunday's own tap parts, the ones the kit has no part for: `.sd-tile`,
+  `.sd-off`, `.sd-sign` and `.sd-pilechip` keep `--mny-shadow-btn` and the
+  heavy edge (`--bw-btn`; `--bw-card`, the same 2.5px, on `.sd-tile` and
+  `.sd-pilechip`). Sunday's other controls follow the kit instead: `.ui-btn`,
+  `.ui-chip` and `.ui-stepper` buttons carry no money shadow, and the chips
+  and steppers use `--bw-chip`. The two selected meanings are under PR 3
+  above. (text only)
 - **The sheet scrim** `--mny-v15-scrim` is 0.62 in both looks, so the page's
   numbers do not read beside a sheet. (text only)
 - **Held by** smoke `aSundayRowOpensItsSheet` and the unit case in
