@@ -14,12 +14,12 @@ and outside the 3-minute short loop: a list whose checks are all declared in
 `SETUP_NEEDS` (below) takes about half a minute on the owner's PC, any other
 list about two and a half. The rules are in `ARCHITECTURE.md`, Verification.
 
-Before a pull request opens — the full suite green on GitHub: the `checks` job,
-the browser job (cleanup-tool tests), the picture job, and the smoke jobs (all
-four dates, each in three parts: 12 jobs). Every job is under 5 minutes: a
-smoke job takes about 2-3 minutes and the whole run about 4 and a half (table
-below). A pull request starts the run by itself; on a branch,
-`gh workflow run ci.yml --ref <branch>`. `npm test` still runs all of it in one
+Every push to a branch starts one GitHub run by itself: checks, browser,
+pictures and the smoke test for 2026-10-07 in three parts. Before a pull
+request opens, that run must be green on the branch head. All four dates (12
+smoke jobs) run on main and nightly. A notes-only commit carries [skip ci].
+Every job is under 5 minutes: a smoke job takes about 2-3 minutes and the whole
+run about 4 and a half (table below). `npm test` still runs all of it in one
 process, but the smoke suite alone is over 30 minutes on a laptop, so it is not
 run locally.
 
@@ -180,6 +180,7 @@ clock runs on from there. CI runs the smoke suite once per date, in three parts
 (`SMOKE_PART`), in a matrix --
 `2026-10-15` (a weekday), `2026-10-11` (a Sunday), `2026-10-01` (the first of a
 month) and `2026-10-07` -- so a check that only passes on some days fails there.
+All four run on main and nightly; other branches run 2026-10-07 only.
 
 ## The picture test
 
@@ -238,11 +239,12 @@ whether it passes or fails.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
-plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
+`.github/workflows/ci.yml` runs once per push to any branch (no separate
+pull-request run), plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
 unit suite), `browser` (installs Chromium and its system packages once, caches
 both, runs the cleanup-tool tests), `smoke`, one job per date and part (4 x 3
-= 12, `Headless smoke test (<date>, part <n>)`), which
+= 12 on `main` and nightly; only 2026-10-07, 3 jobs, on other branches;
+`Headless smoke test (<date>, part <n>)`), which
 installs the browser from those caches and uploads `tests/out/` as an artifact
 (`smoke-screenshots-<date>-p<n>`) so a layout regression is visible in the run
 itself, and `pictures`, the picture test (above) on one fixed clock, which
