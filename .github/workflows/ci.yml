@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  pull_request:
+  # One run per push, on every branch: the run reports on the pull request's
+  # head commit, so there is no separate pull_request trigger.
   push:
-    branches: [main]
   schedule:
     # Nightly, 07:00 UTC — catches drift in the pinned browser and toolchain
     # even on weeks when nothing is pushed.
@@ -176,7 +176,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        date: ['2026-10-15', '2026-10-11', '2026-10-01', '2026-10-07']
+        # All four dates on main and nightly; 2026-10-07 only on other branches.
+        date: ${{ fromJSON((github.ref == 'refs/heads/main' || github.event_name == 'schedule') && '["2026-10-15","2026-10-11","2026-10-01","2026-10-07"]' || '["2026-10-07"]') }}
         part: [1, 2, 3]
     # A GitHub job with no timeout runs for SIX HOURS before the platform kills
     # it (2026-08-19 needed a human to cancel one). One date as one job took

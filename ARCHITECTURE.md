@@ -215,11 +215,13 @@ setup just before each check, prints both slowest first, and writes
 artifacts, lists the slowest checks and setup, and checks that a date's parts
 together ran every smoke check exactly once.
 
-CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main`,
+CI (`.github/workflows/ci.yml`) runs once per push to any branch (it reports on
+the pull request's head commit; there is no separate pull-request trigger),
 plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and
 every unit suite), `browser` (installs Chromium and its system packages once,
-caches both, runs the cleanup-tool tests), then the smoke jobs, each of the
-four dates in three parts (12 jobs, `Headless smoke test (<date>, part <n>)`),
+caches both, runs the cleanup-tool tests), then the smoke jobs: all four dates
+in three parts (12 jobs) on `main` and nightly, only 2026-10-07 (3 jobs) on any
+other branch (`Headless smoke test (<date>, part <n>)`),
 which install the browser from those caches and upload their screenshots as the
 artifact `smoke-screenshots-<date>-p<n>`. The browser job exists because the system packages came from the
 Ubuntu mirror in every smoke job, and a slow mirror made one job take 20 minutes

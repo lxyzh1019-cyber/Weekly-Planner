@@ -238,11 +238,12 @@ whether it passes or fails.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
-plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
+`.github/workflows/ci.yml` runs once per push to any branch (no separate
+pull-request run), plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
 unit suite), `browser` (installs Chromium and its system packages once, caches
 both, runs the cleanup-tool tests), `smoke`, one job per date and part (4 x 3
-= 12, `Headless smoke test (<date>, part <n>)`), which
+= 12 on `main` and nightly; only 2026-10-07, 3 jobs, on other branches;
+`Headless smoke test (<date>, part <n>)`), which
 installs the browser from those caches and uploads `tests/out/` as an artifact
 (`smoke-screenshots-<date>-p<n>`) so a layout regression is visible in the run
 itself, and `pictures`, the picture test (above) on one fixed clock, which
