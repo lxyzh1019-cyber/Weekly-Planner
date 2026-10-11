@@ -154,6 +154,7 @@ const PARTS = {
     'redesignEndToEnd',
     'routineItemsAlwaysHaveAnIcon',
     'todayShowsRoutineIcons',
+    'kitButtonsHold44pxOnWeekAndDay',
     'kidScreensMeetTheHouseRules',
     'parentScreensMeetTheHouseRules',
     'portalFitsAPhone',
