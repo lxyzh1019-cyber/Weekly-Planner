@@ -38,6 +38,7 @@ const PARTS = {
     'everyHeaderMeasuresToTheExactValues',
     'oneBackStackGoesWhereYouCameFrom',
     'theBuildNumberIsOnThePage',
+    'thePortalKitHolds44px',
     'everyMoneyControlClicksClean',
     'theSundayKitHolds44pxInItsBoxes',
   ],

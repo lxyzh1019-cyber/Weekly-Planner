@@ -204,10 +204,11 @@ const PN_KIND_GROUPS = [
   ['moves', '🔀 Moves', ['move']],
   ['fines', '📦 Fines', ['dispute']],
 ];
-/* A segmented toggle, remembered on this device. */
-function pnSeg(label, action, opts, cur) {
-  return `<div class="pn-seg" role="group" aria-label="${escapeAttr(label)}">${opts.map(([id, text]) =>
-    `<button type="button" class="pn-segbtn${cur === id ? ' on' : ''}" aria-pressed="${cur === id}" data-pn-action="${action}" data-kid="${id}">${escapeHtml(text)}</button>`).join('')}</div>`;
+/* A toggle, remembered on this device: the kit's kid switch for whose
+   questions (`kids`), its chips otherwise. */
+function pnSeg(label, action, opts, cur, kids) {
+  return `<div class="${kids ? 'ui-kids' : 'pn-seg'}" role="group" aria-label="${escapeAttr(label)}">${opts.map(([id, text]) =>
+    `<button type="button"${kids ? '' : ' class="ui-chip"'} aria-pressed="${cur === id}" data-pn-action="${action}" data-kid="${id}">${escapeHtml(text)}</button>`).join('')}</div>`;
 }
 /* Everything that is not a question she asked — a backlog, chores to grade,
    activities to approve, a note, the loan season — as one compact line each
@@ -220,7 +221,7 @@ function pnQueueCard() {
       <span class="pn-ico" aria-hidden="true">${r.icon}</span>
       <span class="pn-text"><span class="pn-title">${escapeHtml(r.title)}</span>
         <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
-      <span class="pn-cta${r.go ? ' go' : ''}">${escapeHtml(r.cta)}</span>
+      <span class="ui-btn ${r.go ? 'ui-btn--primary' : 'ui-btn--secondary'}">${escapeHtml(r.cta)}</span>
     </button>`).join('')}</div>`;
 }
 /* 🎯 A full jar — "did she buy it?" — a card in the list only when due. */
@@ -277,7 +278,7 @@ function pnSundayCard() {
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
-    days += `<button type="button" class="pn-day${mmIsDayConfirmed(d) ? ' ok' : ''}${k === todayKey() ? ' now' : ''}"
+    days += `<button type="button" class="ui-chip pn-day${mmIsDayConfirmed(d) ? ' ok' : ''}${k === todayKey() ? ' now' : ''}"
         data-pn-action="day" data-day="${d}" aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate())}">
         <span class="pn-day-dow">${DAY_SHORT[d]}</span>
         <span class="pn-day-date">${date.getDate()}</span></button>`;
@@ -294,16 +295,16 @@ function pnSundayCard() {
       </div>`;
   }).join('');
   const cta = held
-    ? `<button type="button" class="pill-btn pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 Re-open the meeting</button>`
-    : `<button type="button" class="btn-confirm pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
-  return `<div class="pn-card pn-side-card pn-sun">
+    ? `<button type="button" class="ui-btn ui-btn--secondary pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="ui-btn ui-btn--primary pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+  return `<div class="ui-card pn-side-card pn-sun">
       <div class="pn-side-head"><span class="pn-side-title">☀️ This Sunday · ${escapeHtml(sunday.getDate() + ' ' + MONTH_SHORT[sunday.getMonth()])}</span>
         <span class="pn-side-meta">${nConfirmed} of 7 days confirmed</span></div>
       <p class="pn-purpose">Is payday ready? What still blocks it.</p>
       ${kids}
       <div class="pn-days">${days}</div>
       ${cta}
-      <button type="button" class="pill-btn pn-wide" data-pn-action="fullweek">📋 Open her full week ›</button>
+      <button type="button" class="ui-btn ui-btn--secondary pn-wide" data-pn-action="fullweek">📋 Open her full week ›</button>
     </div>`;
 }
 /* 💬 Her answer last week — read before the meeting (`sdLastAnswer`, the
@@ -315,7 +316,7 @@ function pnLastAnswerCard() {
     return a && a.said ? `<div class="pn-said">${guKidChip(kid)} “${escapeHtml(a.said)}”${a.guess != null ? ` <span class="pn-sub">guessed ${escapeHtml(fmtMoney(a.guess))}</span>` : ''}</div>` : '';
   }).join('');
   if (!rows) return '';
-  return `<div class="pn-card pn-side-card">
+  return `<div class="ui-card pn-side-card">
       <div class="pn-side-head"><span class="pn-side-title">💬 Her answer last week</span></div>
       <p class="pn-purpose">Read it before the meeting.</p>
       ${rows}
@@ -337,7 +338,7 @@ function pnOwnsCard() {
   // The next lock to come back, either girl's (the day a parent hands it back to her pile).
   const back = K.flatMap(k => mnyHoldingsOfKind(k, 'gic').map(h => String(h.maturesOn || ''))).filter(Boolean).sort()[0] || '';
   const waiting = K.some(k => parts[k].waiting > 0) ? row('📥 Waiting for Sunday', k => fmtMoney(parts[k].waiting)) : '';
-  return `<div class="pn-card pn-side-card pn-owns">
+  return `<div class="ui-card pn-side-card pn-owns">
       <div class="pn-side-head"><span class="pn-side-title">👛 What they own</span></div>
       <p class="pn-purpose">Check before you say yes to a move or a cash-out.</p>
       <table class="pn-owns-table">
@@ -352,7 +353,7 @@ function pnOwnsCard() {
           ${row('🧱 Loan left', k => fmtMoney(mnyTotalOwing(k)))}
         </tbody>
       </table>
-      <div class="pn-owns-fix">${K.map(k => `<button type="button" class="gu-btn" data-mnyp-action="gufixowns" data-mnyp-kid="${k}">✏️ Fix ${escapeHtml(kidLabel(k).name)}’s</button>`).join('')}</div>
+      <div class="pn-owns-fix">${K.map(k => `<button type="button" class="ui-btn ui-btn--secondary" data-mnyp-action="gufixowns" data-mnyp-kid="${k}">✏️ Fix ${escapeHtml(kidLabel(k).name)}’s</button>`).join('')}</div>
     </div>`;
 }
 /* 🔧 Tidy-up — one-time and repair jobs (the stream set-up, weeks the
@@ -363,7 +364,7 @@ function pnTidyCard() {
   const cards = [guStreamCard(), guRepairCard(), guMeetsCard()].filter(Boolean);
   if (!cards.length) return '';
   return `<div class="pn-tidy">
-      <button type="button" class="pn-tidybtn" data-pn-action="tidy" aria-expanded="${pnTidyOpen}">🔧 Tidy-up · ${cards.length} ${pnTidyOpen ? '▾' : '▸'}</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-pn-action="tidy" aria-expanded="${pnTidyOpen}">🔧 Tidy-up · ${cards.length} ${pnTidyOpen ? '▾' : '▸'}</button>
       ${pnTidyOpen ? `<div class="gu">${cards.join('')}</div>` : ''}
     </div>`;
 }
@@ -376,7 +377,7 @@ function pnOpenToldSheet() {
 function pnRenderToldSheet() {
   const body = document.getElementById('pnToldBody');
   if (!body || !pnSheetOpen) return;
-  body.innerHTML = `${pnAnswerCard()}<button type="button" class="btn-confirm pn-wide" data-pn-action="told-close">Done</button>`;
+  body.innerHTML = `${pnAnswerCard()}<button type="button" class="ui-btn ui-btn--primary pn-wide" data-pn-action="told-close">Done</button>`;
 }
 
 /* ── On her behalf (R5 §5 rows 7 and 8, C1 — 2026-09-24) ─────────────────
@@ -405,21 +406,21 @@ function pnAnswerTarget() {
 }
 function pnAnswerCard() {
   const { kid, wk, d, todayIdx, dayKey } = pnAnswerTarget();
-  const kids = ['jenn', 'jess'].map(k => `<button type="button" class="pn-kidbtn${k === kid ? ' on' : ''}"
+  const kids = ['jenn', 'jess'].map(k => `<button type="button"
       data-pn-action="answer-kid" data-kid="${k}" aria-pressed="${k === kid}">
       ${CT_PROFILE_ICON[k]} ${escapeHtml(kidLabel(k).name)}</button>`).join('');
   const mon = formatDayKey(wk);
   const days = [0, 1, 2, 3, 4, 5, 6].map(i => {
     const date = new Date(mon); date.setDate(mon.getDate() + i);
-    return `<button type="button" class="pn-day${i === d ? ' on' : ''}" data-pn-action="answer-day" data-day="${i}"
+    return `<button type="button" class="ui-chip pn-day${i === d ? ' on' : ''}" data-pn-action="answer-day" data-day="${i}"
         aria-pressed="${i === d}"${i > todayIdx ? ' disabled' : ''}
         aria-label="${escapeAttr(DAY_SHORT[i] + ' ' + date.getDate())}">
         <span class="pn-day-dow">${DAY_SHORT[i]}</span>
         <span class="pn-day-date">${date.getDate()}</span></button>`;
   }).join('');
-  const head = `<div class="pn-answer-kids">${kids}</div><div class="pn-days">${days}</div>`;
+  const head = `<div class="ui-kids pn-answer-kids" role="group" aria-label="Which child">${kids}</div><div class="pn-days">${days}</div>`;
   if (mnyWeekSettled(wk, kid)) {
-    return `<div class="pn-card pn-answer">${head}
+    return `<div class="ui-card pn-answer">${head}
       <p class="pn-note">This week is settled for her, so there is nothing more to answer here.</p></div>`;
   }
 
@@ -436,7 +437,7 @@ function pnAnswerCard() {
       <span class="pn-ico" aria-hidden="true">${escapeHtml(row.icon)}</span>
       <span class="pn-text"><span class="pn-title">${escapeHtml(row.label)}</span>
         <span class="pn-sub">${escapeHtml(c ? 'she said ' + word(c) + ' — change it' : 'no answer yet')}</span></span>
-      <span class="pn-cta">${c ? 'Change' : 'Answer'} ›</span></button>`;
+      <span class="ui-btn ui-btn--secondary">${c ? 'Change' : 'Answer'} ›</span></button>`;
   }).join('');
   const left = ckUnlistedChoresFor(kid, wk, d);
   const elseHtml = !left.length ? '' : !pnAnswerElse
@@ -446,7 +447,7 @@ function pnAnswerCard() {
     : left.map(row => `<button type="button" class="pn-row" data-pn-action="answer-else-pick" data-chore="${escapeAttr(row.id)}">
         <span class="pn-ico" aria-hidden="true">${escapeHtml(row.icon)}</span>
         <span class="pn-text"><span class="pn-title">${escapeHtml(row.label)}</span></span>
-        <span class="pn-cta">Answer ›</span></button>`).join('')
+        <span class="ui-btn ui-btn--secondary">Answer ›</span></button>`).join('')
       + `<button type="button" class="pn-row" data-pn-action="answer-else" aria-expanded="true">
         <span class="pn-text"><span class="pn-title">Never mind</span></span></button>`;
 
@@ -466,7 +467,7 @@ function pnAnswerCard() {
   if (t) {
     const a = mrGetAttitude(kid, wk, d);
     training = `<p class="pn-answer-h">${escapeHtml((t.act && t.act.name) || 'Training')} — her own rating</p>
-      <div class="pn-rates">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="pn-rate${a.self === n ? ' on' : ''}"
+      <div class="pn-rates">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="ui-chip pn-rate"
         data-pn-action="answer-attitude" data-n="${n}" aria-pressed="${a.self === n}">${n}</button>`).join('')}</div>`;
   }
 
@@ -476,14 +477,14 @@ function pnAnswerCard() {
     const units = mrGetLearning(kid, wk, d, it.id);
     return `<div class="pn-learn"><span class="pn-text"><span class="pn-title">${escapeHtml(it.label)}</span>
         <span class="pn-sub">${units} ${escapeHtml(it.unit || '')}</span></span>
-      <button type="button" class="pn-step" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="-1"
+      <span class="ui-stepper"><button type="button" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="-1"
         aria-label="${escapeAttr('Less ' + it.label)}">−</button>
-      <button type="button" class="pn-step" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="1"
-        aria-label="${escapeAttr('More ' + it.label)}">+</button></div>`;
+      <button type="button" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="1"
+        aria-label="${escapeAttr('More ' + it.label)}">+</button></span></div>`;
   }).join('');
 
   const section = (title, html) => html ? `<p class="pn-answer-h">${title}</p>${html}` : '';
-  return `<div class="pn-card pn-answer">${head}
+  return `<div class="ui-card pn-answer">${head}
       ${section('Chores', jobs + elseHtml)}
       ${section('Own things · helping out', lanes)}
       ${training}
@@ -521,7 +522,7 @@ function pnAnswerClick(a, el) {
 function pnRenderNow() {
   const wrap = document.getElementById('pnWrap');
   if (!wrap) return;
-  if (!isParent()) { wrap.innerHTML = `<div class="pn-card">Parents only 🔒</div>`; return; }
+  if (!isParent()) { wrap.innerHTML = `<div class="ui-card">Parents only 🔒</div>`; return; }
   ctPrepareRead();
   if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
   /* The queue's backlog line is the only representation of the backlog here
@@ -535,7 +536,7 @@ function pnRenderNow() {
           <span class="pn-count">${open} open</span>
           <span class="pn-strap">Nothing pays until it passes here.</span>
           <span class="pn-wait-toggles">
-            ${pnSeg('Whose questions', 'scope', [['jenn', 'Jenn'], ['jess', 'Jess'], ['both', 'Both']], pnScope())}
+            ${pnSeg('Whose questions', 'scope', [['jenn', 'Jenn'], ['jess', 'Jess'], ['both', 'Both']], pnScope(), true)}
             ${pnSeg('Group them', 'groupby', [['girl', 'By girl'], ['kind', 'By kind']], pnGroupBy())}
           </span>
         </div>
@@ -547,8 +548,8 @@ function pnRenderNow() {
         ${pnLastAnswerCard()}
         ${pnOwnsCard()}
         <div class="pn-sidebtns">
-          <button type="button" class="pn-sidebtn" data-pn-action="record">✍️ Record</button>
-          <button type="button" class="pn-sidebtn" data-pn-action="told">🚪 She told me…</button>
+          <button type="button" class="ui-btn ui-btn--secondary" data-pn-action="record">✍️ Record</button>
+          <button type="button" class="ui-btn ui-btn--secondary" data-pn-action="told">🚪 She told me…</button>
           ${rcDoorHint()}
         </div>
         ${pnTidyCard()}

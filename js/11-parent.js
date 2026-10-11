@@ -113,7 +113,7 @@ function parentRenderPreSystem(kids) {
     const mon = formatDayKey(wk);
     const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()}${mon.getFullYear() === thisYear ? '' : ', ' + mon.getFullYear()}`;
     const on = wk === parentPreWeek;
-    return `<button type="button" class="pill-btn${on ? ' active' : ''}" data-parent-preweek="${escapeAttr(wk)}" aria-pressed="${on}">${escapeHtml(label)}</button>`;
+    return `<button type="button" class="ui-chip" data-parent-preweek="${escapeAttr(wk)}" aria-pressed="${on}">${escapeHtml(label)}</button>`;
   }).join('');
   const boards = kids.filter(k => ctWeekIsPreSystem(parentPreWeek, k))
     .map(k => ctPreSystemBoard(k, parentPreWeek)).join('');
@@ -125,8 +125,8 @@ function parentRenderHistory() {
   const kids = parentHistoryKids();
   const views = PARENT_HISTORY_VIEWS.filter(v => v.id !== 'before' || parentPreSystemWeeks(kids).length);
   const view = views.find(v => v.id === parentHistoryView) || views[0];
-  wrap.innerHTML = `<div class="pn-toggle">${views.map(v =>
-      `<button type="button" class="pill-btn${v.id === view.id ? ' active' : ''}" data-parent-history="${v.id}">${escapeHtml(v.label)}</button>`).join('')}</div>
+  wrap.innerHTML = `<div class="ph-views" role="group" aria-label="Which reading">${views.map(v =>
+      `<button type="button" class="ui-chip" aria-pressed="${v.id === view.id}" data-parent-history="${v.id}">${escapeHtml(v.label)}</button>`).join('')}</div>
     <p class="pn-note">${escapeHtml(view.note)}</p>
     ${view.id === 'before' ? parentRenderPreSystem(kids) : ''}`;
   // The two halves live in their own panels; show the one this view names.
@@ -156,7 +156,7 @@ function parentRenderLanding(destId) {
      APP_BUILD (js/01-config.js) and sw.js's SW_VERSION are held equal by
      tests/check-sw-shell.js. */
   const build = destId === 'app' ? `<p class="app-build">Build ${escapeHtml(APP_BUILD)}</p>` : '';
-  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>${build}`;
+  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="ui-card pl-list">${rows}</div>${build}`;
 }
 
 /* ── The parent header (PR 5, D35) ──
@@ -173,9 +173,9 @@ function parentRenderHeader() {
   const menu = `<div class="parent-menu">
       <button type="button" class="parent-menu-btn" id="parentMenuBtn" aria-expanded="false" aria-controls="parentMenu" onclick="parentMenuToggle()">🔒<span class="pm-word"> Parent</span> ▾</button>
       <div class="parent-menu-pop" id="parentMenu" hidden>
-        <button class="btn-icon" onclick="parentMenuToggle(false);changeParentPin()" title="Change parent PIN">🔒 PIN</button>
-        <button class="btn-icon" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the ${escapeAttr(lookTo)} look" aria-label="Switch to the ${escapeAttr(lookTo)} look">🎨 ${escapeHtml(lookTo)}</button>
-        <button class="btn-icon" onclick="parentMenuToggle(false);goProfile()">Exit to the girls</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="parentMenuToggle(false);changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+        <button type="button" class="ui-btn ui-btn--secondary" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the ${escapeAttr(lookTo)} look" aria-label="Switch to the ${escapeAttr(lookTo)} look">🎨 ${escapeHtml(lookTo)}</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="parentMenuToggle(false);goProfile()">Exit to the girls</button>
       </div>
     </div>`;
   const panelOf = { now: 'now', meeting: 'review', history: 'history', money: 'money', setup: 'setup', app: 'app' };
@@ -184,16 +184,16 @@ function parentRenderHeader() {
     const isApp = d.id === 'app';
     const badge = d.id === 'now' ? '<span class="pn-badge" id="pnTabBadge" hidden></span>' : '';
     const inner = isApp ? escapeHtml(d.icon)
-      : `<span class="parent-tab-icon">${escapeHtml(d.icon)} </span>${escapeHtml(d.label)}${badge}`;
-    return `<button class="parent-tab${isApp ? ' parent-tab--icon' : ''}${on ? ' active' : ''}" role="tab" id="pdestbtn-${d.id}" data-pdest="${d.id}"
+      : `<span class="pdest-icon">${escapeHtml(d.icon)} </span>${escapeHtml(d.label)}${badge}`;
+    return `<button type="button" role="tab" id="pdestbtn-${d.id}" data-pdest="${d.id}"
         aria-selected="${on}" aria-controls="ptab-${panelOf[d.id]}" tabindex="${on ? 0 : -1}"
         data-parent-dest="${d.id}"${isApp ? ' aria-label="App"' : ''}>${inner}</button>`;
   }).join('');
   hdrMount('screen-parent', {
     variant: 'parent',
-    lead: `${menu}<div class="parent-tabs" role="tablist" aria-label="Parent sections">${tabs}</div>`,
+    lead: `${menu}<div class="ui-tabs parent-dests" id="parentDests" role="tablist" aria-label="Parent sections">${tabs}</div>`,
     title: dest.label,
-    tools: '<div class="parent-scope" id="parentScopePills" role="group" aria-label="Which child"></div>',
+    tools: '<div class="parent-scope ui-kids" id="parentScopePills" role="group" aria-label="Which child"></div>',
   });
 }
 
@@ -210,7 +210,7 @@ function parentRenderScope() {
   const opts = [['both', 'Both', '<span class="ps-word">Both</span><span class="ps-short">All</span>'],
     ['jenn', 'Jenn', '🐥<span class="ps-word"> Jenn</span>'], ['jess', 'Jess', '🦊<span class="ps-word"> Jess</span>']];
   wrap.innerHTML = opts.map(([id, name, inner]) =>
-    `<button type="button" class="pill-btn${parentScope === id ? ' active' : ''}" aria-pressed="${parentScope === id}"
+    `<button type="button" aria-pressed="${parentScope === id}"
        aria-label="${name}" data-parent-scope="${id}">${inner}</button>`).join('');
 }
 
@@ -237,7 +237,7 @@ function parentRenderNav() {
   nav.innerHTML = PARENT_DESTS.map(d => {
     const on = d.id === parentDest;
     const badge = (d.id === 'now' && waiting) ? `<span class="pn-navdot">${waiting}</span>` : '';
-    return `<button type="button" class="parent-nav-btn${on ? ' on' : ''}"
+    return `<button type="button" class="ui-btn"
         data-parent-dest="${d.id}"${on ? ' aria-current="page"' : ''}>
         <span class="parent-nav-icon" aria-hidden="true">${d.icon}${badge}</span>
         <span class="parent-nav-label">${escapeHtml(d.label)}</span>
@@ -350,9 +350,8 @@ function setParentTab(tab) {
   // A phone's row names the destination (its tabs are the bottom bar).
   const title = document.querySelector('#screen-parent > .hdr .hdr-title');
   if (title && dest) title.textContent = dest.label;
-  document.querySelectorAll('#screen-parent .parent-tab').forEach(t => {
+  document.querySelectorAll('#parentDests > [role="tab"]').forEach(t => {
     const on = t.dataset.pdest === parentDest;
-    t.classList.toggle('active', on);
     // A strip that says role="tab" has to answer which one is selected and what
     // it controls, and has to be one stop in the tab order rather than five.
     t.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -368,7 +367,7 @@ function setParentTab(tab) {
     back.hidden = !isDetail;
     if (isDetail) {
       const row = (PARENT_LANDINGS[parentDest] || []).find(r => r.panel === tab);
-      back.innerHTML = `<button type="button" class="pill-btn" data-parent-back="1">◀ ${escapeHtml(dest.label)}</button>
+      back.innerHTML = `<button type="button" class="ui-btn ui-btn--secondary" data-parent-back="1">◀ ${escapeHtml(dest.label)}</button>
         <span class="parent-crumb">${escapeHtml(row ? row.title : '')}</span>`;
     }
   }
@@ -387,7 +386,7 @@ function setParentTab(tab) {
    in js/99-main.js. Roving tabindex is set in setParentTab above, so focus
    follows selection and the strip stays a single stop in the tab order. */
 function parentTabsKeydown(e) {
-  const tabs = [...document.querySelectorAll('#screen-parent .parent-tab')];
+  const tabs = [...document.querySelectorAll('#parentDests > [role="tab"]')];
   const i = tabs.indexOf(document.activeElement);
   if (i < 0 || !tabs.length) return;
   let next = null;
@@ -423,7 +422,7 @@ function renderMeetingHub() {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
     const confirmed = mmIsDayConfirmed(d);
-    days += `<button type="button" class="review-day${confirmed ? ' confirmed' : ''}${k === todayKey() ? ' today' : ''}" onclick="openFamilyMeetingAt(1,${d})">
+    days += `<button type="button" class="ui-btn${confirmed ? ' confirmed' : ''}${k === todayKey() ? ' today' : ''}" onclick="openFamilyMeetingAt(1,${d})">
         <span class="review-day-dow">${DAY_SHORT[d]}</span>
         <span class="review-day-date">${date.getDate()}</span>
         <span class="review-day-count">🐥${mmDayPct('jenn', d)}% 🦊${mmDayPct('jess', d)}%</span>
@@ -443,11 +442,11 @@ function renderMeetingHub() {
     ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
     : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
   const cta = held
-    ? `<button type="button" class="pill-btn" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
-    : `<button type="button" class="btn-confirm" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+    ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="ui-btn ui-btn--primary" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
   wrap.innerHTML = `<div class="hub-week">Week of ${escapeHtml(weekLabel)}</div>
     <div class="review-day-row">${days}</div>${status}
-    <div style="margin-top:0.6rem">${cta}</div>${mmCatchUpBanner()}`;
+    <div class="hub-cta">${cta}</div>${mmCatchUpBanner()}`;
 }
 // Deep-link into the meeting: used by the hub's day strip to open the exact
 // day a parent wants to review, inside the one-and-only confirm surface.
@@ -504,12 +503,12 @@ function renderPendingApproval() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${kidLabel(owner).icon} ${escapeHtml(kidLabel(owner).name)} added</span></div>
-      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
-      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
-        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
-        <button class="btn-icon" style="padding:2px 8px" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
-        <button class="btn-icon" style="padding:2px 8px" onclick="rejectKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑 Reject</button>
+      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span class="pc-meta">· ${kidLabel(owner).icon} ${escapeHtml(kidLabel(owner).name)} added</span></div>
+      <div class="pc-sub">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--primary" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
+        <button type="button" class="ui-btn ui-btn--danger" onclick="rejectKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
   });
@@ -557,12 +556,12 @@ function renderPendingTaskApproval() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">🎁 ${escapeHtml(fmtMoney(gift.amount))} · ${escapeHtml(gift.from || 'A gift')}
-        <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
-      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(fmtDay(gift.dayKey || gift.weekKey, 'dated'))}
+        <span class="pc-meta">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
+      <div class="pc-sub">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(fmtDay(gift.dayKey || gift.weekKey, 'dated'))}
         · nothing has moved yet</div>
-      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
-        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
-        <button class="btn-icon" style="padding:2px 8px" data-gift-reject="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">🗑 Reject</button>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--primary" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--danger" data-gift-reject="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
   });
@@ -572,12 +571,12 @@ function renderPendingTaskApproval() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">🏋️ ${escapeHtml(task.name)}${task.reps ? ` <span style="font-weight:700">(${escapeHtml(task.reps)})</span>` : ''}
-        <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
-      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
-      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
-        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
-        <button class="btn-icon" style="padding:2px 8px" data-task-reject="${escapeAttr(task.id)}">🗑 Reject</button>
+      <div class="challenge-title">🏋️ ${escapeHtml(task.name)}${task.reps ? ` <span class="pc-reps">(${escapeHtml(task.reps)})</span>` : ''}
+        <span class="pc-meta">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
+      <div class="pc-sub">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--primary" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--danger" data-task-reject="${escapeAttr(task.id)}">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
   });
@@ -745,7 +744,7 @@ function renderParentActivities() {
         <span class="pa-retired-meta">${n} block${n === 1 ? '' : 's'} in history</span>`;
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'pill-btn';
+      btn.className = 'ui-btn ui-btn--secondary';
       btn.textContent = 'Put it back';
       btn.onclick = () => unarchiveParentActivity(owner, act.id);
       row.appendChild(btn);
@@ -761,12 +760,12 @@ function parentActivityCard(act, owner) {
   const ownerLabel = owner==='shared' ? '🔗 Shared'
                     : `${kidLabel(owner).icon} ${kidLabel(owner).name} only`;
   card.innerHTML = `
-    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(ownerLabel)}</span></div>
-    <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
-    <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
-      <button class="btn-icon" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
-      <button class="btn-icon" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px">✏️ Edit</button>
-      <button class="btn-icon" onclick="deleteParentActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px">🗑</button>
+    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span class="pc-meta">· ${escapeHtml(ownerLabel)}</span></div>
+    <div class="pc-sub">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
+    <div class="pc-actions">
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Edit</button>
+      <button type="button" class="ui-btn ui-btn--danger" onclick="deleteParentActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑</button>
     </div>
   `;
   return card;
@@ -1081,13 +1080,13 @@ function renderPerfTrend() {
     const pw = Math.round(st.planned / scaleMax * 100);
     const dw = Math.round(st.done / scaleMax * 100);
     return `<span class="perf-track"><span class="perf-plan" style="width:${pw}%"></span>`
-      + `<span class="perf-fill ${cls}" style="display:block;width:${dw}%"></span></span>`
+      + `<span class="perf-fill ${cls}" style="width:${dw}%"></span></span>`
       + `<span class="perf-num">${st.planned ? fmtHrsMin(st.done) + ' / ' + fmtHrsMin(st.planned) : '—'}</span>`;
   };
   const money = (st) => st.money != null ? `${fmtMoney(st.money)}` : '—';
   let rows = '';
   weeks.forEach(w => {
-    rows += `<button type="button" class="perf-row${w.off === perfWeekOffset ? ' sel' : ''}" onclick="perfSelectWeek(${w.off})">
+    rows += `<button type="button" class="ui-btn" aria-pressed="${w.off === perfWeekOffset}" onclick="perfSelectWeek(${w.off})">
         <span class="perf-week">${w.off === 0 ? 'This wk' : MONTH_SHORT[w.mon.getMonth()] + ' ' + w.mon.getDate()}${heldMap[w.monKey] ? ' ✅' : ''}</span>
         ${bar(w.j, 'mm-bar-j')}${bar(w.s, 'mm-bar-s')}
         <span class="perf-money">${money(w.j)} · ${money(w.s)}</span>
@@ -1095,7 +1094,7 @@ function renderPerfTrend() {
   });
   wrap.innerHTML = `<div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">planned hours completed · same scale across both girls and every week · ✅ = recorded at a meeting · $ = money recorded (Jenn · Jess)</span></div>
     <div class="perf-table">${rows}</div>
-    <div class="ct-meta" style="margin-top:0.4rem">Tap a week to see its detail below.</div>`;
+    <div class="ct-meta">Tap a week to see its detail below.</div>`;
 }
 function perfSelectWeek(off) {
   perfWeekOffset = Math.min(0, off);
@@ -1137,9 +1136,9 @@ function renderPerfDetail() {
   };
   const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
   wrap.innerHTML = `<div class="perf-detail-nav">
-      <button type="button" class="btn-icon" onclick="perfSelectWeek(${perfWeekOffset - 1})">◀</button>
+      <button type="button" class="ui-btn ui-btn--icon" onclick="perfSelectWeek(${perfWeekOffset - 1})" aria-label="Previous week">◀</button>
       <b>${perfWeekOffset === 0 ? 'This week' : 'Week of ' + label}</b>
-      <button type="button" class="btn-icon" ${perfWeekOffset >= 0 ? 'disabled' : ''} onclick="perfSelectWeek(${perfWeekOffset + 1})">▶</button>
+      <button type="button" class="ui-btn ui-btn--icon" ${perfWeekOffset >= 0 ? 'disabled' : ''} onclick="perfSelectWeek(${perfWeekOffset + 1})" aria-label="Next week">▶</button>
     </div>
     <div class="mm-2b">${kidCard('jenn')}${kidCard('jess')}</div>
     <div class="mm-cap">Solid = planned hours completed · dashed = planned. The app records which planned blocks were finished, not how long anything actually took.</div>`;
@@ -1157,11 +1156,11 @@ function renderRoutinesList() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· built-in${isOverridden?' (edited)':''}</span></div>
-      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${tmpl.items.length} items</div>
-      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem">
-        <button class="btn-icon" onclick="openEditBuiltInRoutine('${escapeJsAttr(id)}')" style="padding:2px 8px">✏️ Edit</button>
-        ${isOverridden ? `<button class="btn-icon" onclick="resetBuiltInRoutine('${escapeJsAttr(id)}')" style="padding:2px 8px" title="Reset to default">↩️ Reset</button>` : ''}
+      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span class="pc-meta">· built-in${isOverridden?' (edited)':''}</span></div>
+      <div class="pc-sub">${tmpl.items.length} items</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="openEditBuiltInRoutine('${escapeJsAttr(id)}')">✏️ Edit</button>
+        ${isOverridden ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="resetBuiltInRoutine('${escapeJsAttr(id)}')" title="Reset to default">↩️ Reset</button>` : ''}
       </div>
     `;
     wrap.appendChild(card);
@@ -1173,10 +1172,10 @@ function renderRoutinesList() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">${r.icon||'📋'} ${escapeHtml(r.title)}</div>
-      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${r.items.length} items</div>
-      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem">
-        <button class="btn-icon" onclick="openEditRoutine('${escapeJsAttr(r.id)}')" style="padding:2px 8px">✏️ Edit</button>
-        <button class="btn-icon" onclick="deleteRoutine('${escapeJsAttr(r.id)}')" style="padding:2px 8px">🗑</button>
+      <div class="pc-sub">${r.items.length} items</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="openEditRoutine('${escapeJsAttr(r.id)}')">✏️ Edit</button>
+        <button type="button" class="ui-btn ui-btn--danger" onclick="deleteRoutine('${escapeJsAttr(r.id)}')">🗑</button>
       </div>
     `;
     wrap.appendChild(card);
@@ -1428,10 +1427,10 @@ async function deleteRoutine(id) {
    they came to carry different controls in the first place. */
 function parentBannerBackButton() {
   if (typeof mmHasReturn === 'function' && mmHasReturn()) {
-    return `<button type="button" class="pv-btn no-print pb-back-btn" onclick="mmReturnToMeeting()" aria-label="Back to weekly meeting">`
+    return `<button type="button" class="ui-btn ui-btn--secondary no-print pb-back-btn" onclick="mmReturnToMeeting()" aria-label="Back to weekly meeting">`
          + `◀<span class="pv-word"> Back to weekly meeting</span></button>`;
   }
-  return `<button type="button" class="pv-btn no-print pb-back-btn" onclick="showScreen('parent')" aria-label="Back to the parent hub">◀<span class="pv-word"> Hub</span></button>`;
+  return `<button type="button" class="ui-btn ui-btn--secondary no-print pb-back-btn" onclick="showScreen('parent')" aria-label="Back to the parent hub">◀<span class="pv-word"> Hub</span></button>`;
 }
 
 /* A parent viewing a girl's Week or Day: the purple 44px sub-bar under the
@@ -1518,7 +1517,7 @@ function changeParentMonth(delta) {
    switch. Its buttons carry data-hdr-action, answered by kidHeadClick. */
 function parentMonthlyHeader() {
   const kids = [['jenn', '🐥', 'Jenn'], ['jess', '🦊', 'Jess']].map(([id, icon, name]) =>
-    `<button type="button" class="pill-btn${parentMonthlyKid === id ? ' active' : ''}" id="pmKid${name}" aria-pressed="${parentMonthlyKid === id}"
+    `<button type="button" id="pmKid${name}" aria-pressed="${parentMonthlyKid === id}"
        aria-label="${name}" data-hdr-action="month-kid" data-hdr-kid="${id}">${icon}<span class="ps-word"> ${name}</span></button>`).join('');
   hdrMount('screen-parent-monthly', {
     variant: 'parent',
@@ -1527,7 +1526,7 @@ function parentMonthlyHeader() {
     step: { prev: { aria: 'Previous month', data: { 'hdr-action': 'month-prev' } },
             next: { aria: 'Next month', data: { 'hdr-action': 'month-next' } }, labelId: 'pmMonthLabel' },
     context: ' ',
-    tools: `<div class="parent-scope pm-kids" role="group" aria-label="Which child">${kids}</div>`,
+    tools: `<div class="parent-scope ui-kids" role="group" aria-label="Which child">${kids}</div>`,
   });
 }
 
@@ -1634,7 +1633,7 @@ function renderLevelRules() {
   list.innerHTML = '';
   const rules = state.shared.levelRules || [];
   if (!rules.length) {
-    list.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.9rem * var(--text-scale, 1))">No rules yet</p>';
+    list.innerHTML = '<p class="pc-empty">No rules yet</p>';
     return;
   }
   const acts = [...DEFAULT_ACTIVITIES, ...SEASONAL_ACTIVITIES];
@@ -1644,11 +1643,11 @@ function renderLevelRules() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">${r.newIcon||act?.icon||''} ${escapeHtml(r.name||'Level Up')}</div>
-      <div style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light)">
+      <div class="pc-sub pc-rule">
         ${act?.icon||''} ${escapeHtml(act?.name||r.activityId)} → level up after <b>${r.target} ${r.type==='count'?'times':'hours'}</b>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:0.4rem">
-        <button class="btn-icon" onclick="deleteLevelRule('${escapeJsAttr(r.id)}')" style="padding:2px 8px">🗑</button>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--danger" onclick="deleteLevelRule('${escapeJsAttr(r.id)}')">🗑</button>
       </div>
     `;
     list.appendChild(card);
