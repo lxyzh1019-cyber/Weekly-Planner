@@ -200,6 +200,13 @@ suite`, and it refuses to run at all when `CI` is set. The full suite on GitHub
 gates every pull request. A new check gets the same prefix, with its own name in
 both places. (text only)
 
+**Re-running only the failed smoke checks:** `tests/smoke.js` saves the names of
+failed checks to `tests/.smoke-failed` (git-ignored) at the end of every run;
+`npm run test:failed` re-runs only those (via `SMOKE_ONLY`), and that run keeps
+only the names still failing. After a fix: run `test:failed` first, the full
+suite once at the end. A GitHub failure without a code change: `gh run rerun
+<id> --failed`.
+
 **Every smoke check is in exactly one part.** CI runs each date's suite as three
 parts side by side (`SMOKE_PART=1|2|3`, the fixed lists in
 `tests/smoke-parts/parts.js`). A new smoke check must be added to one part's

@@ -133,6 +133,16 @@ header in both looks at 1194 and 390, and the screens whose sizes step by
 width at 375 and 360, read against `docs/handoff/header-exact-values.md`):
 about 11-17 s for the check, 41-48 s wall on the owner's PC (2026-10-09).
 
+**Re-run only the failed checks.** At the end of every smoke run (local and
+CI) `smoke.js` writes the names of the failed checks, one per line, to
+`tests/.smoke-failed` (git-ignored; empty when none failed). `npm run
+test:failed` (`tests/run-failed.js`) re-runs only those through `SMOKE_ONLY`
+(`SMOKE_DATE` and `SMOKE_CHROMIUM` pass through; the `SETUP_NEEDS` rules apply)
+and that run rewrites the file with only the names still failing; with none
+saved it prints `no failed checks saved` and exits 0. After a fix: run `npm run
+test:failed` first, the full suite once at the end. A GitHub failure without a
+code change: `gh run rerun <id> --failed`.
+
 Every run times each check and the setup just before it, prints the slowest,
 and writes `tests/out/smoke-ran-<date>.json` (`smoke-ran-<date>-part<N>.json`
 in a part). To see where a CI run's time went:

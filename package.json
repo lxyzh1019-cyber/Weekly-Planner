@@ -16,7 +16,8 @@
     "test": "npm run test:fast && npm run test:cleanup && npm run test:smoke && npm run test:pictures",
     "test:xp": "node tests/xp.test.js",
     "test:money": "node tests/money.test.js",
-    "test:sunday": "node tests/sunday.test.js"
+    "test:sunday": "node tests/sunday.test.js",
+    "test:failed": "node tests/run-failed.js"
   },
   "devDependencies": {
     "playwright-core": "1.62.1"

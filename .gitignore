@@ -1,6 +1,7 @@
 node_modules/
 tests/node_modules/
 tests/out/
+tests/.smoke-failed
 
 # Working-rules bundle: track .claude/, but not its per-session state
 !.claude/
