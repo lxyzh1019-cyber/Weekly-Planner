@@ -15,6 +15,17 @@ Single working record for this repository. Updated by the main session at the en
 - Must know: no cash account (Plan v9 Deviation 37); "Dad" → "parents" on screen (38); smoke on this PC needs `SMOKE_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"`; workers do not commit, the main session does; main session cannot Write script files (use Edit on the plan, short python -c for records).
 
 ## Design decisions
+- [agreed] Owner 2026-10-11 (kit-gaps-pr7-10.md): one small "Kit 1.1" pull request before PR 11 fixes the kit gaps once, not per screen — search: Kit 1.1
+- [agreed] Owner 2026-10-11 K1: disabled look on kit buttons — 45% opacity, no shadow, default cursor — search: disabled look
+- [agreed] Owner 2026-10-11 K2: hover look on kit buttons and chips (mouse only) — pale wash, pointer cursor — search: hover look
+- [agreed] Owner 2026-10-11 K3: drop dark mode app-wide; delete every dark-mode rule; light colour scheme on the root; a guard fails on any new dark-mode rule — search: drop dark mode
+- [agreed] Owner 2026-10-11 K4: one kid switch everywhere — the header's joined switch, selected in the selected colour — search: one kid switch
+- [agreed] Owner 2026-10-11 K5: one seven-day row part — 7 equal cells, 12px corner, today / confirmed / chosen / future states; used by Now, She told me, Meeting and the Today strip — search: seven-day row part
+- [agreed] Owner 2026-10-11 K6: a full-width kit button for a screen's one leading action — search: full-width kit button
+- [agreed] Owner 2026-10-11 K7: a green "ok" kit button; Approve and She bought it use it; Confirm all stays main colour — search: green ok button
+- [agreed] Owner 2026-10-11 K8: a kit list-row part (44px, 2px border, 11px corner, dashed add variant); Today and Week/Day rows use it in PR 11 — search: kit list-row part
+- [agreed] Owner 2026-10-11 K9: inner corners 11px so rows are not rounder than their card — search: inner corners 11px
+- [agreed] Owner 2026-10-11 PR 8 Q3: on any block 46px or taller, show the stopwatch as a 44px icon-only button beside the tick; only blocks under 46px lose both — search: icon-only stopwatch
 - [agreed] Owner 2026-10-10: PR 5 differences 1, 2, 3, 5, 6, 7, 8 and 10 accepted as built — search: accept 1, 2, 3, 5, 6, 7, 8 and 10
 - [agreed] Owner 2026-10-10: Day keeps both ways back — "◀ Week" in row 1 (the kid's) and "◀ Hub" in the sub-bar (the parent's); Week keeps its single "◀ Hub" — search: keep both buttons on Day
 - [agreed] Owner 2026-10-10: when a parent views a girl, the avatar is that girl's (🐥 Jenn / 🦊 Jess, 52px pink circle), not the family emoji; aria-label "Viewing Jenn, switch profile"; measured by the check — search: avatar shows that girl's avatar
