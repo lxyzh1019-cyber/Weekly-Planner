@@ -12,6 +12,7 @@ const { PARTS, smokeCheckNames, partProblems } = require('./smoke-parts/parts');
 const houseRulesWalks = require('./smoke-parts/house-rules-walks');
 const moneyScreens = require('./smoke-parts/money-screens');
 const looksWalks = require('./smoke-parts/looks');
+const parentPortal = require('./smoke-parts/parent');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -16731,26 +16732,26 @@ function findChromium() {
       parentUnlockedThisSession = true; selectProfile('parent');
       // Plan v9 §N: PIN, the look and Exit sit in the one-row header's 🔒 Parent ▾ menu.
       parentMenuToggle(true);
-      take('Parent', ['#screen-parent .parent-menu-btn', '#parentMenu .btn-icon', '#parentLookBtn']);
+      take('Parent', ['#screen-parent .parent-menu-btn', '#parentMenu .ui-btn', '#parentLookBtn']);
       parentMenuToggle(false);
       /* Looks stage 4: the portal's own components, on its destinations, and
          the picker a parent comes in through. */
       parentViewing = 'jenn'; setParentDest('now');
-      take('Parent › Now', ['#screen-parent > .hdr', '#screen-parent .parent-tab:not(.active)',
-        '#screen-parent .parent-tab.active',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
-        '#pnWrap .pn-card', '#pnWrap .pn-day', '#pnWrap .pn-day.now', '#pnWrap .pn-segbtn.on', '#pnWrap .pn-sunkid',
-        '#screen-parent .btn-confirm']);
+      take('Parent › Now', ['#screen-parent > .hdr', '#parentDests > [aria-selected="false"]',
+        '#parentDests > [aria-selected="true"]',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
+        '#pnWrap .ui-card', '#pnWrap .pn-day', '#pnWrap .pn-day.now', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
+        '#screen-parent .ui-btn--primary']);
       pnOpenToldSheet(); await wait(300);
-      take('Parent › Now › She told me', ['#pnToldBody .pn-day.on', '#pnToldBody .pn-kidbtn.on']);
+      take('Parent › Now › She told me', ['#pnToldBody .pn-day.on', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
       pnSheetOpen = false; closeSheet('pnToldOverlay');
       setParentDest('setup');
-      take('Parent › Setup', ['#screen-parent .pn-card', '#screen-parent .pn-row', '#parentScopePills .pill-btn.active', '#parentScopePills .pill-btn:not(.active)']);
+      take('Parent › Setup', ['#screen-parent .ui-card', '#screen-parent .pn-row', '#parentScopePills [aria-pressed="true"]', '#parentScopePills [aria-pressed="false"]']);
       const wasHistoryView = parentHistoryView;
       setParentHistoryView('money');   // the view a parent lands on; an earlier check may have left another
-      take('Parent › History', ['#screen-parent [data-parent-history].active', '#screen-parent [data-parent-history]:not(.active)', '#screen-parent .ctr-tile']);
+      take('Parent › History', ['#screen-parent [data-parent-history][aria-pressed="true"]', '#screen-parent [data-parent-history][aria-pressed="false"]', '#screen-parent .ctr-tile']);
       parentHistoryView = wasHistoryView;
       setParentDest('meeting');
-      take('Parent › Meeting', ['#screen-parent .review-day', '#screen-parent .hub-status']);
+      take('Parent › Meeting', ['#screen-parent .review-day-row > .ui-btn', '#screen-parent .hub-status']);
       openFamilyMeeting(); await wait(350);
       take('Family meeting', ['#screen-meeting .hdr-steps > .hdr-switch-cell:not([aria-current])', '#screen-meeting .hdr-steps > .hdr-switch-cell[aria-current]',
         '#screen-meeting .mm-drow', '#screen-meeting .mm-nav']);
@@ -17051,7 +17052,7 @@ function findChromium() {
       card.click();
       if (parentViewing !== 'jess') bad.push('the day card did not change who is shown');
       if (parentScope !== 'jess') bad.push('the day card left the top-bar switcher stale');
-      const active = document.querySelector('[data-parent-scope].active');
+      const active = document.querySelector('[data-parent-scope][aria-pressed="true"]');
       if (!active || active.getAttribute('data-parent-scope') !== 'jess') {
         bad.push('the top-bar switcher does not show what the chore tab is showing');
       }
@@ -26794,7 +26795,7 @@ function findChromium() {
     // PR 4, the Week header's Full / Print preview pair (#weekFull,
     // #weekPrintPreview) — but only the portal's are its destinations.
     const tabs = [...document.querySelectorAll('[role="tab"]')];
-    const portalTabs = document.querySelectorAll('.parent-tabs [role="tab"]').length;
+    const portalTabs = document.querySelectorAll('#parentDests [role="tab"]').length;
     if (portalTabs !== 6) bad.push(`${portalTabs} portal tabs, expected 6 (💰 Money is its own, Plan v9 §N)`);
     if (tabs.length !== 8) bad.push(`${tabs.length} tabs on the page, expected 8 (the portal's 6 and the Week's 2)`);
     tabs.forEach(t => {
@@ -27705,7 +27706,7 @@ function findChromium() {
                 if (!name || !/Jenn/.test(name.textContent)) out.push(`${tag}: the sub-bar does not name Jenn`);
                 const back = sub.querySelector('.pb-back-btn');
                 if (!back || back.getAttribute('aria-label') !== 'Back to the parent hub') out.push(`${tag}: the sub-bar's way back is missing or misnamed`);
-                const acts = [...sub.querySelectorAll('.pv-btn')].filter(shown);
+                const acts = [...sub.querySelectorAll('.pv-btn, .pb-back-btn')].filter(shown);
                 acts.forEach(b => box(b, Object.assign({}, want.action, b.classList.contains('pv-btn--main') && want.confirmFill ? { bg: want.confirmFill[0], fg: want.confirmFill[1], weight: '600' } : b.classList.contains('pb-action--notdone') || b.classList.contains('on') ? { skipFill: true } : {}), `"${b.getAttribute('aria-label')}"`));
                 if (open === 'view-day') {
                   const labels = acts.map(b => b.getAttribute('aria-label') || '');
@@ -27764,19 +27765,19 @@ function findChromium() {
                   const wantWords = phone ? '🔒 ▾' : '🔒 Parent ▾';
                   if (m && m.innerText.replace(/\s+/g, ' ').trim() !== wantWords) out.push(`${tag}: the menu reads ${JSON.stringify(m.innerText)}, the table's "${wantWords}"`);
                 }
-                const tabs = [...hdr.querySelectorAll('.parent-tab')];
+                const tabs = [...hdr.querySelectorAll('#parentDests > [role="tab"]')];
                 if (/^portal/.test(open)) {
                   if (tabs.length !== 6) out.push(`${tag}: ${tabs.length} destination tabs, want 6`);
                   if (phone) { if (tabs.some(shown)) out.push(`${tag}: the destination tabs show on a phone (the bottom bar has them)`); }
                   else if (want.tab) {
-                    const cur = tabs.filter(t => t.classList.contains('active'));
+                    const cur = tabs.filter(t => t.getAttribute('aria-selected') === 'true');
                     const wantCur = open === 'portal-now' ? 'now' : 'setup';
                     if (cur.length !== 1 || cur[0].dataset.pdest !== wantCur) out.push(`${tag}: the current tab is ${cur.map(t => t.dataset.pdest).join(',') || 'none'}, expected ${wantCur}`);
                     for (const t of tabs) {
-                      const on = t.classList.contains('active');
+                      const on = t.getAttribute('aria-selected') === 'true';
                       const b = t.dataset.pdest === 'app' ? want.app : Object.assign({}, want.tab, on && want.tabSel ? { bg: want.tabSel[0], fg: want.tabSel[1], weight: want.tabSel[2] } : {});
                       box(t, b, `the ${t.dataset.pdest} tab`);
-                      const icon = t.querySelector('.parent-tab-icon');
+                      const icon = t.querySelector('.pdest-icon');
                       if (icon && shown(icon) !== on) out.push(`${tag}: the ${t.dataset.pdest} tab ${on ? 'hides' : 'shows'} its icon`);
                     }
                   }
@@ -28030,7 +28031,7 @@ function findChromium() {
     profile = 'parent'; showScreen('parent'); renderParentHome();
     if (!click('#pdestbtn-app')) problems.push('the portal has no App destination');
     const wrap = document.getElementById('ptab-app-wrap');
-    const card = wrap && wrap.querySelector('.pn-card');
+    const card = wrap && wrap.querySelector('.ui-card');
     const after = card && card.nextElementSibling;
     const appText = after ? after.textContent : '';
     if (!card) problems.push('the App landing drew no list');
@@ -28044,6 +28045,9 @@ function findChromium() {
     profile = 'jenn'; goToday();
     return problems.length ? problems : true;
   });
+
+  // The parent portal on the kit: tests/smoke-parts/parent.js.
+  await parentPortal({ page, want, checks, setLook, clearLooks });
 
   // The money click sweep: tests/smoke-parts/money-screens.js.
   await moneyScreens.moneyClicks({ page, want, checks });
