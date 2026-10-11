@@ -253,3 +253,5 @@ When asking Claude (or anyone) to change this app, ask them to **run the short
 loop and the map's tests before pushing, and attach the smoke-test screenshots
 from the GitHub run** before the pull request opens. New features
 should come with a new check in `smoke.js`.
+
+Note (2026-10-11): CI now runs once per push; a branch gets date 2026-10-07 only, main and nightly get all four.
