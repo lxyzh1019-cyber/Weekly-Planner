@@ -1,3 +1,272 @@
-/* css/parent.css — styles for the parent portal (js/11-parent.js, js/32-parent-now.js) — PR 10. Empty until that PR fills it.
+/* css/parent.css — styles for the parent portal (js/11-parent.js, js/32-parent-now.js) — PR 10.
+   The portal's buttons, tabs, chips, cards and kid switches are the component
+   kit's (.ui-btn, .ui-chip, .ui-tabs, .ui-card, .ui-kids — css/app.css); this
+   file holds the portal's layout around them, and the header's sizes
+   (docs/handoff/header-exact-values.md, PR 5), which the kit does not replace.
    Shared parts and sheets stay in css/app.css; css/floors.css loads after this
    file, so the minimum sizes win. */
+
+/* ── The parent header (PR 5) ─────────────────────────────────────────────── */
+
+/* 🔒 Parent ▾ (SRC 265): 44px, pad 0 14, white, 2px ink, radius 12, the
+   look's shadow, body 17px 600; PIN, the look and Exit drop under it. On a
+   phone "🔒 ▾", pad 0 12, 16px (SRC 318). Moved unchanged from css/app.css. */
+.parent-menu { position: relative; flex: 0 0 auto; }
+.parent-menu-btn {
+  box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--hdr-parent-btn); padding: 0 14px; border: var(--bw-chip) solid var(--ink); border-radius: 12px; cursor: pointer; white-space: nowrap;
+  background: var(--paper); color: var(--ink); box-shadow: var(--hdr-sh);
+  font-family: var(--font-text); font-weight: 600; font-size: var(--hdr-parent-word-size); line-height: 1;
+}
+.parent-menu-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 120; min-width: 210px;
+  display: flex; flex-direction: column; gap: 6px; padding: 8px;
+  background: var(--paper); border: 2px solid var(--ink); border-radius: 12px; box-shadow: var(--shadow-sm);
+}
+.parent-menu-pop[hidden] { display: none; }
+/* 🔒 Parent ▾'s three: PIN, the look and Exit, full width under the button. */
+.parent-menu-pop .ui-btn { width: 100%; }
+
+/* The portal's destinations (.parent-dests, a .ui-tabs; SRC 266-272): 44px, pad
+   0 16, white, 2px ink, radius 12, body 17px; the current one the look's --sel,
+   600, with its icon (the others' words alone); ⚙️ App 44×44, 18px. The
+   header's picture sets these, not the kit's. A class, not the id: each rule
+   weighs the same as the kit's .ui-tabs rule it overrides (css/app.css) and
+   this file loads after it, so these win on order; css/floors.css loads last. */
+.parent-dests { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.parent-dests > button {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--hdr-parent-btn); min-width: var(--hdr-parent-btn); padding: 0 16px;
+  background: var(--paper); color: var(--ink); border: var(--bw-chip) solid var(--ink); border-radius: 12px;
+  font-family: var(--font-text); font-size: var(--hdr-parent-word-size); font-weight: 400; line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.parent-dests > button:hover { background: var(--accent-yellow); }
+/* The selected destination: Pop yellow, Calm navy with white text. Hovered
+   too, or Calm's hover fill would sit under the white label. */
+.parent-dests > button[aria-selected="true"], .parent-dests > button[aria-selected="true"]:hover { background: var(--sel); color: var(--sel-ink); font-weight: 600; }
+.parent-dests > button:not([aria-selected="true"]) .pdest-icon { display: none; }
+.parent-dests > button[data-pdest="app"] { width: var(--hdr-parent-btn); padding: 0; font-size: var(--hdr-parent-icon-size); }
+
+/* The girl switch (a .ui-kids; SRC 273-277): one joined switch, 2px ink,
+   radius 999, clipped, white; cells 44px high (the tap floor; the picture's
+   42), pad 0 16 (Both) / 0 14, 2px dividers, body 17px; the chosen one the
+   look's --sel, 600. Parent Monthly's Jenn / Jess is the same switch. On a
+   phone 46×44 cells, All 15px, 🐥 🦊 19px. */
+.parent-scope {
+  box-sizing: border-box; flex: none; display: flex; gap: 0;
+  border: var(--bw-chip) solid var(--ink); border-radius: 999px; overflow: hidden; background: var(--paper);
+}
+.parent-scope[hidden] { display: none; }   /* Parent › Now has its own girl switch (Plan v17 item 6) */
+.parent-scope > button {
+  box-sizing: content-box; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: var(--hdr-parent-cell-h); min-height: 0; margin: 0; padding: 0 14px; border: 0; border-radius: 0; box-shadow: none;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-text); font-size: var(--hdr-parent-word-size); font-weight: 400; line-height: 1; white-space: nowrap;
+}
+.parent-scope > button[data-parent-scope="both"] { padding: 0 16px; }
+.parent-scope > button + button { border-left: var(--bw-chip) solid var(--ink); }
+.parent-scope > button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); font-weight: 600; }
+
+/* The sub-bar's way back when a parent views a girl's Week or Day
+   (parentBannerBackButton): the sub-bar's button sizes (SRC 300-304, the
+   .pv-btn values in css/app.css), not the kit's. */
+.hdr-sub > .ui-btn.pb-back-btn {
+  box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px;
+  min-height: var(--hdr-parent-btn); height: var(--hdr-parent-btn); min-width: var(--hdr-parent-btn);
+  padding: 0 14px; background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: 12px;
+  font-family: var(--font-text); font-size: var(--hdr-parent-sub-size); font-weight: 400; line-height: 1; white-space: nowrap; cursor: pointer;
+}
+
+/* The header on a phone (SRC 316-325): the destinations move to the bottom
+   bar; the girl switch's cells 46×44 (All 15px 600, 🐥 🦊 19px); the way
+   back pads 0 10. */
+@media (max-width: 699px) {
+  .parent-dests { display: none; }
+  .parent-menu-btn { padding: 0 12px; }
+  .parent-scope > button, .parent-scope > button[data-parent-scope="both"] { width: var(--hdr-parent-cell-w); padding: 0; font-size: var(--hdr-parent-emoji-size); }
+  .parent-scope > button[data-parent-scope="both"] { font-size: var(--hdr-parent-short-size); font-weight: 600; }
+  .hdr-sub > .ui-btn.pb-back-btn { padding: 0 10px; }
+}
+
+/* ── The phone's bottom bar ───────────────────────────────────────────────────
+   Same shape and the same 44px floor as the kid nav, but it drives the
+   portal's destinations rather than screens. Its buttons are .ui-btn in the
+   bar's own shape: icon over label, divided, no frame. */
+.parent-nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sticky);
+  display: flex; background: var(--bg2); border-top: 2px solid var(--ink);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.parent-nav[hidden] { display: none; }
+body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)); }
+.parent-nav > .ui-btn {
+  flex: 1; min-height: 56px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px; padding: 1px 6px;
+  border: 0; border-right: 2px solid var(--paper-line); border-radius: 0; background: transparent;
+  font-family: inherit; font-weight: 400; color: var(--ink-light); cursor: pointer;
+}
+.parent-nav > .ui-btn:last-child { border-right: 0; }
+.parent-nav > .ui-btn[aria-current="page"] { color: var(--accent-strong); background: var(--paper); }
+.parent-nav-icon { font-size: calc(1.15rem * var(--fs-scale, 1) * var(--text-scale, 1)); position: relative; display: inline-block; }
+.parent-nav-label { font-size: calc(max(13px, calc(0.72rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
+.pn-navdot {
+  position: absolute; top: -3px; right: -10px; padding: 0 5px;
+  border-radius: var(--radius-full); background: var(--accent-strong); color: var(--ink-on-strong);
+  font-size: calc(max(13px, calc(0.68rem * var(--fs-scale, 1))) * var(--text-scale, 1)); line-height: 1.4;
+}
+/* Above the phone the top strip is roomy enough, so the bar stays out of the
+   way and the iPad keeps the layout every other screen is drawn at. */
+@media (min-width: 700px) {
+  .parent-nav { display: none; }
+  body.has-parent-nav { padding-bottom: 0; }
+}
+
+/* ── Landings, History, the approval cards ────────────────────────────────── */
+
+/* A landing's rows fill their card edge to edge. */
+.ui-card.pl-list { padding: 0; overflow: hidden; }
+
+/* History's toggle: one screen, two readings of the same eight weeks. */
+.ph-views { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+/* Row 15 — a week from before the new system, under Parent › History. */
+.pre-weeks { display: flex; gap: var(--space-2, 0.5rem); flex-wrap: wrap; margin: var(--space-2, 0.5rem) 0; }
+
+/* The cards of Approvals, Activities, Routines and Level-up rules: who and
+   what under the title, the buttons on the right. */
+.pc-meta { font-size: calc(0.7rem * var(--text-scale, 1)); color: var(--ink-light); font-family: var(--font-text); }
+.pc-sub { font-size: calc(0.85rem * var(--text-scale, 1)); color: var(--ink-light); }
+.pc-sub.pc-rule { font-size: calc(0.88rem * var(--text-scale, 1)); }
+.pc-reps { font-weight: 700; }
+.pc-actions { display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
+.pc-empty { color: var(--ink-light); font-size: calc(0.9rem * var(--text-scale, 1)); }
+
+/* ── Meeting: the hub (read-only; a day opens the meeting) ────────────────── */
+.review-day-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.review-day-row > .ui-btn { flex-direction: column; gap: 2px; padding: 0.4rem 0.35rem; min-width: 68px; }
+.review-day-row > .ui-btn.confirmed { background: var(--accent-green); }
+.review-day-row > .ui-btn.today { outline: 3px solid var(--today-mark); outline-offset: 1px; }
+.review-day-dow { font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 800; text-transform: uppercase; }
+.review-day-date { font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; font-family: var(--font-display); line-height: 1; }
+.review-day-state { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; }
+.review-day-count { font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
+.hub-week { font-weight: 800; margin-bottom: 0.4rem; }
+.hub-status { margin-top: 0.55rem; font-size: calc(0.88rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; background: var(--bg2); border: 2px dashed var(--paper-line); border-radius: 10px; padding: 6px 10px; }
+.hub-status-done { background: var(--accent-green); border-style: solid; border-color: var(--ink); }
+.hub-cta { margin-top: 0.6rem; }
+
+/* ── History › Analysis: one row a week (a .ui-btn), the week's detail ────── */
+.perf-table { display: flex; flex-direction: column; gap: 4px; margin-top: 0.4rem; }
+.perf-table > .ui-btn {
+  display: grid; grid-template-columns: 72px 1fr auto 1fr auto auto; gap: 6px; align-items: center;
+  padding: 5px 8px; text-align: left;
+}
+.perf-table > .ui-btn[aria-pressed="true"] { background: var(--bg2); box-shadow: 2px 2px 0 var(--ink); }
+.perf-table + .ct-meta { margin-top: 0.4rem; }
+.perf-week { font-weight: 800; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); white-space: nowrap; }
+/* Two lengths in one track: planned behind, completed in front, both against
+   the SAME scale for every week and both girls. A bar normalised to its own
+   kid's total says nothing you can compare. */
+.perf-track { position: relative; height: 12px; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: var(--surface-perf-track); min-width: 36px; }
+.perf-plan { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(90deg, var(--surface-plan-stripe), var(--surface-plan-stripe) 3px, transparent 3px, transparent 6px); }
+.perf-fill { display: block; position: relative; height: 100%; }
+/* "6h 30m / 8h" needs real room; 28px was sized for "72%". */
+.perf-num { font-size: calc(max(13px, calc(0.72rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; min-width: 5.6rem; white-space: nowrap; }
+.perf-money { font-size: calc(0.76rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; white-space: nowrap; }
+.perf-facts { margin-top: 6px; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; }
+.perf-detail-nav { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+
+/* ── Now: She told me… (a .ui-card; the girl is a .ui-kids) ───────────────── */
+.pn-answer { padding: var(--space-3); }
+.pn-answer-kids { display: flex; gap: var(--space-2); margin-bottom: var(--space-2); }
+.pn-answer-kids > button { flex: 1 1 0; }
+/* The day squares (This Sunday's rail and She told me…'s days) are .ui-chip:
+   .pn-day lays one out in a 7-column row — day over date, no side padding —
+   and keeps the four states' looks. */
+.pn-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-1); margin-bottom: var(--space-2); }
+/* On a phone, She told me…'s sheet has room for seven 44-wide squares only with 2px gaps. */
+@media (max-width: 699px) { .pn-days { gap: 2px; } }
+.pn-day { flex-direction: column; justify-content: center; gap: 0; min-width: 0; padding: var(--space-1) 0; cursor: pointer; }
+.pn-day.ok { background: var(--accent-green); border-color: var(--ink); }
+/* Today's square: the look's --day-now-* (Pop fills it with the pill colour
+   and its strong ink; Calm frames it in navy instead of filling it), so it
+   never looks like the selected day (.pn-day.on, navy-filled). */
+.pn-day.now { background: var(--day-now-bg); border-color: var(--ink); color: var(--day-now-ink); box-shadow: var(--day-now-ring); }
+/* On her behalf (R5 §5 C1): the chosen child and day, then her answers. */
+.pn-day.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+/* A day still to come is listed, not offered: dashed and in the lighter ink,
+   as Copy a day's empty rows (Plan v6 C7). Faded to 45% it read at 2.7:1. */
+.pn-day:disabled { border-style: dashed; color: var(--ink-light); cursor: default; }
+.pn-day-dow { font-size: calc(max(13px, calc(0.72rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
+.pn-day-date { font-size: calc(max(13px, calc(0.82rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; }
+.pn-answer-h {
+  margin: var(--space-3) 0 var(--space-1); font-weight: 800;
+  font-size: calc(max(13px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light);
+}
+/* Her training rating: five .ui-chip; .pn-rate keeps a one-digit chip 44 wide. */
+.pn-rates { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.pn-rate { min-width: 44px; justify-content: center; }
+/* A learning row: its name and count, then a .ui-stepper's − and +. */
+.pn-learn {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) 0; border-bottom: 2px solid var(--paper-line);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PARENT › NOW — ✅ WAITING FOR YOU (Plan v9 §M 5b / §N, js/32-parent-now.js)
+   The approved mockup: the list on the left (her questions as Grown-ups'
+   own answer cards), three side panes with a stated purpose on the right,
+   then ✍️ Record · 🚪 She told me… and 🔧 Tidy-up. One column under 900px.
+   Moved unchanged from css/app.css (PR 10); its buttons and cards are the kit's.
+   Money colours are the shared --mny-v15-* tokens.
+   ══════════════════════════════════════════════════════════════ */
+.pn-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: start;
+  font-family: var(--font-body); color: var(--mny-v15-ink); font-size: calc(1.0625rem * var(--fs-scale, 1) * var(--text-scale, 1));
+}
+@media (max-width: 899px) { .pn-grid { grid-template-columns: minmax(0, 1fr); } }
+.pn-main, .pn-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pn-wait-head { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+.pn-wait-title { margin: 0; font-family: var(--font-head); font-size: calc(1.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+.pn-count { background: var(--mny-v15-red); color: var(--mny-v15-white); border-radius: var(--radius-full); padding: 1px 10px; font-weight: 800; font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+.pn-strap { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
+.pn-wait-toggles { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+/* Whose questions (a .ui-kids) and Group them (.ui-chip, in .pn-seg). */
+.pn-seg { display: inline-flex; gap: var(--space-2); }
+.pn-lines { display: flex; flex-direction: column; gap: 6px; }
+.pn-line {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 4px 6px 4px 12px; text-align: left;
+  background: var(--mny-v15-amber); color: var(--mny-v15-ink); font: inherit; cursor: pointer;
+  border: var(--bw-chip) dashed var(--mny-v15-ink); border-radius: var(--radius-btn);
+}
+.pn-group { display: flex; flex-direction: column; gap: 6px; }
+.pn-group-head { display: flex; align-items: baseline; gap: 8px; }
+.pn-group-title { font-family: var(--font-head); font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+.pn-group-n { font-size: calc(0.8125rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
+.pn-group--talk { background: var(--mny-v15-amber); border: var(--bw-chip) dashed var(--mny-v15-ink); border-radius: var(--radius-md); padding: 8px 10px; }
+.pn-talknote { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
+/* An answered card shrinks: its stamp and ↺ Undo stay (the mockup's one line). */
+#pnWrap .gu-req--yes .gu-req-rules, #pnWrap .gu-req--yes .gu-check,
+#pnWrap .gu-req--no .gu-req-rules, #pnWrap .gu-req--no .gu-check { display: none; }
+.pn-side-card { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; overflow: visible; }
+.pn-side-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.pn-side-title { font-family: var(--font-head); font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+.pn-side-meta { font-size: calc(0.8125rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
+.pn-purpose { margin: 0; font-family: var(--font-script); font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
+.pn-sun { background: var(--mny-v15-amber); }
+.pn-sunkid { border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
+.pn-sunkid-head { display: flex; align-items: center; gap: 8px; }
+.pn-sunkid-wait { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-red); }
+.pn-sunkid-wait.ok { color: var(--mny-v15-teal-ink); }
+.pn-sunkid-flow { font-size: max(13px, calc(0.9375rem * var(--mny-fit, 1) * var(--fs-scale, 1) * var(--text-scale, 1))); }
+.pn-hers { color: var(--mny-v15-red); }
+.pn-said { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); line-height: 1.3; }
+.pn-owns-table { width: 100%; border-collapse: collapse; font-size: max(13px, calc(0.9375rem * var(--mny-fit, 1) * var(--fs-scale, 1) * var(--text-scale, 1))); }
+.pn-owns-table th, .pn-owns-table td { padding: 2px 4px; border-bottom: var(--bw-hair) dashed var(--mny-v15-dash-soft); text-align: right; font-variant-numeric: var(--num-variant); }
+.pn-owns-table th[scope="row"] { text-align: left; font-weight: 400; white-space: nowrap; }   /* one line (Plan v18, last round) */
+.pn-owns-sub th[scope="row"] { padding-left: 16px; color: var(--mny-v15-red); }
+.pn-owns-total th, .pn-owns-total td { font-weight: 800; border-top: var(--bw-chip) solid var(--mny-v15-ink); }
+.pn-owns-fix { display: flex; gap: 6px; flex-wrap: wrap; }
+.pn-sidebtns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pn-tidy { display: flex; flex-direction: column; gap: 8px; }
+.pn-told-sheet { max-width: 620px; }
