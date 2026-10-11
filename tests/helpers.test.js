@@ -3,16 +3,17 @@
 // Run: node tests/helpers.test.js
 //
 // fmtMoney and fmtDay are the one money and day format (decision D2); PR 6
-// moves the eighteen local formatters onto them, so these numbers are the ones
-// every money and day label will read. They are held here against the outputs
-// of the formatters they replace (mnyShort$ and sdD for money; mnyDayMonth,
-// mnyDayName and guDayName for days). pageHeader is rendered for every slot
+// moved the eighteen local formatters onto them and deleted those, so these
+// fixed cases are the ones every money and day label reads. pageHeader is rendered for every slot
 // combination; its heights are held in the browser by the smoke check
 // theComponentKitHoldsItsSizes.
 // UTC on every machine: set here, before anything reads a date (see
 // tests/buffers.test.js).
 process.env.TZ = 'UTC';
 const helpers = require('../js/05-helpers.js');
+// fmtDay's 'dated' form asks todayKey() for this year; todayKey reads the app's
+// zone from js/01-config.js, a browser global.
+global.APP_TIMEZONE = 'UTC';
 const { fmtMoney, fmtDay } = helpers;
 // pageHeader is a classic script reading escapeHtml and escapeAttr as globals.
 global.escapeHtml = helpers.escapeHtml;
@@ -38,25 +39,28 @@ check('a negative is the minus sign U+2212, never "$-3.00"', table([[-3, '−$3'
 check('rounded to the cent first, as money2 does', table([
   [2.499, '$2.50'], [2.996, '$3'], [2.004, '$2'], [-2.996, '−$3'], [0.001, '$0'], [-0.004, '$0'],
 ], v => fmtMoney(v)));
-check('not a number reads as $0', table([[null, '$0'], [undefined, '$0'], ['abc', '$0'], ['4.5', '$4.50']], v => fmtMoney(v)));
+check('not a number reads as $0', table([[null, '$0'], [undefined, '$0'], ['abc', '$0'], ['4.5', '$4.50'], [Infinity, '$0'], [NaN, '$0']], v => fmtMoney(v)));
 check('signed adds + to a positive only', table([[3, '+$3'], [2.5, '+$2.50'], [0, '$0'], [-3, '−$3']], v => fmtMoney(v, { signed: true })));
-// The same answers as the two formatters D2 names as the model.
-{
-  const money2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-  const mnyShort$ = (v) => { const n = money2(v); return (n < 0 ? '−$' : '$') + (Math.abs(n) % 1 ? Math.abs(n).toFixed(2) : String(Math.abs(n))); };
-  const bad = [];
-  for (let c = -50000; c <= 50000; c += 37) {
-    const v = c / 100 + 0.003;
-    if (fmtMoney(v) !== mnyShort$(v)) bad.push(`${v}: ${fmtMoney(v)} vs ${mnyShort$(v)}`);
-  }
-  check('agrees with mnyShort$ and sdD from −$500 to $500', bad.length ? bad.slice(0, 5) : true);
-}
+// Fixed cases across the range the screens show, the forms the old local
+// formatters got wrong among them ("$-3.00", "$10.00", "−$0.00").
+check('the old formatters\' wrong forms are gone', table([
+  [-3, '−$3'], [10, '$10'], [-0.001, '$0'], [16.15, '$16.15'], [-499.997, '−$500'], [499.993, '$499.99'],
+  [612.34, '$612.34'], [1004.11, '$1004.11'], [0.5, '$0.50'], [-12.1, '−$12.10'],
+], v => fmtMoney(v)));
 
 // ── fmtDay ─────────────────────────────────────────────────────────────────
 check('short is "27 Sep" (mnyDayMonth)', table([['2026-09-27', '27 Sep'], ['2026-10-03', '3 Oct'], ['2027-01-01', '1 Jan']], k => fmtDay(k, 'short')));
 check('long is "Sat 3 Oct" (mnyDayName)', table([['2026-10-03', 'Sat 3 Oct'], ['2026-10-04', 'Sun 4 Oct'], ['2026-12-31', 'Thu 31 Dec']], k => fmtDay(k, 'long')));
 check('weekday is "Sat" (guDayName)', table([['2026-10-03', 'Sat'], ['2026-10-05', 'Mon'], ['2024-02-29', 'Thu']], k => fmtDay(k, 'weekday')));
 check('no form reads as short', fmtDay('2026-10-07') === '7 Oct' || fmtDay('2026-10-07'));
+check('month is "Oct 2026" (a free-by month)', table([['2026-10-31', 'Oct 2026'], ['2028-01-02', 'Jan 2028']], k => fmtDay(k, 'month')));
+{
+  const y = new Date().getUTCFullYear();
+  check('dated names the year only when it is not this year', table([
+    [`${y}-07-28`, '28 Jul'], [`${y + 2}-07-28`, `28 Jul ${y + 2}`], [`${y - 1}-12-31`, `31 Dec ${y - 1}`],
+  ], k => fmtDay(k, 'dated')));
+}
+check('no day reads as a dash', table([['', '—'], [null, '—'], [undefined, '—']], k => fmtDay(k, 'long')));
 {
   // The device's zone cannot move a day: the same key in four zones.
   const seen = new Set();

@@ -66,7 +66,7 @@ function mnyHouseRulesCard() {
   if (!pending.length) return '';
   const from = mrHouseRulesFrom();
   const said = (field, v) => {
-    if (field === 'amount') return mnyMoney(Number(v) || 0);
+    if (field === 'amount') return fmtMoney(Number(v) || 0);
     if (field === 'xpOnly') return v === true ? 'XP only' : 'pays money';
     if (field === 'freeRepeats') return (Number(v) || 0) ? (Number(v) + ' free a week') : 'costs from the first';
     if (field === 'graceDays') return (Number(v) || 0) + ' grace day' + ((Number(v) || 0) === 1 ? '' : 's') + ' a week';
@@ -82,7 +82,7 @@ function mnyHouseRulesCard() {
         The fourth is already how the app counts. The rulebook on this household's devices was written
         before the other three, so they are not in force.</div>
       ${rows}
-      ${from ? `<div class="gu-line">Takes effect from Monday ${escapeHtml(mnyShortDate(from))}: this week and every
+      ${from ? `<div class="gu-line">Takes effect from Monday ${escapeHtml(fmtDay(from, 'dated'))}: this week and every
           week after it price under these, and every week before keeps the prices it was lived under.
           Nothing already earned is re-priced. Only the rows above change — the chore pool, prices, caps and
           targets stay exactly as they are.</div>
@@ -90,7 +90,7 @@ function mnyHouseRulesCard() {
           >Put ${pending.length === 1 ? 'this change' : 'these ' + pending.length + ' changes'} into the rulebook</button>
         <div class="gu-line">Recorded in 📝 Rule changes as “${escapeHtml(MR_HOUSE_RULES_NOTE)}”. Once it is
           in, this card does not come back — changing one of these later is your decision, and it stays.</div>`
-      : `<div class="gu-line">A rules change is already scheduled for ${escapeHtml(mnyShortDate((mrLatestVersion() || {}).effectiveFrom))}.
+      : `<div class="gu-line">A rules change is already scheduled for ${escapeHtml(fmtDay((mrLatestVersion() || {}).effectiveFrom, 'dated'))}.
           These can go in once it has started, so they are not dated in front of it.</div>`}
     </div>`;
 }
@@ -282,14 +282,14 @@ async function mnyRunDefaultSweep() {
   const plan = mnyDefaultSweepPlan();
   if (!plan.saved) { showToast('Enter the start week first — Money rules › 👴 Grandfather rule'); return; }
   if (!plan.weeks.length) { showToast('No weeks outside the review window need it — nothing to credit'); return; }
-  const span = `${mnyShortDate(plan.weeks[plan.weeks.length - 1].wk)} to ${mnyShortDate(plan.weeks[0].wk)}`;
+  const span = `${fmtDay(plan.weeks[plan.weeks.length - 1].wk, 'dated')} to ${fmtDay(plan.weeks[0].wk, 'dated')}`;
   const comps = money2(plan.comp.jenn + plan.comp.jess);
   const sk = plan.skipped;
   const ok = await showConfirm(
-    `Credit ${mnyMoney(plan.total)} under the Grandfather rule?\n\n`
-    + ['jenn', 'jess'].map(k => `${mnyKidName(k)}: ${mnyMoney(plan.perKid[k])}`).join(' · ')
-    + `\n\n${mnyMoney(plan.amount)} per child for each week with no family meeting, ${span}`
-    + (comps > 0 ? `, and ${mnyMoney(comps)} of competitions already on file in those weeks on top.` : '.')
+    `Credit ${fmtMoney(plan.total)} under the Grandfather rule?\n\n`
+    + ['jenn', 'jess'].map(k => `${kidLabel(k).name}: ${fmtMoney(plan.perKid[k])}`).join(' · ')
+    + `\n\n${fmtMoney(plan.amount)} per child for each week with no family meeting, ${span}`
+    + (comps > 0 ? `, and ${fmtMoney(comps)} of competitions already on file in those weeks on top.` : '.')
     + (sk ? `\n\n${sk} week${sk === 1 ? '' : 's'} had a family meeting and ${sk === 1 ? 'is' : 'are'} left alone.` : '')
     + `\n\nThe last ${MNY_CATCHUP_REACH} weeks are left to the catch-up list.`,
     { okLabel: 'Credit it', cancelLabel: 'Not now' });
@@ -317,7 +317,7 @@ async function mnyRunDefaultSweep() {
         const names = cw.entries.map(e => e.name || mnySportLabel(e.sport)).join(', ');
         moneyAddCash(kid, comp, {
           kind: 'settle', from: 'prize', dayKey: w.wk, weekKey: w.wk, ref: w.wk,
-          note: names + ', week of ' + mnyShortDate(w.wk) + ' — on top of the Grandfather rule' });
+          note: names + ', week of ' + fmtDay(w.wk, 'dated') + ' — on top of the Grandfather rule' });
       }
       evMirror(kid, { kind: 'settle', amount: 0, dayKey: w.wk, weekKey: w.wk, ref: w.wk,
                       note: 'Week of ' + w.wk + ' — settled under the Grandfather rule' });
@@ -338,7 +338,7 @@ async function mnyRunDefaultSweep() {
   saveAll();
   mnyRenderRulesTab();
   showToast(moved
-    ? `Credited ${mnyMoney(credited)} across ${plan.weeks.length} week${plan.weeks.length === 1 ? '' : 's'}`
+    ? `Credited ${fmtMoney(credited)} across ${plan.weeks.length} week${plan.weeks.length === 1 ? '' : 's'}`
     : 'Those weeks were already credited');
 }
 
@@ -372,7 +372,7 @@ function mnySaveGrandmaRule() {
   ], { reason: MR_DEFAULT_REASON, effectiveFrom: from });
   mnyGrandmaDraft = null;
   mnyRenderRulesTab();
-  showToast(v ? '👴 Saved — the Grandfather rule starts the week of ' + mnyShortDate(mnyGrandmaRule().from) : 'Nothing changed');
+  showToast(v ? '👴 Saved — the Grandfather rule starts the week of ' + fmtDay(mnyGrandmaRule().from, 'dated') : 'Nothing changed');
 }
 async function mnyRunPayMeets() {
   if (!isParent()) { showToast('A grown-up settles the weeks 🔒'); return; }
@@ -381,14 +381,14 @@ async function mnyRunPayMeets() {
   const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
   if (!weeks) { showToast('Every competition is paid ✅'); return; }
   const lines = plans.filter(p => p.weeks.length).map(p =>
-    `${mnyKidName(p.kid)}: ${mnyMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
+    `${kidLabel(p.kid).name}: ${fmtMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
   const ok = await showConfirm(
-    `Pay ${mnyMoney(total)} for competitions ${weeks} settled week${weeks === 1 ? ' never' : 's never'} paid?\n\n` +
+    `Pay ${fmtMoney(total)} for competitions ${weeks} settled week${weeks === 1 ? ' never' : 's never'} paid?\n\n` +
     `${lines.join('\n')}\n\nEach week is brought up to what its competitions are worth, and nothing is ever taken back.`,
     { okLabel: 'Pay it', cancelLabel: 'Not now' });
   if (!ok) return;
   const res = mnyPayUnpaidMeets();
-  showToast(`✅ ${mnyMoney(res.paid)} across ${res.weeks} week${res.weeks === 1 ? '' : 's'}`);
+  showToast(`✅ ${fmtMoney(res.paid)} across ${res.weeks} week${res.weeks === 1 ? '' : 's'}`);
   mnyRenderRulesTab();
 }
 
@@ -399,14 +399,14 @@ async function mnyRunRepair() {
   const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
   if (!weeks) { showToast('Nothing owed ✅'); return; }
   const lines = plans.filter(p => p.weeks.length).map(p =>
-    `${mnyKidName(p.kid)}: ${mnyMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
+    `${kidLabel(p.kid).name}: ${fmtMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
   const ok = await showConfirm(
-    `Pay ${mnyMoney(total)} that ${weeks} settled week${weeks === 1 ? ' was' : 's were'} short?\n\n` +
+    `Pay ${fmtMoney(total)} that ${weeks} settled week${weeks === 1 ? ' was' : 's were'} short?\n\n` +
     `${lines.join('\n')}\n\nEach week is re-priced under its own rules, and nothing is ever taken away.`,
     { okLabel: 'Pay it', cancelLabel: 'Not now' });
   if (!ok) return;
   const res = evRunRepair();
-  showToast(`✅ ${mnyMoney(res.credited)} across ${res.weeks} week${res.weeks === 1 ? '' : 's'}`);
+  showToast(`✅ ${fmtMoney(res.credited)} across ${res.weeks} week${res.weeks === 1 ? '' : 's'}`);
   mnyRenderRulesTab();
 }
 
@@ -449,8 +449,8 @@ async function mnyRunStreamSetup() {
   const rows = plans.reduce((n, p) => n + p.rows.length, 0);
   if (!rows) { showToast('Already set up ✅'); return; }
   const lines = plans.filter(p => !p.alreadyDone).map(p =>
-    `${mnyKidName(p.kid)}: ${p.weeks} settled week${p.weeks === 1 ? '' : 's'}, ` +
-    `${p.gifts} gift${p.gifts === 1 ? '' : 's'}, opening ${mnyMoney(p.opening.cash)} in hand`);
+    `${kidLabel(p.kid).name}: ${p.weeks} settled week${p.weeks === 1 ? '' : 's'}, ` +
+    `${p.gifts} gift${p.gifts === 1 ? '' : 's'}, opening ${fmtMoney(p.opening.cash)} in hand`);
   const ok = await showConfirm(
     `Record ${rows} movements from what is already on file?\n\n${lines.join('\n')}\n\n` +
     `No money moves — every total stays exactly as it reads today.`,
@@ -494,7 +494,7 @@ function mnySetStartWeek(value) {
      the same reasoning as the retired `unlockedActs`. */
   saveAll();
   mnyRenderRulesTab();
-  showToast('Pocket money starts the week of ' + mnyShortDate(wk));
+  showToast('Pocket money starts the week of ' + fmtDay(wk, 'dated'));
 }
 
 /* Typed fields need input/change rather than click. */
@@ -538,7 +538,7 @@ function mnyAddMissedWeek(kid) {
     xp: 0, boxReleased: 0, loan: null,
   };
   saveAll();
-  showToast('Added the week of ' + mnyShortDate(wk));
+  showToast('Added the week of ' + fmtDay(wk, 'dated'));
 }
 /* ── A $3 week's record stays true to its money ──
    A `defaulted` row is the record of money the rule already put in her wallet,

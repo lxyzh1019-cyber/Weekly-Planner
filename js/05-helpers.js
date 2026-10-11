@@ -1657,32 +1657,40 @@ async function selectProfile(p) {
    the browser, where 01 has already loaded. */
 
 /* ── One money format, one day format (Consistency PR 3, decision D2) ──
-   The app writes money and days with some eighteen local formatters that
-   disagree ("$-3.00" beside "−$3"). These two are the one answer; PR 6 moves
-   every caller onto them and deletes the rest. Nothing calls them yet.
-   Both read only their arguments — no clock, no state, no browser — so
-   tests/helpers.test.js holds them in Node.
+   The app wrote money and days with some eighteen local formatters that
+   disagreed ("$-3.00" beside "−$3"). These two are the one answer: PR 6 moved
+   every caller onto them and deleted the rest, and tests/check-money-words.js
+   fails on a new local money, day or kid-name formatter outside this file.
+   Both read only their arguments — no state, no browser; only fmtDay's
+   'dated' form reads the clock — so tests/helpers.test.js holds them in Node.
 
    fmtMoney: "$3" for whole dollars, "$2.50" otherwise; a negative is "−$3"
    (U+2212, the minus sign, not a hyphen); { signed: true } adds "+" to a
    positive amount ("+$3"), zero stays "$0". Rounded to the cent first, the
-   way money2 rounds (js/14-money.js), so it agrees with mnyShort$ and sdD. */
+   way money2 rounds (js/14-money.js); anything not a finite number reads
+   "$0" (a wrong zero beats "$NaN" on a child's earnings, js/26's old rule). */
 function fmtMoney(v, opts) {
-  const n = Math.round((Number(v) || 0) * 100) / 100;
+  const x = Number(v);
+  const n = Number.isFinite(x) ? Math.round(x * 100) / 100 : 0;   // never "$NaN" or "$Infinity
   const abs = Math.abs(n);
   const sign = n < 0 ? '−' : (opts && opts.signed && n > 0 ? '+' : '');
   return sign + '$' + (abs % 1 ? abs.toFixed(2) : String(abs));
 }
-/* fmtDay: a "YYYY-MM-DD" key as 'short' "27 Sep" (mnyDayMonth), 'long'
-   "Sat 3 Oct" (mnyDayName) or 'weekday' "Sat" (guDayName). Calendar
+/* fmtDay: a "YYYY-MM-DD" key as 'short' "27 Sep", 'long' "Sat 3 Oct",
+   'weekday' "Sat", 'month' "Oct 2026" (a far date: a loan's free-by month),
+   or 'dated' — "27 Sep" this year, "27 Sep 2027" in any other, so a date
+   years away never reads as next week. No key reads "—". Calendar
    arithmetic on the key's own local date (formatDayKey), so the device's
    time zone cannot move it a day. */
 function fmtDay(key, form) {
-  const d = formatDayKey(key);
+  if (!key) return '—';
+  const d = formatDayKey(String(key));
   const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
   const dayMonth = d.getDate() + ' ' + MONTH_SHORT[d.getMonth()];
   if (form === 'weekday') return day;
   if (form === 'long') return day + ' ' + dayMonth;
+  if (form === 'month') return MONTH_SHORT[d.getMonth()] + ' ' + d.getFullYear();
+  if (form === 'dated') return d.getFullYear() === formatDayKey(todayKey()).getFullYear() ? dayMonth : dayMonth + ' ' + d.getFullYear();
   return dayMonth;
 }
 

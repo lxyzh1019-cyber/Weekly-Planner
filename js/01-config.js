@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-10-10a';
+const APP_BUILD = '2026-10-10b';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
@@ -1054,11 +1054,11 @@ const SEASONAL_ACTIVITIES = [
   { id:'leaf_hike', sub:'outings',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90, season:'autumn', archived:true, suitableTime:['weekend'], social:true },
 ];
 
-/* The two girls, named and iconed in one place. The pair
-   `p === 'jenn' ? '🐥 Jenn' : '🦊 Jess'` is written out in about ten files; this
-   is not a sweep of those, it is somewhere for new code to read them from
-   rather than making it eleven. The five profile badges are the exception:
-   they all read profileBadgeText below and no longer spell it out. */
+/* The two girls, named and iconed in one place. Every screen reads a girl's
+   name and icon here (kidLabel(p).name / .icon); the hand-written
+   jenn-or-jess ternaries that used to spell them out in about ten files went
+   in Consistency PR 6, and tests/check-money-words.js fails on a new one. The
+   five profile badges read profileBadgeText below. */
 const KID_LABEL = {
   jenn: { icon: '🐥', name: 'Jenn' },
   jess: { icon: '🦊', name: 'Jess' },

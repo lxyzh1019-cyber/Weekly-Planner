@@ -490,7 +490,7 @@ function inviteToBlock(inv, dayKeys) {
 }
 /* One block of hers, built from the invite. `i` keeps ids apart within one accept. */
 function inviteBlockFor(inv, i) {
-  const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
+  const fromName = kidLabel(inv.from).name;
   const placed = {
     id: Date.now().toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),
     actId: inv.actId, startMin: inv.startMin, durationMin: inv.durationMin,
@@ -577,7 +577,7 @@ async function sendInvite(block, to, day, opts = {}) {
      this is, and for a kid the two are the same value, so the existing Sister
      Sync path (which is kid-only anyway) is unchanged. */
   const from = activeProfile();
-  const sisterName = to==='jenn'?'Jenn':'Jess';
+  const sisterName = kidLabel(to).name;
   /* Refused before the dialog, so she is never asked to confirm something that
      will not happen — and told which state it is in, not just "no". */
   const already = sisterInviteFor(block, to, watch ? 'watch' : 'share', day);
@@ -665,7 +665,7 @@ async function sendInvite(block, to, day, opts = {}) {
     if (!src.invitedTo.includes(to)) src.invitedTo.push(to);
   });
   saveAll();
-  showToast(`Invite sent to ${to==='jenn'?'Jenn':'Jess'} 💌`);
+  showToast(`Invite sent to ${kidLabel(to).name} 💌`);
 }
 
 function startBlockStopwatch(blockId) {
@@ -756,7 +756,7 @@ function inviteFacts(inv) {
   const act = getAllActivities(inv.to, { includeArchived: true }).find(a => a.id === inv.actId);
   const d = formatDayKey(inv.day);
   return {
-    from: inv.from === 'jenn' ? 'Jenn' : 'Jess',
+    from: kidLabel(inv.from).name,
     subject: inv.watch
       ? ((inv.compName || '').trim() || (act?.name || 'her competition'))
       : (act ? `${act.icon} ${act.name}` : 'an activity'),

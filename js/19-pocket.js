@@ -32,11 +32,11 @@ function pmPriceCards(r, only = null) {
 
   if (want('chores')) html += `<div class="chore-card"><h3>🧹 Household chores</h3>
     <div class="ct-meta">${(r.chores || {}).freeChoresPerWeek} each week are free — every chore after that pays. The free ones are always your <b>lowest-paying</b> chores, so doing your best work first never costs you.</div>
-    ${row('On time <b>and</b> to standard', '$' + Number(g[3] || 0).toFixed(2))}
-    ${row('To standard, but late', '$' + Number(g[2] || 0).toFixed(2))}
-    ${row('Redone, then to standard', '$' + Number(g[1] || 0).toFixed(2))}
+    ${row('On time <b>and</b> to standard', fmtMoney(g[3] || 0))}
+    ${row('To standard, but late', fmtMoney(g[2] || 0))}
+    ${row('Redone, then to standard', fmtMoney(g[1] || 0))}
     ${row('Not done, or fails the redo', '$0.00')}
-    ${row('Most you can earn in a day', '$' + Number((r.chores || {}).dailyCap || 0).toFixed(2))}
+    ${row('Most you can earn in a day', fmtMoney((r.chores || {}).dailyCap || 0))}
     <div class="ct-meta">Past your daily max, extra chores earn <b>XP</b> instead of money.</div>
   </div>`;
 
@@ -52,25 +52,25 @@ function pmPriceCards(r, only = null) {
   if (want('learning')) html += `<div class="chore-card"><h3>📘 Learning</h3>
     ${li.map(it => row(
         escapeHtml(it.label) + ` <span class="ct-meta">(${it.perUnit} ${escapeHtml(it.unit)})</span>`,
-        it.xpOnly ? 'XP only' : '$' + Number(it.amount || 0).toFixed(2))).join('')}
+        it.xpOnly ? 'XP only' : fmtMoney(it.amount || 0))).join('')}
     <div class="ct-meta">It has to be new material. Every Sunday ${(r.learning || {}).sundayCheckCount} get picked at random — can't answer, it's unpaid and you do it again.</div>
   </div>`;
 
   const tiers = ((r.streak || {}).tiers) || [];
   if (want('streak')) html += `<div class="chore-card"><h3>🔥 Routine streak</h3>
-    ${tiers.map(t => row(t.days + ' days in a row', '+$' + Number(t.bonus || 0).toFixed(2))).join('')}
+    ${tiers.map(t => row(t.days + ' days in a row', '+' + fmtMoney(t.bonus || 0))).join('')}
     <div class="ct-meta">${pmStreakNote(r.streak || {})}</div>
   </div>`;
 
   const cp = r.competition || {};
   if (want('comp')) html += `<div class="chore-card"><h3>🏆 Competitions</h3>
-    ${row('Swim — per point', '$' + Number((cp.swim || {}).perPoint || 0).toFixed(2))}
-    ${row('Qualify for Provincials', '+$' + Number((cp.swim || {}).qualifyBonus || 0).toFixed(2))}
-    ${row('Provincials — per point', '$' + Number((cp.swim || {}).provincialPerPoint || 0).toFixed(2))}
-    ${row('Skating — per point', '$' + Number((cp.skate || {}).perPoint || 0).toFixed(2))}
-    ${row('Skating placement — group / overall (1st)', '$' + Number((((cp.skate||{}).placement||{}).group||{})[1] || 0).toFixed(2) + ' each')}
-    ${row('Skating star level — Silver / Gold per item', '$' + Number((cp.dance || {}).silverPerItem || 0).toFixed(2) + ' / $' + Number((cp.dance || {}).goldPerItem || 0).toFixed(2))}
-    ${row('Skating star level — all Gold', '+$' + Number((cp.dance || {}).allGoldBonus || 0).toFixed(2) + ' (test max $' + Number((cp.dance || {}).testCap || 0).toFixed(0) + ')')}
+    ${row('Swim — per point', fmtMoney((cp.swim || {}).perPoint || 0))}
+    ${row('Qualify for Provincials', '+' + fmtMoney((cp.swim || {}).qualifyBonus || 0))}
+    ${row('Provincials — per point', fmtMoney((cp.swim || {}).provincialPerPoint || 0))}
+    ${row('Skating — per point', fmtMoney((cp.skate || {}).perPoint || 0))}
+    ${row('Skating placement — group / overall (1st)', fmtMoney((((cp.skate||{}).placement||{}).group||{})[1] || 0) + ' each')}
+    ${row('Skating star level — Silver / Gold per item', fmtMoney((cp.dance || {}).silverPerItem || 0) + ' / ' + fmtMoney((cp.dance || {}).goldPerItem || 0))}
+    ${row('Skating star level — all Gold', '+' + fmtMoney((cp.dance || {}).allGoldBonus || 0) + ' (test max $' + Number((cp.dance || {}).testCap || 0).toFixed(0) + ')')}
     <div class="ct-meta">Both skating placements stack. <b>No cap on points.</b> The official results sheet decides — not your parents, not you.</div>
   </div>`;
 
@@ -79,7 +79,7 @@ function pmPriceCards(r, only = null) {
      say about repeats is one short note under them. */
   if (want('fines')) html += `<div class="chore-card"><h3>📦 Box fine</h3>
     <div class="ct-meta">Leave something out and it's boxed until Sunday. <b>Box first, fine on repeat.</b></div>
-    ${fi.map(f => row(escapeHtml(f.label), '−$' + Number(f.amount || 0).toFixed(2)
+    ${fi.map(f => row(escapeHtml(f.label), '−' + fmtMoney(f.amount || 0)
       + pmFineWhen(f, fi))).join('')}
     <div class="ct-meta">${pmFinesNote(fi)} A day never goes below $0.</div>
   </div>`;

@@ -18,14 +18,6 @@ const CK_QUALITY = [
 function ckGradePay(rules, g) {
   return Number(((rules.chores || {}).grade || {})[g]) || 0;
 }
-/* Whole dollars read as "$3", parts as "$2.50". Non-finite input is floored to
-   zero rather than rendered: "$NaN" on a kid's earnings is worse than a wrong
-   zero, and it is always a bug upstream that this must not hide behind. */
-function ckMoney(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '$0';
-  return '$' + v.toFixed(v % 1 ? 2 : 0);
-}
 
 /* The activity behind a block. The day view resolves this with a local closure
    over getAllActivities(); this is the same lookup, reachable from here. */
@@ -158,12 +150,12 @@ function ckWeekGridData(kid, weekKey) {
       cells: [0, 1, 2, 3, 4, 5, 6].map(d => {
         if (!scheduled[d][p.id]) return { state: 'off', text: '', title: 'not on the plan that day' };
         const g = mrGetChoreGrade(kid, weekKey, d, p.id);
-        if (g > 0) return { state: 'graded', text: ckMoney(ckGradePay(r, g)), title: 'Mom graded it' };
+        if (g > 0) return { state: 'graded', text: fmtMoney(ckGradePay(r, g)), title: 'Mom graded it' };
         const c = mrGetClaim(kid, weekKey, d, p.id);
         if (c > 0) return { state: 'claimed', text: '?', title: 'you answered — not checked yet', choreId: p.id, day: d };
         return { state: 'open', text: '·', title: 'tap to say how it went', choreId: p.id, day: d };
       }),
-      total: money ? ckMoney(money) : '—',
+      total: money ? fmtMoney(money) : '—',
     };
   });
 
@@ -189,7 +181,7 @@ function openChoreClaimPrompt(kid, weekKey, dayIdx, choreId, label) {
   const options = CK_QUALITY.map(q => ({
     id: String(q.g),
     label: q.word,
-    sub: `${mnyMoney(ckGradePay(r, q.g))} · Mom checks it after`,
+    sub: `${fmtMoney(ckGradePay(r, q.g))} · Mom checks it after`,
   }));
   return showChoice(`How did ${label || 'it'} go?`, options, { cancelLabel: 'Not done yet' })
     .then(id => {

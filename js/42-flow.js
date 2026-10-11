@@ -166,10 +166,10 @@ function flMonthShort(m) {
    taken off — then what went out and what was put away to grow. No balance:
    what is waiting right now is My money's 📥 door, not this page's. */
 function flStory(flow, periodWords) {
-  const groups = `💪 I earned ${mnyMoney(flow.earned)}, 🎁 I was given ${mnyMoney(flow.given)}, 🌱 my money made ${mnyMoney(flow.made)} and ➖ ${mnyMoney(flow.off)} was taken off.`;
+  const groups = `💪 I earned ${fmtMoney(flow.earned)}, 🎁 I was given ${fmtMoney(flow.given)}, 🌱 my money made ${fmtMoney(flow.made)} and ➖ ${fmtMoney(flow.off)} was taken off.`;
   const after = [];
-  if (flow.outTotal > 0) after.push(`${mnyMoney(flow.outTotal)} went out`);
-  if (flow.savedTotal > 0) after.push(`${mnyMoney(flow.savedTotal)} was put away to grow`);
+  if (flow.outTotal > 0) after.push(`${fmtMoney(flow.outTotal)} went out`);
+  if (flow.savedTotal > 0) after.push(`${fmtMoney(flow.savedTotal)} was put away to grow`);
   return `${escapeHtml(periodWords)}: ${groups}${after.length ? ' ' + after.join(' and ') + '.' : ''}`;
 }
 
@@ -187,14 +187,14 @@ function flRibbonRows(entries) {
   return rows.map(e => {
     if (e.sub) {
       return `<div class="fl-row fl-subrow"><span class="fl-row-name">${e.icon} ${escapeHtml(e.label)}</span>
-          <span class="fl-sub-amt">${mnyMoney(e.value)}</span></div>`;
+          <span class="fl-sub-amt">${fmtMoney(e.value)}</span></div>`;
     }
     const v = money2(e.value);
     const pct = v > 0 && max > 0 ? Math.max(4, Math.round((v / max) * 100)) : 0;
     return `<div class="fl-row">
         <span class="fl-row-name">${e.icon} ${escapeHtml(e.label)}</span>
         <span class="fl-track"><span class="fl-bar" style="width:${pct}%;background:${escapeAttr(e.colour)}"></span></span>
-        <b class="fl-row-amt">${e.minus && v > 0 ? '−' : ''}${mnyMoney(v)}</b>
+        <b class="fl-row-amt">${e.minus && v > 0 ? '−' : ''}${fmtMoney(v)}</b>
       </div>`;
   }).join('');
 }
@@ -243,7 +243,7 @@ function flHistoryStrip(months, selected) {
       v > 0 ? `<span class="fl-seg" style="height:${(v / max) * 100}%;background:${escapeAttr(FL_COLOURS[k])}"></span>` : '').join('') : '';
     return `<button type="button" class="fl-col${on ? ' on' : ''}${mo.empty ? ' empty' : ''}"
         data-fl-action="month" data-fl-month="${escapeAttr(mo.month)}"
-        aria-label="${escapeAttr(flMonthLabel(mo.month) + ' — ' + mnyMoney(came(mo)) + ' came in')}">
+        aria-label="${escapeAttr(flMonthLabel(mo.month) + ' — ' + fmtMoney(came(mo)) + ' came in')}">
         <span class="fl-stack">${stack}</span>
         <span class="fl-col-name">${flMonthShort(mo.month)}</span>
       </button>`;
@@ -286,17 +286,17 @@ function flRenderFlow(kid) {
   const groups = nothingYet ? '<div class="fl-empty">Nothing has landed this month yet.</div>' : `<p class="fl-story">${flStory(flow, periodWords)}</p>
 
       <div class="fl-group">
-        <div class="fl-cap">⬇️ What came in <b>${mnyMoney(flow.inTotal)}</b></div>
+        <div class="fl-cap">⬇️ What came in <b>${fmtMoney(flow.inTotal)}</b></div>
         ${flInRows(flow)}
       </div>
 
       <div class="fl-group">
-        <div class="fl-cap">➡️ What went out <b>${mnyMoney(flow.outTotal)}</b></div>
+        <div class="fl-cap">➡️ What went out <b>${fmtMoney(flow.outTotal)}</b></div>
         ${outRows || '<div class="fl-empty">Nothing went out.</div>'}
       </div>
 
       <div class="fl-group">
-        <div class="fl-cap">🌱 Put away to grow <b>${mnyMoney(flow.savedTotal)}</b></div>
+        <div class="fl-cap">🌱 Put away to grow <b>${fmtMoney(flow.savedTotal)}</b></div>
         ${growRows || '<div class="fl-empty">Nothing was put away to grow.</div>'}
       </div>`;
   return `<div class="mv2-flow" data-money-surface>

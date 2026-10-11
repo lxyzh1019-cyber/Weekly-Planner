@@ -331,7 +331,7 @@ function rcFineForm() {
   if (!items.length) return `<p class="rc-note">Nothing is on the list to owe for. Money rules › Fines.</p>`;
   const rows = items.map(f =>
     `<button type="button" class="rc-chip${rcDraft.fineId === f.id ? ' on' : ''}"
-       data-rc-action="fine" data-rc-id="${escapeAttr(f.id)}">${escapeHtml(f.label)} · ${mnyMoney(f.amount)}</button>`).join('');
+       data-rc-action="fine" data-rc-id="${escapeAttr(f.id)}">${escapeHtml(f.label)} · ${fmtMoney(f.amount)}</button>`).join('');
   return `${rcField('Which day', 'day', rcDraft.dayKey, 'date')}
     <div class="rc-row"><span class="rc-lab">What for</span><span class="rc-chiprow">${rows}</span></div>
     <p class="rc-note">A fine can never take more than that day earned, so it can never
@@ -346,7 +346,7 @@ function rcMoveForm() {
     const shut = (h !== 'cash') && !evHomeOpen(rcDraft.kid, h);
     return `<button type="button" class="rc-chip${current === h ? ' on' : ''}${shut ? ' shut' : ''}"
       data-rc-action="${action}" data-rc-id="${h}">${escapeHtml(mnyHomeLabel(h))}
-      <small>${mnyMoney(evHomeBalance(rcDraft.kid, h))}</small></button>`;
+      <small>${fmtMoney(evHomeBalance(rcDraft.kid, h))}</small></button>`;
   }).join('');
   // Why a move is refused is said on the save button (rcRender), in the
   // owner's own sentence, rather than in a second paragraph beside it.
@@ -444,7 +444,7 @@ function rcSave() {
     };
     const saved = d.id ? mrUpdateCompetition(kid, d.id, entry) : mrAddCompetition(kid, entry);
     if (!saved) return;
-    showToast(`🏆 ${d.name.trim()} · ${mnyMoney(saved.awarded)}`);
+    showToast(`🏆 ${d.name.trim()} · ${fmtMoney(saved.awarded)}`);
   } else if (d.kind === 'gift') {
     if (!(d.amount > 0)) { showToast('How much?'); return; }
     if (d.id) {
@@ -454,7 +454,7 @@ function rcSave() {
       const g = mnyAddDeposit(kid, mnyWeekOfDay(d.dayKey),
         { amount: d.amount, from: d.from, giver: d.giver, dayKey: d.dayKey });
       if (!g) return;
-      showToast(isParent() ? `🎁 ${mnyMoney(d.amount)} recorded` : 'Asked a grown-up 🎁');
+      showToast(isParent() ? `🎁 ${fmtMoney(d.amount)} recorded` : 'Asked a grown-up 🎁');
     }
   } else if (d.kind === 'fine') {
     if (!d.fineId) { showToast('What for?'); return; }

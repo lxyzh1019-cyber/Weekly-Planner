@@ -777,11 +777,11 @@ function evRepairPlanFor(kid) {
       wk, id, was, should, gap,
       // Named, so the preview can say WHY rather than just showing a number.
       why: [
-        b.chorePaid > 0 ? `chores ${mnyMoney(b.chorePaid)}` : '',
-        b.streakBonus > 0 ? `routines ${mnyMoney(b.streakBonus)} (${b.streak.days} clean days)` : '',
-        b.compPaid > 0 ? `competitions ${mnyMoney(b.compPaid)}` : '',
-        b.learnPaid > 0 ? `learning ${mnyMoney(b.learnPaid)}` : '',
-        b.sessionsPaid > 0 ? `club sessions ${mnyMoney(b.sessionsPaid)}` : '',
+        b.chorePaid > 0 ? `chores ${fmtMoney(b.chorePaid)}` : '',
+        b.streakBonus > 0 ? `routines ${fmtMoney(b.streakBonus)} (${b.streak.days} clean days)` : '',
+        b.compPaid > 0 ? `competitions ${fmtMoney(b.compPaid)}` : '',
+        b.learnPaid > 0 ? `learning ${fmtMoney(b.learnPaid)}` : '',
+        b.sessionsPaid > 0 ? `club sessions ${fmtMoney(b.sessionsPaid)}` : '',
       ].filter(Boolean).join(' · '),
     });
   });
@@ -914,7 +914,7 @@ function mnyMoveRefusal(kid, from, to, amount) {
   }
   const have = evHomeBalance(kid, from);
   if (amt > money2(have)) {
-    return 'There is only ' + mnyMoney(have) + ' there.';
+    return 'There is only ' + fmtMoney(have) + ' there.';
   }
   /* The route is the last word. A pair the writer has no route for is refused
      HERE, in a sentence — never allowed through to fail inside the writer,
@@ -1024,7 +1024,7 @@ function mnyWallMoveRefusal(kid, from, amount) {
   if (!(amt > 0)) return 'How much?';
   if (!(mnyTotalOwing(kid) > 0)) return 'There is nothing left on the wall.';
   const have = evHomeBalance(kid, from);
-  if (amt > money2(have)) return 'There is only ' + mnyMoney(have) + ' there.';
+  if (amt > money2(have)) return 'There is only ' + fmtMoney(have) + ' there.';
   return null;
 }
 

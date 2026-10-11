@@ -25,7 +25,6 @@ const CP_GRADES = [
 ];
 
 function cpKid() { return parentViewing === 'jess' ? 'jess' : 'jenn'; }
-function cpName(kid) { return kid === 'jenn' ? 'Jenn' : 'Jess'; }
 function cpDayKey() { return mrWeekDayKeys(ctWeekKey)[cpDay]; }
 
 /* ── Header ── */
@@ -41,7 +40,7 @@ function cpHeader() {
     const n = mrClaimQueue(ctWeekKey, k).length;
     return `<span class="cp-kid ${k === kid ? 'on' : ''}">
       <span class="cp-kid-icon">${CT_PROFILE_ICON[k]}</span>
-      <span><span class="cp-kid-name">${cpName(k)}</span>
+      <span><span class="cp-kid-name">${escapeHtml(kidLabel(k).name)}</span>
       <span class="cp-kid-badge ${n ? 'wait' : ''}">${n ? `${n} waiting` : 'nothing waiting'}</span></span></span>`;
   }).join('');
   const date = new Date(info.mon); date.setDate(info.mon.getDate() + cpDay);
@@ -53,7 +52,7 @@ function cpHeader() {
     </span>` : '';
   return `<div class="cp-head">
     <div class="cp-head-top">
-      <span class="cp-title">${cpName(kid)}'s week — ${escapeHtml(weekLabel)}</span>
+      <span class="cp-title">${escapeHtml(kidLabel(kid).name)}'s week — ${escapeHtml(weekLabel)}</span>
       <span class="ck-spacer"></span>
       <button type="button" class="ck-navbtn" data-cp-action="week-step" data-delta="-1" aria-label="Previous week">‹</button>
       <button type="button" class="ck-navbtn" data-cp-action="week-step" data-delta="1" aria-label="Next week">›</button>
@@ -82,14 +81,14 @@ function cpSettleCard() {
   const queue = mrClaimQueue(ctWeekKey, kid);
   const held = !!((state.shared.chore.meetingsHeld || {})[ctWeekKey]);
   const parts = [];
-  if (b.chorePaid)   parts.push(`🧹 ${ckMoney(b.chorePaid)}`);
-  if (b.learnPaid)   parts.push(`📘 ${ckMoney(b.learnPaid)}`);
-  if (b.streakBonus) parts.push(`🔥 ${ckMoney(b.streakBonus)}`);
-  if (b.compPaid)    parts.push(`🏆 ${ckMoney(b.compPaid)}`);
-  if (b.fines.total) parts.push(`📦 −${ckMoney(b.fines.total)}`);
+  if (b.chorePaid)   parts.push(`🧹 ${fmtMoney(b.chorePaid)}`);
+  if (b.learnPaid)   parts.push(`📘 ${fmtMoney(b.learnPaid)}`);
+  if (b.streakBonus) parts.push(`🔥 ${fmtMoney(b.streakBonus)}`);
+  if (b.compPaid)    parts.push(`🏆 ${fmtMoney(b.compPaid)}`);
+  if (b.fines.total) parts.push(`📦 −${fmtMoney(b.fines.total)}`);
   return `<div class="cp-settle">
     <div class="cp-settle-top">
-      <span class="ck-rail-total">${ckMoney(b.net)}</span>
+      <span class="ck-rail-total">${fmtMoney(b.net)}</span>
       <span class="ck-sub">${parts.join(' · ') || 'nothing earned yet this week'}</span>
     </div>
     ${queue.length ? `<div class="ck-risk">${queue.length} chore${queue.length === 1 ? '' : 's'} claimed and waiting on you.</div>` : ''}
@@ -114,8 +113,8 @@ function cpDayCards() {
     const routines = asked.filter(s => ctGetMandatory(ctWeekKey, cpDay, s, k)).length;
     const sick = mrIsSick(k, ctWeekKey, cpDay);
     return `<button type="button" class="cp-daycard ${k === cpKid() ? 'on' : ''}" data-cp-action="kid" data-kid="${k}">
-      <span class="cp-daycard-top">${CT_PROFILE_ICON[k]} <b>${cpName(k)}</b>
-        <span class="ck-spacer"></span><span class="ck-hist-total">${ckMoney(day.paid)}</span></span>
+      <span class="cp-daycard-top">${CT_PROFILE_ICON[k]} <b>${escapeHtml(kidLabel(k).name)}</b>
+        <span class="ck-spacer"></span><span class="ck-hist-total">${fmtMoney(day.paid)}</span></span>
       <span class="ck-pill ${waiting ? '' : 'cp-pill-quiet'}">${waiting ? `${waiting} waiting` : 'all answered'}</span>
       <span class="ck-sub">${routines}/${asked.length} routines closed${sick ? ' · 🤒 sick day' : ''}</span>
     </button>`;
@@ -143,12 +142,12 @@ function cpQueue() {
       <div class="cp-qtext">
         <div class="cp-qname">${escapeHtml(name)}</div>
         <div class="ck-sub">${CT_DAYS[q.dayIdx]} · due ${escapeHtml(due)}</div>
-        <div class="ck-risk cp-qclaim">She said: ${escapeHtml(word.toLowerCase())} (${ckMoney(ckGradePay(r, q.claim))})</div>
+        <div class="ck-risk cp-qclaim">She said: ${escapeHtml(word.toLowerCase())} (${fmtMoney(ckGradePay(r, q.claim))})</div>
       </div>
       <div class="cp-gradebar">${CP_GRADES.map(x => `
         <button type="button" class="cp-gbtn ${q.claim === x.g ? 'agrees' : ''}"
           data-cp-action="grade" data-chore-id="${escapeAttr(q.choreId)}" data-day="${q.dayIdx}" data-grade="${x.g}"
-          title="${escapeAttr(x.label)}"><span class="cp-gpay">${ckMoney(ckGradePay(r, x.g))}</span><span class="cp-gword">${escapeHtml(x.short)}</span></button>`).join('')}</div>
+          title="${escapeAttr(x.label)}"><span class="cp-gpay">${fmtMoney(ckGradePay(r, x.g))}</span><span class="cp-gword">${escapeHtml(x.short)}</span></button>`).join('')}</div>
     </div>`;
   }).join('');
   return `<div class="cp-sect"><div class="cp-cap">Waiting on you</div>${body}</div>`;
@@ -169,7 +168,7 @@ function cpGraded() {
     const claim = mrGetClaim(kid, ctWeekKey, cpDay, id);
     const row = mrPoolRow(id, ctWeekKey);
     const agree = claim
-      ? (claim === g ? 'you agreed with her' : `she said ${ckMoney(ckGradePay(r, claim))}`)
+      ? (claim === g ? 'you agreed with her' : `she said ${fmtMoney(ckGradePay(r, claim))}`)
       : 'she never claimed it';
     return `<div class="cp-qrow cp-qrow-done">
       <span class="cp-qicon">${row ? row.icon : '🧺'}</span>
@@ -177,11 +176,11 @@ function cpGraded() {
         <div class="cp-qname">${escapeHtml(row ? row.label : id)}</div>
         <div class="ck-sub">${escapeHtml((CP_GRADES.find(x => x.g === g) || {}).label || '')} · ${escapeHtml(agree)}</div>
       </div>
-      <span class="ck-chore-pay ck-green">${freeIds.has(id) ? 'free' : ckMoney(ckGradePay(r, g))}</span>
+      <span class="ck-chore-pay ck-green">${freeIds.has(id) ? 'free' : fmtMoney(ckGradePay(r, g))}</span>
       <div class="cp-gradebar cp-gradebar-sm">${CP_GRADES.map(x => `
         <button type="button" class="cp-gbtn ${g === x.g ? 'on' : ''}"
           data-cp-action="grade" data-chore-id="${escapeAttr(id)}" data-day="${cpDay}" data-grade="${x.g}"
-          title="${escapeAttr(x.label)}">${ckMoney(ckGradePay(r, x.g))}</button>`).join('')}</div>
+          title="${escapeAttr(x.label)}">${fmtMoney(ckGradePay(r, x.g))}</button>`).join('')}</div>
     </div>`;
   }).join('');
   // Same notice the meeting's step 1 carries, from the same reader, so the two
@@ -248,17 +247,17 @@ function cpFines() {
   const fw = mrFinesWeek(ctWeekKey, kid, chores.days.map(d => d.paid));
   const items = ((r.fines || {}).items || []).filter(f => f.id !== 'box_repeat');
   const btns = items.map(f => `<button type="button" class="cp-fine" data-cp-action="fine" data-fine="${escapeAttr(f.id)}">
-      ${escapeHtml(f.label)} <b>−${ckMoney(f.amount)}</b></button>`).join('');
+      ${escapeHtml(f.label)} <b>−${fmtMoney(f.amount)}</b></button>`).join('');
   const names = {}; ((r.fines || {}).items || []).forEach(i => { names[i.id] = i.label; });
   const applied = mrFines(kid).filter(f => mrMoneyDayKeys(ctWeekKey, kid).includes(f.dayKey)).slice(-6).reverse()
     .map(f => `<div class="cp-applied">
       <span class="cp-plan-name">${escapeHtml(names[f.itemId] || f.itemId)}<span class="ck-item-due">${escapeHtml(f.dayKey)}</span></span>
-      <span class="ck-red">−${ckMoney(1)}</span>
+      <span class="ck-red">−${fmtMoney(1)}</span>
       <button type="button" class="ck-navbtn" data-cp-action="unfine" data-fine-id="${escapeAttr(f.id)}" aria-label="Take this fine back">×</button>
     </div>`).join('');
   return `<div class="cp-sect">
     <div class="cp-cap">Fines — flat, applied to ${CT_DAYS[cpDay]}</div>
-    <div class="ck-sub">Leaving something out isn't here — that goes in the box first. Fines this week: <b>−${ckMoney(fw.total)}</b>, and a day never goes below $0.</div>
+    <div class="ck-sub">Leaving something out isn't here — that goes in the box first. Fines this week: <b>−${fmtMoney(fw.total)}</b>, and a day never goes below $0.</div>
     ${btns}
     ${applied ? `<div class="cp-cap cp-cap-gap">Applied this week</div>${applied}` : ''}
   </div>`;
@@ -286,12 +285,12 @@ function cpDualGrid() {
   head += '<div class="ck-grid-dh">wk</div></div>';
 
   const stripe = (k, p, d) => {
-    if (!sched[k][d][p.id]) return `<span class="cp-stripe off" title="${cpName(k)} — not on the plan"></span>`;
+    if (!sched[k][d][p.id]) return `<span class="cp-stripe off" title="${escapeHtml(kidLabel(k).name)} — not on the plan"></span>`;
     const g = mrGetChoreGrade(k, ctWeekKey, d, p.id);
-    if (g > 0) return `<span class="cp-stripe done" title="${cpName(k)} — graded">${ckMoney(ckGradePay(r, g))}</span>`;
+    if (g > 0) return `<span class="cp-stripe done" title="${escapeHtml(kidLabel(k).name)} — graded">${fmtMoney(ckGradePay(r, g))}</span>`;
     const c = mrGetClaim(k, ctWeekKey, d, p.id);
-    if (c > 0) return `<span class="cp-stripe claimed" title="${cpName(k)} — claimed, waiting">?</span>`;
-    return `<span class="cp-stripe" title="${cpName(k)} — nothing claimed">·</span>`;
+    if (c > 0) return `<span class="cp-stripe claimed" title="${escapeHtml(kidLabel(k).name)} — claimed, waiting">?</span>`;
+    return `<span class="cp-stripe" title="${escapeHtml(kidLabel(k).name)} — nothing claimed">·</span>`;
   };
   const rows = pool.map(p => {
     let cells = '';
@@ -304,7 +303,7 @@ function cpDualGrid() {
       return m;
     };
     return `<div class="cp-grid-row"><div class="ck-grid-label"><span class="ck-grid-icon">${p.icon}</span>${escapeHtml(p.label)}</div>${cells}
-      <div class="cp-grid-tot"><span>${ckMoney(tot('jenn'))}</span><span>${ckMoney(tot('jess'))}</span></div></div>`;
+      <div class="cp-grid-tot"><span>${fmtMoney(tot('jenn'))}</span><span>${fmtMoney(tot('jess'))}</span></div></div>`;
   }).join('');
   return `<div class="cp-sect"><div class="cp-cap">Both kids, same week</div>
     <div class="ck-sub">Top stripe ${CT_PROFILE_ICON.jenn} Jenn · bottom ${CT_PROFILE_ICON.jess} Jess. Grey means the planner never put it on that day.</div>
@@ -320,25 +319,25 @@ function cpPayout() {
   const b = mrWeekBreakdown(ctWeekKey, kid);
   const lines = [];
   const push = (name, detail, amount, cls) => lines.push({ name, detail, amount, cls });
-  push('Household chores', `${b.chores.freeUsed.length} free · ${b.chores.overflowChores} past the cap`, ckMoney(b.chorePaid), 'ck-green');
-  if (b.learnPaid)   push('Learning', 'whole bundles only', ckMoney(b.learnPaid), 'ck-green');
-  if (b.streakBonus) push('Streak', `${b.streak.days} clean days`, ckMoney(b.streakBonus), 'ck-green');
-  if (b.compPaid)    push('Competition', 'from the results sheet', ckMoney(b.compPaid), 'ck-green');
-  if (b.fines.total) push('Fines', 'floored at $0 each day', '−' + ckMoney(b.fines.total), 'ck-red');
+  push('Household chores', `${b.chores.freeUsed.length} free · ${b.chores.overflowChores} past the cap`, fmtMoney(b.chorePaid), 'ck-green');
+  if (b.learnPaid)   push('Learning', 'whole bundles only', fmtMoney(b.learnPaid), 'ck-green');
+  if (b.streakBonus) push('Streak', `${b.streak.days} clean days`, fmtMoney(b.streakBonus), 'ck-green');
+  if (b.compPaid)    push('Competition', 'from the results sheet', fmtMoney(b.compPaid), 'ck-green');
+  if (b.fines.total) push('Fines', 'floored at $0 each day', '−' + fmtMoney(b.fines.total), 'ck-red');
   Object.keys(b.honesty.voidedChannels || {}).forEach(ch =>
-    push(`${ch} voided`, 'honesty ladder, step 2', ckMoney(0), 'ck-red'));
+    push(`${ch} voided`, 'honesty ladder, step 2', fmtMoney(0), 'ck-red'));
   Object.keys(b.overrides || {}).forEach(ch =>
     push(`${ch} adjusted`, escapeHtml(mrReasonLabel((b.overrides[ch] || {}).reason) || 'agreed at the meeting'),
-      ckMoney(b.overrides[ch].value), 'ck-amber'));
+      fmtMoney(b.overrides[ch].value), 'ck-amber'));
 
   const body = lines.map(l => `<div class="cp-payline">
     <span class="cp-payname">${escapeHtml(l.name)}</span><span class="cp-paydots"></span>
     <span class="ck-sub">${l.detail}</span>
     <span class="cp-payamt ${l.cls}">${l.amount}</span></div>`).join('');
-  return `<div class="cp-sect"><div class="cp-cap">${cpName(kid)} — the payout sheet</div>
+  return `<div class="cp-sect"><div class="cp-cap">${escapeHtml(kidLabel(kid).name)} — the payout sheet</div>
     <div class="ck-sub">Every line that made the number. Change a grade in Day view and this follows. Adjustments are made at the meeting, where they get a reason recorded beside them.</div>
     <div class="cp-payout">${body}
-      <div class="cp-paytotal"><span>${cpName(kid)}</span><span class="ck-hist-total">${ckMoney(b.net)}</span></div>
+      <div class="cp-paytotal"><span>${escapeHtml(kidLabel(kid).name)}</span><span class="ck-hist-total">${fmtMoney(b.net)}</span></div>
     </div></div>`;
 }
 
@@ -359,12 +358,12 @@ function cpCompetition() {
     const d = formatDayKey(c.dayKey);
     return `<div class="cp-applied">
       <span class="cp-plan-name">${escapeHtml(c.name || mnySportLabel(c.sport))}<span class="ck-item-due">${escapeHtml(mnySportLabel(c.sport))} · ${MONTH_SHORT[d.getMonth()]} ${d.getDate()} · ${escapeHtml(bits.join(' · ') || '—')}</span></span>
-      <span class="ck-green">${ckMoney(c.awarded || 0)}</span>
+      <span class="ck-green">${fmtMoney(c.awarded || 0)}</span>
       <button type="button" class="ck-navbtn" data-ct-action="edit-comp" data-comp-id="${escapeAttr(c.id)}" aria-label="Correct this result">✎</button>
       <button type="button" class="ck-navbtn" data-ct-action="del-comp" data-comp-id="${escapeAttr(c.id)}" aria-label="Remove result">×</button>
     </div>`;
   }).join('') : '<div class="ck-sub">No results this week.</div>';
-  return `<div class="cp-sect"><div class="cp-cap">Competition — week: ${ckMoney(cw.paid)}</div>
+  return `<div class="cp-sect"><div class="cp-cap">Competition — week: ${fmtMoney(cw.paid)}</div>
     <div class="ck-sub">The official results sheet decides, and a result pays in the week it happened — one dated outside this week won't show here.</div>
     ${rows}
     <button type="button" class="ck-btn" data-ct-action="add-comp">🏆 Record a result</button></div>`;

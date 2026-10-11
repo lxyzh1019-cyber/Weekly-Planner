@@ -3200,6 +3200,28 @@ a delete inside `state.shared.chore` cannot propagate (`deepMergeObj` iterates
 the keys the remote has), so tidying them would churn the document on every sync
 to no effect. Same reasoning as the retired `unlockedActs`.
 
+## One money and day format — fmtMoney, fmtDay, kidLabel (Consistency PR 6)
+
+Money on screen is written by `fmtMoney` only, days by `fmtDay` only (both in
+`js/05-helpers.js`), and a girl's name and icon come from `kidLabel`
+(`js/01-config.js`). D2: "$3" for whole dollars, "$2.50" otherwise, "−$3"
+(U+2212) for a negative, "+$3" when signed. Days: 'short' "27 Sep", 'long'
+"Sat 3 Oct", 'weekday' "Sat", 'month' "Oct 2026", 'dated' "27 Sep" with the
+year added when it is not this year. Do not write a local formatter, a
+`'$' + x.toFixed(2)`, a `toLocaleDateString` or a `kid === 'jenn' ? 'Jenn' :
+'Jess'` — `tests/check-money-words.js` fails on each, outside
+`js/05-helpers.js`, unless named in its FMT_ALLOW with why. (checked by tests/check-money-words.js)
+
+Two named exceptions: `sdBook$` (js/43-sunday-core.js) keeps "$100 and up
+shown rounded" on the passbook and the forecast — an owner decision still
+open (Stage 32), fmtMoney below $100 — and `sdOff$`, which only puts the
+minus of "taken off" in front of fmtMoney. `js/43-sunday-core.js` is required
+by Node tests, where fmtMoney and fmtDay are not globals: its existing
+`module.exports` guard takes them from `js/05-helpers.js`'s guard (inert in the
+browser), so there is still one formatter. Stored records are never rewritten:
+a note saved with the old words ("$3.00", "Jul 28") keeps them; only new
+notes and every figure drawn from stored numbers use the new style.
+
 ## One money model, for every week
 
 `mrUsesNewModel` is **gone**, and with it the legacy branch of `ctWeekMoney`,

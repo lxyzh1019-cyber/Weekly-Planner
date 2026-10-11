@@ -36,7 +36,7 @@ function paRenderProfiles() {
   const wrap = document.getElementById('paProfilesWrap');
   if (!wrap) return;
   const card = kid => {
-    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const name = kidLabel(kid).name;
     return `<div class="pn-card pa-profile">
       <div class="pa-prof-head">
         <span class="pa-avatar ${kid === 'jenn' ? 'pa-avatar-jenn' : 'pa-avatar-jess'}">${CT_PROFILE_ICON[kid]}</span>

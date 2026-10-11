@@ -90,7 +90,7 @@ function mnyLadderCard(kid, pct, idx) {
   return `<div class="mv2-card mv2-ladder">
       <div class="mv2-cardhead"><span class="mv2-title">🔓 What opens when</span></div>
       <div class="mv2-ladder-goal">${owed > 0
-        ? `<b class="mv2-ladder-pct">${pct}%</b><span>of my loans paid</span><b class="mv2-ladder-left">${mnyMoney(owed)} to go</b>`
+        ? `<b class="mv2-ladder-pct">${pct}%</b><span>of my loans paid</span><b class="mv2-ladder-left">${fmtMoney(owed)} to go</b>`
         /* No loan is not a loan paid off. `mnyPaidPct` reads 100 for a child
            who owes nothing, which opens every pot — but "paid off" would be
            celebrating something that never happened. */
@@ -98,7 +98,7 @@ function mnyLadderCard(kid, pct, idx) {
       <span class="mv2-bar mv2-ladder-bar"><i style="width:${pct}%"></i></span>
       <div class="mv2-rows">${rows}</div>
       ${next && toNext > 0
-        ? `<div class="mv2-sum mv2-ladder-next">Pay off <b>${mnyMoney(toNext)}</b> more and <b>${escapeHtml(next.icon + ' ' + next.title)}</b> opens.</div>`
+        ? `<div class="mv2-sum mv2-ladder-next">Pay off <b>${fmtMoney(toNext)}</b> more and <b>${escapeHtml(next.icon + ' ' + next.title)}</b> opens.</div>`
         : ''}
     </div>`;
 }
@@ -135,7 +135,7 @@ function mnyBuysCard() {
   return `<div class="mv2-card mv2-buys">
       <div class="mv2-cardhead"><span class="mv2-title">🛒 What money buys</span></div>
       <div class="mv2-rows">${items.map(i =>
-        `<div class="mv2-li"><span>${escapeHtml(i.label)}</span><b>${mnyMoney(i.amount)}</b></div>`).join('')}</div>
+        `<div class="mv2-li"><span>${escapeHtml(i.label)}</span><b>${fmtMoney(i.amount)}</b></div>`).join('')}</div>
       <div class="mv2-note">Real prices, from things we actually buy.</div>
     </div>`;
 }
