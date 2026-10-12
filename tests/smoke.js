@@ -6735,7 +6735,7 @@ function findChromium() {
       const screen = document.getElementById('screen-meeting');
       const signs = [...screen.querySelectorAll('button')].filter(b => /hold to sign/i.test(b.textContent + ' ' + (b.getAttribute('aria-label') || '')));
       if (signs.length !== 1) bad.push(signs.length + ' "hold to sign" controls on the money step: ' + signs.map(b => b.className).join(', '));
-      const dead = [...screen.querySelectorAll('.btn-confirm[disabled]')];
+      const dead = [...screen.querySelectorAll('.ui-btn--primary[disabled]')];
       if (dead.length) bad.push('the footer draws a disabled button: ' + dead.map(b => b.textContent.trim()).join(' | '));
       if (!screen.querySelector('[data-sd-sign]')) bad.push('the ritual\'s own hold to sign is missing');
     } catch (e) { bad.push('threw: ' + e.message); }
@@ -14468,6 +14468,19 @@ function findChromium() {
     });
     // The current place has to be stated, not only tinted.
     const marksCurrent = !!nav.querySelector('.kid-nav-btn.on[aria-current="page"]');
+    // R2 (owner 2026-10-12): the current tab wears the planner's picked colour (--sel-planner, white text), never the main action's yellow.
+    const onTab = nav.querySelector('.kid-nav-btn.on');
+    if (onTab) {
+      const probe = document.createElement('i');
+      probe.style.cssText = 'position:absolute;background:var(--sel-planner);color:var(--sel-planner-ink)';
+      document.body.appendChild(probe);
+      const want = getComputedStyle(probe);
+      const got = getComputedStyle(onTab);
+      const pair = [want.backgroundColor, want.color];
+      probe.remove();
+      if (got.backgroundColor !== pair[0] || got.color !== pair[1]) return `the current tab is ${got.backgroundColor} / ${got.color}, the planner's picked colour is ${pair[0]} / ${pair[1]}`;
+      if (got.backgroundColor === 'rgb(255, 200, 61)') return 'the current tab is the main action yellow';
+    }
     // Content must not sit underneath it.
     const padded = parseFloat(getComputedStyle(document.body).paddingBottom) >= 50;
 
@@ -15459,7 +15472,7 @@ function findChromium() {
     const answer = (mood) => {
       const dot = [...document.querySelectorAll('#reflectOverallMoods .vibe-mood')].find(el => el.textContent === mood);
       if (dot) dot.click();
-      const save = document.querySelector('#reflectOverlay .btn-confirm');
+      const save = document.querySelector('#reflectOverlay .ui-btn--primary');
       if (save) save.click();
       if (document.getElementById('ritualScreen').classList.contains('show')) closeRitual();
     };
@@ -24327,7 +24340,7 @@ function findChromium() {
         mnyOpenRequestSheet('list', { kid });
         const chips = [...document.querySelectorAll('#requestBody .rq-chip')];
         if (chips.length !== asks().length || !/Skate bag/.test(chips[0].textContent) || !/⏳ waiting/.test(chips[0].textContent)) bad.push('the list is not every request, newest first, with its answer');
-        press('[data-mny-action="rq-close"]');
+        document.querySelector('#requestOverlay .ui-sheet > .ui-sheet-x').click();
         if (open()) bad.push('Done did not close the list');
         // A disabled option says why rather than doing nothing.
         mnyOpenRequestSheet('move', { kid });
@@ -25389,7 +25402,7 @@ function findChromium() {
         btn(fine.id).click();
         if (!rqDraft || rqDraft.kind !== 'dispute') bad.push('the button did not open the dispute sheet');
         if (!/This fine is wrong/.test(document.getElementById('rqSheetTitle').textContent)) bad.push('the sheet is not titled "This fine is wrong"');
-        if (!document.querySelector('#requestBody [data-mny-action="rq-close"].ui-sheet-x')) bad.push('the sheet has no × to close it');
+        if (!document.querySelector('#requestOverlay .ui-sheet > .ui-sheet-x')) bad.push('the sheet has no × to close it');
         const head = document.querySelector('#requestBody .rq-fine');
         if (!head || !/−\$/.test(head.textContent)) bad.push('the sheet does not show the fine with its amount negative');
         const chip = document.querySelector('#requestBody [data-mny-action="rq-why"]');
@@ -25938,7 +25951,7 @@ function findChromium() {
               });
               const alpha = Number((getComputedStyle(ov).backgroundColor.match(/rgba?\(([^)]+)\)/) || [])[1].split(',')[3] || 1);
               if (!(alpha >= 0.6)) bad.push(where + ': the scrim behind the sheet is ' + alpha + ' — the page reads through it');
-              const x = body.querySelector('[data-mny-action="rq-close"]');
+              const x = ov.querySelector('.ui-sheet > .ui-sheet-x');
               if (!x) bad.push(where + ': the sheet has no ✕');
               else { x.click(); if (ov.classList.contains('open')) bad.push(where + ': ✕ did not close the sheet'); }
             };
@@ -25979,7 +25992,7 @@ function findChromium() {
               const shownSum = lrows.reduce((n, l) => { const m = (l.querySelector('b') || {}).textContent.match(/−\$?([\d.,]+)/); return n + (m ? Number(m[1].replace(/,/g, '')) : 0); }, 0);
               if (lrows.length && Math.round(shownSum * 100) !== Math.round(rec.takenOff.fines * 100)) bad.push('late fine: the sheet lists ' + lrows.length + ' fine row(s) charging ' + shownSum.toFixed(2) + ' under a frozen ➖ fines total of ' + rec.takenOff.fines.toFixed(2) + ': ' + lbody.textContent.replace(/\s+/g, ' ').slice(0, 160));
               if (!lrows.length && rec.takenOff.fines > 0 && !frozenLine) bad.push('late fine: neither the fine rows nor the frozen 📦 Fines line show');
-              const lx = lbody.querySelector('[data-mny-action="rq-close"]'); if (lx) lx.click();
+              const lx = document.querySelector('#requestOverlay .ui-sheet > .ui-sheet-x'); if (lx) lx.click();
               lateAll.forEach(f => mrRemoveFine(kid, f.id));
             }
           } catch (e) { bad.push('threw: ' + e.message); }
@@ -27692,7 +27705,7 @@ function findChromium() {
                       const cs = getComputedStyle(pill);
                       near(px(cs.paddingTop), +p.pad[1], 0.01, 'the step pill top padding');
                       near(px(cs.paddingLeft), +p.pad[2], 0.01, 'the step pill side padding');
-                      if (cs.backgroundColor !== rgb(p.bg) || cs.color !== rgb(p.fg)) out.push(`${tag}: the step pill is ${cs.backgroundColor} / ${cs.color}, the picture's ${p.bg} / ${p.fg}`);
+                      if (cs.backgroundColor !== rgb('#2f7f77') || cs.color !== rgb('#ffffff')) out.push(`${tag}: the step pill is ${cs.backgroundColor} / ${cs.color}, R2 (owner 2026-10-12) wants the teal #2f7f77 / #ffffff, not the main action's yellow`);
                       if (!ruleOk(px(cs.borderTopWidth), 2) || cs.borderTopLeftRadius !== '999px') out.push(`${tag}: the step pill is ${cs.borderTopWidth} radius ${cs.borderTopLeftRadius}, the picture's 2px r999`);
                       if (cs.fontWeight !== p.weight) out.push(`${tag}: the step pill weight is ${cs.fontWeight}, the picture's ${p.weight}`);
                     }

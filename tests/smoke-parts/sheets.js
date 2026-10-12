@@ -1,4 +1,4 @@
-// Smoke group: one sheet and one dialog (Stage 43, Part 12; owner answers G13 and P1–P4, 2026-10-12). oneSheetAndOneDialogEverywhere opens each of the 25 pop-ups (the 23 overlays in index.html, the ⋯ More sheet tdMoreOverlay, and the app dialog appDialogOverlay), at the iPad width 1024×768 and the phone width 390×844. A sheet is the kit's .ui-sheet with the same paper, border and corner as every other sheet, at layer --z-sheet (300); it is centred on the iPad and sits on the bottom edge, full width, on the phone, except the three forms (edit, activity, training: .ui-sheet--docked), which on the iPad are the right-side panel on the bottom right edge. Each sheet has exactly one ✕ (.ui-sheet-x), at least 44×44, in its top-right corner, and tapping it closes the sheet. The app dialog (a confirm and a choice) is the kit's .ui-dialog, centred at both widths, at layer --z-dialog (500), with no ✕; its Cancel closes it. tests/smoke.js calls it near the end of the run, on its one shared page; it puts back the profile and the size.
+// Smoke group: one sheet and one dialog (Stage 43, Part 12; owner answers G13 and P1–P4, 2026-10-12). oneSheetAndOneDialogEverywhere opens each of the 25 pop-ups (the 23 overlays in index.html, the ⋯ More sheet tdMoreOverlay, and the app dialog appDialogOverlay), at the iPad width 1024×768 and the phone width 390×844. A sheet is the kit's .ui-sheet with the same paper, border and corner as every other sheet, at layer --z-sheet (300); it is centred on the iPad and sits on the bottom edge, full width, on the phone, except the three forms (edit, activity, training: .ui-sheet--docked), which on the iPad are the right-side panel on the bottom right edge. Each sheet has exactly one ✕ (.ui-sheet-x), at least 44×44, in its top-right corner, and tapping it closes the sheet. The app dialog (a confirm and a choice) is the kit's .ui-dialog, centred at both widths, at layer --z-dialog (500), with no ✕; its Cancel closes it. Stage 63 (owner P5, P6, 2026-10-12): the handle bar shows only on a phone sheet (390 wide), never on an iPad sheet, centred or docked; on a sheet made tall (a 1600px spacer) and scrolled to the bottom, the ✕ is still inside the visible sheet at its top right and a tap lands on it; the ✕ does not cover the title's words; a danger confirm's OK is .ui-btn--danger, a plain one's .ui-btn--primary, both .act-guard. tests/smoke.js calls it near the end of the run, on its one shared page; it puts back the profile and the size.
 module.exports = async ({ page, want, checks }) => {
   if (!want('oneSheetAndOneDialogEverywhere')) return;
   const before = page.viewportSize();
@@ -23,7 +23,7 @@ module.exports = async ({ page, want, checks }) => {
         if (statics.length !== 23) out.push(`${statics.length} overlays in index.html, expected 23`);
         const ids = statics.concat(['tdMoreOverlay']);
         const vw = window.innerWidth, vh = window.innerHeight;
-        let first = null;
+        let first = null, handles = 0;
         for (const id of ids) {
           const where = `${id}@${size}`;
           profile = 'jenn'; parentViewing = 'jenn';
@@ -49,6 +49,13 @@ module.exports = async ({ page, want, checks }) => {
             const dx = (r.left + r.right) / 2 - vw / 2, dy = (r.top + r.bottom) / 2 - vh / 2;
             if (Math.abs(dx) > 2 || Math.abs(dy) > 2) out.push(`${where}: not centred (off by ${Math.round(dx)}, ${Math.round(dy)}; box ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)})`);
           }
+          // P5 (owner 2026-10-12): the handle bar shows only on a phone sheet that comes from the bottom, never on a centred or docked iPad sheet.
+          for (const h of sheet.querySelectorAll('.sheet-handle')) {
+            const shown = getComputedStyle(h).display !== 'none' && h.getBoundingClientRect().height > 0;
+            if (size === 'phone') handles++;
+            if (size === 'phone' && !shown) out.push(`${where}: no handle bar on a phone sheet`);
+            if (size === 'iPad' && shown) out.push(`${where}: a handle bar on an iPad sheet (${docked ? 'docked' : 'centred'})`);
+          }
           const xs = [...sheet.querySelectorAll('.ui-sheet-x')];
           const glyphs = [...sheet.querySelectorAll('button')].filter(b => /^[×✕✖]$/.test(b.textContent.trim()));
           if (xs.length !== 1) out.push(`${where}: ${xs.length} kit ✕ (.ui-sheet-x), want 1`);
@@ -60,11 +67,36 @@ module.exports = async ({ page, want, checks }) => {
             if (b.right < r.right - 24 || b.top > r.top + 24) out.push(`${where}: the ✕ is not top right (✕ ${Math.round(b.right)},${Math.round(b.top)}; sheet ${Math.round(r.right)},${Math.round(r.top)})`);
             const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
             if (!hit || !x.contains(hit)) out.push(`${where}: a tap on the ✕ lands on ${hit ? hit.tagName + '.' + hit.className : 'nothing'}`);
+            // P6 (owner 2026-10-12): the ✕ stays in view at the top right while a tall sheet scrolls. A spacer makes this sheet tall; at the bottom of the scroll the ✕ is still inside the visible sheet box, near its top right, and a tap on it lands on it.
+            const spacer = document.createElement('div');
+            spacer.style.height = '1600px';
+            x.parentNode.insertBefore(spacer, x);
+            sheet.scrollTop = sheet.scrollHeight;
+            await tick();
+            const sr = sheet.getBoundingClientRect(), b2 = x.getBoundingClientRect();
+            if (sheet.scrollTop < 100) out.push(`${where}: the tall sheet did not scroll (scrollTop ${Math.round(sheet.scrollTop)})`);
+            else if (b2.top < sr.top - 0.5 || b2.bottom > sr.bottom + 0.5 || b2.top > sr.top + 24 || b2.right < sr.right - 24) out.push(`${where}: after scrolling to the bottom the ✕ left the visible sheet (✕ ${Math.round(b2.right)},${Math.round(b2.top)}–${Math.round(b2.bottom)}; sheet ${Math.round(sr.right)},${Math.round(sr.top)}–${Math.round(sr.bottom)})`);
+            else {
+              const hit2 = document.elementFromPoint(b2.left + b2.width / 2, b2.top + b2.height / 2);
+              if (!hit2 || !x.contains(hit2)) out.push(`${where}: after scrolling a tap on the ✕ lands on ${hit2 ? hit2.tagName + '.' + hit2.className : 'nothing'}`);
+            }
+            sheet.scrollTop = 0;
+            spacer.remove();
+            await tick();
+            // The ✕ never covers the title's words.
+            const h3 = sheet.querySelector(':scope > h3');
+            if (h3) {
+              const rg = document.createRange();
+              rg.selectNodeContents(h3);
+              const tr = rg.getBoundingClientRect(), b3 = x.getBoundingClientRect();
+              if (tr.width && tr.right > b3.left + 0.5 && tr.bottom > b3.top && tr.top < b3.bottom) out.push(`${where}: the ✕ covers the title text (title right ${Math.round(tr.right)}, ✕ left ${Math.round(b3.left)})`);
+            }
             x.click();
             await tick();
             if (ov.classList.contains('open')) { out.push(`${where}: the ✕ did not close it`); closeSheet(id); }
           } else closeSheet(id);
         }
+        if (size === 'phone' && !handles) out.push('no sheet has a handle bar on the phone');
         // The app dialog: a confirm and a choice.
         for (const [kind, open] of [['confirm', () => showConfirm('Sure?')], ['choice', () => showChoice('How did it go?', [{ id: 'a', label: 'Fine' }, { id: 'b', label: 'Not fine' }])]]) {
           const where = `appDialog ${kind}@${size}`;
@@ -88,6 +120,16 @@ module.exports = async ({ page, want, checks }) => {
           else cancel.click();
           await p;
           if (ov.classList.contains('open')) out.push(`${where}: Cancel did not close it`);
+        }
+        // Stage 63: a danger confirm's OK is the kit's danger button (C8), a plain one's the primary; both stay under the double-tap guard (act-guard), which no longer keys on every .ui-btn--primary.
+        for (const danger of [false, true]) {
+          const p = showConfirm('Sure?', danger ? { danger: true } : {});
+          await tick();
+          const ok = document.getElementById('appDialogOkBtn');
+          const want = danger ? 'ui-btn--danger' : 'ui-btn--primary';
+          if (!ok || !ok.classList.contains(want) || !ok.classList.contains('act-guard')) out.push(`appDialog ${danger ? 'danger' : 'plain'} confirm@${size}: the OK is ${ok ? ok.className : 'missing'}, want .${want}.act-guard`);
+          _closeAppDialog(null);
+          await p;
         }
         profile = 'jenn'; parentViewing = 'jenn'; goToday();
         return out;

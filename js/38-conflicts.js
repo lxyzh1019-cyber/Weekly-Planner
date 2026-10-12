@@ -148,7 +148,7 @@ function cfBannerHtml() {
         ? 'Two devices saved different versions of one record.'
         : `Two devices saved different versions of ${escapeHtml(String(n))} records.`}
         The newer one is showing.</span>
-      <button type="button" class="pill-btn" data-cf-open="1">Have a look</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-cf-open="1">Have a look</button>
     </div>`;
 }
 
@@ -200,7 +200,7 @@ function cfRenderPanel() {
             ${isShown ? '<span class="cf-tag">showing now</span>' : ''}
           </div>
           <div class="cf-version-when">saved ${escapeHtml(cfWhen(v))}</div>
-          ${done ? '' : `<button type="button" class="btn-confirm cf-pick"
+          ${done ? '' : `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard cf-pick"
               data-cf-pick="${escapeAttr(c.id)}" data-cf-index="${i}">Keep this one</button>`}
         </div>`;
     }).join('');

@@ -271,8 +271,8 @@ function bkRenderPanel() {
     <h3 class="parent-h3">🗄️ Backup &amp; restore</h3>
     <p class="parent-hint">A full backup contains everything both girls have planned and earned — every week, routine, goal, chore and pocket-money record. Keep one somewhere off this device.</p>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.5rem">
-      <button class="btn-confirm bk-btn" onclick="bkExportFullBackup()">⬇️ Export full backup</button>
-      <button class="pill-btn bk-btn" onclick="bkImportPickFile()">⬆️ Restore from file…</button>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard bk-btn" onclick="bkExportFullBackup()">⬇️ Export full backup</button>
+      <button class="ui-btn ui-btn--secondary bk-btn" onclick="bkImportPickFile()">⬆️ Restore from file…</button>
     </div>
     <p class="parent-hint">On this device now: ${stats.weeks} week${stats.weeks === 1 ? '' : 's'}, ${stats.blocks} planned block${stats.blocks === 1 ? '' : 's'}, ${stats.goals} goal${stats.goals === 1 ? '' : 's'}.</p>
 
@@ -285,7 +285,7 @@ function bkRenderPanel() {
 
     <h3 class="parent-h3">🧹 Chore-only export</h3>
     <p class="parent-hint">A smaller file with just the chore groups, prices and money snapshots — useful for checking the money setup, but <b>not</b> a backup of the planner and not restorable here.</p>
-    <button class="pill-btn bk-btn" onclick="ctExportBackup()">⬇️ Export chore-only file</button>
+    <button class="ui-btn ui-btn--secondary bk-btn" onclick="ctExportBackup()">⬇️ Export chore-only file</button>
     <div class="bk-reset" onclick="coHandleClick(event)">${typeof coDangerCard === 'function' ? coDangerCard() : ''}</div>
   `;
 }

@@ -66,7 +66,7 @@
 .sd-steps { display: flex; gap: var(--hdr-r2-gap); align-items: center; white-space: nowrap; }
 .sd-stepsep { color: var(--hdr-label-ink); }
 .sd-stepchip { display: inline-flex; align-items: center; white-space: nowrap; }
-.sd-stepchip.on { padding: var(--hdr-pill-pad); border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill); background: var(--btn-main); color: var(--btn-main-ink); font-weight: 600; }
+.sd-stepchip.on { padding: var(--hdr-pill-pad); border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill); background: var(--mny-v15-teal); color: var(--mny-v15-white); font-weight: 600; } /* R2 (owner 2026-10-12): the current step is the money teal, never the main action's yellow. */
 
 /* The content: main card and a 356px right side (§0), filling the screen. */
 .sd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 356px; gap: 14px; align-items: stretch; }

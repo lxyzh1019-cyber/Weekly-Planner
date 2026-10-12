@@ -611,9 +611,9 @@ function reflRenderCarry(wk, kid, rec) {
   return `<div class="refl-carry">
       <span class="refl-carry-cap">Saved either way. Want it in the plan too?</span>
       <div class="refl-carry-btns">
-        ${links.map(l => `<button type="button" class="pill-btn" data-mm-action="refl-carry"
+        ${links.map(l => `<button type="button" class="ui-btn ui-btn--secondary" data-mm-action="refl-carry"
             data-refl-link="${escapeAttr(l.id)}">${l.icon} As a to-do, with ${escapeHtml(l.name)}</button>`).join('')}
-        <button type="button" class="pill-btn" data-mm-action="refl-carry"
+        <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="refl-carry"
           >➕ Add to ${escapeHtml(when)}'s to-dos</button>
       </div>
     </div>`;
@@ -660,12 +660,12 @@ function mmRenderReflect(wk) {
         ${rec.planNext.doneText ? `<div><b>We will check:</b> ${escapeHtml(rec.planNext.doneText)}</div>` : ''}
       </div>` : ''}
     ${locked ? '' : `<div class="refl-foot">
-      ${reflIsSettled(rec) ? `<button type="button" class="btn-confirm refl-talked${rec.parentReviewedAt ? ' on' : ''}"
+      ${reflIsSettled(rec) ? `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard refl-talked${rec.parentReviewedAt ? ' on' : ''}"
         data-mm-action="refl-talked" data-kid="${escapeAttr(kid)}"
         >${rec.parentReviewedAt ? `✓ We talked about ${escapeHtml(name)}'s reflection`
                                 : `We talked about ${escapeHtml(name)}'s reflection`}</button>`
       : `<span class="mm-cap">${reflDoneCount(rec)}/${REFL_TABS.length} answered — finish them, or skip, before recording the conversation.</span>`}
-      ${reflIsComplete(rec) ? '' : `<button type="button" class="pill-btn" data-mm-action="refl-skip" data-kid="${escapeAttr(kid)}"
+      ${reflIsComplete(rec) ? '' : `<button type="button" class="ui-btn ui-btn--secondary" data-mm-action="refl-skip" data-kid="${escapeAttr(kid)}"
         >${skipped ? 'Skipped — pick it back up' : 'Skip for now'}</button>`}
     </div>`}
     ${skipped ? `<p class="mm-cap">Left unfinished on purpose. It does not hold up the money.</p>` : ''}
@@ -673,7 +673,7 @@ function mmRenderReflect(wk) {
     <div class="mm-2b">${mm2b('jenn', mm2bScale(wk))}${mm2b('jess', mm2bScale(wk))}</div>
     <div class="mm-cap">Solid = planned hours completed · dashed = planned, on one scale for both girls. The app records which planned blocks were finished, not how long anything took.</div>
     <div class="mm-blocklink">${['jenn', 'jess'].map(k =>
-      `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
+      `<button type="button" class="ui-btn ui-btn--secondary" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
         >${CT_PROFILE_ICON[k]} Open ${escapeHtml(kidLabel(k).name)}'s week ›</button>`).join('')}
       <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
 }

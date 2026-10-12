@@ -186,7 +186,7 @@ function rcRender() {
     const sv = rcSaveState();
     foot = `<div class="rc-foot">
         <button type="button" class="rc-btn ${sv.cls}" data-rc-action="save"${sv.disabled ? ' disabled' : ''}>${escapeHtml(sv.text)}</button>
-        <button type="button" class="rc-btn" data-rc-action="close">Not now</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-rc-action="close">Not now</button>
       </div>`;
   }
   host.innerHTML = `<div class="rc-chiprow rc-kinds">${chips}</div>${who}${body}${foot}`;

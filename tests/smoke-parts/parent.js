@@ -253,7 +253,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
             const body = document.getElementById('requestBody');
             measure(`Request sheet (${kind})`, body, '.ui-stepper--kid > button');
             sizeOf(`Request sheet (${kind}) stepper (the girl: 52)`, '.ui-stepper > button', body, 52, 52);
-            const x = body.querySelector('.ui-sheet-x');
+            const x = document.querySelector('#requestOverlay .ui-sheet-x');
             if (!x || !x.matches('.ui-btn.ui-btn--icon')) out.push(`${tag} Request sheet (${kind}): the ✕ is not the kit icon button`);
             const leftRq = body.querySelectorAll(OLD.join(', '));
             if (leftRq.length) out.push(`${tag} Request sheet (${kind}): ${leftRq.length} element(s) still wear a retired class`);

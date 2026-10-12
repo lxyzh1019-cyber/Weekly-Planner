@@ -68,8 +68,8 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
       <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       ${inputHtml}${checkHtml}
       <div class="app-dialog-btns">
-        ${hideCancel ? '' : `<button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>`}
-        <button type="button" id="appDialogOkBtn" class="btn-confirm${danger ? ' danger' : ''}" style="width:auto;flex:1"${checkLabel ? ' disabled' : ''} onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
+        ${hideCancel ? '' : `<button type="button" class="ui-btn ui-btn--secondary app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>`}
+        <button type="button" id="appDialogOkBtn" class="ui-btn ${danger ? 'ui-btn--danger' : 'ui-btn--primary'} ui-btn--block act-guard" style="width:auto;flex:1"${checkLabel ? ' disabled' : ''} onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
       </div>
     </div>`;
   return new Promise(resolve => {
@@ -121,7 +121,7 @@ function showChoice(message, options, opts = {}) {
       <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       <div class="app-dialog-choices">${btns}</div>
       <div class="app-dialog-btns">
-        <button type="button" class="pill-btn app-dialog-cancel" onclick="_closeAppDialog(null)">${escapeHtml(opts.cancelLabel || 'Not yet')}</button>
+        <button type="button" class="ui-btn ui-btn--secondary app-dialog-cancel" onclick="_closeAppDialog(null)">${escapeHtml(opts.cancelLabel || 'Not yet')}</button>
       </div>
     </div>`;
   ov.querySelectorAll('[data-choice]').forEach(btn => {
@@ -151,7 +151,9 @@ function _appChoiceKey(e) {
 // handler twice — placing a duplicate block, sending a duplicate invite, etc.
 // We swallow a repeat activation of the SAME action button inside a short
 // window. Opening any sheet resets the guard so legitimately re-using the same
-// static button on a fresh sheet is never blocked.
+// static button on a fresh sheet is never blocked. `act-guard` marks the kit
+// buttons that were .btn-confirm before Stage 63, so the guard covers the same
+// buttons as before, not every .ui-btn--primary.
 let _actGuardBtn = null, _actGuardAt = 0;
 function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
 (function installActionDoubleTapGuard() {
@@ -162,7 +164,7 @@ function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
     if (!btn) return;
     const cls = typeof btn.className === 'string' ? btn.className : '';
     const oc = (btn.getAttribute && btn.getAttribute('onclick')) || '';
-    const isAction = /\bbtn-confirm\b/.test(cls) || /\bbtn-danger\b/.test(cls) || MUTATING.test(oc);
+    const isAction = /\b(?:act-guard|btn-confirm|btn-danger)\b/.test(cls) || MUTATING.test(oc);
     if (!isAction) return;
     const now = Date.now();
     if (btn === _actGuardBtn && (now - _actGuardAt) < WINDOW_MS) {
@@ -314,7 +316,7 @@ function showMascotWithSuggestions(msg, suggestions, autoHide=true) {
   sugWrap.innerHTML = '';
   (suggestions || []).forEach(s => {
     const b = document.createElement('button');
-    b.className = 'pill-btn';
+    b.className = 'ui-btn ui-btn--secondary';
     b.textContent = `${s.icon} ${s.name}`;
     b.onclick = () => {
       hideMascot();

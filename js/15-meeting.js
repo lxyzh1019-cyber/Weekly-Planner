@@ -680,7 +680,7 @@ function mmExpressKidCard(wk, kid) {
       ${row('Competition', fmtMoney(b.compPaid))}
       ${row('Fines', b.fines.total ? '−' + fmtMoney(b.fines.total) : 'none')}
       <div class="mm-xp-row mm-xp-total"><span><b>Total</b></span><span class="mm-xp-n"><b>${fmtMoney(b.net)}</b></span></div>
-      <button type="button" class="pill-btn" data-mm-action="express-adjust">Adjust in the full meeting ›</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="express-adjust">Adjust in the full meeting ›</button>
     </div>`;
 }
 
@@ -695,7 +695,7 @@ function mmRenderExpress(wk) {
         <div><div class="mm-xp-title">Catch up · ${escapeHtml(mmWeekLabel(wk))}</div>
         <div class="ct-meta">${idx >= 0 ? `Week ${idx + 1} of ${open.length} still open` : 'This week is already closed'}</div></div>
         <span class="ck-spacer"></span>
-        <button type="button" class="pill-btn" data-mm-action="express-full">Open the full meeting</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="express-full">Open the full meeting</button>
       </div>
       <div class="mm-xp-cards">${['jenn', 'jess'].map(k => mmExpressKidCard(wk, k)).join('')}</div>
       <div class="mm-xp-ticks">
@@ -709,8 +709,8 @@ function mmRenderExpress(wk) {
         </button>
       </div>
       <div class="mm-xp-actions">
-        <button type="button" class="btn-confirm" data-mm-action="express-commit">Close this week and go to the next</button>
-        <button type="button" class="pill-btn" data-mm-action="express-skip">Skip for now</button>
+        <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" data-mm-action="express-commit">Close this week and go to the next</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="express-skip">Skip for now</button>
       </div>
     </div>`;
 }
@@ -983,11 +983,11 @@ function renderMeetingMode() {
   }
   else body = mmRenderPlan(wk);
 
-  const back = mmStep > 1 ? `<button type="button" class="pill-btn" onclick="mmGoIndex(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
+  const back = mmStep > 1 ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="mmGoIndex(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
   /* Back / Next / Finish on the week and close steps. The money step has no
      footer (Plan v17 §0): hold to sign is the one sign control. */
   const next = mmStep < MM_STEPS.length
-    ? `<button type="button" class="btn-confirm" onclick="mmGoIndex(${mmStep + 1})">Next ▶</button>`
+    ? `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mmGoIndex(${mmStep + 1})">Next ▶</button>`
     : mmFinishButtons(wk);
 
   /* One scroller — the sheet — with the week-and-step header pinned to its top
@@ -1213,7 +1213,7 @@ function mmRenderReview(wk) {
      reading the plan is what a review is, and it is not a repair action.
      Same writer and same labels as step 2's pair, so the two cannot drift. */
   const openWeek = `<div class="mm-blocklink">${['jenn', 'jess'].map(k =>
-    `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
+    `<button type="button" class="ui-btn ui-btn--secondary" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
       >${CT_PROFILE_ICON[k]} Open ${escapeHtml(kidLabel(k).name)}'s week ›</button>`).join('')}
     <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
   return `${mnyChecklist(wk, mnyMeetingKid())}
@@ -1553,8 +1553,8 @@ function mmRenderQuarterly() {
       <div><b>📅 Quarterly review — ${mrQuarterOf(todayKey())}</b></div>
       <div class="ct-meta">The rulebook says these numbers get looked at every three months. Here's what actually happened.</div>
       ${rows}
-      <div style="margin-top:0.4rem"><button type="button" class="pill-btn" onclick="mmDoQuarterlyReview()">Open the rules editor</button>
-        <button type="button" class="pill-btn" onclick="mmSkipQuarterlyReview()">Reviewed — no change</button></div>
+      <div style="margin-top:0.4rem"><button type="button" class="ui-btn ui-btn--secondary" onclick="mmDoQuarterlyReview()">Open the rules editor</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="mmSkipQuarterlyReview()">Reviewed — no change</button></div>
     </div>`;
 }
 function mmDoQuarterlyReview() {
@@ -1841,7 +1841,7 @@ function mmRenderPlan(wk) {
     return `${strip}
       <div class="mm-h">This week hasn't happened yet</div>
       <div class="ct-meta">A future week can't be reviewed or closed. Plan it in the weekly planner, and come back once it has been lived.</div>
-      <button type="button" class="btn-confirm" data-mm-action="thisweek">Go to this week ▶</button>`;
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" data-mm-action="thisweek">Go to this week ▶</button>`;
   }
 
   if (pos === 'past') {
@@ -1855,9 +1855,9 @@ function mmRenderPlan(wk) {
       ${mmCloseSummary(wk)}
       <div class="ct-meta">${escapeHtml(mmWeekLabel(wk))} has already been and gone, so there is nothing to plan forward from it. Finish what it still owes, then come back to the present.</div>
       ${go
-        ? `<button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(go.kid)}');mmGoStep(${go.agreed ? 4 : 3})">Finish ${escapeHtml(go.name)}'s week ▶</button>`
+        ? `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mnySetMeetKid('${escapeJsAttr(go.kid)}');mmGoStep(${go.agreed ? 4 : 3})">Finish ${escapeHtml(go.name)}'s week ▶</button>`
         : `<div class="mm-recorded">✅ This week is fully reviewed and settled.</div>`}
-      <button type="button" class="pill-btn" data-mm-action="thisweek">Return to this week</button>`;
+      <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="thisweek">Return to this week</button>`;
   }
 
   // Current week: close it, then move on. Copying a schedule stays where it
@@ -1868,9 +1868,9 @@ function mmRenderPlan(wk) {
   let closeBtn;
   if (closed) {
     closeBtn = `<div class="mm-recorded">✅ This week is closed.</div>
-      <button type="button" class="pill-btn" onclick="mmReopenWeek()">Reopen it</button>`;
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="mmReopenWeek()">Reopen it</button>`;
   } else if (gate.ok) {
-    closeBtn = `<button type="button" class="btn-confirm" onclick="mmCloseWeekNow()">🔒 Close the week</button>`;
+    closeBtn = `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mmCloseWeekNow()">🔒 Close the week</button>`;
   } else {
     const why = gate.missing.map(m => {
       const who = kidLabel(m.kid).name;
@@ -1879,7 +1879,7 @@ function mmRenderPlan(wk) {
       if (m.reason === 'reflection-talk') return `nobody has recorded talking through ${who}'s reflection`;
       return `${who}'s money is not settled yet`;
     }).join(' · ');
-    closeBtn = `<button type="button" class="btn-confirm" disabled>🔒 Close the week</button>
+    closeBtn = `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" disabled>🔒 Close the week</button>
       <div class="ct-meta">${escapeHtml(why)}.</div>`;
   }
   return `${strip}
@@ -1889,7 +1889,7 @@ function mmRenderPlan(wk) {
     ${closeBtn}
     <div class="mm-h mm-h-sub">Next week</div>
     <div class="ct-meta">Open next week to plan it. Copying a schedule across lives in the planner itself, next to the week it would land on.</div>
-    <button type="button" class="pill-btn" onclick="mmOpenNextWeek()">Open next week ▶</button>`;
+    <button type="button" class="ui-btn ui-btn--secondary" onclick="mmOpenNextWeek()">Open next week ▶</button>`;
 }
 
 /* Which days of this week are still ahead, named. Empty on the last day, so the
@@ -2000,7 +2000,7 @@ function mmSettledStrip(wk) {
 
 function mmFinishButtons(wk) {
   if (mmAllSettled(wk)) {
-    return `<button type="button" class="btn-confirm" onclick="mmCloseMeeting()">🎉 Finish meeting</button>`;
+    return `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mmCloseMeeting()">🎉 Finish meeting</button>`;
   }
   const unsettled = ['jenn', 'jess'].map(k => mmKidSettled(wk, k)).filter(s => !s.decided);
   const gap = unsettled.length === 2
@@ -2008,8 +2008,8 @@ function mmFinishButtons(wk) {
     : `${unsettled[0].name}'s week isn't decided yet`;
   const goTo = unsettled[0];
   return `<span class="mm-finish-gap">
-      <button type="button" class="pill-btn" onclick="mmCloseMeeting()">Close anyway</button>
-      <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="mmCloseMeeting()">Close anyway</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
     </span>`;
 }
 /* mmPlanNextWeek lived here. It copied whatever week the meeting was pointed

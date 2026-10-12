@@ -1069,7 +1069,7 @@ function rqPreviewAndFoot(o) {
   const opt = o || {};
   return `${opt.preview === false ? '' : `<div class="rq-preview" data-rq-preview>${escapeHtml(st.preview || '')}</div>`}
     <div class="rq-foot">
-      ${opt.notNow === false ? '' : '<button type="button" class="rq-notnow" data-mny-action="rq-close">Not now</button>'}
+      ${opt.notNow === false ? '' : '<button type="button" class="ui-btn ui-btn--secondary" data-mny-action="rq-close">Not now</button>'}
       <button type="button" class="rq-send${st.ready ? ' ready' : ''}" data-mny-action="rq-send">Send to parents →</button>
     </div>`;
 }
@@ -1095,7 +1095,7 @@ function rqRender() {
   else if (d.kind === 'prices') body = rqPricesBody(d);
   else if (MNY_INFO_KINDS.indexOf(d.kind) >= 0) body = mnyInfoSheetBody(d);
   else body = rqListBody(kid);
-  host.innerHTML = `${sheetCloseXHtml('data-mny-action="rq-close"')}${body}`;
+  host.innerHTML = body;
 }
 
 /* Typing changed something the button and the preview say: update those two,
