@@ -4063,23 +4063,20 @@ rows without `defaulted` keep the editor unchanged. (checked by smoke: aDefaulte
 
 *Moved to `docs/archive/architecture-history.md`: the Small fixes R6 introduction and index table.*
 
-**Dark mode (C7).** There is no dark theme: `css/app.css` has three
-`prefers-color-scheme: dark` rules (the week's clash and to-do banners) and no
-`color-scheme` declaration, so a device set to dark renders these screens in
-their light colours. `theR5ScreensReadInDarkMode` emulates the dark scheme,
-asserts it took (`matchMedia`), and measures every piece of text on Sister
-Sync's timeline and inbox, the 📋 Copy a day sheet (a child's with a row open,
-and a parent's with the sister tabs), Today's 🌙 row and Parent › Now against
-what is actually behind it — background layers composited, opacity included —
-at **4.5:1, with no white text on a pastel**. Emoji-only text is skipped (it
-draws in its own colours); sheets are measured after their slide-in, because
-mid-animation every word reads 1:1. It found two things, both also true in
-light mode, and both fixed: the empty rows of Copy a day were faded to 55%
-opacity ("Friday" at 1.4:1 — now dashed and in `--ink-light`, not faded), and
-Parent › Now's today square was white on `--accent` (2.6:1 — now
-`--accent-strong`, the portal's own "go" colour, 4.9:1). "On her behalf" is
-measured with Parent › Now since the merge with `main`, and Today's 🕓 Catch up
-card (a day open) since Plan v7, which found nothing to fix there. (checked by smoke: theR5ScreensReadInDarkMode)
+**Dark mode (C7) — removed (Stage 49, owner decision K3, 2026-10-11).** The app
+has one light scheme and no dark theme. The three `prefers-color-scheme: dark`
+rules (the week's clash and to-do banners), their six `--dark-*` tokens and the
+`theR5ScreensReadInDarkMode` check are gone, and the first `:root` of
+`css/app.css` declares `color-scheme: light`, so a device set to dark still
+draws the light app. `tests/check-look-tokens.js` (rule 6, "no dark scheme",
+part of `npm run check`) fails on `prefers-color-scheme` in `css/`, `js/`,
+`index.html` or `sw.js`, and when that `:root` lacks `color-scheme: light`.
+The contrast it measured is still held in the light looks: Sister Sync, Copy a
+day, Today's 🌙 row, Catch up and Parent › Now are measured at **4.5:1, with no
+white text on a pastel** by the looks walks (`thePopLookReadsEverywhere`,
+`theCalmLookReadsEverywhere`, which share `contrastFindings` in
+`tests/smoke.js`), and the "with Mum" row by `withMumReadsInBothLooks`.
+(checked by: tests/check-look-tokens.js)
 
 *Moved to `docs/archive/architecture-history.md`: the "C6 found" note of Small fixes R6.*
 

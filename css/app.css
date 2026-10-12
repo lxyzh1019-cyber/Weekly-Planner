@@ -1,4 +1,6 @@
   :root {
+    /* One light scheme: the app has no dark theme (tests/check-look-tokens.js, rule "no dark scheme"). */
+    color-scheme: light;
     /* Print grid slot height (per 15-min slot) — the default only.
        renderPrintSheet (js/16-print.js) sets its own on the sheet's host,
        sized so the chosen window (6am–10pm unless a parent narrows it)
@@ -327,14 +329,6 @@
     --status-warmup-stripe-soft: rgba(244,163,64,0.2);
     --travel-edge-shade: black;
     --travel-ink-shade: black;
-
-    /* Dark scheme: the three prefers-color-scheme rules (the week clash and to-do banners) */
-    --dark-clash-fill: #3a1512;
-    --dark-clash-ink: #ffd7d2;
-    --dark-clash-border: #e5675c;
-    --dark-todo-fill: #33260c;
-    --dark-todo-ink: #ffe6b0;
-    --dark-todo-border: #d9a33d;
 
     /* Zones: the time-of-day bands of the week and day grids */
     --zone-school: #d7eafe;
@@ -1860,9 +1854,6 @@
   }
   .week-conflict-banner .wcb-icon { font-size: calc(1.15rem * var(--text-scale, 1)); }
   .week-conflict-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-  @media (prefers-color-scheme: dark) {
-    .week-conflict-banner { background: var(--dark-clash-fill); color: var(--dark-clash-ink); border-color: var(--dark-clash-border); }
-  }
   /* Something still to do, not something already wrong. Same shape as the clash
      banner so the footer reads as one row of week-level notes, but amber rather
      than red: a week that has not found a day for the family's chores yet is a
@@ -1884,9 +1875,6 @@
   .week-todo-banner--warn { border-width: 3px; box-shadow: 3px 3px 0 var(--status-todo-glow-strong); }
   .week-todo-banner .wcb-icon { font-size: calc(1.15rem * var(--text-scale, 1)); }
   .week-todo-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: calc(max(13px, calc(0.82rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
-  @media (prefers-color-scheme: dark) {
-    .week-todo-banner { background: var(--dark-todo-fill); color: var(--dark-todo-ink); border-color: var(--dark-todo-border); }
-  }
   /* Hatched travel/get-ready strips hugging a card in the week lane — tinted
      to the activity's own colour so it reads as "part of that block" rather
      than a generic grey stripe. */

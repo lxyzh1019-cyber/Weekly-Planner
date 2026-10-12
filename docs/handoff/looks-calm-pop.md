@@ -102,7 +102,7 @@ Earlier revisions were owner decisions and appear below without marks.
   - My money charts (`js/21-money-data.js`, `js/22-money-page1.js`): Kept ready yellow `#ffd166`, Locked away blue `#6fb1fc`, Spent pink `#ff9eb5`, loan paid off green `#95d5b2`.
   - Flow (`FL_COLOURS`, `js/42-flow.js`): Kept ready blue `#6fb1fc`, Locked away teal `#8ad8d0`, In companies lilac `#b0a0ea`, Spent yellow `#ffd166`, Loan peach `#f2b880`.
   - The Flow's own comment says its colours match My money; they do not.
-- The app has **no dark theme**. Three rules adjust banners under the system dark setting, and `theR5ScreensReadInDarkMode` measures contrast under it. That check must keep passing in both looks.
+- The app has **no dark theme** (removed in Stage 49, owner decision K3). The first `:root` of `css/app.css` declares `color-scheme: light`, and `tests/check-look-tokens.js` (rule 6) fails on any `prefers-color-scheme` in `css/`, `js/`, `index.html` or `sw.js`. Contrast is held in both looks by `thePopLookReadsEverywhere`, `theCalmLookReadsEverywhere` and `withMumReadsInBothLooks`.
 - The kid nav has **five** tabs: Today · Week · Money · Sister Sync · More, drawn by `tdRenderNav`. "Sister Sync" fits at 375px in today's font; Calm's font changes that measurement.
 - The ⋯ More sheet (`tdOpenMore`) holds 🧹 Chores · ◀ Switch and the build number. `check-dead-actions.js` cannot see `data-td-more`, so a More tile and its `tdGoMore` branch are added by hand, together.
 - The parent portal has one header on every destination (`#screen-parent .topbar`): scope pills, 🔒 PIN, Exit.

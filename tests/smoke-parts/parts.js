@@ -330,7 +330,6 @@ const PARTS = {
     'removeAllInSeriesKeepsPins',
     'sisterDetailsAreTheParentsToChange',
     'copyADayNamesTheSistersDay',
-    'theR5ScreensReadInDarkMode',
     'thePopLookReadsEverywhere',
     'theCalmLookReadsEverywhere',
     'everyTextUsesTheLooksFonts',

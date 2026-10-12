@@ -16022,19 +16022,15 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  /* C7 — dark mode. The screens changed in R5 are rendered with the device
-     asking for a dark scheme (prefers-color-scheme: dark, emulated), and every
-     piece of text on them is measured against what is actually behind it:
-     contrast at least 4.5:1, and never white text on a pastel. Sister Sync's
-     timeline, the 📋 Copy a day sheet (a row open, and a parent's sister tabs),
-     Today's 🌙 row, Parent › Now (with "On her behalf") and, since Plan v7,
-     Today's 🕓 Catch up card with a day open. */
-  await page.emulateMedia({ colorScheme: 'dark' });
+  /* contrastFindings(root, label, skip) — the contrast measure the looks walks
+     (tests/smoke-parts/looks.js) share: every piece of text under root against
+     what is actually behind it. The app has one light scheme (no dark mode;
+     tests/check-look-tokens.js guards that), so nothing is emulated. */
   await page.evaluate(() => {
     /* skip: a selector whose contents are not measured — thePopLookReadsEverywhere
        passes '.print-sheet', the week's print preview, which draws the printed
        sheet and so ignores the look (L12). */
-    window.darkContrastFindings = (root, label, skip) => {
+    window.contrastFindings = (root, label, skip) => {
       const out = [];
       if (!root) return [`${label}: not on screen`];
       const parse = (c) => {
@@ -16095,110 +16091,6 @@ function findChromium() {
       return out;
     };
   });
-  if (want('theR5ScreensReadInDarkMode')) checks.theR5ScreensReadInDarkMode = await page.evaluate(async () => {
-    const bad = [];
-    // Overlays fade in and sheets slide up; measured mid-animation, every word reads as 1:1.
-    const settle = () => new Promise(r => setTimeout(r, 400));
-    if (!matchMedia('(prefers-color-scheme: dark)').matches) return ['the dark scheme was not emulated — nothing was measured'];
-    const unpin = pinClockToWeekday(3); // Thursday, midday
-    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey, wasOffset = weekOffset;
-    const wasUnlocked = parentUnlockedThisSession, wasSyncIdx = syncDayIdx;
-    const wasInvites = state.shared.invites;
-    const hadVis = Object.prototype.hasOwnProperty.call(state.shared, 'sisterVisibilityMode'), wasVis = state.shared.sisterVisibilityMode;
-    const keys = getDayKeys(0);
-    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
-    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
-    const pd = getProfData('jenn');
-    const hadMoods = JSON.parse(JSON.stringify(pd.dayMoods || {}));
-    try {
-      state.shared.sisterVisibilityMode = 'public';
-      const thu = keys[3];
-      setDayBlocks(thu, [
-        { id: 'r6-dk-a', actId: 'reading', startMin: 16 * 60, durationMin: 90, public: true,
-          travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 },
-        { id: 'r6-dk-b', actId: 'piano', startMin: 19 * 60, durationMin: 30 },
-      ], 'jenn');
-      setDayBlocks(thu, [
-        { id: 'r6-dk-c', actId: 'piano', startMin: 16 * 60, durationMin: 60, public: true },
-        { id: 'r6-dk-d', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
-      ], 'jess');
-      setDayBlocks(keys[1], [{ id: 'r6-dk-e', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
-        { id: 'r6-dk-f', actId: 'piano', startMin: 17 * 60, durationMin: 30, parentPinned: true }], 'jenn');
-      state.shared.invites = [{ id: 'r6-dk-inv', from: 'jess', to: 'jenn', status: 'pending', day: keys[4],
-        actId: 'piano', startMin: 16 * 60, durationMin: 60, sourceBlockId: 'r6-dk-src' }];
-
-      // Sister Sync's timeline, with the inbox under it.
-      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
-      openSisterSync(); syncDayIdx = 3; renderSync();
-      bad.push(...darkContrastFindings(document.getElementById('screen-sync'), 'Sister Sync'));
-
-      // 📋 Copy a day — a child's, with Tuesday open.
-      openDay(thu, 3);
-      openTemplateSheet();
-      const row = [...document.querySelectorAll('#copyDayList .copy-day-row')].find(r => /Tuesday/.test(r.textContent));
-      if (row) row.click(); else bad.push('Copy a day: Tuesday is not offered');
-      await settle();
-      bad.push(...darkContrastFindings(document.querySelector('#templateOverlay .sheet'), 'Copy a day'));
-      closeSheet('templateOverlay');
-      // …and a parent's, with the sister tabs.
-      profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
-      openDay(thu, 3);
-      openTemplateSheet();
-      await settle();
-      bad.push(...darkContrastFindings(document.querySelector('#templateOverlay .sheet'), 'Copy a day (parent)'));
-      closeSheet('templateOverlay');
-      copyDayDstKid = null;
-
-      // Today's 🌙 row: yesterday has no mood, so it asks.
-      profile = 'jenn'; parentViewing = 'jenn';
-      pd.dayMoods = {};
-      goToday();
-      const moon = document.querySelector('#tdWrap [data-td-action="reflect"]');
-      if (!moon) bad.push("Today's 🌙 row: not on screen");
-      else bad.push(...darkContrastFindings(moon, "Today's 🌙 row"));
-
-      // Parent › Now.
-      profile = 'parent'; parentViewing = 'jenn';
-      showScreen('parent'); renderParentHome(); setParentTab('now');
-      bad.push(...darkContrastFindings(document.getElementById('pnWrap'), 'Parent › Now'));
-
-      /* Today's 🕓 Catch up (Plan v7 item 5): an earlier day of this week with
-         an unanswered chore, opened, so its answers are measured with it. Its
-         own keep/restore (c1), because clearing the two weeks is how the card
-         is made to show exactly one day. */
-      const k = c1.keep('jenn');
-      try {
-        profile = 'jenn'; parentViewing = 'jenn';
-        ctPrepareRead();
-        k.clear();
-        setDayBlocks(mrWeekDayKeys(k.wk)[1], [{ id: 'r7-dk-cu', actId: 'chores', startMin: 17 * 60, durationMin: 30,
-          choreTags: ['mop'] }], 'jenn');
-        goToday();
-        const day = document.querySelector('#tdWrap .td-catchup [data-td-action="catchup-day"]');
-        if (day) day.click();
-        const cu = document.querySelector('#tdWrap .td-catchup');
-        if (cu && !cu.querySelector('.td-catchup-panel')) bad.push('🕓 Catch up: its day did not open, so its answers were not measured');
-        bad.push(...darkContrastFindings(cu, '🕓 Catch up'));
-      } finally {
-        k.restore();
-      }
-    } catch (e) {
-      bad.push('threw: ' + e.message);
-    } finally {
-      unpin();
-      ['templateOverlay'].forEach(id => { if (document.getElementById(id).classList.contains('open')) closeSheet(id); });
-      state.shared.invites = wasInvites;
-      if (hadVis) state.shared.sisterVisibilityMode = wasVis; else delete state.shared.sisterVisibilityMode;
-      pd.dayMoods = hadMoods;
-      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
-      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey; weekOffset = wasOffset;
-      parentUnlockedThisSession = wasUnlocked; syncDayIdx = wasSyncIdx;
-      copyDaySrcWeek = 0; copyDayDstKid = null;
-      goToday();
-    }
-    return bad.length ? bad : true;
-  });
-  await page.emulateMedia({ colorScheme: 'light' });
 
   // The looks walks (Pop, Calm, fonts): tests/smoke-parts/looks.js.
   await looksWalks({ page, want, checks, shot, setLook, clearLooks, KID_SCREENS, defineAuditSeeds });
@@ -16208,8 +16100,8 @@ function findChromium() {
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code
      before it. Item 2 (the Day view's invite buttons) is held by
-     kidScreensMeetTheHouseRules' Day view rows and item 5 (🕓 Catch up in dark
-     mode) by theR5ScreensReadInDarkMode, both above. Every check puts back
+     kidScreensMeetTheHouseRules' Day view rows and item 5 (🕓 Catch up contrast)
+     by the looks walks (tests/smoke-parts/looks.js). Every check puts back
      what it seeds, and pins the clock (Thursday of this week, midday in
      Edmonton) because "today" is what each of them reads. */
 

@@ -308,7 +308,8 @@ Each line says what you see or what the app does, then the test that proves it. 
 
 ## Looks
 
-- Sister Sync, Copy a day, Today's 🌙 row, Catch up and Parent Now keep 4.5:1 contrast in dark mode — Proof: theR5ScreensReadInDarkMode
+- Sister Sync, Copy a day, Today's 🌙 row, Catch up and Parent Now keep 4.5:1 contrast in the light looks, Pop and Calm (the "with Mum" row measured in both) — Proof: withMumReadsInBothLooks, thePopLookReadsEverywhere, theCalmLookReadsEverywhere
+- There is no dark mode: one light scheme (`color-scheme: light` on the root); no `prefers-color-scheme` in css/, js/, index.html or sw.js (retires the dark-mode row, Stage 49) — Proof: tests/check-look-tokens.js
 - Two looks, Pop and Calm, cover the whole app; print ignores them. Pop is cream graph paper with handwriting fonts and yellow buttons; Calm is cool paper with Lexend and purple buttons — Proof: theLookFlipsWithNoReload
 - Pop (default) and Calm share the same border widths and boxes — Proof: theLooksKeepTheSameBoxes
 - Switching: a 🎨 tile in each kid's More and a 🎨 button in the parent portal; instant, remembered per person on this device, never synced — Proof: theLookSurvivesAReload

@@ -65,8 +65,8 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
      markers navy, and makes the text 10% bigger; any of those can put text on
      a colour it does not read on. So every KID_SCREENS row at the phone and the
      iPad sizes, the five parent destinations, the ⋯ More sheet and the block
-     edit sheet are measured with darkContrastFindings' method (background
-     layers composited, opacity included; no dark emulation here): at least
+     edit sheet are measured with contrastFindings' method (background
+     layers composited, opacity included; one light scheme): at least
      4.5:1, and never white text on a pastel. Sheets are measured after their
      slide-in, because mid-animation every word reads 1:1.
 
@@ -120,7 +120,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           const found = await ev(label || id, ([sid, lab]) => {
             const scr = document.getElementById(sid);
             if (!scr || !scr.classList.contains('active')) return [`${lab}: the screen was not on show, so nothing on it was measured`];
-            return darkContrastFindings(scr, lab, '.print-sheet');
+            return contrastFindings(scr, lab, '.print-sheet');
           }, [id, `${label || id}@${w}`]);
           if (found) bad.push(...found);
           if (id === 'screen-today') clashNotes += await ev('clash notes', () => document.querySelectorAll('#screen-today .quest-conflict-note').length) || 0;
@@ -151,9 +151,9 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           day.click();
           const card = document.querySelector('#tdWrap .td-catchup');
           const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
-          const out = [...catchUpPlacementFindings().map(f => `${lab}: ${f}`), ...darkContrastFindings(card, lab)];
+          const out = [...catchUpPlacementFindings().map(f => `${lab}: ${f}`), ...contrastFindings(card, lab)];
           if (!card.querySelector('.td-catchup-panel')) out.push(`${lab}: the day did not open`);
-          if (row) out.push(...darkContrastFindings(row, `${lab} earlier-day row`));
+          if (row) out.push(...contrastFindings(row, `${lab} earlier-day row`));
           const btns = [...card.querySelectorAll('button'), ...(row ? [row] : [])];
           const small = btns.filter(b => { const r = b.getBoundingClientRect(); return r.height < 44 || r.width < 44; });
           if (small.length) out.push(`${lab}: ${small.length} control(s) under 44px: ${small[0].className} ${Math.round(small[0].getBoundingClientRect().height)}px`);
@@ -184,8 +184,8 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           const found = await ev(`parent ${dest}`, (lab) => {
             if (!document.getElementById('screen-parent').classList.contains('active')) return [`${lab}: the portal was not on show, so nothing on it was measured`];
             const nav = document.getElementById('parentNav');
-            return [...darkContrastFindings(document.getElementById('screen-parent'), lab),
-              ...(nav && !nav.hidden ? darkContrastFindings(nav, `${lab} bottom bar`) : [])];
+            return [...contrastFindings(document.getElementById('screen-parent'), lab),
+              ...(nav && !nav.hidden ? contrastFindings(nav, `${lab} bottom bar`) : [])];
           }, `Parent › ${dest}@${w}`);
           if (found) bad.push(...found);
           await snap(`parent-${dest}`, w);
@@ -196,13 +196,13 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
         const picker = await ev('picker', (lab) => {
           const scr = document.getElementById('screen-profile');
           if (!scr.classList.contains('active')) return [`${lab}: the picker was not on show, so nothing on it was measured`];
-          return darkContrastFindings(scr, lab);
+          return contrastFindings(scr, lab);
         }, `profile picker@${w}`);
         if (picker) bad.push(...picker);
         await snap('picker', w);
         await ev('More', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); tdOpenMore(); });
         await settle(450);
-        const more = await ev('More', (lab) => darkContrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
+        const more = await ev('More', (lab) => contrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
         if (more) bad.push(...more);
         await page.screenshot({ path: shot(`look-${look}-more-${w}`) });
         await ev('More close', () => { const ov = document.getElementById('tdMoreOverlay'); if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay'); });
@@ -215,7 +215,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('pop-edit');
         });
         await settle(450);
-        const edit = await ev('edit', (lab) => darkContrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
+        const edit = await ev('edit', (lab) => contrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
         if (edit) bad.push(...edit);
         await page.screenshot({ path: shot(`look-${look}-edit-sheet-${w}`) });
         await ev('edit close', () => { closeSheet('editOverlay'); setDayBlocks(todayKey(), window.__popHad, 'jenn'); });

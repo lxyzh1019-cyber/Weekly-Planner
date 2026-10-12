@@ -7,7 +7,7 @@
 // look when the family switches to the other — nobody sees it until a child does. So a
 // typed colour or font anywhere outside the shared value set fails the build.
 //
-// Five rules:
+// Six rules:
 //
 // 1. css/app.css and every other file in css/. Comments are stripped first. Outside a TOKEN BLOCK no
 //    declaration may carry a colour literal — hex, rgb()/rgba(), hsl()/hsla(),
@@ -82,6 +82,11 @@
 //    are not checked. Both markers must be there exactly once, start first, in
 //    css/app.css and again in css/money.css (the Sunday steps' rules, PR 9) —
 //    a missing marker fails, so the rule cannot switch itself off.
+//
+// 6. No dark scheme. `prefers-color-scheme` appears nowhere in css/, js/,
+//    index.html or sw.js (comments are not read; tools/ and docs/ are not
+//    scanned), and the first `:root` of css/app.css declares
+//    `color-scheme: light`. The colour-name list (NAMED) is not involved.
 //
 // What it knowingly does NOT catch:
 //   - Named colours in js/ and index.html (`color:white` in a template string).
@@ -472,6 +477,42 @@ for (const [x, hits] of exemptHits) {
     fix: 'delete the entry from EXEMPT — an exemption that outlives its reason is a hole' });
 }
 
+// ── Rule 6: no dark scheme (Stage 49, owner decision K3) ──────────────────
+// The app has one light scheme. `prefers-color-scheme` may not appear in css/,
+// js/, index.html or sw.js (comments are not read; tools/ and docs/ are not
+// scanned), and the first `:root` of css/app.css declares `color-scheme: light`.
+let darkChecked = 0;
+{
+  const DARK = /prefers-color-scheme/g;
+  const scan = (file, text) => {
+    darkChecked++;
+    DARK.lastIndex = 0;
+    let m;
+    while ((m = DARK.exec(text))) problems.push({ where: `${file}:${lineOf(text, m.index)}`, rule: 'no dark scheme',
+      detail: text.split('\n')[lineOf(text, m.index) - 1].trim().slice(0, 90),
+      fix: 'the app has no dark theme: delete the rule or the matchMedia call (one light scheme, owner decision K3)' });
+  };
+  for (const f of CSS_FILES) scan(f, fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, blank));
+  for (const name of fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith('.js')).sort()) {
+    scan(`js/${name}`, lex(fs.readFileSync(path.join(ROOT, 'js', name), 'utf8')).text);
+  }
+  scan(HTML_FILE, fs.readFileSync(path.join(ROOT, HTML_FILE), 'utf8').replace(/<!--[\s\S]*?-->/g, blank));
+  scan('sw.js', lex(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8')).text);
+  const app = fs.readFileSync(path.join(ROOT, CSS_FILE), 'utf8').replace(/\/\*[\s\S]*?\*\//g, blank);
+  const open = app.search(/(^|\})\s*:root\s*\{/);
+  let body = '';
+  if (open >= 0) {
+    const start = app.indexOf('{', open);
+    let depth = 0, i = start;
+    for (; i < app.length; i++) { if (app[i] === '{') depth++; else if (app[i] === '}' && --depth === 0) break; }
+    body = app.slice(start + 1, i);
+  }
+  if (!/(?:^|[;\s])color-scheme\s*:\s*light\s*(?:;|$)/.test(body)) {
+    problems.push({ where: CSS_FILE, rule: 'no dark scheme', detail: 'the first top-level :root has no `color-scheme: light`',
+      fix: 'declare color-scheme: light in the first :root of css/app.css, so a device set to dark still draws the light app' });
+  }
+}
+
 // ── Rule 3: every look defines every look token ───────────────────────────
 let looksNote;
 if (looks.size < 2) {
@@ -493,7 +534,8 @@ if (!problems.length) {
     + `${scannedFiles} js/html file(s) clean — ${allowedLiterals} literal(s) kept by ${marksUsed} look: mark(s) `
     + `(${tablesCovered} table(s)) and ${EXEMPT.length} exemption(s); every absolute font size multiplies --text-scale `
     + `(${unscaledKept} print-only size(s) kept by look: marks); ${looksNote}; `
-    + `${moneySizeDecls} money size value(s) between the markers are tokens (${SIZE_EXEMPT.length} named exemption(s))`);
+    + `${moneySizeDecls} money size value(s) between the markers are tokens (${SIZE_EXEMPT.length} named exemption(s)); `
+    + `no dark scheme in ${darkChecked} file(s), color-scheme: light on :root`);
   process.exit(0);
 }
 console.error(`FAIL  ${problems.length} typed colour/font/size problem(s):\n`);
