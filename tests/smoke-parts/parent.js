@@ -167,7 +167,14 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
             const kidCells = [...document.querySelectorAll('#pnToldBody .pn-answer-kids > button')];
             if (kidCells.length !== 2 || Math.abs(kidCells[1].getBoundingClientRect().left - kidCells[0].getBoundingClientRect().right) > 0.6) out.push(`${tag} Now › She told me: the girl switch cells are not joined (no gap)`);
             const toldKids = document.querySelector('#pnToldBody .pn-answer-kids');
-            if (toldKids) switchFaults(toldKids).forEach(f => out.push(`${tag} Now › She told me: the girl switch ${f}`));
+            if (!toldKids) out.push(`${tag} Now › She told me: no body girl switch`);
+            else {
+              switchFaults(toldKids).forEach(f => out.push(`${tag} Now › She told me: the girl switch ${f}`));
+              // C4 (R4): the body switch fills its row like Now's; a plant (shrink-to-fit) must fail.
+              toldKids.style.display = 'inline-grid';
+              if (!switchFaults(toldKids).length) out.push(`${tag} Now › She told me: the body switch width check missed its plant (a switch that does not grow)`);
+              toldKids.style.display = '';
+            }
             const chosenDay = document.querySelector('#pnToldBody .ui-days > [aria-pressed="true"]'), cd = chosenDay && getComputedStyle(chosenDay);
             if (!chosenDay) out.push(`${tag} Now › She told me: no chosen day`);
             else if (cd.backgroundColor !== 'rgb(28, 34, 64)' || cd.color !== 'rgb(255, 255, 255)') out.push(`${tag} Now › She told me: the chosen day is ${cd.backgroundColor} / ${cd.color}, want the parent's #1c2240 / #fff`);
