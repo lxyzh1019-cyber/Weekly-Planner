@@ -131,3 +131,5 @@ The PARENT v2 block (SRC 258-329) draws three things: the portal row at 1194 (SR
 6. **The phone's sub-bar has no picture.** It holds the iPad's parts with the words in the buttons' labels (below 900px wide, as the Day's three do not fit at 768): ◀, the girl's name, ✅ (count), 🚫 (count), 📋.
 7. **Reading size (D14), a question.** With nothing stored the grown-up pages read at 1.2; the middle choice "Larger" is now 1.2 (was 1.15) so the default is a listed choice, and a stored 1.15 reads as Larger. The header itself is drawn at the picture's sizes at every Reading size.
 8. **The portal's tabs.** As the picture: the current destination shows its icon ("📥 Now"), the others their word alone, ⚙️ App its icon; the day is gone from the bar ("no date in the bar", SRC 260).
+
+2026-10-11 (Stage 53): this repository copy stands (D66); the Parent sub-bar rows are unchanged, and the parent Week "Switch" is now built to them (`pv-btn pb-action`, D81).

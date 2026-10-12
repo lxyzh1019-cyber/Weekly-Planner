@@ -4318,10 +4318,10 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   (`guRuleOpenGroup` builds its own). `theGrandfatherRuleReadsAsItselfEverywhere`
   counts one build per render. (checked by smoke: theGrandfatherRuleReadsAsItselfEverywhere)
 - **Two selected fills, two meanings (PR 5, decision 5 kept both).** Teal
-  `--sel-opt` marks **a picked option** (`.gu-opt.on`, `.rq-opt.on`, `.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
+  `--sel-opt` marks **a picked option** (`.rq-meet.on`, `.mv2-btn.on`, `.mv2-idea-tab.on`,
   `.fl-col.on`) on money's own parts. A kit chip shows the same meaning in
   the kit's own picked fill: `.ui-chip[aria-pressed="true"]` is `--pill-on`
-  (Pop `--accent-strong`, Calm `--ink`), which Sunday's picked chips use since
+  (since Kit 1.1 K11 it equals `--sel` / `--sel-ink`, the one selected colour, in both looks), which Sunday's picked chips use since
   PR 9 — the kit's drawing of "a picked option", not a third meaning. Red
   `--mny-v15-red` marks **where you are now** (`.sd-stepchip.on`,
   `.mm-step-cur`, `.sd-rung.on`, `.pn-segbtn.on`, `.gu-toggle.on`); ink

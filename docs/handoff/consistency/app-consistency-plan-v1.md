@@ -25,6 +25,17 @@
 | D7 | Chores screen may be retired after the owner sees its snapshot (PR 2). |
 | D8 | Security track after this pass. |
 
+Added 2026-10-11 (Stage 53, D61) — notes only; the plan file (`plans/consistency-plan-v11-rev4.md`) is the record:
+
+| # | Decision |
+|---|---|
+| D9 | Checks at iPad 1194×834 and phone 390×844, both looks. |
+| D10 | Stage 0 first: Part 0-A, then Part 0-B (done). |
+| D11 | One session: this session carries Stage 0 and Parts 1–13. |
+| D12 | Part 4 waits for the approved Claude Design header pictures (done). |
+| D13 | Old history goes to the archive. |
+| D14 | Reading size default 1.2 when nothing is stored (done in Part 5). |
+
 ## 2. PRs, in order
 
 ### PR 1 — Money re-check (one PR)

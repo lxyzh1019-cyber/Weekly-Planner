@@ -1481,7 +1481,6 @@ function applyMeetingLock() {
 
 function parentView(p) {
   parentViewing = p;
-  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b=>b.classList.toggle('active', b.textContent.includes(kidLabel(p).name)));
   showScreen('week');
   renderWeek();
 }

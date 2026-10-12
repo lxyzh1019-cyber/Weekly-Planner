@@ -735,72 +735,6 @@
   .screen { display: none; min-height: 100vh; position: relative; z-index: 1; }
   .screen.active { display: flex; flex-direction: column; }
 
-  /* ═══════════ PROFILE SELECT ═══════════ */
-  #screen-profile {
-    align-items: center; justify-content: center;
-    padding: 2rem;
-    background: linear-gradient(135deg, var(--bg) 0%, var(--surface-profile-glow) 100%);
-  }
-  .profile-header { text-align: center; margin-bottom: 2rem; }
-  .profile-header h1 {
-    font-family: var(--font-display);
-    font-size: calc(3.4rem * var(--text-scale, 1)); color: var(--accent-strong);
-    transform: rotate(-2deg);
-    text-shadow: 3px 3px 0 var(--shadow-black-6);
-  }
-  .profile-header p { color: var(--ink-light); font-size: calc(1.2rem * var(--text-scale, 1)); margin-top: 0.5rem; }
-
-  .profile-cards { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
-
-  .profile-card {
-    background: var(--paper);
-    border-radius: 24px;
-    padding: 2.2rem 1.8rem;
-    width: 170px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
-    box-shadow: 4px 6px 0 var(--shadow-ink-12), 0 8px 24px var(--shadow-black-8);
-    border: 3px solid var(--ink);
-    transform: rotate(-1.5deg);
-  }
-  .profile-card:nth-child(2) { transform: rotate(2deg); }
-  .profile-card:nth-child(3) { transform: rotate(-0.5deg); }
-  .profile-card:hover { transform: rotate(0) translateY(-8px) scale(1.04); box-shadow: 6px 10px 0 var(--shadow-ink-15); }
-  .profile-card .avatar { font-size: calc(3.8rem * var(--text-scale, 1)); margin-bottom: 0.8rem; display:block; }
-  .profile-card h2 { font-size: calc(2rem * var(--text-scale, 1)); }
-  .profile-card.jenn { background: var(--jenn-wash); }
-  .profile-card.jess { background: var(--jess-wash); }
-  .profile-card.parent { background: var(--profile-parent-wash); }
-
-  .profile-motto {
-    margin-top: 2.2rem;
-    max-width: 760px;
-    text-align: center;
-  }
-  .profile-motto p {
-    font-family: var(--font-script);
-    font-size: calc(1.55rem * var(--text-scale, 1));
-    color: var(--ink-motto);
-    line-height: 1.4;
-    transform: rotate(-1deg);
-  }
-  .profile-motto .profile-message {
-    font-family: var(--font-text);
-    font-size: calc(1.1rem * var(--text-scale, 1));
-    line-height: 1.45;
-    color: var(--ink);
-    margin-top: 0.8rem;
-    background: var(--surface-glass-45);
-    border: 2px dashed var(--paper-line);
-    border-radius: 16px;
-    padding: 0.85rem 1rem;
-    transform: none;
-  }
-  #parentWeekKidPills .pill-btn {
-    font-size: calc(1.1rem * var(--text-scale, 1));
-    padding: 0.4rem 1rem;
-  }
 
   /* Text that only a screen reader needs (Sister Sync's "moved" note). */
   .visually-hidden {
@@ -1002,56 +936,10 @@
     outline-offset: 2px;
   }
 
-  /* ═══════════ QUICK PROFILE SWITCHER ═══════════ */
-  .profile-switch-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.3rem; }
-  .profile-switch-opt {
-    display: flex; align-items: center; gap: 0.7rem;
-    width: 100%; text-align: left;
-    background: var(--paper-card, var(--paper));
-    border: 2px solid var(--ink); border-radius: 14px;
-    padding: 0.7rem 0.9rem; cursor: pointer;
-    font-family: var(--font-text); font-weight: 800;
-    color: var(--ink); box-shadow: 2px 2px 0 var(--ink);
-    transition: transform 0.12s, box-shadow 0.12s;
-  }
-  .profile-switch-opt:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); background: var(--accent-yellow); }
-  .profile-switch-opt.current { background: var(--accent-yellow); }
-  .profile-switch-opt .ps-emoji { font-size: calc(1.7rem * var(--text-scale, 1)); line-height: 1; flex-shrink: 0; }
-  .profile-switch-opt .ps-name { font-size: calc(1.2rem * var(--text-scale, 1)); flex: 1; }
-  .profile-switch-opt .ps-check { font-size: calc(1.3rem * var(--text-scale, 1)); font-weight: 900; color: var(--accent-strong); }
-  .profile-switch-opt.ps-more { background: transparent; box-shadow: none; border-style: dashed; font-weight: 700; }
-  .profile-switch-opt.ps-more .ps-name { font-size: calc(1rem * var(--text-scale, 1)); color: var(--ink-light); }
-
-  /* ═══════════ STATUS DOT (sync) ═══════════ */
-  .sync-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    display: inline-block; margin-left: 4px;
-    background: var(--accent-green);
-    box-shadow: 0 0 6px var(--accent-green);
-  }
-  .sync-dot.offline { background: var(--status-offline); box-shadow: none; }
-  .sync-dot.syncing { background: var(--accent-yellow); animation: pulse 1s infinite; }
-  .sync-pending-msg {
-    margin-top: 0.35rem;
-    /* max(): Calm's type put it at 12.5px on the picker (Looks stage 4). */
-    font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)));
-    color: var(--ink-light);
-    min-height: 1.1rem;
-  }
-  .sync-debug-msg {
-    margin-top: 0.2rem;
-    font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    color: var(--ink-grey);
-    min-height: 1rem;
-  }
+  /* The sync dot's pulse (.sync-dot.syncing in css/social.css). */
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══════════ WEEK VIEW ═══════════ */
-  .week-nav {
-    display: flex; align-items: center; justify-content: center;
-    gap: 1rem; padding: 0.8rem;
-  }
-  .week-nav h3 { font-size: calc(1.4rem * var(--text-scale, 1)); transform: rotate(-1deg); }
   /* Rest-day toggle now lives inside the Template sheet */
   #restDayBtn.on {
     background: var(--cat-sleep);
@@ -3206,123 +3094,6 @@
   }
   .feedback-empty { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 
-  /* Sister Sync — one timeline, both sisters, one axis (js/10-social.js,
-     renderSync). The DOM order is Jenn, Jess, stripe, gutter, legend, because
-     the invite checks select `#syncGrid .sync-day-col:first-child`; the tracks
-     are placed here as gutter | Jenn | both-free stripe | Jess. The gutter and
-     the stripe start --sync-head down, so all four share one 6am line. Kid
-     screen: 13px floor, 15px for the name she reads to tap. */
-  .sync-grid {
-    --sync-head: 2.2rem;
-    display: grid;
-    grid-template-columns: 2.6rem minmax(0, 1fr) 12px minmax(0, 1fr);
-    column-gap: 6px;
-    padding: 0.6rem 0.6rem 1rem;
-    /* The screen centres its children, which would shrink the grid to its
-       content; the width is stated so the two columns share the screen. */
-    width: 100%; max-width: 860px; margin: 0 auto; box-sizing: border-box;
-  }
-  .sync-day-col { grid-row: 1; min-width: 0; }
-  .sync-day-col--left  { grid-column: 2; }
-  .sync-day-col--right { grid-column: 4; }
-  .sync-day-col h4 {
-    height: var(--sync-head); line-height: var(--sync-head); margin: 0;
-    font-size: calc(1.1rem * var(--text-scale, 1)); text-align: center;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .sync-tl-canvas {
-    position: relative; isolation: isolate; overflow: hidden;
-    background: var(--paper); border-radius: 10px;
-    box-shadow: 0 0 0 2px var(--ink);
-  }
-  .sync-tl-gutter { grid-column: 1; grid-row: 1; padding-top: var(--sync-head); }
-  .sync-tl-gutter-track { position: relative; }
-  .sync-tl-hour {
-    position: absolute; right: 2px; transform: translateY(-50%);
-    font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1)); line-height: 1; white-space: nowrap;
-    color: var(--ink-light);
-  }
-  .sync-tl-stripe { grid-column: 3; grid-row: 1; padding-top: var(--sync-head); }
-  .sync-tl-stripe-track {
-    position: relative; overflow: hidden; border-radius: 6px;
-    background: var(--surface-ink-10);
-  }
-  .sync-free-seg { position: absolute; left: 0; right: 0; background: var(--surface-sync-free); }
-  .sync-tl-band-label, .sync-tl-empty {
-    position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
-    text-align: center; color: var(--ink-light);
-    font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1)); line-height: 1.2; padding-top: 2px;
-  }
-  .sync-tl-empty { top: 4px; }
-  .hour-grid--sync { z-index: 0; }
-  .sync-tl-strip { z-index: 1; }
-  /* Every block shape is a .sync-block; only YOUR tappable ones are also
-     .sync-block-mini, floored at 44px tall (SYNC_TAP_MIN_PX). */
-  .sync-block {
-    position: absolute; box-sizing: border-box; z-index: 2; overflow: hidden;
-    border: 1.5px solid var(--ink); border-radius: 6px; padding: 0 4px;
-    font-family: var(--font-text); line-height: 1.1;
-    color: var(--ink);
-  }
-  .sync-block--busy { background: var(--surface-busy); color: var(--ink-busy); border-color: var(--border-grey); }
-  .sync-block-mini { cursor: pointer; }
-  .sync-block-name {
-    display: block; font-size: calc(max(15px, 0.95rem) * var(--text-scale, 1));
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .sync-block-time, .sync-block-flag {
-    display: block; font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1));
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .sync-block-flag { font-weight: 700; }
-  .sync-tl-legend {
-    grid-column: 1 / -1; grid-row: 2; margin: 0.6rem 0 0;
-    font-size: calc(max(13px, 0.85rem) * var(--text-scale, 1)); color: var(--ink-light);
-  }
-  .sync-overlap {
-    background: var(--accent-yellow);
-    border-radius: 10px; padding: 0.5rem 0.7rem;
-    margin: 0.5rem 0.6rem; border: 2px dashed var(--ink);
-    font-weight: 700;
-  }
-  /* The household's sister-details setting, read-only for her (Plan v6 C5) —
-     a grown-up changes it in Parent › App › Profiles. */
-  .sync-vis-note {
-    margin: 0 0.6rem 0.55rem; color: var(--ink-light);
-    font-size: calc(max(15px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1));
-  }
-
-  /* Challenges */
-  .challenge-card {
-    background: var(--paper); border: 2px solid var(--ink); border-radius: 14px;
-    padding: 0.7rem 0.9rem; margin-bottom: 0.5rem;
-    box-shadow: var(--shadow-card);
-  }
-  .challenge-title { font-family: var(--font-display); font-size: calc(1.2rem * var(--text-scale, 1)); margin-bottom: 0.2rem; }
-  .challenge-progress {
-    display: flex; gap: 0.4rem; align-items: center;
-    font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); margin-top: 0.4rem;
-  }
-  .challenge-bar {
-    flex: 1; height: 12px; background: var(--bg); border-radius: 6px;
-    border: 1.5px solid var(--ink); overflow: hidden;
-  }
-  .challenge-fill {
-    height: 100%; background: var(--accent);
-    transition: width 0.4s;
-  }
-
-  /* Invites */
-  .invite-item {
-    background: var(--surface-today); border: 2px dashed var(--accent);
-    border-radius: 12px; padding: 0.6rem 0.8rem;
-    margin-bottom: 0.5rem; font-size: calc(0.95rem * var(--fs-scale, 1) * var(--text-scale, 1));
-  }
-  .invite-actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
-  /* The inbox's answers are a child's taps: 44px, not .pill-btn's 38px. Found
-     when Sister Sync joined the kid-screen sweep (Plan v6 C6). */
-  .invite-actions .pill-btn { min-height: 44px; }
-
   /* ═══════════ PRINT ═══════════ */
   @media print {
     /* L12: print ignores the look's text scale. `:root[data-look]` so this
@@ -3697,18 +3468,6 @@
   /* iPad portrait (820–979px): explicit single-column + bottom-tray optimised layout */
   @media (min-width: 820px) and (max-width: 979px) {
     #screen-day { grid-template-columns: 1fr; }
-    .profile-cards {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: var(--space-4);
-    }
-    .profile-card {
-      width: auto;
-      min-width: 150px;
-      flex: 1 1 170px;
-      max-width: 220px;
-    }
   }
 
   /* ── Audit fix: screen-reader-only utility (visually hidden but announced by AT) ── */
@@ -5537,12 +5296,6 @@
 /* ── 👨‍👩‍👧 Grown-ups (js/46-grownups.js) ── */
 .gu { font-family: var(--font-body); color: var(--mny-v15-ink); font-size: calc(1.125rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-tabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-start; padding: 0 0 10px; margin-bottom: 12px; border-bottom: var(--bw-rule) solid var(--mny-v15-ink); }
-.gu-tab {
-  min-height: 44px; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 11px;
-  font: inherit; font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); white-space: nowrap; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink);
-}
-.gu-tab.on { background: var(--sel-tab); color: var(--sel-tab-ink); }
 .gu-grid { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 14px; align-items: start; }
 .gu-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .gu-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -5571,12 +5324,7 @@
 .gu-kidchip { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-bar); padding: 0 8px; }
 .gu-kidchip--jenn { background: var(--mny-v15-jenn); }
 .gu-kidchip--jess { background: var(--mny-v15-jess); }
-.gu-x {
-  width: 44px; height: 44px; flex: none; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1));
-}
 .gu-num { min-width: 42px; text-align: center; font-family: var(--font-round); font-variant-numeric: var(--num-variant); }
-.gu-pair { display: flex; align-items: center; gap: 3px; }
 /* Was an ellipsis; a name on the money screens is never cut with "…" (owner's review, Plan v6 §M) — it wraps. */
 .gu-ellip { min-width: 0; overflow-wrap: anywhere; }
 .gu-empty { border: var(--bw-card) dashed var(--mny-v15-ink); border-radius: var(--radius-md); padding: 24px; text-align: center; color: var(--mny-v15-sub); }
@@ -5611,13 +5359,6 @@
 .gu-req-rules { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); line-height: 1.25; }
 .gu-check { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); border: var(--bw-info) dashed var(--mny-v15-teal); border-radius: var(--radius-bar); padding: 3px 8px; }
 .gu-answer { display: flex; gap: 6px; flex-wrap: wrap; }
-.gu-yes, .gu-talk, .gu-no {
-  flex: 1 0 auto; min-height: 44px; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); cursor: pointer;
-  color: var(--mny-v15-ink); font: inherit; font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--fs-scale, 1) * var(--text-scale, 1))); padding: 0 4px; white-space: nowrap;
-}
-.gu-yes { flex: 1.3 0 auto; border-width: var(--bw-card); background: var(--mny-v15-green); }
-.gu-talk { background: var(--mny-v15-amber); }
-.gu-no { background: var(--mny-v15-paper); }
 .gu-done { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gu-stamp {
   font-family: var(--font-head); font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1));
@@ -5626,10 +5367,6 @@
 .gu-stamp--yes { color: var(--mny-v15-teal); }
 .gu-stamp--talk { color: var(--mny-v15-red); }
 .gu-after { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
-.gu-undo {
-  margin-left: auto; min-height: 44px; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 10px; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1));
-}
 .gu-wobble { background: var(--mny-v15-lav); gap: 6px; padding: 10px 14px; }
 .gu-wobble .gu-cardhead { align-items: center; }
 .gu-toggle {
@@ -5651,14 +5388,6 @@
 .gu-formrow { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; }
 .gu-q { font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-opts { display: flex; gap: 6px; flex-wrap: wrap; }
-.gu-opt {
-  min-height: 44px; min-width: 48px; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 12px; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1));
-}
-.gu-opt.on { background: var(--sel-opt); color: var(--sel-opt-ink); }
-/* A day still to come (📦 Fines › Day, Plan v5 Deviation 23): dashed and not
-   tappable; the ink stays full so the label still reads. */
-.gu-opt:disabled { border-style: dashed; cursor: not-allowed; }
 .gu-afford { gap: 4px; padding: 10px 14px; }
 .gu-afford--ok { background: var(--mny-v15-green); }
 .gu-afford--warn { background: var(--mny-v15-warn); }
@@ -5823,7 +5552,6 @@ button.gu-loanrow {
   .gu-tools .rc-door-hint { order: 3; flex: 1 0 100%; max-width: none; }
   .gu-formrow { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .gu-exrow { grid-template-columns: minmax(0, 1fr) 44px; }
-  .gu-exrow .gu-pair { grid-column: 1 / -1; }
 }
 
 /* ── ✋ Her request sheets (js/45-requests.js) ── */
@@ -5892,13 +5620,6 @@ button.gu-loanrow {
 .rq-pickfirst { border: var(--bw-card) dashed var(--mny-v15-dash); border-radius: var(--radius-md); padding: 30px 20px; text-align: center; color: var(--mny-v15-muted); font-size: calc(1.125rem * var(--text-scale, 1)); }
 .rq-row { display: flex; flex-direction: column; gap: 6px; }
 .rq-opts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.rq-two .rq-opt { flex: 1; }
-.rq-opt {
-  min-height: 48px; min-width: 48px; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 14px; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1.0625rem * var(--text-scale, 1));
-}
-.rq-opt.on { background: var(--sel-opt); color: var(--sel-opt-ink); }
-.rq-opt.off { border-style: dashed; opacity: 0.5; }
 .rq-race {
   display: grid; grid-template-columns: 30px minmax(0, 1fr) 124px auto 44px; gap: 8px; align-items: center;
   border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); background: var(--mny-v15-sky); padding: 6px 8px;
@@ -5910,7 +5631,6 @@ button.gu-loanrow {
 }
 .rq-race .rq-time { min-height: 44px; border-width: var(--bw-chip); border-radius: var(--radius-btn); padding: 0 10px; font-size: calc(1.0625rem * var(--text-scale, 1)); }
 .rq-step { display: flex; align-items: center; gap: 4px; }
-.rq-race .rq-opt { min-height: 44px; width: 44px; min-width: 44px; padding: 0; border-width: var(--bw-chip); border-radius: var(--radius-btn); font-size: calc(1.25rem * var(--text-scale, 1)); }
 .rq-num { min-width: 62px; text-align: center; font-family: var(--font-round); font-variant-numeric: var(--num-variant); font-size: calc(1.0625rem * var(--text-scale, 1)); }
 .rq-preview {
   border: var(--bw-chip) dashed var(--mny-v15-teal); border-radius: var(--radius-btn); padding: 8px 12px; line-height: 1.15;
@@ -6267,32 +5987,27 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
   .mv2-act-t { font-size: max(13px, calc(1.0625rem * var(--mny-fit, 1) * var(--text-scale, 1))); white-space: nowrap; }
   .mv2-loanfoot .mv2-line { white-space: nowrap; }
 }
-/* A · Draw early (owner, 2026-10-05): the text larger than the other sheets,
-   big − and + (the + yellow) — and the whole sheet on one screen without
+/* A · Draw early (owner, 2026-10-05): the question and preview larger than the
+   other sheets (its − and + are the kit stepper since Stage 51) — and the whole sheet on one screen without
    scrolling, iPad and phone, both looks (Calm's wider type takes --mny-fit;
    every size floored at 13px, every target 44px or more). */
 .rq-sheet[data-rq-mode="early"] { padding: 14px 20px; }
 .rq-sheet[data-rq-mode="early"] h3 { margin-bottom: 8px; }
 .rq-sheet[data-rq-mode="early"] #requestBody { gap: 10px; }
-.rq-sheet[data-rq-mode="early"] .rq-q, .rq-sheet[data-rq-mode="early"] .rq-opt { font-size: max(13px, calc(1.3125rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
-.rq-sheet[data-rq-mode="early"] .rq-opt { padding: 0 12px; }
+.rq-sheet[data-rq-mode="early"] .rq-q { font-size: max(13px, calc(1.3125rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
 .rq-sheet[data-rq-mode="early"] .rq-plain { font-size: max(13px, calc(1.25rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
 .rq-sheet[data-rq-mode="early"] .rq-preview { font-size: max(13px, calc(1.625rem * var(--mny-fit, 1) * var(--text-scale, 1))); padding: 6px 12px; }
 .rq-sheet[data-rq-mode="early"] .rq-send { font-size: max(13px, calc(1.375rem * var(--mny-fit, 1) * var(--text-scale, 1))); min-height: 52px; }
 .rq-sheet[data-rq-mode="early"] .rq-amtval { font-size: calc(1.75rem * var(--text-scale, 1)); min-width: 64px; }
-.rq-sheet[data-rq-mode="early"] .rq-amtline .rq-opt { width: 56px; min-width: 56px; min-height: 56px; padding: 0; font-size: calc(1.75rem * var(--text-scale, 1)); font-weight: 700; }
-.rq-sheet[data-rq-mode="early"] .rq-amtline .rq-opt[data-mny-d="1"] { background: var(--mny-v15-gold); }
 @media (max-width: 767px) {
   .rq-sheet[data-rq-mode="early"] { padding: 10px 12px; max-height: none; }
   .rq-sheet[data-rq-mode="early"] h3 { font-size: calc(1.5rem * var(--text-scale, 1)); }
   .rq-sheet[data-rq-mode="early"] #requestBody { gap: 7px; }
-  .rq-sheet[data-rq-mode="early"] .rq-q, .rq-sheet[data-rq-mode="early"] .rq-opt { font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
-  .rq-sheet[data-rq-mode="early"] .rq-opt { min-height: 44px; padding: 0 8px; }
+  .rq-sheet[data-rq-mode="early"] .rq-q { font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
   .rq-sheet[data-rq-mode="early"] .rq-opts { gap: 6px; }
   .rq-sheet[data-rq-mode="early"] .rq-plain { font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
   .rq-sheet[data-rq-mode="early"] .rq-preview { font-size: max(13px, calc(1.25rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
   .rq-sheet[data-rq-mode="early"] .rq-send { font-size: max(13px, calc(1.125rem * var(--mny-fit, 1) * var(--text-scale, 1))); min-height: 48px; }
-  .rq-sheet[data-rq-mode="early"] .rq-amtline .rq-opt { width: 48px; min-width: 48px; min-height: 48px; font-size: calc(1.5rem * var(--text-scale, 1)); }
   .rq-sheet[data-rq-mode="early"] .rq-amtval { font-size: calc(1.5rem * var(--text-scale, 1)); }
 }
 
@@ -6399,17 +6114,9 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 .mny-total--owe { color: var(--sd-purple); }
 .mny-total--own { color: var(--sd-own-ink); }
 .mny-total--pile { color: var(--mny-v15-red); }
-/* Money fit and logic PR 5 (Stage C c): ONE stepper look — Grown-ups' .gu-step
-   and the − / + of the request sheets and Grown-ups' forms (.mny-step, set by
-   rqOpt / guOpt on a − or +): a 44px round button, ink border and button
-   shadow. The value between them is plain text (.mny-stepval), never a
-   button. Sunday's steppers are the kit's .ui-stepper (PR 9). */
-.gu-step, .rq-opt.mny-step, .gu-opt.mny-step, .rq-race .rq-opt.mny-step {
-  width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: none; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-full); padding: 0; cursor: pointer; box-shadow: var(--mny-shadow-btn);
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1.25rem * var(--text-scale, 1));
-}
-.gu-step, .gu-opt.mny-step { font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-.rq-opt.mny-step.off, .gu-opt.mny-step:disabled { border-style: dashed; }
+/* The value between a stepper's − and + is plain text (.mny-stepval), never a
+   button. The steppers are the kit's .ui-stepper (Stage 53 deleted the old
+   round stepper rule). */
 .mny-stepval {
   display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 48px; padding: 0 4px;
   font-weight: 700; font-variant-numeric: var(--num-variant); white-space: nowrap;
@@ -6590,7 +6297,6 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
    (the stage 8 drawing). */
 .rq-pricetabs { margin: 0 0 6px; }
 .rq-pricetabs { gap: 4px; }
-.rq-pricetabs .rq-opt { padding: 0 8px; font-size: calc(0.9375rem * var(--text-scale, 1)); }
 .rq-pricetabs ~ .rq-prices { max-height: none; overflow: visible; }
 .rq-prices .chore-card { padding: 6px 12px; margin: 0 0 6px; gap: 0; }
 .rq-prices .chore-card h3 { margin: 0; font-size: calc(1.3125rem * var(--text-scale, 1)); }
@@ -6606,6 +6312,6 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
    buttons: thick border and shadow"). Information boxes, doors and list rows
    (.gu-loanrow, .mv2-idea-row, .mv2-door, the Sunday rows) and the dashed
    "add / not yet" buttons keep their thin edge or none. */
-.gu-tab, .gu-btn, .gu-save, .gu-yes, .gu-talk, .gu-no, .gu-undo, .gu-toggle, .gu-opt, .gu-x,
-.rq-meet, .rq-opt, .rq-notnow, .mv2-idea-tab { border-width: var(--bw-btn); box-shadow: var(--mny-shadow-btn); }
+.gu-btn, .gu-save, .gu-toggle,
+.rq-meet, .rq-notnow, .mv2-idea-tab { border-width: var(--bw-btn); box-shadow: var(--mny-shadow-btn); }
 /* money-tokens:end */
