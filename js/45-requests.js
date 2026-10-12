@@ -640,12 +640,16 @@ function rqClose() { rqDraft = null; closeSheet('requestOverlay'); }
 
 /* ── One option button: the prototype's opt(label, on, pick, disabled). A
    disabled option is still pressable and says why (data-mny-why), because a
-   greyed control with no reason is one a child works around. A − or + is a
-   stepper button (`.mny-step`, one look with the Sunday and Grown-ups
-   steppers, Money fit and logic PR 5). */
+   greyed control with no reason is one a child works around. An option is a
+   kit chip (picked = aria-pressed); a − or + is a button of the kit stepper
+   at the girl's 52px size (`rqStepper`); a ✕ is a kit icon button. */
 function rqOpt(label, on, action, attrs, why) {
-  return `<button type="button" class="rq-opt${label === '−' || label === '+' ? ' mny-step' : ''}${on ? ' on' : ''}${why ? ' off' : ''}" data-mny-action="${action}"${attrs || ''}${why ? ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"` : ''}>${escapeHtml(label)}</button>`;
+  const step = label === '−' || label === '+';   // sits in a .ui-stepper (rqStepper)
+  const look = step ? '' : label === '✕' ? ' class="ui-btn ui-btn--secondary ui-btn--icon"' : ` class="ui-chip" aria-pressed="${!!on}"`;
+  return `<button type="button"${look} data-mny-action="${action}"${attrs || ''}${why ? ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"` : ''}>${escapeHtml(label)}</button>`;
 }
+// The girl's stepper: the kit's .ui-stepper at its 52px size (G4).
+function rqStepper(inner) { return `<span class="ui-stepper ui-stepper--kid">${inner}</span>`; }
 // The value between a stepper's − and +: plain text, not a button (PR 5).
 function rqVal(label) { return `<span class="mny-stepval">${escapeHtml(label)}</span>`; }
 function rqRow(q, optsHtml) {
@@ -787,7 +791,7 @@ function rqResultBody(kid, d) {
         <select class="rq-select" data-mny-action="rq-ev" data-mny-i="${i}" aria-label="Race ${i + 1}">${RQ_SWIM_EVENTS.map(e =>
           `<option value="${escapeAttr(e)}"${e === r.ev ? ' selected' : ''}>${escapeHtml(e)}</option>`).join('')}</select>
         <input class="rq-input rq-time" type="text" value="${escapeAttr(r.time || '')}" placeholder="time 0:41.2" data-mny-action="rq-time" data-mny-i="${i}" aria-label="Race ${i + 1} time">
-        <span class="rq-step">${rqOpt('−', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="-1" aria-label="Fewer points"`)}<b class="rq-num mny-stepval">${Number(r.pts) || 0} pts</b>${rqOpt('+', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="1" aria-label="More points"`)}</span>
+        <span class="rq-step ui-stepper ui-stepper--kid">${rqOpt('−', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="-1" aria-label="Fewer points"`)}<b class="rq-num mny-stepval">${Number(r.pts) || 0} pts</b>${rqOpt('+', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="1" aria-label="More points"`)}</span>
         ${rqOpt('✕', false, 'rq-racedel', ` data-mny-i="${i}" aria-label="Take this race off"`, races.length > 1 ? '' : 'One race stays — change it instead.')}
       </div>`).join('')}
       ${races.length < 4 ? `<button type="button" class="rq-custom" data-mny-action="rq-raceadd">➕ Add a race (${4 - races.length} left)</button>` : ''}
@@ -796,7 +800,7 @@ function rqResultBody(kid, d) {
     right += `<div class="rq-q">② My result</div>
       <div class="rq-side">${rqRow('In my group', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.grp || 0) === n, 'rq-grp', ` data-mny-id="${n}"`)).join(''))}
       ${rqRow('Overall', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.ovr || 0) === n, 'rq-ovr', ` data-mny-id="${n}"`)).join(''))}
-      ${rqRow('Points', `${rqOpt('−', false, 'rq-pts', ' data-mny-d="-1" aria-label="Fewer points"')}${rqVal((Number(p.pts) || 0) + ' pts')}${rqOpt('+', false, 'rq-pts', ' data-mny-d="1" aria-label="More points"')}`)}</div>`;
+      ${rqRow('Points', rqStepper(`${rqOpt('−', false, 'rq-pts', ' data-mny-d="-1" aria-label="Fewer points"')}${rqVal((Number(p.pts) || 0) + ' pts')}${rqOpt('+', false, 'rq-pts', ' data-mny-d="1" aria-label="More points"')}`))}</div>`;
   }
   right += `${rqPreviewAndFoot()}</div>`;
   return `<div class="rq-result">${left}${right}</div>`;
@@ -857,7 +861,7 @@ function rqMoveBody(kid, d) {
       d.from === h, 'rq-from', ` data-mny-id="${h}"`, why);
   }).join(''));
   const amtRow = rqRow(d.mode === 'dep' ? '① How much cash?' : '③ How much?',
-    `${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal(fmtMoney(st.amt))}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.max ? 'That is all there is.' : '')}${d.mode === 'dep' ? '' : rqOpt('All of it', false, 'rq-amtall', '', st.max < 1 ? 'Nothing to take out of there yet.' : '')}`);
+    `${rqStepper(`${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal(fmtMoney(st.amt))}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.max ? 'That is all there is.' : '')}`)}${d.mode === 'dep' ? '' : rqOpt('All of it', false, 'rq-amtall', '', st.max < 1 ? 'Nothing to take out of there yet.' : '')}`);
   const whyRow = rqRow('④ Why?', RQ_MOVE_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''));
   const toList = d.mode === 'dep' ? ['ready', 'wall', 'locked'] : ['wall', 'locked', 'invest', 'ready'].filter(h => h !== d.from);
   const toRow = rqRow('② Put it in', toList.map(h => {
@@ -895,7 +899,7 @@ function rqAdvState(kid, d) {
 function rqAdvBody(kid, d) {
   const st = rqAdvState(kid, d);
   return `<div class="rq-plain">⏪ Draw early: money I need before Sunday. It comes off next Sunday’s payday.</div>
-    <div class="rq-amtline"><span class="rq-q">How much</span>${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}<b class="rq-amtval">${fmtMoney(st.amt)}</b>${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}</div>
+    <div class="rq-amtline"><span class="rq-q">How much</span>${rqStepper(`${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}<b class="rq-amtval">${fmtMoney(st.amt)}</b>${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}`)}</div>
     <div class="rq-opts">${RQ_ADV_WHY.map(([icon, w]) => rqOpt(icon + ' ' + w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join('')}</div>`
     + rqPreviewAndFoot({ notNow: false });
 }
@@ -945,7 +949,7 @@ function rqGoalBody(kid, d) {
   const price = d.amt || 30;
   return `<input class="rq-input" type="text" value="${escapeAttr(d.name || '')}" placeholder="what I want to buy · e.g. new skate bag" data-mny-action="rq-goalname" aria-label="What I want to buy">`
     + rqRow('① Pick a picture', RQ_GOAL_ICONS.map(i => rqOpt(i, d.icon === i, 'rq-icon', ` data-mny-id="${i}"`)).join(''))
-    + rqRow('② How much does it cost?', `${rqOpt('−', false, 'rq-price', ' data-mny-d="-5" aria-label="Less"', price <= 5 ? 'That is the least.' : '')}${rqVal(fmtMoney(price))}${rqOpt('+', false, 'rq-price', ' data-mny-d="5" aria-label="More"')}${[20, 35, 50, 80].map(v => rqOpt('$' + v, price === v, 'rq-priceset', ` data-mny-id="${v}"`)).join('')}`)
+    + rqRow('② How much does it cost?', `${rqStepper(`${rqOpt('−', false, 'rq-price', ' data-mny-d="-5" aria-label="Less"', price <= 5 ? 'That is the least.' : '')}${rqVal(fmtMoney(price))}${rqOpt('+', false, 'rq-price', ' data-mny-d="5" aria-label="More"')}`)}${[20, 35, 50, 80].map(v => rqOpt('$' + v, price === v, 'rq-priceset', ` data-mny-id="${v}"`)).join('')}`)
     + `<div class="rq-row"><div class="rq-q">③ When do I want it by? <span class="rq-hint">(if there is a day)</span></div><input class="rq-input rq-date" type="date" value="${escapeAttr(d.targetDate || '')}" data-mny-action="rq-goaldate" aria-label="When do I want it by"></div>`
     + (jar.saved > 0 ? rqRow(`④ My jar has ${fmtMoney(jar.saved)} for ${jar.goal}. What happens to it?`,
         [['move', '➡️ Use it for the new goal'], ['ready', '🏦 Put it in Savings']].map(([k, l]) => rqOpt(l, (d.keep || 'move') === k, 'rq-keep', ` data-mny-id="${k}"`)).join('')) : '')
@@ -994,7 +998,7 @@ function rqGiftState(kid, d) {
 }
 function rqGiftBody(kid, d) {
   const amt = money2(d.amt) || 0;
-  return rqRow('① How much?', `${rqOpt('−', false, 'rq-giftamt', ' data-mny-d="-1" aria-label="Less"', amt <= 1 ? 'That is the least.' : '')}${rqVal(fmtMoney(amt))}${rqOpt('+', false, 'rq-giftamt', ' data-mny-d="1" aria-label="More"')}${RQ_GIFT_CHIPS.map(v => rqOpt('$' + v, amt === v, 'rq-giftset', ` data-mny-id="${v}"`)).join('')}`)
+  return rqRow('① How much?', `${rqStepper(`${rqOpt('−', false, 'rq-giftamt', ' data-mny-d="-1" aria-label="Less"', amt <= 1 ? 'That is the least.' : '')}${rqVal(fmtMoney(amt))}${rqOpt('+', false, 'rq-giftamt', ' data-mny-d="1" aria-label="More"')}`)}${RQ_GIFT_CHIPS.map(v => rqOpt('$' + v, amt === v, 'rq-giftset', ` data-mny-id="${v}"`)).join('')}`)
     + `<div class="rq-row"><div class="rq-q">② Who gave it to me?</div><input class="rq-input" type="text" value="${escapeAttr(d.giver || '')}" placeholder="e.g. Grandma, Uncle Mike" data-mny-action="rq-giver" aria-label="Who gave it to me"></div>`
     + rqRow('③ What kind?', MNY_FROM.map(f => rqOpt(f, d.from === f, 'rq-giftfrom', ` data-mny-id="${escapeAttr(f)}"`)).join(''))
     + rqRow('④ Which day?', rqGiftDays().map((k, i) => rqOpt(i === 0 ? 'Today' : i === 1 ? 'Yesterday' : fmtDay(k, 'long'), d.dayKey === k, 'rq-giftday', ` data-mny-id="${k}"`)).join(''))
@@ -1091,7 +1095,7 @@ function rqRender() {
   else if (d.kind === 'prices') body = rqPricesBody(d);
   else if (MNY_INFO_KINDS.indexOf(d.kind) >= 0) body = mnyInfoSheetBody(d);
   else body = rqListBody(kid);
-  host.innerHTML = `<button type="button" class="rq-x" data-mny-action="rq-close" aria-label="Close">✕</button>${body}`;
+  host.innerHTML = `<button type="button" class="ui-btn ui-btn--secondary ui-btn--icon rq-x" data-mny-action="rq-close" aria-label="Close">✕</button>${body}`;
 }
 
 /* Typing changed something the button and the preview say: update those two,

@@ -10565,7 +10565,7 @@ function findChromium() {
     showScreen('parent'); setParentTab('money'); mnyParentSection = 'rules'; mnyRenderRulesTab();
     const rulesWrap = document.getElementById('mnyRulesWrap');
     const onRules = !rulesWrap.querySelector('.hdr-tab')
-      && rulesWrap.querySelectorAll('.gu-tab').length === GU_TABS.length && GU_TABS.length === 5   // ✅ Approve moved to Parent › Now (Plan v9 §N)
+      && rulesWrap.querySelectorAll('.gu-tabs [data-mnyp-action="gutab"]').length === GU_TABS.length && GU_TABS.length === 5   // ✅ Approve moved to Parent › Now (Plan v9 §N)
       && !rulesWrap.querySelector('.gu-more-chip')
       && /Save · starts next Sunday/.test(rulesWrap.textContent);
     /* The meeting's money step is the Sunday ritual (Stage 4): its own header
@@ -16642,10 +16642,10 @@ function findChromium() {
       parentViewing = 'jenn'; setParentDest('now');
       take('Parent › Now', ['#screen-parent > .hdr', '#parentDests > [aria-selected="false"]',
         '#parentDests > [aria-selected="true"]',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
-        '#pnWrap .ui-card', '#pnWrap .pn-day', '#pnWrap .pn-day.now', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
+        '#pnWrap .ui-card', '#pnWrap .ui-days > button', '#pnWrap .ui-days > [aria-current="date"]', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
         '#screen-parent .ui-btn--primary']);
       pnOpenToldSheet(); await wait(300);
-      take('Parent › Now › She told me', ['#pnToldBody .pn-day.on', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
+      take('Parent › Now › She told me', ['#pnToldBody .ui-days > [aria-pressed="true"]', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
       pnSheetOpen = false; closeSheet('pnToldOverlay');
       setParentDest('setup');
       take('Parent › Setup', ['#screen-parent .ui-card', '#screen-parent .pn-row', '#parentScopePills [aria-pressed="true"]', '#parentScopePills [aria-pressed="false"]']);
@@ -16654,7 +16654,7 @@ function findChromium() {
       take('Parent › History', ['#screen-parent [data-parent-history][aria-pressed="true"]', '#screen-parent [data-parent-history][aria-pressed="false"]', '#screen-parent .ctr-tile']);
       parentHistoryView = wasHistoryView;
       setParentDest('meeting');
-      take('Parent › Meeting', ['#screen-parent .review-day-row > .ui-btn', '#screen-parent .hub-status']);
+      take('Parent › Meeting', ['#screen-parent #meetingHub .ui-days > button', '#screen-parent .hub-status']);
       openFamilyMeeting(); await wait(350);
       take('Family meeting', ['#screen-meeting .hdr-steps > .hdr-switch-cell:not([aria-current])', '#screen-meeting .hdr-steps > .hdr-switch-cell[aria-current]',
         '#screen-meeting .mm-drow', '#screen-meeting .mm-nav']);
@@ -16841,10 +16841,10 @@ function findChromium() {
         const s = getComputedStyle(el);
         return { bg: s.backgroundColor, ink: s.color, ring: s.boxShadow, edge: s.borderTopColor };
       };
-      const now = sig(document.querySelector('#pnWrap .pn-day.now'));
+      const now = sig(document.querySelector('#pnWrap .ui-days > [aria-current="date"]'));
       // The selected day lives in 🚪 "She told me…" since Plan v9 §N.
       pnOpenToldSheet();
-      const on = sig(document.querySelector('#pnToldBody .pn-day.on'));
+      const on = sig(document.querySelector('#pnToldBody .ui-days > [aria-pressed="true"]'));
       pnSheetOpen = false; closeSheet('pnToldOverlay');
       return { now, on };
     });
@@ -16853,8 +16853,8 @@ function findChromium() {
         if (look === 'pop') await clearLooks(); else await setLook(look);
         await page.waitForTimeout(150);
         const r = await read();
-        if (!r.now) { bad.push(`${look}: Parent › Now drew no today square (.pn-day.now), so nothing was compared`); continue; }
-        if (!r.on) { bad.push(`${look}: Parent › Now drew no selected day (.pn-day.on), so nothing was compared`); continue; }
+        if (!r.now) { bad.push(`${look}: Parent › Now drew no today square (.ui-days > [aria-current]), so nothing was compared`); continue; }
+        if (!r.on) { bad.push(`${look}: Parent › Now drew no selected day (.ui-days > [aria-pressed]), so nothing was compared`); continue; }
         if (r.now.bg === r.on.bg) bad.push(`${look}: Parent › Now's today square and selected day share the fill ${r.now.bg}`);
         // L9: in Calm today's mark is navy (Pop's rail square keeps its own colour).
         if (look === 'calm' && ![r.now.bg, r.now.ring, r.now.edge].some(v => String(v).includes(NAVY))) {
@@ -23772,7 +23772,7 @@ function findChromium() {
         const wrap = guOpen('fines');
         // Plan v5 Deviation 23: the Day row, today chosen first, the days to come disabled.
         const dayBtn = (i) => wrap.querySelector(`[data-mnyp-action="gufnday"][data-mnyp-id="${i}"]`);
-        if (!dayBtn(3) || !dayBtn(3).classList.contains('on')) bad.push('the Day row does not start on today (Thursday)');
+        if (!dayBtn(3) || dayBtn(3).getAttribute('aria-pressed') !== 'true') bad.push('the Day row does not start on today (Thursday)');
         if ([0, 1, 2, 3].some(i => !dayBtn(i) || dayBtn(i).disabled) || [4, 5, 6].some(i => !dayBtn(i) || !dayBtn(i).disabled)) bad.push('Mon–Thu should be open and Fri–Sun disabled: ' + [0, 1, 2, 3, 4, 5, 6].map(i => dayBtn(i) && dayBtn(i).disabled).join(','));
         dayBtn(5).click();
         if (guFine().dayIdx !== 3) bad.push('a day still to come could be chosen: ' + guFine().dayIdx);
@@ -27765,7 +27765,7 @@ function findChromium() {
                 if (!name || !/Jenn/.test(name.textContent)) out.push(`${tag}: the sub-bar does not name Jenn`);
                 const back = sub.querySelector('.pb-back-btn');
                 if (!back || back.getAttribute('aria-label') !== 'Back to the parent hub') out.push(`${tag}: the sub-bar's way back is missing or misnamed`);
-                const acts = [...sub.querySelectorAll('.pv-btn, .pb-back-btn')].filter(shown);
+                const acts = [...sub.querySelectorAll('.pv-btn, .pb-back-btn, .pb-switch')].filter(shown);
                 acts.forEach(b => box(b, Object.assign({}, want.action, b.classList.contains('pv-btn--main') && want.confirmFill ? { bg: want.confirmFill[0], fg: want.confirmFill[1], weight: '600' } : b.classList.contains('pb-action--notdone') || b.classList.contains('on') ? { skipFill: true } : {}), `"${b.getAttribute('aria-label')}"`));
                 if (open === 'view-day') {
                   const labels = acts.map(b => b.getAttribute('aria-label') || '');

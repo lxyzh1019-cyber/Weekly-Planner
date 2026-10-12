@@ -233,7 +233,7 @@ function pnBoughtCards(kids) {
       <div class="gu-req-top">${guKidChip(kid)}<span class="gu-kind">jar is full</span><span class="gu-amt"><b>${escapeHtml(fmtMoney(mnyGoalJarValue(kid, g)))}</b></span></div>
       <div class="gu-req-text">${escapeHtml((g.icon || '🎯') + ' ' + g.name)} — did she buy it?</div>
       <div class="gu-check">🔎 Takes it out of the jar and writes a line</div>
-      <div class="gu-answer"><button type="button" class="gu-yes" data-mnyp-action="guboughtit" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(g.id)}">✓ She bought it</button></div>
+      <div class="gu-answer"><button type="button" class="ui-btn ui-btn--ok" data-mnyp-action="guboughtit" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(g.id)}">✓ She bought it</button></div>
     </div>`));
 }
 /* The questions: open ones, yeses Sunday has not used, and the last 7 days'
@@ -278,10 +278,10 @@ function pnSundayCard() {
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
-    days += `<button type="button" class="ui-chip pn-day${mmIsDayConfirmed(d) ? ' ok' : ''}${k === todayKey() ? ' now' : ''}"
-        data-pn-action="day" data-day="${d}" aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate())}">
-        <span class="pn-day-dow">${DAY_SHORT[d]}</span>
-        <span class="pn-day-date">${date.getDate()}</span></button>`;
+    const isOk = mmIsDayConfirmed(d), isToday = k === todayKey();
+    days += `<button type="button"${isOk ? ' class="ui-day--ok"' : ''}${isToday ? ' aria-current="date"' : ''}
+        data-pn-action="day" data-day="${d}" aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate() + (isToday ? ', today' : '') + (isOk ? ', confirmed' : ', not confirmed yet'))}">
+        <span>${DAY_SHORT[d]}</span><span>${date.getDate()}</span></button>`;
   }
   const sunday = new Date(info.sun);
   const kids = ['jenn', 'jess'].map(kid => {
@@ -295,16 +295,16 @@ function pnSundayCard() {
       </div>`;
   }).join('');
   const cta = held
-    ? `<button type="button" class="ui-btn ui-btn--secondary pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 Re-open the meeting</button>`
-    : `<button type="button" class="ui-btn ui-btn--primary pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+    ? `<button type="button" class="ui-btn ui-btn--secondary ui-btn--block" data-pn-action="meeting">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="ui-btn ui-btn--primary ui-btn--block" data-pn-action="meeting">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
   return `<div class="ui-card pn-side-card pn-sun">
       <div class="pn-side-head"><span class="pn-side-title">☀️ This Sunday · ${escapeHtml(sunday.getDate() + ' ' + MONTH_SHORT[sunday.getMonth()])}</span>
         <span class="pn-side-meta">${nConfirmed} of 7 days confirmed</span></div>
       <p class="pn-purpose">Is payday ready? What still blocks it.</p>
       ${kids}
-      <div class="pn-days">${days}</div>
+      <div class="ui-days">${days}</div>
       ${cta}
-      <button type="button" class="ui-btn ui-btn--secondary pn-wide" data-pn-action="fullweek">📋 Open her full week ›</button>
+      <button type="button" class="ui-btn ui-btn--secondary ui-btn--block" data-pn-action="fullweek">📋 Open her full week ›</button>
     </div>`;
 }
 /* 💬 Her answer last week — read before the meeting (`sdLastAnswer`, the
@@ -377,7 +377,7 @@ function pnOpenToldSheet() {
 function pnRenderToldSheet() {
   const body = document.getElementById('pnToldBody');
   if (!body || !pnSheetOpen) return;
-  body.innerHTML = `${pnAnswerCard()}<button type="button" class="ui-btn ui-btn--primary pn-wide" data-pn-action="told-close">Done</button>`;
+  body.innerHTML = `${pnAnswerCard()}<button type="button" class="ui-btn ui-btn--primary ui-btn--block" data-pn-action="told-close">Done</button>`;
 }
 
 /* ── On her behalf (R5 §5 rows 7 and 8, C1 — 2026-09-24) ─────────────────
@@ -410,15 +410,17 @@ function pnAnswerCard() {
       data-pn-action="answer-kid" data-kid="${k}" aria-pressed="${k === kid}">
       ${CT_PROFILE_ICON[k]} ${escapeHtml(kidLabel(k).name)}</button>`).join('');
   const mon = formatDayKey(wk);
+  const confirmStore = state.shared.parentDayConfirm || {}, keys = mrWeekDayKeys(wk);
   const days = [0, 1, 2, 3, 4, 5, 6].map(i => {
     const date = new Date(mon); date.setDate(mon.getDate() + i);
-    return `<button type="button" class="ui-chip pn-day${i === d ? ' on' : ''}" data-pn-action="answer-day" data-day="${i}"
-        aria-pressed="${i === d}"${i > todayIdx ? ' disabled' : ''}
-        aria-label="${escapeAttr(DAY_SHORT[i] + ' ' + date.getDate())}">
-        <span class="pn-day-dow">${DAY_SHORT[i]}</span>
-        <span class="pn-day-date">${date.getDate()}</span></button>`;
+    const isOk = !!((confirmStore.jenn || {})[keys[i]]) && !!((confirmStore.jess || {})[keys[i]]);
+    const isToday = i === todayIdx;
+    return `<button type="button"${isOk ? ' class="ui-day--ok"' : ''} data-pn-action="answer-day" data-day="${i}"
+        aria-pressed="${i === d}"${isToday ? ' aria-current="date"' : ''}${i > todayIdx ? ' disabled' : ''}
+        aria-label="${escapeAttr(DAY_SHORT[i] + ' ' + date.getDate() + (isToday ? ', today' : '') + (isOk ? ', confirmed' : '') + (i > todayIdx ? ', still to come' : ''))}">
+        <span>${DAY_SHORT[i]}</span><span>${date.getDate()}</span></button>`;
   }).join('');
-  const head = `<div class="ui-kids pn-answer-kids" role="group" aria-label="Which child">${kids}</div><div class="pn-days">${days}</div>`;
+  const head = `<div class="ui-kids pn-answer-kids" role="group" aria-label="Which child">${kids}</div><div class="ui-days">${days}</div>`;
   if (mnyWeekSettled(wk, kid)) {
     return `<div class="ui-card pn-answer">${head}
       <p class="pn-note">This week is settled for her, so there is nothing more to answer here.</p></div>`;

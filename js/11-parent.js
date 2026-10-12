@@ -418,16 +418,17 @@ function renderMeetingHub() {
   const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
   const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
   let days = '';
+  const figures = [];
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
     const confirmed = mmIsDayConfirmed(d);
-    days += `<button type="button" class="ui-btn${confirmed ? ' confirmed' : ''}${k === todayKey() ? ' today' : ''}" onclick="openFamilyMeetingAt(1,${d})">
-        <span class="review-day-dow">${DAY_SHORT[d]}</span>
-        <span class="review-day-date">${date.getDate()}</span>
-        <span class="review-day-count">🐥${mmDayPct('jenn', d)}% 🦊${mmDayPct('jess', d)}%</span>
-        <span class="review-day-state">${confirmed ? '✓ Confirmed' : 'Review ›'}</span>
-      </button>`;
+    const isToday = k === todayKey();
+    const pcts = `Jenn ${mmDayPct('jenn', d)}%, Jess ${mmDayPct('jess', d)}%`;
+    figures.push(`${DAY_SHORT[d]} 🐥${mmDayPct('jenn', d)}% 🦊${mmDayPct('jess', d)}%`);
+    days += `<button type="button"${confirmed ? ' class="ui-day--ok"' : ''}${isToday ? ' aria-current="date"' : ''} onclick="openFamilyMeetingAt(1,${d})"
+        aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate() + ', ' + (confirmed ? 'confirmed' : 'not confirmed yet') + (isToday ? ', today' : '') + ', ' + pcts)}">
+        <span>${DAY_SHORT[d]}</span><span>${date.getDate()}</span></button>`;
   }
   const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
   /* pool.cameIn, not ctWeekMoney. This line says "pocket money so far" and it is
@@ -438,14 +439,15 @@ function renderMeetingHub() {
      different figure and keeps its own label elsewhere. */
   const money = ['jenn', 'jess'].map(kid =>
     `${CT_PROFILE_ICON[kid]} ${fmtMoney(mnyPool(wk, kid).cameIn)}`).join(' · ');
+  const figureLine = `<div class="hub-pct">${figures.join(' · ')}</div>`;
   const status = held
-    ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
-    : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
+    ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.${figureLine}</div>`
+    : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}${figureLine}</div>`;
   const cta = held
-    ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
-    : `<button type="button" class="ui-btn ui-btn--primary" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+    ? `<button type="button" class="ui-btn ui-btn--secondary ui-btn--block" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="ui-btn ui-btn--primary ui-btn--block" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
   wrap.innerHTML = `<div class="hub-week">Week of ${escapeHtml(weekLabel)}</div>
-    <div class="review-day-row">${days}</div>${status}
+    <div class="ui-days">${days}</div>${status}
     <div class="hub-cta">${cta}</div>${mmCatchUpBanner()}`;
 }
 // Deep-link into the meeting: used by the hub's day strip to open the exact
@@ -506,7 +508,7 @@ function renderPendingApproval() {
       <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span class="pc-meta">· ${kidLabel(owner).icon} ${escapeHtml(kidLabel(owner).name)} added</span></div>
       <div class="pc-sub">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
       <div class="pc-actions">
-        <button type="button" class="ui-btn ui-btn--primary" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--ok" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
         <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
         <button type="button" class="ui-btn ui-btn--danger" onclick="rejectKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑 Reject</button>
       </div>`;
@@ -560,7 +562,7 @@ function renderPendingTaskApproval() {
       <div class="pc-sub">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(fmtDay(gift.dayKey || gift.weekKey, 'dated'))}
         · nothing has moved yet</div>
       <div class="pc-actions">
-        <button type="button" class="ui-btn ui-btn--primary" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--ok" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
         <button type="button" class="ui-btn ui-btn--danger" data-gift-reject="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
@@ -575,7 +577,7 @@ function renderPendingTaskApproval() {
         <span class="pc-meta">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
       <div class="pc-sub">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
       <div class="pc-actions">
-        <button type="button" class="ui-btn ui-btn--primary" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--ok" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
         <button type="button" class="ui-btn ui-btn--danger" data-task-reject="${escapeAttr(task.id)}">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
