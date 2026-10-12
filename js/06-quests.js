@@ -735,21 +735,20 @@ function goProfile() {
 function openProfileSwitcher() {
   const cur = activeProfile();
   const parentNow = isParent();
-  const opt = (p, emoji, name) => {
-    const on = !parentNow && cur === p;
-    return `<button type="button" class="profile-switch-opt${on ? ' current' : ''}" onclick="pickProfileFromSwitcher('${escapeJsAttr(p)}')">`
-      + `<span class="ps-emoji">${emoji}</span><span class="ps-name">${name}</span>`
-      + `${on ? '<span class="ps-check">✓</span>' : ''}</button>`;
-  };
+  /* Kit rows (Kit 1.1 K8, owner answer G11): icon, name, and the ✓ of the
+     profile on screen in the right-hand slot; that row is aria-current and
+     wears the selected colour (css/social.css). */
+  const row = (on, onclick, emoji, name) =>
+    `<button type="button" class="ui-row"${on ? ' aria-current="true"' : ''} onclick="${onclick}">`
+      + `<span class="ui-row-icon" aria-hidden="true">${emoji}</span><span class="ui-row-name">${name}</span>`
+      + `${on ? '<span class="ui-row-end" aria-hidden="true">✓</span>' : ''}</button>`;
+  const opt = (p, emoji, name) => row(!parentNow && cur === p, `pickProfileFromSwitcher('${escapeJsAttr(p)}')`, emoji, name);
   const body = document.getElementById('profileSwitchBody');
   body.innerHTML =
     opt('jenn', '🐥', 'Jenn') +
     opt('jess', '🦊', 'Jess') +
-    `<button type="button" class="profile-switch-opt${parentNow ? ' current' : ''}" onclick="pickProfileFromSwitcher('parent')">`
-      + `<span class="ps-emoji">🧑‍🧑‍🧒</span><span class="ps-name">Parent Mode</span>`
-      + `${parentNow ? '<span class="ps-check">✓</span>' : ''}</button>` +
-    `<button type="button" class="profile-switch-opt ps-more" onclick="closeSheet('profileSwitchOverlay'); goProfile();">`
-      + `<span class="ps-emoji">👤</span><span class="ps-name">Full profile screen…</span></button>`;
+    row(parentNow, "pickProfileFromSwitcher('parent')", '🧑‍🧑‍🧒', 'Parent Mode') +
+    row(false, "closeSheet('profileSwitchOverlay'); goProfile();", '👤', 'Full profile screen…');
   openSheet('profileSwitchOverlay');
 }
 async function pickProfileFromSwitcher(p) {

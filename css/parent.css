@@ -28,7 +28,7 @@
 .parent-menu-pop .ui-btn { width: 100%; }
 
 /* The portal's destinations (.parent-dests, a .ui-tabs; SRC 266-272): 44px, pad
-   0 16, white, 2px ink, radius 12, body 17px; the current one the look's --sel,
+   0 16, white, 2px ink, radius 12, body 17px; the current one the area's picked colour --sel,
    600, with its icon (the others' words alone); ⚙️ App 44×44, 18px. The
    header's picture sets these, not the kit's. A class, not the id: each rule
    weighs the same as the kit's .ui-tabs rule it overrides (css/app.css) and
@@ -41,7 +41,7 @@
   font-family: var(--font-text); font-size: var(--hdr-parent-word-size); font-weight: 400; line-height: 1; white-space: nowrap; cursor: pointer;
 }
 .parent-dests > button:hover { background: var(--accent-yellow); }
-/* The selected destination: Pop yellow, Calm navy with white text. Hovered
+/* The selected destination: the parent area's picked colour (navy, white text). Hovered
    too, or Calm's hover fill would sit under the white label. */
 .parent-dests > button[aria-selected="true"], .parent-dests > button[aria-selected="true"]:hover { background: var(--sel); color: var(--sel-ink); font-weight: 600; }
 .parent-dests > button:not([aria-selected="true"]) .pdest-icon { display: none; }
@@ -50,7 +50,7 @@
 /* The girl switch (a .ui-kids; SRC 273-277): one joined switch, 2px ink,
    radius 999, clipped, white; cells 44px high (the tap floor; the picture's
    42), pad 0 16 (Both) / 0 14, 2px dividers, body 17px; the chosen one the
-   look's --sel, 600. Parent Monthly's Jenn / Jess is the same switch. On a
+   area's picked colour --sel, 600. Parent Monthly's Jenn / Jess is the same switch. On a
    phone 46×44 cells, All 15px, 🐥 🦊 19px. */
 .parent-scope {
   box-sizing: border-box; flex: none; display: flex; gap: 0;
@@ -142,14 +142,6 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 .pc-empty { color: var(--ink-light); font-size: calc(0.9rem * var(--text-scale, 1)); }
 
 /* ── Meeting: the hub (read-only; a day opens the meeting) ────────────────── */
-.review-day-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-.review-day-row > .ui-btn { flex-direction: column; gap: 2px; padding: 0.4rem 0.35rem; min-width: 68px; }
-.review-day-row > .ui-btn.confirmed { background: var(--accent-green); }
-.review-day-row > .ui-btn.today { outline: 3px solid var(--today-mark); outline-offset: 1px; }
-.review-day-dow { font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 800; text-transform: uppercase; }
-.review-day-date { font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; font-family: var(--font-display); line-height: 1; }
-.review-day-state { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; }
-.review-day-count { font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
 .hub-week { font-weight: 800; margin-bottom: 0.4rem; }
 .hub-status { margin-top: 0.55rem; font-size: calc(0.88rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; background: var(--bg2); border: 2px dashed var(--paper-line); border-radius: 10px; padding: 6px 10px; }
 .hub-status-done { background: var(--accent-green); border-style: solid; border-color: var(--ink); }
@@ -178,27 +170,12 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 
 /* ── Now: She told me… (a .ui-card; the girl is a .ui-kids) ───────────────── */
 .pn-answer { padding: var(--space-3); }
-.pn-answer-kids { display: flex; gap: var(--space-2); margin-bottom: var(--space-2); }
-.pn-answer-kids > button { flex: 1 1 0; }
-/* The day squares (This Sunday's rail and She told me…'s days) are .ui-chip:
-   .pn-day lays one out in a 7-column row — day over date, no side padding —
-   and keeps the four states' looks. */
-.pn-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-1); margin-bottom: var(--space-2); }
-/* On a phone, She told me…'s sheet has room for seven 44-wide squares only with 2px gaps. */
-@media (max-width: 699px) { .pn-days { gap: 2px; } }
-.pn-day { flex-direction: column; justify-content: center; gap: 0; min-width: 0; padding: var(--space-1) 0; cursor: pointer; }
-.pn-day.ok { background: var(--accent-green); border-color: var(--ink); }
-/* Today's square: the look's --day-now-* (Pop fills it with the pill colour
-   and its strong ink; Calm frames it in navy instead of filling it), so it
-   never looks like the selected day (.pn-day.on, navy-filled). */
-.pn-day.now { background: var(--day-now-bg); border-color: var(--ink); color: var(--day-now-ink); box-shadow: var(--day-now-ring); }
-/* On her behalf (R5 §5 C1): the chosen child and day, then her answers. */
-.pn-day.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-/* A day still to come is listed, not offered: dashed and in the lighter ink,
-   as Copy a day's empty rows (Plan v6 C7). Faded to 45% it read at 2.7:1. */
-.pn-day:disabled { border-style: dashed; color: var(--ink-light); cursor: default; }
-.pn-day-dow { font-size: calc(max(13px, calc(0.72rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
-.pn-day-date { font-size: calc(max(13px, calc(0.82rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; }
+.pn-answer-kids { margin-bottom: var(--space-2); }
+/* The day rows (This Sunday's card and She told me…) are the kit's .ui-days; this only spaces them.
+   On a phone, She told me…'s sheet has room for seven 44-wide cells only with 2px gaps. */
+.pn-sun .ui-days, .pn-answer .ui-days { margin-bottom: var(--space-2); }
+@media (max-width: 699px) { .pn-answer .ui-days { gap: 2px; } }
+.pn-sun > .ui-btn--block, #pnToldBody > .ui-btn--block { margin-top: var(--space-2); }
 .pn-answer-h {
   margin: var(--space-3) 0 var(--space-1); font-weight: 800;
   font-size: calc(max(13px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light);
@@ -230,8 +207,10 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 .pn-wait-title { margin: 0; font-family: var(--font-head); font-size: calc(1.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .pn-count { background: var(--mny-v15-red); color: var(--mny-v15-white); border-radius: var(--radius-full); padding: 1px 10px; font-weight: 800; font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .pn-strap { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
-.pn-wait-toggles { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
-/* Whose questions (a .ui-kids) and Group them (.ui-chip, in .pn-seg). */
+.pn-wait-toggles { margin-left: auto; flex: 1 1 auto; display: flex; gap: 8px; flex-wrap: wrap; }
+/* Whose questions (a .ui-kids, C4: it fills the rest of the row, the girls in
+   equal parts) and Group them (.ui-chip, in .pn-seg). */
+.pn-wait-toggles > .ui-kids { flex: 1 1 auto; }
 .pn-seg { display: inline-flex; gap: var(--space-2); }
 .pn-lines { display: flex; flex-direction: column; gap: 6px; }
 .pn-line {
@@ -270,3 +249,21 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 .pn-sidebtns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pn-tidy { display: flex; flex-direction: column; gap: 8px; }
 .pn-told-sheet { max-width: 620px; }
+
+/* ── Grown-ups and the request sheets on the kit (Stage 51) ─────────────────
+   Their buttons, chips and steppers are the kit's; this keeps their layout.
+   The answer row's buttons share its width; a chip may wrap its label (the kit
+   chip does not); an option that cannot be taken now (a request sheet's
+   aria-disabled, Grown-ups' disabled) is faded and dashed. */
+.gu-answer > .ui-btn { flex: 1 0 auto; }
+.gu-saverow > .ui-btn:last-child { margin-left: auto; min-width: 220px; }
+.gu-afford .ui-btn { margin-top: 6px; }
+.gu-opts > .ui-chip, .rq-opts > .ui-chip { white-space: normal; text-align: center; }
+.rq-two > .ui-chip { flex: 1; }
+.gu-opts > .ui-chip:disabled, .rq-opts > .ui-chip[aria-disabled="true"], .rq-sheet .ui-stepper > button[aria-disabled="true"] { opacity: 0.45; border-style: dashed; cursor: default; }
+/* A kit stepper / icon button inside a Grown-ups row keeps its size (the old pair did: gap 3px, no shrink). */
+.gu-exrow .ui-stepper, .gu-ovrow .ui-stepper, .gu-formrow .ui-stepper, .gu-amt .ui-stepper { gap: 3px; }
+.gu .ui-stepper > button, .gu-card .ui-stepper > button, .gu-formrow .ui-stepper > button, .gu-amt .ui-stepper > button, .gu-card .ui-btn--icon { flex: none; }
+@media (max-width: 767px) { .gu-exrow .ui-stepper { grid-column: 1 / -1; } }
+/* A chip with one figure or one emoji is still a 44px target on the iPad (K12 does this only on a phone). */
+.gu-opts > .ui-chip, .rq-opts > .ui-chip { min-width: 44px; max-width: 100%; justify-content: center; flex-shrink: 1; }   /* a long label wraps; it does not push the page sideways */

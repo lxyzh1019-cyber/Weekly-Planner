@@ -1,4 +1,6 @@
   :root {
+    /* One light scheme: the app has no dark theme (tests/check-look-tokens.js, rule "no dark scheme"). */
+    color-scheme: light;
     /* Print grid slot height (per 15-min slot) — the default only.
        renderPrintSheet (js/16-print.js) sets its own on the sheet's host,
        sized so the chosen window (6am–10pm unless a parent narrows it)
@@ -120,6 +122,17 @@
        .hdr page header (100), the nav the kid's bottom bar .kid-nav (60), a sheet the
        .overlay (300), a dialog #appDialogOverlay (500). */
     --radius-pill: var(--radius-full);
+    /* Kit 1.1 K5: a seven-day row's cell corner (.ui-days). */
+    --radius-cell: 12px;
+    /* C8 (owner 2026-10-12): today's day tile is a double navy frame, no fill. */
+    --bw-today: 4px;
+    /* C8: the kit's button jobs, each pointing at a value app.css already
+       has — Yes / OK green #2f7d55 with white (5.02:1), Danger (deletes
+       only) #b8441f with white (5.41:1). Same in both looks. */
+    --btn-ok: var(--status-done-strong);
+    --btn-ok-ink: var(--ink-on-strong);
+    --btn-danger: var(--mny-v15-red);
+    --btn-danger-ink: var(--mny-v15-white);
     --z-header: 100;
     --z-nav:    60;
     --z-sheet:  300;
@@ -328,14 +341,6 @@
     --travel-edge-shade: black;
     --travel-ink-shade: black;
 
-    /* Dark scheme: the three prefers-color-scheme rules (the week clash and to-do banners) */
-    --dark-clash-fill: #3a1512;
-    --dark-clash-ink: #ffd7d2;
-    --dark-clash-border: #e5675c;
-    --dark-todo-fill: #33260c;
-    --dark-todo-ink: #ffe6b0;
-    --dark-todo-border: #d9a33d;
-
     /* Zones: the time-of-day bands of the week and day grids */
     --zone-school: #d7eafe;
     --zone-evening: #e8dcf2;
@@ -420,14 +425,17 @@
     /* Secondary text inside the filled Now card: navy, because the muted text
        does not reach 4.5:1 on a block colour. */
     --now-ink-soft: var(--ink);
-    /* Main buttons and the selected tab: yellow, navy text; the selected tab
-       has no ring. Selected pills: the strong accent, white text. */
+    /* Main buttons: yellow, navy text (C8: yellow means only the main
+       action). Picked pills: the picked colour of their area (--pill-on is
+       --sel; owner corrections C1/C2, 2026-10-12). */
     --btn-main: #ffc83d;
     --btn-main-ink: var(--ink);
     --nav-on: #ffc83d;
     --nav-on-ring: none;
-    --pill-on: var(--accent-strong);
-    --pill-on-ink: var(--ink-on-strong);
+    --pill-on: var(--sel);
+    --pill-on-ink: var(--sel-ink);
+    /* Kit 1.1 K2: the pale wash a kit button or chip wears under a mouse. */
+    --hover-wash: rgba(184, 68, 31, 0.08);
     /* The Now card's tick: a navy tile. Progress bar: navy on white — none of
        the running block's colour in it. */
     --tick-bg: var(--ink);
@@ -516,15 +524,10 @@
     --mytime-surface: #fff8e1;
     --mytime-paper: #fffdf5;
     --mytime-glow: rgba(255,209,102,0.3);
-    /* Selected tabs (the portal's five, Copy a day's sister tabs, the chore
-       lanes): Pop yellow with navy text, Calm navy with white. */
-    --tab-on: var(--accent-yellow);
-    --tab-on-ink: var(--ink);
-    /* Parent › Now's today square, beside a selected day that is navy-filled:
-       Pop fills today with the strong accent, white text, no ring. */
-    --day-now-bg: var(--pill-on);
-    --day-now-ink: var(--ink-on-strong);
-    --day-now-ring: none;
+    /* Selected tabs (Copy a day's sister tabs, the chore lanes, .ui-tabs):
+       the picked colour (C8: tabs are picked; yellow is never picked). */
+    --tab-on: var(--sel);
+    --tab-on-ink: var(--sel-ink);
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--accent-yellow);
     --series-jess: var(--accent);
@@ -532,8 +535,14 @@
        the selected cell, the badge, the meeting's ring, the date's ink and the
        buttons' hard shadow. Badge, ring and ink are the same literals in both
        looks in the owner's source (SRC 52, 209, 51). */
-    --sel: #ffc83d;
-    --sel-ink: #1c2240;
+    /* The picked colour (C1/C8, owner 2026-10-12): the planner's — Pop teal
+       #2f7f77 with white (--mny-v15-teal, 4.75:1); never yellow, so it never
+       clashes with Jenn's 🐥. An area root sets its own (css kit block,
+       [data-area]); outside one, the planner's. */
+    --sel-planner: var(--mny-v15-teal);
+    --sel-planner-ink: var(--mny-v15-white);
+    --sel: var(--sel-planner);
+    --sel-ink: var(--sel-planner-ink);
     --hdr-badge-bg: #ffe4ec;
     --hdr-ring: #ff5c8a;
     --hdr-label-ink: #1c2240;
@@ -581,13 +590,16 @@
     /* On the white Now card the secondary text is the look's own. */
     --now-ink-soft: var(--ink-light);
     /* Purple main button, white text. Selected tab: the page tint ringed in
-       navy (an inset ring, so no box moves). Selected pills: navy, white text. */
+       navy (an inset ring, so no box moves). Picked pills: the picked
+       colour of their area (--pill-on is --sel; C1/C2, 2026-10-12). */
     --btn-main: #5b4fd6;
     --btn-main-ink: #fff;
     --nav-on: #eef2f9;
     --nav-on-ring: inset 0 0 0 2px var(--ink);
-    --pill-on: var(--ink);
-    --pill-on-ink: #fff;
+    --pill-on: var(--sel);
+    --pill-on-ink: var(--sel-ink);
+    /* Kit 1.1 K2: the pale wash a kit button or chip wears under a mouse. */
+    --hover-wash: rgba(28, 34, 64, 0.07);
     /* Purple tick, white check. Progress bar in the running block's colour. */
     --tick-bg: #5b4fd6;
     --tick-ink: #fff;
@@ -677,23 +689,21 @@
     --mytime-surface: #ffeef3;
     --mytime-paper: #ffffff;
     --mytime-glow: rgba(255,92,138,0.25);
-    /* Selected tabs (the portal's five, Copy a day's sister tabs, the chore
-       lanes): Pop yellow with navy text, Calm navy with white. */
-    --tab-on: var(--ink);
-    --tab-on-ink: #fff;
-    /* Parent › Now's today square: Calm's selected pill is navy-filled, so
-       today is navy by frame (L9) — white inside, navy text, an inset navy
-       ring on the navy border (inset, so no box moves). */
-    --day-now-bg: var(--paper);
-    --day-now-ink: var(--ink);
-    --day-now-ring: inset 0 0 0 2px var(--today-mark);
+    /* Selected tabs (Copy a day's sister tabs, the chore lanes, .ui-tabs):
+       the picked colour (C8: tabs are picked). */
+    --tab-on: var(--sel);
+    --tab-on-ink: var(--sel-ink);
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--jenn);
     --series-jess: var(--jess);
     /* The rebuilt header (Stage 20): navy selected with white text, the
        2px shadow; badge, ring and ink as Pop (SRC 612, 615). */
-    --sel: #1c2240;
-    --sel-ink: #fff;
+    /* The picked colour (C1/C8): the planner's — Calm navy #1c2240 with white
+       (15.5:1). An area root sets its own ([data-area]). */
+    --sel-planner: var(--ink);
+    --sel-planner-ink: var(--ink-on-strong);
+    --sel: var(--sel-planner);
+    --sel-ink: var(--sel-planner-ink);
     --hdr-badge-bg: #ffe4ec;
     --hdr-ring: #ff5c8a;
     --hdr-label-ink: #1c2240;
@@ -716,8 +726,18 @@
     /* Calm lines its figures up (tabular); Pop draws them as the font does. */
     font-variant-numeric: var(--num-variant);
     min-height: 100vh;
-    overflow-x: hidden;
   }
+
+  /* No sideways scroll, set on html rather than body (Fix C7). The bottom navs
+     are position:fixed against the layout viewport. iOS Safari is known not to
+     heed overflow-x on body alone, and a page wider than the screen there is
+     zoomed out to fit, which leaves a fixed bar part way up the glass. On html
+     the clip is the viewport's own in every browser; body stays overflow
+     visible. Not reproduced in Chrome; theBottomNavStaysPinned holds the
+     conditions (no page wider than the window, nothing on html or body that
+     captures a fixed child, the bar at the window's foot). */
+  html { overflow-x: hidden; }
+  body { overflow-x: clip; }
 
   /* One font everywhere (Looks stage 4C). The browser gives form controls its
      own system font, so without this every button, field and menu with no
@@ -733,72 +753,6 @@
   .screen { display: none; min-height: 100vh; position: relative; z-index: 1; }
   .screen.active { display: flex; flex-direction: column; }
 
-  /* ═══════════ PROFILE SELECT ═══════════ */
-  #screen-profile {
-    align-items: center; justify-content: center;
-    padding: 2rem;
-    background: linear-gradient(135deg, var(--bg) 0%, var(--surface-profile-glow) 100%);
-  }
-  .profile-header { text-align: center; margin-bottom: 2rem; }
-  .profile-header h1 {
-    font-family: var(--font-display);
-    font-size: calc(3.4rem * var(--text-scale, 1)); color: var(--accent-strong);
-    transform: rotate(-2deg);
-    text-shadow: 3px 3px 0 var(--shadow-black-6);
-  }
-  .profile-header p { color: var(--ink-light); font-size: calc(1.2rem * var(--text-scale, 1)); margin-top: 0.5rem; }
-
-  .profile-cards { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
-
-  .profile-card {
-    background: var(--paper);
-    border-radius: 24px;
-    padding: 2.2rem 1.8rem;
-    width: 170px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
-    box-shadow: 4px 6px 0 var(--shadow-ink-12), 0 8px 24px var(--shadow-black-8);
-    border: 3px solid var(--ink);
-    transform: rotate(-1.5deg);
-  }
-  .profile-card:nth-child(2) { transform: rotate(2deg); }
-  .profile-card:nth-child(3) { transform: rotate(-0.5deg); }
-  .profile-card:hover { transform: rotate(0) translateY(-8px) scale(1.04); box-shadow: 6px 10px 0 var(--shadow-ink-15); }
-  .profile-card .avatar { font-size: calc(3.8rem * var(--text-scale, 1)); margin-bottom: 0.8rem; display:block; }
-  .profile-card h2 { font-size: calc(2rem * var(--text-scale, 1)); }
-  .profile-card.jenn { background: var(--jenn-wash); }
-  .profile-card.jess { background: var(--jess-wash); }
-  .profile-card.parent { background: var(--profile-parent-wash); }
-
-  .profile-motto {
-    margin-top: 2.2rem;
-    max-width: 760px;
-    text-align: center;
-  }
-  .profile-motto p {
-    font-family: var(--font-script);
-    font-size: calc(1.55rem * var(--text-scale, 1));
-    color: var(--ink-motto);
-    line-height: 1.4;
-    transform: rotate(-1deg);
-  }
-  .profile-motto .profile-message {
-    font-family: var(--font-text);
-    font-size: calc(1.1rem * var(--text-scale, 1));
-    line-height: 1.45;
-    color: var(--ink);
-    margin-top: 0.8rem;
-    background: var(--surface-glass-45);
-    border: 2px dashed var(--paper-line);
-    border-radius: 16px;
-    padding: 0.85rem 1rem;
-    transform: none;
-  }
-  #parentWeekKidPills .pill-btn {
-    font-size: calc(1.1rem * var(--text-scale, 1));
-    padding: 0.4rem 1rem;
-  }
 
   /* Text that only a screen reader needs (Sister Sync's "moved" note). */
   .visually-hidden {
@@ -1000,56 +954,10 @@
     outline-offset: 2px;
   }
 
-  /* ═══════════ QUICK PROFILE SWITCHER ═══════════ */
-  .profile-switch-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.3rem; }
-  .profile-switch-opt {
-    display: flex; align-items: center; gap: 0.7rem;
-    width: 100%; text-align: left;
-    background: var(--paper-card, var(--paper));
-    border: 2px solid var(--ink); border-radius: 14px;
-    padding: 0.7rem 0.9rem; cursor: pointer;
-    font-family: var(--font-text); font-weight: 800;
-    color: var(--ink); box-shadow: 2px 2px 0 var(--ink);
-    transition: transform 0.12s, box-shadow 0.12s;
-  }
-  .profile-switch-opt:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); background: var(--accent-yellow); }
-  .profile-switch-opt.current { background: var(--accent-yellow); }
-  .profile-switch-opt .ps-emoji { font-size: calc(1.7rem * var(--text-scale, 1)); line-height: 1; flex-shrink: 0; }
-  .profile-switch-opt .ps-name { font-size: calc(1.2rem * var(--text-scale, 1)); flex: 1; }
-  .profile-switch-opt .ps-check { font-size: calc(1.3rem * var(--text-scale, 1)); font-weight: 900; color: var(--accent-strong); }
-  .profile-switch-opt.ps-more { background: transparent; box-shadow: none; border-style: dashed; font-weight: 700; }
-  .profile-switch-opt.ps-more .ps-name { font-size: calc(1rem * var(--text-scale, 1)); color: var(--ink-light); }
-
-  /* ═══════════ STATUS DOT (sync) ═══════════ */
-  .sync-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    display: inline-block; margin-left: 4px;
-    background: var(--accent-green);
-    box-shadow: 0 0 6px var(--accent-green);
-  }
-  .sync-dot.offline { background: var(--status-offline); box-shadow: none; }
-  .sync-dot.syncing { background: var(--accent-yellow); animation: pulse 1s infinite; }
-  .sync-pending-msg {
-    margin-top: 0.35rem;
-    /* max(): Calm's type put it at 12.5px on the picker (Looks stage 4). */
-    font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)));
-    color: var(--ink-light);
-    min-height: 1.1rem;
-  }
-  .sync-debug-msg {
-    margin-top: 0.2rem;
-    font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    color: var(--ink-grey);
-    min-height: 1rem;
-  }
+  /* The sync dot's pulse (.sync-dot.syncing in css/social.css). */
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══════════ WEEK VIEW ═══════════ */
-  .week-nav {
-    display: flex; align-items: center; justify-content: center;
-    gap: 1rem; padding: 0.8rem;
-  }
-  .week-nav h3 { font-size: calc(1.4rem * var(--text-scale, 1)); transform: rotate(-1deg); }
   /* Rest-day toggle now lives inside the Template sheet */
   #restDayBtn.on {
     background: var(--cat-sleep);
@@ -1614,7 +1522,7 @@
     font-family: var(--font-text); font-weight: 700;
     font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1));
   }
-  .refl-kid.on { background: var(--pill-on); color: var(--ink-on-strong); }
+  .refl-kid.on { background: var(--pill-on); color: var(--pill-on-ink); }
   .refl-kid-n { font-size: calc(0.86rem * var(--fs-scale, 1) * var(--text-scale, 1)); opacity: 0.85; }
   .refl-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
   .refl-tab {
@@ -1860,9 +1768,6 @@
   }
   .week-conflict-banner .wcb-icon { font-size: calc(1.15rem * var(--text-scale, 1)); }
   .week-conflict-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-  @media (prefers-color-scheme: dark) {
-    .week-conflict-banner { background: var(--dark-clash-fill); color: var(--dark-clash-ink); border-color: var(--dark-clash-border); }
-  }
   /* Something still to do, not something already wrong. Same shape as the clash
      banner so the footer reads as one row of week-level notes, but amber rather
      than red: a week that has not found a day for the family's chores yet is a
@@ -1884,9 +1789,6 @@
   .week-todo-banner--warn { border-width: 3px; box-shadow: 3px 3px 0 var(--status-todo-glow-strong); }
   .week-todo-banner .wcb-icon { font-size: calc(1.15rem * var(--text-scale, 1)); }
   .week-todo-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: calc(max(13px, calc(0.82rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
-  @media (prefers-color-scheme: dark) {
-    .week-todo-banner { background: var(--dark-todo-fill); color: var(--dark-todo-ink); border-color: var(--dark-todo-border); }
-  }
   /* Hatched travel/get-ready strips hugging a card in the week lane — tinted
      to the activity's own colour so it reads as "part of that block" rather
      than a generic grey stripe. */
@@ -2011,7 +1913,7 @@
     transition: all 0.15s;
   }
   .vibe-mood:hover { transform: scale(1.15); }
-  .vibe-mood.selected { background: var(--accent-yellow); transform: scale(1.2) rotate(-5deg); box-shadow: 2px 2px 0 var(--ink); }
+  .vibe-mood.selected { background: var(--pill-on); color: var(--pill-on-ink); transform: scale(1.2) rotate(-5deg); box-shadow: 2px 2px 0 var(--ink); }
   /* The reflect sheet's moods are what she taps there: 44px, the day's and each
      block's (Plan v6 C2 — they were 36px and 28px). The gap is wide enough for a
      chosen dot's 1.2x to stay off its neighbour's target. Each block's row wraps
@@ -2606,7 +2508,7 @@
   .parent-stamp-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.4rem 0; }
   .parent-stamp-picker { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .stamp-cell { width: 34px; height: 34px; border: 2px solid var(--ink); border-radius: 9px; background: var(--surface-card); font-size: calc(1.15rem * var(--text-scale, 1)); line-height: 1; cursor: pointer; padding: 0; }
-  .stamp-cell.selected { background: var(--accent-yellow); box-shadow: 1.5px 1.5px 0 var(--ink); }
+  .stamp-cell.selected { background: var(--pill-on); color: var(--pill-on-ink); box-shadow: 1.5px 1.5px 0 var(--ink); }
   .badge-stamp { background: var(--surface-reward); }
   /* Evening wind-down reminder inside the day Next-Up banner */
   .bedtime-tip {
@@ -2722,7 +2624,7 @@
     transition: all 0.15s; font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 600;
     font-family: var(--font-text);
   }
-  .obj-item.checked { background: var(--accent-yellow); }
+  .obj-item.checked { background: var(--pill-on); color: var(--pill-on-ink); }
   .obj-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--ink); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); background:var(--surface-card); }
   .obj-item.checked .obj-check { background: var(--accent-strong); color: var(--ink-on-strong); }
   .obj-item .obj-meta { margin-left: auto; font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
@@ -2779,7 +2681,7 @@
     font-family: var(--font-text);
     box-shadow: 2px 2px 0 var(--ink);
   }
-  .day-pick.active { background: var(--pill-on); color: var(--ink-on-strong); }
+  .day-pick.active { background: var(--pill-on); color: var(--pill-on-ink); }
   .day-pick-presets { display:flex; gap: 0.3rem; margin-bottom: 0.4rem; flex-wrap:wrap; }
 
   .btn-confirm {
@@ -2821,7 +2723,7 @@
     background: var(--surface-card); border: 2px solid transparent; border-radius: 9px;
   }
   .emoji-cell:hover { border-color: var(--paper-line); transform: scale(1.08); }
-  .emoji-cell.selected { border-color: var(--ink); background: var(--accent-yellow); box-shadow: 1.5px 1.5px 0 var(--ink); }
+  .emoji-cell.selected { border-color: var(--ink); background: var(--pill-on); color: var(--pill-on-ink); box-shadow: 1.5px 1.5px 0 var(--ink); }
   @media (max-width: 420px) { .emoji-grid { grid-template-columns: repeat(6, 1fr); } }
 
   /* ═══════════ TOAST ═══════════ */
@@ -3210,123 +3112,6 @@
   }
   .feedback-empty { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 
-  /* Sister Sync — one timeline, both sisters, one axis (js/10-social.js,
-     renderSync). The DOM order is Jenn, Jess, stripe, gutter, legend, because
-     the invite checks select `#syncGrid .sync-day-col:first-child`; the tracks
-     are placed here as gutter | Jenn | both-free stripe | Jess. The gutter and
-     the stripe start --sync-head down, so all four share one 6am line. Kid
-     screen: 13px floor, 15px for the name she reads to tap. */
-  .sync-grid {
-    --sync-head: 2.2rem;
-    display: grid;
-    grid-template-columns: 2.6rem minmax(0, 1fr) 12px minmax(0, 1fr);
-    column-gap: 6px;
-    padding: 0.6rem 0.6rem 1rem;
-    /* The screen centres its children, which would shrink the grid to its
-       content; the width is stated so the two columns share the screen. */
-    width: 100%; max-width: 860px; margin: 0 auto; box-sizing: border-box;
-  }
-  .sync-day-col { grid-row: 1; min-width: 0; }
-  .sync-day-col--left  { grid-column: 2; }
-  .sync-day-col--right { grid-column: 4; }
-  .sync-day-col h4 {
-    height: var(--sync-head); line-height: var(--sync-head); margin: 0;
-    font-size: calc(1.1rem * var(--text-scale, 1)); text-align: center;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .sync-tl-canvas {
-    position: relative; isolation: isolate; overflow: hidden;
-    background: var(--paper); border-radius: 10px;
-    box-shadow: 0 0 0 2px var(--ink);
-  }
-  .sync-tl-gutter { grid-column: 1; grid-row: 1; padding-top: var(--sync-head); }
-  .sync-tl-gutter-track { position: relative; }
-  .sync-tl-hour {
-    position: absolute; right: 2px; transform: translateY(-50%);
-    font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1)); line-height: 1; white-space: nowrap;
-    color: var(--ink-light);
-  }
-  .sync-tl-stripe { grid-column: 3; grid-row: 1; padding-top: var(--sync-head); }
-  .sync-tl-stripe-track {
-    position: relative; overflow: hidden; border-radius: 6px;
-    background: var(--surface-ink-10);
-  }
-  .sync-free-seg { position: absolute; left: 0; right: 0; background: var(--surface-sync-free); }
-  .sync-tl-band-label, .sync-tl-empty {
-    position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
-    text-align: center; color: var(--ink-light);
-    font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1)); line-height: 1.2; padding-top: 2px;
-  }
-  .sync-tl-empty { top: 4px; }
-  .hour-grid--sync { z-index: 0; }
-  .sync-tl-strip { z-index: 1; }
-  /* Every block shape is a .sync-block; only YOUR tappable ones are also
-     .sync-block-mini, floored at 44px tall (SYNC_TAP_MIN_PX). */
-  .sync-block {
-    position: absolute; box-sizing: border-box; z-index: 2; overflow: hidden;
-    border: 1.5px solid var(--ink); border-radius: 6px; padding: 0 4px;
-    font-family: var(--font-text); line-height: 1.1;
-    color: var(--ink);
-  }
-  .sync-block--busy { background: var(--surface-busy); color: var(--ink-busy); border-color: var(--border-grey); }
-  .sync-block-mini { cursor: pointer; }
-  .sync-block-name {
-    display: block; font-size: calc(max(15px, 0.95rem) * var(--text-scale, 1));
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .sync-block-time, .sync-block-flag {
-    display: block; font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1));
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .sync-block-flag { font-weight: 700; }
-  .sync-tl-legend {
-    grid-column: 1 / -1; grid-row: 2; margin: 0.6rem 0 0;
-    font-size: calc(max(13px, 0.85rem) * var(--text-scale, 1)); color: var(--ink-light);
-  }
-  .sync-overlap {
-    background: var(--accent-yellow);
-    border-radius: 10px; padding: 0.5rem 0.7rem;
-    margin: 0.5rem 0.6rem; border: 2px dashed var(--ink);
-    font-weight: 700;
-  }
-  /* The household's sister-details setting, read-only for her (Plan v6 C5) —
-     a grown-up changes it in Parent › App › Profiles. */
-  .sync-vis-note {
-    margin: 0 0.6rem 0.55rem; color: var(--ink-light);
-    font-size: calc(max(15px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1));
-  }
-
-  /* Challenges */
-  .challenge-card {
-    background: var(--paper); border: 2px solid var(--ink); border-radius: 14px;
-    padding: 0.7rem 0.9rem; margin-bottom: 0.5rem;
-    box-shadow: var(--shadow-card);
-  }
-  .challenge-title { font-family: var(--font-display); font-size: calc(1.2rem * var(--text-scale, 1)); margin-bottom: 0.2rem; }
-  .challenge-progress {
-    display: flex; gap: 0.4rem; align-items: center;
-    font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); margin-top: 0.4rem;
-  }
-  .challenge-bar {
-    flex: 1; height: 12px; background: var(--bg); border-radius: 6px;
-    border: 1.5px solid var(--ink); overflow: hidden;
-  }
-  .challenge-fill {
-    height: 100%; background: var(--accent);
-    transition: width 0.4s;
-  }
-
-  /* Invites */
-  .invite-item {
-    background: var(--surface-today); border: 2px dashed var(--accent);
-    border-radius: 12px; padding: 0.6rem 0.8rem;
-    margin-bottom: 0.5rem; font-size: calc(0.95rem * var(--fs-scale, 1) * var(--text-scale, 1));
-  }
-  .invite-actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
-  /* The inbox's answers are a child's taps: 44px, not .pill-btn's 38px. Found
-     when Sister Sync joined the kid-screen sweep (Plan v6 C6). */
-  .invite-actions .pill-btn { min-height: 44px; }
-
   /* ═══════════ PRINT ═══════════ */
   @media print {
     /* L12: print ignores the look's text scale. `:root[data-look]` so this
@@ -3701,18 +3486,6 @@
   /* iPad portrait (820–979px): explicit single-column + bottom-tray optimised layout */
   @media (min-width: 820px) and (max-width: 979px) {
     #screen-day { grid-template-columns: 1fr; }
-    .profile-cards {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: var(--space-4);
-    }
-    .profile-card {
-      width: auto;
-      min-width: 150px;
-      flex: 1 1 170px;
-      max-width: 220px;
-    }
   }
 
   /* ── Audit fix: screen-reader-only utility (visually hidden but announced by AT) ── */
@@ -4196,7 +3969,7 @@
   .mny-btn[disabled] { background: var(--mny-surface-disabled); color: var(--ink-light); cursor: not-allowed; box-shadow: none; }
 
   .mny-chip {
-    min-height: 34px; border: 2px solid var(--ink); border-radius: 9px; background: var(--paper);
+    min-height: 34px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper);
     color: var(--ink); font: inherit; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.25rem 0.6rem; cursor: pointer;
   }
   .mny-chip.on { background: var(--pill-on); color: var(--pill-on-ink); }
@@ -4357,7 +4130,7 @@
   }
   .ck-segbtn:first-child { border-radius: 11px 0 0 11px; border-right-width: 1px; }
   .ck-segbtn:last-child { border-radius: 0 11px 11px 0; border-left-width: 1px; }
-  .ck-segbtn.on { background: var(--accent-yellow); }
+  .ck-segbtn.on { background: var(--pill-on); color: var(--pill-on-ink); }
   .ck-btn {
     border: 2px solid var(--ck-ink); border-radius: 11px; background: var(--ck-paper); color: var(--ck-ink);
     font-family: inherit; font-size: max(13px, calc(12.5px * var(--text-scale, 1))); font-weight: 800; padding: 8px 15px; cursor: pointer;
@@ -4447,7 +4220,7 @@
     border: 2px solid var(--ink); border-radius: 14px; padding: 0.25rem 0.7rem 0.25rem 0.5rem;
     background: var(--paper); color: var(--ink); font: inherit; cursor: pointer;
   }
-  .cp-kid.on { background: var(--accent-yellow); }
+  .cp-kid.on { background: var(--pill-on); color: var(--pill-on-ink); }
   .cp-kid-icon { font-size: calc(1rem * var(--text-scale, 1)); }
   .cp-kid-name { display: block; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; line-height: 1.15; }
   .cp-kid-badge { display: block; font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); line-height: 1.15; }
@@ -4906,12 +4679,12 @@
   display: inline-flex; align-items: center; justify-content: center;
   flex-direction: column; gap: 0.1rem;
   min-height: 44px; padding: 0.4rem 0.7rem;
-  border: 2px solid var(--ink); border-radius: 999px;
+  border: 2px solid var(--ink); border-radius: var(--radius-btn);
   background: var(--bg2); color: var(--ink);
   font-size: calc(max(13px, 0.9rem) * var(--text-scale, 1)); font-weight: 700; line-height: 1.2;
   cursor: pointer;
 }
-.rc-chip.on { background: var(--ink); color: var(--paper); }
+.rc-chip.on { background: var(--pill-on); color: var(--pill-on-ink); }
 .rc-chip small { font-size: calc(max(13px, 0.78rem) * var(--text-scale, 1)); font-weight: 600; opacity: 0.85; }
 /* Shut, not hidden: a pot Money school has not opened yet is still something
    she can see she is working towards. The refusal beside the button says when. */
@@ -4932,11 +4705,11 @@
 }
 .rc-toggle {
   min-height: 44px; padding: 0.4rem 0.8rem;
-  border: 2px solid var(--ink); border-radius: 999px;
+  border: 2px solid var(--ink); border-radius: var(--radius-btn);
   background: var(--bg2); color: var(--ink);
   font-size: calc(max(13px, 0.9rem) * var(--text-scale, 1)); font-weight: 700; cursor: pointer;
 }
-.rc-toggle.on { background: var(--ink); color: var(--paper); }
+.rc-toggle.on { background: var(--pill-on); color: var(--pill-on-ink); }
 .rc-note { margin: var(--space-2, 0.6rem) 0; font-size: calc(max(13px, 0.88rem) * var(--text-scale, 1)); line-height: 1.4; opacity: 0.9; }
 /* A refusal is never decoration: it is the sentence that says what to change. */
 .rc-no { color: var(--status-warn-strong); opacity: 1; font-weight: 700; }
@@ -5009,7 +4782,11 @@
    radii, borders, layers and header sizes all read a :root or look token, so
    both looks reach every piece. Every target is at least 44px. The header is
    kept minimal until its picture is approved (Stage 17); its sizes follow the
-   owner's header pictures (PR 4, D21).
+   owner's header pictures (PR 4, D21). Kit 1.1 (K1–K12) adds the disabled
+   and hover looks, the joined kid switch, the seven-day row (.ui-days), the
+   ok and full-width buttons, the list row (.ui-row) and the kid stepper; every
+   value is in docs/handoff/kit-1-1-values.md, measured by
+   theComponentKitHoldsItsSizes.
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 699px) {
   /* The page header on a phone (SRC 122-125, 133-151, 184-192, 235-250). */
@@ -5033,23 +4810,47 @@
   cursor: pointer;
 }
 .ui-btn--primary { background: var(--btn-main); color: var(--btn-main-ink); }
-.ui-btn--secondary { background: var(--paper); color: var(--ink); }
-.ui-btn--danger { background: var(--status-danger-wash); color: var(--status-danger-ink); border-color: var(--status-danger-ink); }
+.ui-btn--secondary { background: var(--paper); color: var(--ink); border-width: var(--bw-chip); }
+/* C8 (owner 2026-10-12): Danger is for a delete that cannot be undone —
+   #b8441f with white, both looks; never for "No" or "Not now". */
+.ui-btn--danger { background: var(--btn-danger); color: var(--btn-danger-ink); }
+/* Kit 1.1 K7, C8: the green "ok" button (Approve, She bought it, ✓ Yes /
+   Agree, Set it): #2f7d55 with white, both looks. */
+.ui-btn--ok { background: var(--btn-ok); color: var(--btn-ok-ink); }
+/* Kit 1.1 K6: a screen's one leading action, the full width of its column. */
+.ui-btn--block { width: 100%; }
 .ui-btn--icon { width: 44px; padding: 0; }
 /* The money size: 54px in a money row, 66px for a two-line action button. */
 .ui-btn--lg { min-height: 54px; min-width: 54px; }
 .ui-btn--lg.ui-btn--two-line { min-height: 66px; flex-direction: column; gap: 0; }
 .ui-btn--icon.ui-btn--lg { width: 54px; }
+/* Kit 1.1 K1: a button that cannot act now — 45%, no shadow, the plain cursor. */
+.ui-btn:disabled, .ui-btn[aria-disabled="true"] { opacity: 0.45; box-shadow: none; cursor: default; }
 
 .ui-chip {
   box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-1);
   min-height: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
   font-family: var(--font-text); font-weight: 700; font-size: calc(0.95rem * var(--text-scale, 1));
   white-space: nowrap;
 }
+/* C3 (owner 2026-10-12, overrides the kit's pill): a chip, an amount
+   button among them, is a rounded rectangle, 11px corners. A picked chip
+   wears its area's picked colour (--pill-on is --sel, C1/C2). */
 .ui-chip[aria-pressed="true"] { background: var(--pill-on); color: var(--pill-on-ink); }
+
+/* Kit 1.1 K2: a mouse pointing at a kit button or chip washes it pale (over
+   its own fill, so a main or ok button keeps its colour) and shows the
+   pointer; so does a list row that is a button (C6, owner 2026-10-12: the
+   row hover hint comes back). Fingers on the iPad see no difference: no
+   hover there. */
+@media (hover: hover) {
+  .ui-btn:hover:not(:disabled):not([aria-disabled="true"]), .ui-chip:hover:not(:disabled):not([aria-disabled="true"]),
+  button.ui-row:hover:not(:disabled) {
+    background-image: linear-gradient(var(--hover-wash), var(--hover-wash)); cursor: pointer;
+  }
+}
 
 .ui-tabs { display: flex; gap: var(--space-2); }
 .ui-tabs > button {
@@ -5060,6 +4861,9 @@
 }
 .ui-tabs > button[aria-selected="true"] { background: var(--tab-on); color: var(--tab-on-ink); }
 
+/* Kit 1.1 K9: a card keeps --radius-md (14px); everything inside it (buttons,
+   tabs, steppers, rows) takes --radius-btn (11px), so no row is rounder than
+   its card. */
 .ui-card {
   box-sizing: border-box; background: var(--paper); color: var(--ink);
   border: var(--bw-card) solid var(--ink); border-radius: var(--radius-md);
@@ -5077,21 +4881,117 @@
   border-top: var(--bw-card) solid var(--ink); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
-.ui-kids { display: inline-flex; gap: var(--space-2); }
+/* Kit 1.1 K4 (D49): one kid switch everywhere — the header's joined switch
+   (the parent header's girl switch, .parent-scope): a 2px ink frame with pill
+   ends, 2px ink dividers, the chosen girl in her area's picked colour (--sel,
+   C1/C2). C4 (owner 2026-10-12): it fills the width of its row, the girls in
+   equal parts, one grid column each (in a flex row it grows: Now's
+   toggles, the money sub-bar).
+   The cells draw the frame, and the end and divider
+   rules use :where() so they weigh no more than the base cell rule: a screen
+   that draws its girls its own way (the meeting's round pictures, .sd-avs;
+   the portal's framed .parent-scope, whose cells the header table sizes)
+   keeps its look. */
+.ui-kids { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; }
 .ui-kids > button {
   box-sizing: border-box; min-height: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  border: var(--bw-chip) solid var(--ink); border-radius: 0;
   font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
 }
-.ui-kids > button[aria-pressed="true"] { background: var(--pill-on); color: var(--pill-on-ink); }
+.ui-kids > button:where(:first-child) { border-top-left-radius: var(--radius-pill); border-bottom-left-radius: var(--radius-pill); }
+.ui-kids > button:where(:last-child) { border-top-right-radius: var(--radius-pill); border-bottom-right-radius: var(--radius-pill); }
+.ui-kids > button:where(:not(:first-child)) { border-left-width: 0; }
+.ui-kids > button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); }
 
+/* C1 / C2 / C8 (owner 2026-10-12): two colours, two jobs. Picked (a chip, an
+   amount, a day, a kid switch, a tab) is one colour per area, set ONCE here
+   at the area's root ([data-area] on the screen or sheet, index.html):
+   money teal #2f7f77 in both looks (My money, Money school, Sunday and the
+   meeting, Grown-ups, the request sheets); the planner Pop teal, Calm navy
+   (Today, Week, Day, Sister Sync, Profile; the look's own --sel); the
+   parent navy #1c2240 in both (Now, She told me, the Meeting hub, Monthly).
+   White text on each (4.75:1 teal, 15.5:1 navy). The main action is the
+   look's --btn-main (Pop yellow, Calm violet): yellow is never picked.
+   --pill-on and --tab-on are re-read here, so they follow the area. */
+[data-area="money"] { --sel: var(--mny-v15-teal); --sel-ink: var(--mny-v15-white); }
+[data-area="planner"] { --sel: var(--sel-planner); --sel-ink: var(--sel-planner-ink); }
+[data-area="parent"] { --sel: var(--ink); --sel-ink: var(--ink-on-strong); }
+[data-area] { --pill-on: var(--sel); --pill-on-ink: var(--sel-ink); --tab-on: var(--sel); --tab-on-ink: var(--sel-ink); }
+
+/* Kit 1.1 K5 (D50): one seven-day row — 7 equal cells, 12px corners, day over
+   date. Four states, never colour alone (G1): today (aria-current="date") a
+   double navy frame and a dot, no fill of its own (C8, owner 2026-10-12);
+   confirmed (.ui-day--ok) green and a ✓; chosen (aria-pressed="true") its
+   area's picked colour; still to come dashed in the
+   lighter ink (:disabled when it cannot be tapped, .ui-day--future when it can). Each cell carries its spoken name (aria-label), which
+   may say its %. */
+.ui-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); }
+.ui-days > button {
+  box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  min-width: 0; min-height: 44px; margin: 0; padding: var(--space-1) 0;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-cell);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(0.9rem * var(--text-scale, 1)); line-height: 1.15;
+  cursor: pointer;
+}
+.ui-days > button[aria-current="date"] { border: var(--bw-today) double var(--today-mark); }
+.ui-days > button[aria-current="date"]::after { content: '\2022'; }
+.ui-days > .ui-day--ok { background: var(--status-done); color: var(--status-done-ink); }
+.ui-days > .ui-day--ok::after { content: '\2713'; }
+.ui-days > .ui-day--ok[aria-current="date"]::after { content: '\2022\00a0\2713'; }
+.ui-days > button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); }
+.ui-days > button:disabled { background: var(--paper); color: var(--ink-light); border-style: dashed; box-shadow: none; cursor: default; }
+/* Still to come but tappable (Now, the Meeting hub): the same dashed look, the pointer stays. */
+.ui-days > .ui-day--future { background: var(--paper); color: var(--ink-light); border-style: dashed; box-shadow: none; }
+/* C5 (owner 2026-10-12, overrides K5 on Now and the Meeting hub): a day tile
+   tells its day — weekday, date, 🐥 % and 🦊 %, "Review ›" (Confirmed once
+   it is) — and the tiles wrap onto a second row where seven 72px tiles do
+   not fit (a phone, Now's side card), all the same width. */
+.ui-days--tiles { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: var(--space-1); }
+.ui-days--tiles > button { gap: 2px; padding: var(--space-2) 2px; }
+.ui-day-dow { font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 800; text-transform: uppercase; }
+.ui-day-date { font-family: var(--font-display); font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; line-height: 1; }
+.ui-day-pct, .ui-day-state { font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 700; white-space: nowrap; }
+
+/* Kit 1.1 K8 (D53, corrected by the owner 2026-10-11, G8): one list row — an
+   icon, the name, and things on the right; a kid's row 52px, a parent's
+   (.ui-row--parent) 44px; 2px ink, 11px corners. Done: the green wash and
+   the name struck through (not colour alone). Add: dashed. */
+.ui-row {
+  box-sizing: border-box; display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; min-height: 52px; margin: 0; padding: 0 var(--space-3); text-align: left;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
+}
+.ui-row--parent { min-height: 44px; }
+.ui-row-icon { flex: none; }
+.ui-row-name { flex: 1 1 auto; min-width: 0; }
+.ui-row-end { flex: none; display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.ui-row--done { background: var(--status-done-wash); }
+.ui-row--done .ui-row-name { text-decoration: line-through; }
+.ui-row--add { border-style: dashed; }
+
+/* Kit 1.1 K10 (D71, G4): the only stepper. Its − / + are 44px where only a
+   parent uses it, 52px where the girl does (.ui-stepper--kid). C3 (owner
+   2026-10-12, overrides K10's shape): the − / + are round again. */
 .ui-stepper { display: inline-flex; align-items: center; gap: var(--space-2); }
 .ui-stepper > button {
   box-sizing: border-box; width: 44px; height: 44px; padding: 0;
   background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-full);
   font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
+}
+.ui-stepper--kid > button { width: 52px; height: 52px; }
+
+/* Kit 1.1 K12: on a phone a chip's sides are 0.6rem (the Sunday choose row
+   fits two rows at 390px). With the narrower sides a short chip could fall
+   under the 44px target, so there it is at least 44px wide; it does not
+   shrink in a row (min-width replaces flex's content minimum, which kept a
+   long chip from being squeezed under its label). */
+@media (max-width: 699px) {
+  .ui-chip { padding: 0 0.6rem; min-width: 44px; flex-shrink: 0; }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -5176,7 +5076,7 @@
 .hdr-badge[hidden] { display: none; }
 /* One joined switch (Week's 📋 / 🖨, the Day's 1 2 3, the meeting's steps):
    a 2px ink frame, radius 14, cells 48px high with 2px dividers, the chosen
-   cell the look's --sel (Pop yellow, Calm navy with white) (SRC 67-69, 106-110,
+   cell its area's picked colour --sel (Pop teal, Calm navy, white text) (SRC 67-69, 106-110,
    213-218). */
 .hdr-switch {
   box-sizing: border-box; flex: none; display: flex;
@@ -5208,7 +5108,7 @@
 .hdr-r2-start, .hdr-r2-end { display: flex; align-items: center; gap: var(--hdr-r2-gap); min-width: 0; }
 .hdr-r2-end { flex: none; }
 .hdr-week { white-space: nowrap; font-weight: 600; }
-.hdr-sub .ui-kids { margin-left: auto; }
+.hdr-sub .ui-kids { margin-left: auto; flex: 1 1 auto; }
 /* Money: 72px, its buttons and badge 54px, ◀ 18px, ? 24px 600, the badge's
    emoji 26px; her two tabs are pills in the head font, 26px × the look's
    scale, the current one --sel (SRC 168-176). No title and no date: the
@@ -5417,11 +5317,8 @@
      never the app's navy --shadow-sm/md), the selected fills and the main button. */
   --mny-shadow-card: 3px 3px 0 var(--mny-v15-shadow);
   --mny-shadow-btn: 2px 2px 0 var(--mny-v15-shadow);
-  --sel-tab: var(--mny-v15-ink);
-  --sel-tab-ink: var(--mny-v15-white);
   --sel-opt: var(--mny-v15-teal);
   --sel-opt-ink: var(--mny-v15-white);
-  --btn-main: var(--mny-v15-red);
   --btn-main-ink: var(--mny-v15-white);
   --btn-off: var(--mny-v15-off);
   --btn-off-ink: var(--mny-v15-muted);
@@ -5454,12 +5351,6 @@
 /* ── 👨‍👩‍👧 Grown-ups (js/46-grownups.js) ── */
 .gu { font-family: var(--font-body); color: var(--mny-v15-ink); font-size: calc(1.125rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-tabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-start; padding: 0 0 10px; margin-bottom: 12px; border-bottom: var(--bw-rule) solid var(--mny-v15-ink); }
-.gu-tab {
-  min-height: 44px; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 11px;
-  font: inherit; font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); white-space: nowrap; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink);
-}
-.gu-tab.on { background: var(--sel-tab); color: var(--sel-tab-ink); }
 .gu-grid { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 14px; align-items: start; }
 .gu-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .gu-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -5488,12 +5379,7 @@
 .gu-kidchip { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-bar); padding: 0 8px; }
 .gu-kidchip--jenn { background: var(--mny-v15-jenn); }
 .gu-kidchip--jess { background: var(--mny-v15-jess); }
-.gu-x {
-  width: 44px; height: 44px; flex: none; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1));
-}
 .gu-num { min-width: 42px; text-align: center; font-family: var(--font-round); font-variant-numeric: var(--num-variant); }
-.gu-pair { display: flex; align-items: center; gap: 3px; }
 /* Was an ellipsis; a name on the money screens is never cut with "…" (owner's review, Plan v6 §M) — it wraps. */
 .gu-ellip { min-width: 0; overflow-wrap: anywhere; }
 .gu-empty { border: var(--bw-card) dashed var(--mny-v15-ink); border-radius: var(--radius-md); padding: 24px; text-align: center; color: var(--mny-v15-sub); }
@@ -5528,13 +5414,6 @@
 .gu-req-rules { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); line-height: 1.25; }
 .gu-check { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); border: var(--bw-info) dashed var(--mny-v15-teal); border-radius: var(--radius-bar); padding: 3px 8px; }
 .gu-answer { display: flex; gap: 6px; flex-wrap: wrap; }
-.gu-yes, .gu-talk, .gu-no {
-  flex: 1 0 auto; min-height: 44px; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); cursor: pointer;
-  color: var(--mny-v15-ink); font: inherit; font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--fs-scale, 1) * var(--text-scale, 1))); padding: 0 4px; white-space: nowrap;
-}
-.gu-yes { flex: 1.3 0 auto; border-width: var(--bw-card); background: var(--mny-v15-green); }
-.gu-talk { background: var(--mny-v15-amber); }
-.gu-no { background: var(--mny-v15-paper); }
 .gu-done { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gu-stamp {
   font-family: var(--font-head); font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1));
@@ -5543,10 +5422,6 @@
 .gu-stamp--yes { color: var(--mny-v15-teal); }
 .gu-stamp--talk { color: var(--mny-v15-red); }
 .gu-after { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
-.gu-undo {
-  margin-left: auto; min-height: 44px; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 10px; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1));
-}
 .gu-wobble { background: var(--mny-v15-lav); gap: 6px; padding: 10px 14px; }
 .gu-wobble .gu-cardhead { align-items: center; }
 .gu-toggle {
@@ -5568,14 +5443,6 @@
 .gu-formrow { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; }
 .gu-q { font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-opts { display: flex; gap: 6px; flex-wrap: wrap; }
-.gu-opt {
-  min-height: 44px; min-width: 48px; border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 12px; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1));
-}
-.gu-opt.on { background: var(--sel-opt); color: var(--sel-opt-ink); }
-/* A day still to come (📦 Fines › Day, Plan v5 Deviation 23): dashed and not
-   tappable; the ink stays full so the label still reads. */
-.gu-opt:disabled { border-style: dashed; cursor: not-allowed; }
 .gu-afford { gap: 4px; padding: 10px 14px; }
 .gu-afford--ok { background: var(--mny-v15-green); }
 .gu-afford--warn { background: var(--mny-v15-warn); }
@@ -5740,7 +5607,6 @@ button.gu-loanrow {
   .gu-tools .rc-door-hint { order: 3; flex: 1 0 100%; max-width: none; }
   .gu-formrow { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .gu-exrow { grid-template-columns: minmax(0, 1fr) 44px; }
-  .gu-exrow .gu-pair { grid-column: 1 / -1; }
 }
 
 /* ── ✋ Her request sheets (js/45-requests.js) ── */
@@ -5809,13 +5675,6 @@ button.gu-loanrow {
 .rq-pickfirst { border: var(--bw-card) dashed var(--mny-v15-dash); border-radius: var(--radius-md); padding: 30px 20px; text-align: center; color: var(--mny-v15-muted); font-size: calc(1.125rem * var(--text-scale, 1)); }
 .rq-row { display: flex; flex-direction: column; gap: 6px; }
 .rq-opts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.rq-two .rq-opt { flex: 1; }
-.rq-opt {
-  min-height: 48px; min-width: 48px; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-btn); padding: 0 14px; cursor: pointer;
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1.0625rem * var(--text-scale, 1));
-}
-.rq-opt.on { background: var(--sel-opt); color: var(--sel-opt-ink); }
-.rq-opt.off { border-style: dashed; opacity: 0.5; }
 .rq-race {
   display: grid; grid-template-columns: 30px minmax(0, 1fr) 124px auto 44px; gap: 8px; align-items: center;
   border: var(--bw-chip) solid var(--mny-v15-ink); border-radius: var(--radius-btn); background: var(--mny-v15-sky); padding: 6px 8px;
@@ -5827,7 +5686,6 @@ button.gu-loanrow {
 }
 .rq-race .rq-time { min-height: 44px; border-width: var(--bw-chip); border-radius: var(--radius-btn); padding: 0 10px; font-size: calc(1.0625rem * var(--text-scale, 1)); }
 .rq-step { display: flex; align-items: center; gap: 4px; }
-.rq-race .rq-opt { min-height: 44px; width: 44px; min-width: 44px; padding: 0; border-width: var(--bw-chip); border-radius: var(--radius-btn); font-size: calc(1.25rem * var(--text-scale, 1)); }
 .rq-num { min-width: 62px; text-align: center; font-family: var(--font-round); font-variant-numeric: var(--num-variant); font-size: calc(1.0625rem * var(--text-scale, 1)); }
 .rq-preview {
   border: var(--bw-chip) dashed var(--mny-v15-teal); border-radius: var(--radius-btn); padding: 8px 12px; line-height: 1.15;
@@ -6184,32 +6042,27 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
   .mv2-act-t { font-size: max(13px, calc(1.0625rem * var(--mny-fit, 1) * var(--text-scale, 1))); white-space: nowrap; }
   .mv2-loanfoot .mv2-line { white-space: nowrap; }
 }
-/* A · Draw early (owner, 2026-10-05): the text larger than the other sheets,
-   big − and + (the + yellow) — and the whole sheet on one screen without
+/* A · Draw early (owner, 2026-10-05): the question and preview larger than the
+   other sheets (its − and + are the kit stepper since Stage 51) — and the whole sheet on one screen without
    scrolling, iPad and phone, both looks (Calm's wider type takes --mny-fit;
    every size floored at 13px, every target 44px or more). */
 .rq-sheet[data-rq-mode="early"] { padding: 14px 20px; }
 .rq-sheet[data-rq-mode="early"] h3 { margin-bottom: 8px; }
 .rq-sheet[data-rq-mode="early"] #requestBody { gap: 10px; }
-.rq-sheet[data-rq-mode="early"] .rq-q, .rq-sheet[data-rq-mode="early"] .rq-opt { font-size: max(13px, calc(1.3125rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
-.rq-sheet[data-rq-mode="early"] .rq-opt { padding: 0 12px; }
+.rq-sheet[data-rq-mode="early"] .rq-q { font-size: max(13px, calc(1.3125rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
 .rq-sheet[data-rq-mode="early"] .rq-plain { font-size: max(13px, calc(1.25rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
 .rq-sheet[data-rq-mode="early"] .rq-preview { font-size: max(13px, calc(1.625rem * var(--mny-fit, 1) * var(--text-scale, 1))); padding: 6px 12px; }
 .rq-sheet[data-rq-mode="early"] .rq-send { font-size: max(13px, calc(1.375rem * var(--mny-fit, 1) * var(--text-scale, 1))); min-height: 52px; }
 .rq-sheet[data-rq-mode="early"] .rq-amtval { font-size: calc(1.75rem * var(--text-scale, 1)); min-width: 64px; }
-.rq-sheet[data-rq-mode="early"] .rq-amtline .rq-opt { width: 56px; min-width: 56px; min-height: 56px; padding: 0; font-size: calc(1.75rem * var(--text-scale, 1)); font-weight: 700; }
-.rq-sheet[data-rq-mode="early"] .rq-amtline .rq-opt[data-mny-d="1"] { background: var(--mny-v15-gold); }
 @media (max-width: 767px) {
   .rq-sheet[data-rq-mode="early"] { padding: 10px 12px; max-height: none; }
   .rq-sheet[data-rq-mode="early"] h3 { font-size: calc(1.5rem * var(--text-scale, 1)); }
   .rq-sheet[data-rq-mode="early"] #requestBody { gap: 7px; }
-  .rq-sheet[data-rq-mode="early"] .rq-q, .rq-sheet[data-rq-mode="early"] .rq-opt { font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
-  .rq-sheet[data-rq-mode="early"] .rq-opt { min-height: 44px; padding: 0 8px; }
+  .rq-sheet[data-rq-mode="early"] .rq-q { font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
   .rq-sheet[data-rq-mode="early"] .rq-opts { gap: 6px; }
   .rq-sheet[data-rq-mode="early"] .rq-plain { font-size: max(13px, calc(1rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
   .rq-sheet[data-rq-mode="early"] .rq-preview { font-size: max(13px, calc(1.25rem * var(--mny-fit, 1) * var(--text-scale, 1))); }
   .rq-sheet[data-rq-mode="early"] .rq-send { font-size: max(13px, calc(1.125rem * var(--mny-fit, 1) * var(--text-scale, 1))); min-height: 48px; }
-  .rq-sheet[data-rq-mode="early"] .rq-amtline .rq-opt { width: 48px; min-width: 48px; min-height: 48px; font-size: calc(1.5rem * var(--text-scale, 1)); }
   .rq-sheet[data-rq-mode="early"] .rq-amtval { font-size: calc(1.5rem * var(--text-scale, 1)); }
 }
 
@@ -6316,17 +6169,9 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
 .mny-total--owe { color: var(--sd-purple); }
 .mny-total--own { color: var(--sd-own-ink); }
 .mny-total--pile { color: var(--mny-v15-red); }
-/* Money fit and logic PR 5 (Stage C c): ONE stepper look — Grown-ups' .gu-step
-   and the − / + of the request sheets and Grown-ups' forms (.mny-step, set by
-   rqOpt / guOpt on a − or +): a 44px round button, ink border and button
-   shadow. The value between them is plain text (.mny-stepval), never a
-   button. Sunday's steppers are the kit's .ui-stepper (PR 9). */
-.gu-step, .rq-opt.mny-step, .gu-opt.mny-step, .rq-race .rq-opt.mny-step {
-  width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: none; border: var(--bw-btn) solid var(--mny-v15-ink); border-radius: var(--radius-full); padding: 0; cursor: pointer; box-shadow: var(--mny-shadow-btn);
-  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1.25rem * var(--text-scale, 1));
-}
-.gu-step, .gu-opt.mny-step { font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-.rq-opt.mny-step.off, .gu-opt.mny-step:disabled { border-style: dashed; }
+/* The value between a stepper's − and + is plain text (.mny-stepval), never a
+   button. The steppers are the kit's .ui-stepper (Stage 53 deleted the old
+   round stepper rule). */
 .mny-stepval {
   display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 48px; padding: 0 4px;
   font-weight: 700; font-variant-numeric: var(--num-variant); white-space: nowrap;
@@ -6507,7 +6352,6 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
    (the stage 8 drawing). */
 .rq-pricetabs { margin: 0 0 6px; }
 .rq-pricetabs { gap: 4px; }
-.rq-pricetabs .rq-opt { padding: 0 8px; font-size: calc(0.9375rem * var(--text-scale, 1)); }
 .rq-pricetabs ~ .rq-prices { max-height: none; overflow: visible; }
 .rq-prices .chore-card { padding: 6px 12px; margin: 0 0 6px; gap: 0; }
 .rq-prices .chore-card h3 { margin: 0; font-size: calc(1.3125rem * var(--text-scale, 1)); }
@@ -6523,6 +6367,6 @@ button.mv2-hist-row { border-bottom: 0; text-align: left; font-size: inherit; }
    buttons: thick border and shadow"). Information boxes, doors and list rows
    (.gu-loanrow, .mv2-idea-row, .mv2-door, the Sunday rows) and the dashed
    "add / not yet" buttons keep their thin edge or none. */
-.gu-tab, .gu-btn, .gu-save, .gu-yes, .gu-talk, .gu-no, .gu-undo, .gu-toggle, .gu-opt, .gu-x,
-.rq-meet, .rq-opt, .rq-notnow, .mv2-idea-tab { border-width: var(--bw-btn); box-shadow: var(--mny-shadow-btn); }
+.gu-btn, .gu-save, .gu-toggle,
+.rq-meet, .rq-notnow, .mv2-idea-tab { border-width: var(--bw-btn); box-shadow: var(--mny-shadow-btn); }
 /* money-tokens:end */

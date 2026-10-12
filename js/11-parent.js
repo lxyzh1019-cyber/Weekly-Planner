@@ -420,14 +420,7 @@ function renderMeetingHub() {
   let days = '';
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
-    const k = ctDateToKey(date);
-    const confirmed = mmIsDayConfirmed(d);
-    days += `<button type="button" class="ui-btn${confirmed ? ' confirmed' : ''}${k === todayKey() ? ' today' : ''}" onclick="openFamilyMeetingAt(1,${d})">
-        <span class="review-day-dow">${DAY_SHORT[d]}</span>
-        <span class="review-day-date">${date.getDate()}</span>
-        <span class="review-day-count">🐥${mmDayPct('jenn', d)}% 🦊${mmDayPct('jess', d)}%</span>
-        <span class="review-day-state">${confirmed ? '✓ Confirmed' : 'Review ›'}</span>
-      </button>`;
+    days += meetingDayTile(d, date, `onclick="openFamilyMeetingAt(1,${d})"`);
   }
   const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
   /* pool.cameIn, not ctWeekMoney. This line says "pocket money so far" and it is
@@ -442,11 +435,27 @@ function renderMeetingHub() {
     ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
     : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
   const cta = held
-    ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
-    : `<button type="button" class="ui-btn ui-btn--primary" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+    ? `<button type="button" class="ui-btn ui-btn--secondary ui-btn--block" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="ui-btn ui-btn--primary ui-btn--block" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
   wrap.innerHTML = `<div class="hub-week">Week of ${escapeHtml(weekLabel)}</div>
-    <div class="review-day-row">${days}</div>${status}
+    <div class="ui-days ui-days--tiles">${days}</div>${status}
     <div class="hub-cta">${cta}</div>${mmCatchUpBanner()}`;
+}
+/* C5 (owner 2026-10-12): one day tile of the meeting's week, on the Meeting
+   hub and Now's Sunday card — weekday, date, each girl's % and "Review ›"
+   ("Confirmed" once both girls' day is); the kit draws the ✓ / • marks and
+   today's double frame. Its spoken name says the day, date, state and both
+   %. `act` is the tile's own handler attribute. */
+function meetingDayTile(d, date, act) {
+  const k = ctDateToKey(date), confirmed = mmIsDayConfirmed(d);
+  const isToday = k === todayKey(), isFuture = k > todayKey();
+  const jenn = mmDayPct('jenn', d), jess = mmDayPct('jess', d);
+  const cls = [confirmed ? 'ui-day--ok' : '', isFuture ? 'ui-day--future' : ''].filter(Boolean).join(' ');
+  const label = `${DAY_SHORT[d]} ${date.getDate()}, ${confirmed ? 'confirmed' : 'not confirmed yet'}${isToday ? ', today' : ''}, ${kidLabel('jenn').name} ${jenn}%, ${kidLabel('jess').name} ${jess}%`;
+  return `<button type="button"${cls ? ` class="${cls}"` : ''}${isToday ? ' aria-current="date"' : ''} ${act}
+      aria-label="${escapeAttr(label)}"><span class="ui-day-dow">${DAY_SHORT[d]}</span><span class="ui-day-date">${date.getDate()}</span>
+      <span class="ui-day-pct">🐥${jenn}%</span><span class="ui-day-pct">🦊${jess}%</span>
+      <span class="ui-day-state">${confirmed ? 'Confirmed' : 'Review ›'}</span></button>`;
 }
 // Deep-link into the meeting: used by the hub's day strip to open the exact
 // day a parent wants to review, inside the one-and-only confirm surface.
@@ -506,7 +515,7 @@ function renderPendingApproval() {
       <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span class="pc-meta">· ${kidLabel(owner).icon} ${escapeHtml(kidLabel(owner).name)} added</span></div>
       <div class="pc-sub">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
       <div class="pc-actions">
-        <button type="button" class="ui-btn ui-btn--primary" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--ok" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
         <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
         <button type="button" class="ui-btn ui-btn--danger" onclick="rejectKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑 Reject</button>
       </div>`;
@@ -560,7 +569,7 @@ function renderPendingTaskApproval() {
       <div class="pc-sub">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(fmtDay(gift.dayKey || gift.weekKey, 'dated'))}
         · nothing has moved yet</div>
       <div class="pc-actions">
-        <button type="button" class="ui-btn ui-btn--primary" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--ok" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
         <button type="button" class="ui-btn ui-btn--danger" data-gift-reject="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
@@ -575,7 +584,7 @@ function renderPendingTaskApproval() {
         <span class="pc-meta">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
       <div class="pc-sub">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
       <div class="pc-actions">
-        <button type="button" class="ui-btn ui-btn--primary" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--ok" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
         <button type="button" class="ui-btn ui-btn--danger" data-task-reject="${escapeAttr(task.id)}">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
@@ -1479,7 +1488,6 @@ function applyMeetingLock() {
 
 function parentView(p) {
   parentViewing = p;
-  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b=>b.classList.toggle('active', b.textContent.includes(kidLabel(p).name)));
   showScreen('week');
   renderWeek();
 }

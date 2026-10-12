@@ -40,7 +40,7 @@
   .quest-card {
     position: relative;
     background: color-mix(in srgb, var(--cw, var(--surface-card)) var(--row-fill), var(--surface-card));
-    border: 2.5px solid var(--ink); border-radius: 18px;
+    border: 2.5px solid var(--ink); border-radius: var(--radius-btn); /* 11px, owner answer G9 */
     box-shadow: var(--shadow-row);
     padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.85rem;
     transition: transform 0.15s;
@@ -383,14 +383,12 @@
     font-weight: 700; color: var(--ink-light);
   }
 
-  .td-row {
-    display: flex; align-items: center; gap: 0.6rem; width: 100%;
-    min-height: 52px; padding: 0.45rem 0.5rem; margin-top: 0.3rem;
-    border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
-    background: var(--bg); color: var(--ink); font: inherit; text-align: left;
-    cursor: pointer;
-  }
-  .td-row:hover { background: var(--bg2); }
+  /* Today's rows are the kit's list row (.ui-row, css/app.css; Stage 55, owner
+     answer G8): 52px, 2px ink, 11px corners, icon / name / right-hand slots.
+     Today only spaces them. .td-row-icon and .td-row-name stay for the open
+     loops and Mum-answered lines, which are not rows; .td-row-go is the words
+     or chevron in a row's right-hand slot. */
+  .td-wrap .ui-row { margin-top: 0.3rem; }
   .td-row-icon { font-size: calc(1.3rem * var(--text-scale, 1)); flex: 0 0 auto; }
   .td-row-name { flex: 1 1 auto; font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; }
   .td-row-go {
@@ -490,13 +488,13 @@
   }
 
   /* A job that is no longer hers to act on — waiting with a grown-up, or
-     answered. Still a row, because "it happened" is what the card is for. */
-  .td-row--waiting, .td-row--done { opacity: 0.75; }
-  /* D18 (PR 7): the words on a faded row are ink, not --accent-strong — at the
-     row's 0.75 "with Mum" was 3.27:1 in both looks; ink keeps it over 4.5:1
-     (withMumReadsInBothLooks). */
-  .td-row--waiting .td-row-go, .td-row--done .td-row-go { color: var(--ink); }
-  .td-row--done .td-row-name { text-decoration: line-through; }
+     answered — wears the kit's done look (.ui-row--done: the green wash; the
+     name struck through only when answered). Still a row, because "it happened" is what the card
+     is for. D18 (PR 7): its words are ink, not --accent-strong, so "with Mum"
+     stays over 4.5:1 in both looks (withMumReadsInBothLooks). */
+  .ui-row--done .td-row-go { color: var(--ink); }
+  /* Waiting with Mum keeps the wash but is not struck through: it is not done, only not hers. */
+  .ui-row--done[data-td-action="waiting"] .ui-row-name { text-decoration: none; }
   .td-earlier-btn, .td-later-btn { margin-top: 0.4rem; }
 
   /* ── The day as a row of squares ──────────────────────────────────────────
@@ -629,7 +627,6 @@
     color: var(--ink-light); margin: 0.1rem 0 0.3rem;
   }
   .td-else { margin-top: 0.3rem; }
-  .td-else-btn { border-style: dashed; }
   .td-items { display: flex; flex-direction: column; gap: 0.25rem; margin: 0.3rem 0 0.2rem 0.6rem; }
   .td-item {
     display: flex; align-items: center; gap: 0.55rem; width: 100%;
@@ -656,8 +653,9 @@
   .td-rates > .ui-chip { min-width: 44px; justify-content: center; }
   /* Amber like the family chip: something is waiting, nothing is wrong. */
   .td-catchup { background: var(--surface-catchup); border-color: var(--status-todo-border); }
+  /* C6 (owner 2026-10-12): the open catch-up day turns pale again. */
+  .td-catchup .ui-row[data-td-action="catchup-day"][aria-expanded="true"] { background: var(--bg2); }
   .td-catchup-title { font-size: calc(max(15px, calc(1.05rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; }
-  .td-catchup-day.on { background: var(--bg2); }
   .td-catchup-panel {
     margin: 0.3rem 0 0.4rem 0.3rem; padding-left: 0.5rem;
     border-left: 3px dashed var(--status-todo-border);

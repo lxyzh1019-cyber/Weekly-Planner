@@ -1567,8 +1567,10 @@ function blockIsCompetition(b) {
   return !!(act && act.isCompetition);
 }
 
-/* The four training checks in a sheet's checklist styling (the block gets its
-   own compact rendering — buildBlockTrainingChecks). */
+/* The four training checks as the kit's list rows (.ui-row; Stage 55, owner
+   answer G10: the tick box in the icon slot, a ticked one in the done look) —
+   the block gets its own compact rendering, buildBlockTrainingChecks. The
+   packing list below and the training sheet's objectives are the same rows. */
 function renderTrainingChecks(containerId, block) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
@@ -1581,10 +1583,10 @@ function renderTrainingChecks(containerId, block) {
   TRAINING_CHECKS.forEach(c => {
     const on = !!block.trainingCheck[c.id];
     const row = document.createElement('div');
-    row.className = 'checklist-item' + (on ? ' checked' : '');
+    row.className = on ? 'ui-row ui-row--done' : 'ui-row';
     row.title = c.full;
-    row.innerHTML = `<div class="checklist-check">${on ? '✓' : ''}</div>`
-      + `<span class="checklist-text">${c.icon} ${escapeHtml(c.label)}<small style="display:block;opacity:0.75">${escapeHtml(c.full)}</small></span>`;
+    row.innerHTML = `<div class="ui-row-icon checklist-check">${on ? '✓' : ''}</div>`
+      + `<span class="ui-row-name">${c.icon} ${escapeHtml(c.label)}<small style="display:block;opacity:0.75">${escapeHtml(c.full)}</small></span>`;
     row.onclick = () => {
       block.trainingCheck[c.id] = !block.trainingCheck[c.id];
       markItemUpdated(block);
@@ -1614,8 +1616,8 @@ function renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp
   items.forEach((label, idx)=>{
     const key = `${prefix}-${idx}`;
     const row = document.createElement('div');
-    row.className = 'checklist-item' + (stateObj.gearState[key] ? ' checked' : '');
-    row.innerHTML = `<div class="checklist-check">${stateObj.gearState[key]?'✓':''}</div><span class="checklist-text">${label}</span>`;
+    row.className = stateObj.gearState[key] ? 'ui-row ui-row--done' : 'ui-row';
+    row.innerHTML = `<div class="ui-row-icon checklist-check">${stateObj.gearState[key]?'✓':''}</div><span class="ui-row-name">${label}</span>`;
     row.onclick = ()=>{
       stateObj.gearState[key] = !stateObj.gearState[key];
       if (persist) saveAll();
@@ -1798,7 +1800,7 @@ function openKidTrainingQuick(blockId) {
   document.getElementById('kidTrainingTitle').textContent = `${act.icon} ${act.name}`;
   const objEl = document.getElementById('kidTrainingObjectives');
   const lines = (b.objectives && b.objectives.length)
-    ? b.objectives.map(o => `<div class="checklist-item" style="cursor:default;border-color:var(--accent)"><span class="checklist-text">🎯 ${escapeHtml(o)}</span></div>`).join('')
+    ? b.objectives.map(o => `<div class="ui-row"><span class="ui-row-icon">🎯</span><span class="ui-row-name">${escapeHtml(o)}</span></div>`).join('')
     : '<p style="font-size:calc(0.95rem * var(--text-scale, 1));color:var(--ink-light)">No objectives listed yet — tap Edit to add some.</p>';
   objEl.innerHTML = lines;
   const swEl = document.getElementById('kidTrainingStopwatch');

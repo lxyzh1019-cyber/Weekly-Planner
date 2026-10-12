@@ -15,6 +15,7 @@ const looksWalks = require('./smoke-parts/looks');
 const parentPortal = require('./smoke-parts/parent');
 const weekDay = require('./smoke-parts/week-day');
 const todayChecks = require('./smoke-parts/today');
+const socialChecks = require('./smoke-parts/social');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -10565,7 +10566,7 @@ function findChromium() {
     showScreen('parent'); setParentTab('money'); mnyParentSection = 'rules'; mnyRenderRulesTab();
     const rulesWrap = document.getElementById('mnyRulesWrap');
     const onRules = !rulesWrap.querySelector('.hdr-tab')
-      && rulesWrap.querySelectorAll('.gu-tab').length === GU_TABS.length && GU_TABS.length === 5   // ✅ Approve moved to Parent › Now (Plan v9 §N)
+      && rulesWrap.querySelectorAll('.gu-tabs [data-mnyp-action="gutab"]').length === GU_TABS.length && GU_TABS.length === 5   // ✅ Approve moved to Parent › Now (Plan v9 §N)
       && !rulesWrap.querySelector('.gu-more-chip')
       && /Save · starts next Sunday/.test(rulesWrap.textContent);
     /* The meeting's money step is the Sunday ritual (Stage 4): its own header
@@ -10967,7 +10968,7 @@ function findChromium() {
       door.click();
       const picks = document.querySelectorAll(`#tdWrap [data-td-action="else-pick"][data-td-day="${todayKey()}"]`);
       if (!picks.length) return bad.concat(['"I did something else" offers no chores']);
-      const label = (picks[0].querySelector('.td-row-name') || {}).textContent.trim();
+      const label = (picks[0].querySelector('.ui-row-name') || {}).textContent.trim();
       picks[0].click();
       await new Promise(r => setTimeout(r, 30));
       const choice = document.querySelectorAll('#appDialogOverlay.open .app-dialog-choice')[0];
@@ -10977,7 +10978,7 @@ function findChromium() {
       await new Promise(r => setTimeout(r, 30));   // let the .then re-render land
 
       if (mrClaimQueue(wk, kid).length !== 1) bad.push(`the claim queue holds ${mrClaimQueue(wk, kid).length}, want 1`);
-      const waiting = [...document.querySelectorAll('#tdWrap .td-row--waiting')].map(el => el.textContent.replace(/\s+/g, ' ').trim());
+      const waiting = [...document.querySelectorAll('#tdWrap .ui-row[data-td-action="waiting"]')].map(el => el.textContent.replace(/\s+/g, ' ').trim());
       if (!waiting.some(t => t.includes(label))) bad.push(`Today does not show "${label}" with Mum (waiting rows: ${JSON.stringify(waiting)})`);
       if (mrChoreWeek(wk, kid).paid !== 0) bad.push('the unplanned claim paid before a parent decided');
     } finally {
@@ -11595,7 +11596,7 @@ function findChromium() {
     openDay(dk, 1);
     document.querySelector('#block-nav60 .block-train-chip').click();
     const toSheet = document.getElementById('kidTrainingOverlay').classList.contains('open')
-      && document.querySelectorAll('#kidTrainingChecks .checklist-item').length === TRAINING_CHECKS.length;
+      && document.querySelectorAll('#kidTrainingChecks .ui-row').length === TRAINING_CHECKS.length;
     closeSheet('kidTrainingOverlay');
     setDayBlocks(dk, [], 'jenn');
 
@@ -13186,7 +13187,7 @@ function findChromium() {
       if (row.getAttribute('aria-expanded') !== 'false') bad.push('the earlier-day row does not start closed');
       const r = row.getBoundingClientRect();
       if (r.height < 44) bad.push(`the earlier-day row is ${Math.round(r.height)}px tall`);
-      const name = row.querySelector('.td-row-name') || row;
+      const name = row.querySelector('.ui-row-name') || row;
       if (parseFloat(getComputedStyle(name).fontSize) < 15) bad.push(`the earlier-day row's words are ${getComputedStyle(name).fontSize}`);
       if (document.querySelector('#tdWrap .td-else-earlier-list')) bad.push('the earlier days show before the row is opened');
       row.click();
@@ -13248,7 +13249,7 @@ function findChromium() {
       if (listed.includes(lastKeys[4])) bad.push('an unanswered day LAST week is listed in catch up');
       if (!listed.includes(keys[1])) bad.push(`an unanswered day earlier THIS week (Tue ${keys[1]}) is not listed in catch up (listed ${JSON.stringify(listed)})`);
       const tueBtn = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
-      if (tueBtn && /\d/.test(tueBtn.querySelector('.td-row-name').textContent.split('·')[0])) bad.push(`this week's day is named with a date: "${tueBtn.textContent.trim()}"`);
+      if (tueBtn && /\d/.test(tueBtn.querySelector('.ui-row-name').textContent.split('·')[0])) bad.push(`this week's day is named with a date: "${tueBtn.textContent.trim()}"`);
       const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
       if (!row) bad.push('no "Add to an earlier day" row with Mon and Wed of this week not in catch up');
       else {
@@ -13603,7 +13604,7 @@ function findChromium() {
       goToday();
       const mopLabel = (mrPoolRow('mop', wk) || {}).label || 'Mop';
       if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="mop"]')) bad.push('Mop, already answered, is still offered as a job on Today');
-      const waiting = [...document.querySelectorAll('#tdWrap .td-row--waiting')].some(el => el.textContent.includes(mopLabel));
+      const waiting = [...document.querySelectorAll('#tdWrap .ui-row[data-td-action="waiting"]')].some(el => el.textContent.includes(mopLabel));
       if (!waiting) bad.push('Today does not show Mop as waiting after it was answered elsewhere');
 
       // The owner → Today: a routine tick; then Today → the owner.
@@ -13788,7 +13789,7 @@ function findChromium() {
       goToday();
       if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="dishes"]')) bad.push('a graded job is still offered as a job on Today');
       const label = (mrPoolRow('dishes', wk) || {}).label || 'Dishes';
-      const done = [...document.querySelectorAll('#tdWrap .td-row--done')].find(el => el.textContent.includes(label));
+      const done = [...document.querySelectorAll('#tdWrap .ui-row--done[data-td-action="fresh"]')].find(el => el.textContent.includes(label));
       if (!done) bad.push(`Today does not show ${label} as done once Mum graded it`);
       else {
         done.click();
@@ -15476,11 +15477,11 @@ function findChromium() {
         const box = r.getBoundingClientRect();
         if (box.height < 44) bad.push(`the 🌙 row is ${Math.round(box.height)}px tall, under 44px`);
         // Words she reads to act: 15px. The ›, aria-hidden, is every Today
-        // row's chevron (.td-row-go), an affordance and not text; 13px floor.
+        // row's chevron (.td-row-go, its right-hand slot), an affordance and not text; 13px floor.
         const small = [r, ...r.querySelectorAll('*')].filter(el => el.textContent.trim()
           && el.children.length === 0
           && parseFloat(getComputedStyle(el).fontSize) < (el.getAttribute('aria-hidden') === 'true' ? 13 : 15));
-        if (!r.querySelector('.td-row-name')) bad.push('the 🌙 row has no .td-row-name text');
+        if (!r.querySelector('.ui-row-name')) bad.push('the 🌙 row has no .ui-row-name text');
         if (small.length) bad.push(`the 🌙 row has text under 15px (${getComputedStyle(small[0]).fontSize})`);
         if (!sheetOpen()) bad.push('the yesterday row did not open the reflect sheet');
         else {
@@ -16022,19 +16023,15 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  /* C7 — dark mode. The screens changed in R5 are rendered with the device
-     asking for a dark scheme (prefers-color-scheme: dark, emulated), and every
-     piece of text on them is measured against what is actually behind it:
-     contrast at least 4.5:1, and never white text on a pastel. Sister Sync's
-     timeline, the 📋 Copy a day sheet (a row open, and a parent's sister tabs),
-     Today's 🌙 row, Parent › Now (with "On her behalf") and, since Plan v7,
-     Today's 🕓 Catch up card with a day open. */
-  await page.emulateMedia({ colorScheme: 'dark' });
+  /* contrastFindings(root, label, skip) — the contrast measure the looks walks
+     (tests/smoke-parts/looks.js) share: every piece of text under root against
+     what is actually behind it. The app has one light scheme (no dark mode;
+     tests/check-look-tokens.js guards that), so nothing is emulated. */
   await page.evaluate(() => {
     /* skip: a selector whose contents are not measured — thePopLookReadsEverywhere
        passes '.print-sheet', the week's print preview, which draws the printed
        sheet and so ignores the look (L12). */
-    window.darkContrastFindings = (root, label, skip) => {
+    window.contrastFindings = (root, label, skip) => {
       const out = [];
       if (!root) return [`${label}: not on screen`];
       const parse = (c) => {
@@ -16095,110 +16092,6 @@ function findChromium() {
       return out;
     };
   });
-  if (want('theR5ScreensReadInDarkMode')) checks.theR5ScreensReadInDarkMode = await page.evaluate(async () => {
-    const bad = [];
-    // Overlays fade in and sheets slide up; measured mid-animation, every word reads as 1:1.
-    const settle = () => new Promise(r => setTimeout(r, 400));
-    if (!matchMedia('(prefers-color-scheme: dark)').matches) return ['the dark scheme was not emulated — nothing was measured'];
-    const unpin = pinClockToWeekday(3); // Thursday, midday
-    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey, wasOffset = weekOffset;
-    const wasUnlocked = parentUnlockedThisSession, wasSyncIdx = syncDayIdx;
-    const wasInvites = state.shared.invites;
-    const hadVis = Object.prototype.hasOwnProperty.call(state.shared, 'sisterVisibilityMode'), wasVis = state.shared.sisterVisibilityMode;
-    const keys = getDayKeys(0);
-    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
-    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
-    const pd = getProfData('jenn');
-    const hadMoods = JSON.parse(JSON.stringify(pd.dayMoods || {}));
-    try {
-      state.shared.sisterVisibilityMode = 'public';
-      const thu = keys[3];
-      setDayBlocks(thu, [
-        { id: 'r6-dk-a', actId: 'reading', startMin: 16 * 60, durationMin: 90, public: true,
-          travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 },
-        { id: 'r6-dk-b', actId: 'piano', startMin: 19 * 60, durationMin: 30 },
-      ], 'jenn');
-      setDayBlocks(thu, [
-        { id: 'r6-dk-c', actId: 'piano', startMin: 16 * 60, durationMin: 60, public: true },
-        { id: 'r6-dk-d', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
-      ], 'jess');
-      setDayBlocks(keys[1], [{ id: 'r6-dk-e', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
-        { id: 'r6-dk-f', actId: 'piano', startMin: 17 * 60, durationMin: 30, parentPinned: true }], 'jenn');
-      state.shared.invites = [{ id: 'r6-dk-inv', from: 'jess', to: 'jenn', status: 'pending', day: keys[4],
-        actId: 'piano', startMin: 16 * 60, durationMin: 60, sourceBlockId: 'r6-dk-src' }];
-
-      // Sister Sync's timeline, with the inbox under it.
-      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
-      openSisterSync(); syncDayIdx = 3; renderSync();
-      bad.push(...darkContrastFindings(document.getElementById('screen-sync'), 'Sister Sync'));
-
-      // 📋 Copy a day — a child's, with Tuesday open.
-      openDay(thu, 3);
-      openTemplateSheet();
-      const row = [...document.querySelectorAll('#copyDayList .copy-day-row')].find(r => /Tuesday/.test(r.textContent));
-      if (row) row.click(); else bad.push('Copy a day: Tuesday is not offered');
-      await settle();
-      bad.push(...darkContrastFindings(document.querySelector('#templateOverlay .sheet'), 'Copy a day'));
-      closeSheet('templateOverlay');
-      // …and a parent's, with the sister tabs.
-      profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
-      openDay(thu, 3);
-      openTemplateSheet();
-      await settle();
-      bad.push(...darkContrastFindings(document.querySelector('#templateOverlay .sheet'), 'Copy a day (parent)'));
-      closeSheet('templateOverlay');
-      copyDayDstKid = null;
-
-      // Today's 🌙 row: yesterday has no mood, so it asks.
-      profile = 'jenn'; parentViewing = 'jenn';
-      pd.dayMoods = {};
-      goToday();
-      const moon = document.querySelector('#tdWrap [data-td-action="reflect"]');
-      if (!moon) bad.push("Today's 🌙 row: not on screen");
-      else bad.push(...darkContrastFindings(moon, "Today's 🌙 row"));
-
-      // Parent › Now.
-      profile = 'parent'; parentViewing = 'jenn';
-      showScreen('parent'); renderParentHome(); setParentTab('now');
-      bad.push(...darkContrastFindings(document.getElementById('pnWrap'), 'Parent › Now'));
-
-      /* Today's 🕓 Catch up (Plan v7 item 5): an earlier day of this week with
-         an unanswered chore, opened, so its answers are measured with it. Its
-         own keep/restore (c1), because clearing the two weeks is how the card
-         is made to show exactly one day. */
-      const k = c1.keep('jenn');
-      try {
-        profile = 'jenn'; parentViewing = 'jenn';
-        ctPrepareRead();
-        k.clear();
-        setDayBlocks(mrWeekDayKeys(k.wk)[1], [{ id: 'r7-dk-cu', actId: 'chores', startMin: 17 * 60, durationMin: 30,
-          choreTags: ['mop'] }], 'jenn');
-        goToday();
-        const day = document.querySelector('#tdWrap .td-catchup [data-td-action="catchup-day"]');
-        if (day) day.click();
-        const cu = document.querySelector('#tdWrap .td-catchup');
-        if (cu && !cu.querySelector('.td-catchup-panel')) bad.push('🕓 Catch up: its day did not open, so its answers were not measured');
-        bad.push(...darkContrastFindings(cu, '🕓 Catch up'));
-      } finally {
-        k.restore();
-      }
-    } catch (e) {
-      bad.push('threw: ' + e.message);
-    } finally {
-      unpin();
-      ['templateOverlay'].forEach(id => { if (document.getElementById(id).classList.contains('open')) closeSheet(id); });
-      state.shared.invites = wasInvites;
-      if (hadVis) state.shared.sisterVisibilityMode = wasVis; else delete state.shared.sisterVisibilityMode;
-      pd.dayMoods = hadMoods;
-      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
-      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey; weekOffset = wasOffset;
-      parentUnlockedThisSession = wasUnlocked; syncDayIdx = wasSyncIdx;
-      copyDaySrcWeek = 0; copyDayDstKid = null;
-      goToday();
-    }
-    return bad.length ? bad : true;
-  });
-  await page.emulateMedia({ colorScheme: 'light' });
 
   // The looks walks (Pop, Calm, fonts): tests/smoke-parts/looks.js.
   await looksWalks({ page, want, checks, shot, setLook, clearLooks, KID_SCREENS, defineAuditSeeds });
@@ -16208,8 +16101,8 @@ function findChromium() {
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code
      before it. Item 2 (the Day view's invite buttons) is held by
-     kidScreensMeetTheHouseRules' Day view rows and item 5 (🕓 Catch up in dark
-     mode) by theR5ScreensReadInDarkMode, both above. Every check puts back
+     kidScreensMeetTheHouseRules' Day view rows and item 5 (🕓 Catch up contrast)
+     by the looks walks (tests/smoke-parts/looks.js). Every check puts back
      what it seeds, and pins the clock (Thursday of this week, midday in
      Edmonton) because "today" is what each of them reads. */
 
@@ -16750,10 +16643,10 @@ function findChromium() {
       parentViewing = 'jenn'; setParentDest('now');
       take('Parent › Now', ['#screen-parent > .hdr', '#parentDests > [aria-selected="false"]',
         '#parentDests > [aria-selected="true"]',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
-        '#pnWrap .ui-card', '#pnWrap .pn-day', '#pnWrap .pn-day.now', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
+        '#pnWrap .ui-card', '#pnWrap .ui-days > button', '#pnWrap .ui-days > [aria-current="date"]', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
         '#screen-parent .ui-btn--primary']);
       pnOpenToldSheet(); await wait(300);
-      take('Parent › Now › She told me', ['#pnToldBody .pn-day.on', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
+      take('Parent › Now › She told me', ['#pnToldBody .ui-days > [aria-pressed="true"]', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
       pnSheetOpen = false; closeSheet('pnToldOverlay');
       setParentDest('setup');
       take('Parent › Setup', ['#screen-parent .ui-card', '#screen-parent .pn-row', '#parentScopePills [aria-pressed="true"]', '#parentScopePills [aria-pressed="false"]']);
@@ -16762,7 +16655,7 @@ function findChromium() {
       take('Parent › History', ['#screen-parent [data-parent-history][aria-pressed="true"]', '#screen-parent [data-parent-history][aria-pressed="false"]', '#screen-parent .ctr-tile']);
       parentHistoryView = wasHistoryView;
       setParentDest('meeting');
-      take('Parent › Meeting', ['#screen-parent .review-day-row > .ui-btn', '#screen-parent .hub-status']);
+      take('Parent › Meeting', ['#screen-parent #meetingHub .ui-days > button', '#screen-parent .hub-status']);
       openFamilyMeeting(); await wait(350);
       take('Family meeting', ['#screen-meeting .hdr-steps > .hdr-switch-cell:not([aria-current])', '#screen-meeting .hdr-steps > .hdr-switch-cell[aria-current]',
         '#screen-meeting .mm-drow', '#screen-meeting .mm-nav']);
@@ -16949,10 +16842,10 @@ function findChromium() {
         const s = getComputedStyle(el);
         return { bg: s.backgroundColor, ink: s.color, ring: s.boxShadow, edge: s.borderTopColor };
       };
-      const now = sig(document.querySelector('#pnWrap .pn-day.now'));
+      const now = sig(document.querySelector('#pnWrap .ui-days > [aria-current="date"]'));
       // The selected day lives in 🚪 "She told me…" since Plan v9 §N.
       pnOpenToldSheet();
-      const on = sig(document.querySelector('#pnToldBody .pn-day.on'));
+      const on = sig(document.querySelector('#pnToldBody .ui-days > [aria-pressed="true"]'));
       pnSheetOpen = false; closeSheet('pnToldOverlay');
       return { now, on };
     });
@@ -16961,8 +16854,8 @@ function findChromium() {
         if (look === 'pop') await clearLooks(); else await setLook(look);
         await page.waitForTimeout(150);
         const r = await read();
-        if (!r.now) { bad.push(`${look}: Parent › Now drew no today square (.pn-day.now), so nothing was compared`); continue; }
-        if (!r.on) { bad.push(`${look}: Parent › Now drew no selected day (.pn-day.on), so nothing was compared`); continue; }
+        if (!r.now) { bad.push(`${look}: Parent › Now drew no today square (.ui-days > [aria-current]), so nothing was compared`); continue; }
+        if (!r.on) { bad.push(`${look}: Parent › Now drew no selected day (.ui-days > [aria-pressed]), so nothing was compared`); continue; }
         if (r.now.bg === r.on.bg) bad.push(`${look}: Parent › Now's today square and selected day share the fill ${r.now.bg}`);
         // L9: in Calm today's mark is navy (Pop's rail square keeps its own colour).
         if (look === 'calm' && ![r.now.bg, r.now.ring, r.now.edge].some(v => String(v).includes(NAVY))) {
@@ -17943,7 +17836,7 @@ function findChromium() {
       if (!/Overnight/.test(text)) bad.push('the glance does not name overnight at all');
       if (!/Unscheduled/.test(text)) bad.push('the glance does not name unscheduled time');
       // Per-day leads. 240 minutes over 7 days is 34 minutes, not 4h.
-      const school = [...body.querySelectorAll('.glance-row')]
+      const school = [...body.querySelectorAll('.ui-row')]
         .find(r => /Brain/.test(r.textContent));
       if (!school) bad.push('no Brain Construction row in the glance');
       else if (!/34m\/day/.test(school.textContent.replace(/\s+/g, ''))) {
@@ -23809,7 +23702,10 @@ function findChromium() {
         input.value = 'Winter Invitational entry';
         input.dispatchEvent(new Event('input', { bubbles: true }));
         if (wrap.querySelector('[data-mnyp-action="gucmwhat"]') !== input) bad.push('typing the name redrew the form');
-        if (!wrap.querySelector('[data-mnyp-action="gucmsave"]').classList.contains('ready')) bad.push('the save button did not wake up for a name');
+        // C8, reviewer finding 4: typing uses the first draw's test (a name, and the tick when one is asked for).
+        const saveBtn = () => wrap.querySelector('[data-mnyp-action="gucmsave"]');
+        const needsTick = !!wrap.querySelector('[data-mnyp-action="gucmtick"]');
+        if (saveBtn().classList.contains('ui-btn--primary') === needsTick) bad.push(needsTick ? 'the save button went main before the "I checked this with her" tick' : 'the save button did not wake up for a name (C8: the main button once ready)');
         const side = wrap.querySelector('.gu-afford').textContent;
         ['Her share$30', '10% down from her Savings$3', 'New row on her wall$27', 'Weekly loan payment', 'Of her steady income', 'Free by'].forEach(line => {
           if (side.replace(/\s+/g, '').indexOf(line.replace(/\s+/g, '')) < 0) bad.push('the affordability card misses "' + line + '"');
@@ -23817,6 +23713,7 @@ function findChromium() {
         if (!/Can she afford it\?/.test(wrap.textContent)) bad.push('no "Can she afford it?"');
         // Money fit and logic L5: a share her steady money cannot judge needs the parent's ✓ first.
         guPress('[data-mnyp-action="gucmtick"]');
+        if (needsTick && !saveBtn().classList.contains('ui-btn--primary')) bad.push('the save button did not go main once ticked');
         guPress('[data-mnyp-action="gucmsave"]');
         const d = mnyEnsureDebts(kid).find(x => x.name === 'Winter Invitational entry');
         if (!d || d.principal !== 30 || d.paid !== 3 || d.monthly !== money2(27 / 26 * 52 / 12)) bad.push('the new row is not her share, 10% down and the rest over 26 weeks: ' + JSON.stringify(d && [d.principal, d.paid, d.monthly]));
@@ -23880,7 +23777,7 @@ function findChromium() {
         const wrap = guOpen('fines');
         // Plan v5 Deviation 23: the Day row, today chosen first, the days to come disabled.
         const dayBtn = (i) => wrap.querySelector(`[data-mnyp-action="gufnday"][data-mnyp-id="${i}"]`);
-        if (!dayBtn(3) || !dayBtn(3).classList.contains('on')) bad.push('the Day row does not start on today (Thursday)');
+        if (!dayBtn(3) || dayBtn(3).getAttribute('aria-pressed') !== 'true') bad.push('the Day row does not start on today (Thursday)');
         if ([0, 1, 2, 3].some(i => !dayBtn(i) || dayBtn(i).disabled) || [4, 5, 6].some(i => !dayBtn(i) || !dayBtn(i).disabled)) bad.push('Mon–Thu should be open and Fri–Sun disabled: ' + [0, 1, 2, 3, 4, 5, 6].map(i => dayBtn(i) && dayBtn(i).disabled).join(','));
         dayBtn(5).click();
         if (guFine().dayIdx !== 3) bad.push('a day still to come could be chosen: ' + guFine().dayIdx);
@@ -26943,7 +26840,310 @@ function findChromium() {
         return out;
       }, [size]));
     }
+    /* Kit 1.1 (Stage 50, K1–K12): every value of docs/handoff/kit-1-1-values.md
+       measured on one fixture per part, at the iPad and the phone size, in Pop
+       and in Calm (the look is set on <html> for the measure and put back).
+       Colours are compared with the token's own computed value, read through a
+       probe, so the check follows the token, not a typed colour. The hover look
+       (K2) is real: the mouse is moved onto each part, since the kit draws it
+       only under @media (hover: hover). */
+    for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+      await page.setViewportSize({ width: w, height: h });
+      for (const look of ['pop', 'calm']) {
+        const tag = `${size} ${look}`;
+        const centres = await page.evaluate(([look]) => {
+          window.__kitLookWas = document.documentElement.getAttribute('data-look');
+          document.documentElement.setAttribute('data-look', look);
+          const host = document.createElement('div');
+          host.id = 'kitFixture';
+          host.style.cssText = 'position:fixed;left:0;top:0;width:min(100%,600px);z-index:2147483647;background:#fff;padding:8px;box-sizing:border-box';
+          /* The older pickers (not kit parts) wear the same picked colour: C1/C2, reviewer findings. */
+          const LEGACY_PICKED = '<button type="button" class="cp-kid on">K</button><button type="button" class="ck-segbtn on">S</button>'
+            + '<button type="button" class="emoji-cell selected">E</button><button type="button" class="vibe-mood selected">V</button>'
+            + '<button type="button" class="stamp-cell selected">T</button><div class="obj-item checked">O</div>'
+            + '<button type="button" class="rc-chip on">R</button><button type="button" class="rc-toggle on">G</button>';
+          const rec = document.createElement('div');
+          rec.id = 'kfRecordFx';
+          rec.innerHTML = '<button type="button" class="rc-chip on">R</button><button type="button" class="rc-toggle on">G</button>';
+          document.getElementById('recordOverlay').appendChild(rec);
+          host.innerHTML = '<style>.kit-fx-shadow { box-shadow: 3px 3px 0 #000; }</style>'
+            + '<p><button type="button" class="ui-btn ui-btn--secondary" id="kfSec">Sec</button> <button type="button" class="ui-btn ui-btn--primary" id="kfMain">Main</button>'
+            + ' <button type="button" class="ui-btn ui-btn--ok" id="kfOk">Ok</button> <button type="button" class="ui-chip" id="kfChip">Chip</button>'
+            + ' <button type="button" class="ui-chip" aria-pressed="true" id="kfChipOn">On</button> <button type="button" class="ui-chip" id="kfChipOne">1</button></p>'
+            + '<p><button type="button" class="ui-btn ui-btn--primary kit-fx-shadow" id="kfOff" disabled>Off</button> <button type="button" class="ui-btn kit-fx-shadow" id="kfAriaOff" aria-disabled="true">Off 2</button></p>'
+            + '<div id="kfCol" style="width:300px"><button type="button" class="ui-btn ui-btn--primary ui-btn--block" id="kfBlock">Run family meeting</button></div>'
+            + '<div class="ui-kids" id="kfKids" role="group" aria-label="Which child"><button type="button" aria-pressed="false">Jenn</button><button type="button" aria-pressed="true">Jess</button></div>'
+            + '<div class="ui-days" id="kfDays">'
+            + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => {
+              const attrs = [i === 0 ? ' class="ui-day--ok"' : '', i === 1 ? ' class="ui-day--ok" aria-current="date"' : '',
+                i === 2 ? ' aria-current="date"' : '', i === 3 ? ' aria-pressed="true"' : '', i === 4 ? ' disabled' : ''].join('');
+              return `<button type="button"${attrs} aria-label="${d} ${5 + i} October, ${i * 10}%"><span>${d}</span><span>${5 + i}</span></button>`;
+            }).join('') + '</div>'
+            + '<button type="button" class="ui-row" id="kfRow"><span class="ui-row-icon">🎹</span><span class="ui-row-name">Piano</span><span class="ui-row-end">✓</span></button>'
+            + '<button type="button" class="ui-row ui-row--parent" id="kfRowP"><span class="ui-row-name">Piano</span></button>'
+            + '<div class="ui-row ui-row--done" id="kfRowDone"><span class="ui-row-name">Done</span></div>'
+            + '<button type="button" class="ui-row ui-row--add" id="kfRowAdd"><span class="ui-row-name">+ Add</span></button>'
+            + '<div class="ui-card" id="kfCard"><div class="ui-tabs"><button type="button" aria-selected="true">A</button><button type="button">B</button></div></div>'
+            + '<span class="ui-stepper" id="kfStep"><button type="button">−</button><button type="button">+</button></span>'
+            + '<span class="ui-stepper ui-stepper--kid" id="kfStepKid"><button type="button">−</button><button type="button">+</button></span>'
+            + '<p><button type="button" class="ui-btn ui-btn--danger" id="kfDanger">Delete</button></p>'
+            /* C1/C2/C8: one picked colour per area root — a picked chip, a kid
+               switch, a tab and a chosen day in each of the three areas. */
+            + ['money', 'planner', 'parent'].map(a => `<div data-area="${a}" id="kfArea-${a}"><button type="button" class="ui-chip" aria-pressed="true">On</button>`
+              + '<div class="ui-kids"><button type="button" aria-pressed="true">Jenn</button><button type="button" aria-pressed="false">Jess</button></div>'
+              + '<div class="ui-tabs"><button type="button" aria-selected="true">A</button><button type="button">B</button></div>'
+              + '<div class="ui-days"><button type="button" aria-pressed="true" aria-label="Mon 5, 10%"><span>Mon</span><span>5</span></button></div>'
+              + LEGACY_PICKED + '</div>').join('')
+            /* C5: seven day tiles in a 300px column wrap, all one width. */
+            + '<div id="kfTilesCol" style="width:300px"><div class="ui-days ui-days--tiles" id="kfTiles">'
+            + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => `<button type="button" aria-label="${d} ${5 + i}, not confirmed yet, Jenn 50%, Jess 40%"><span class="ui-day-dow">${d}</span><span class="ui-day-date">${5 + i}</span><span class="ui-day-pct">🐥50%</span><span class="ui-day-pct">🦊40%</span><span class="ui-day-state">Review ›</span></button>`).join('')
+            + '</div></div>';
+          document.body.appendChild(host);
+          const c = id => { const r = document.getElementById(id).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+          return { kfSec: c('kfSec'), kfMain: c('kfMain'), kfChip: c('kfChip'), kfOff: c('kfOff'), kfRow: c('kfRow'), kfRowDone: c('kfRowDone') };
+        }, [look]);
+        const hovered = {};
+        for (const id of Object.keys(centres)) {
+          await page.mouse.move(centres[id][0], centres[id][1]);
+          hovered[id] = await page.evaluate(id => {
+            const cs = getComputedStyle(document.getElementById(id));
+            return { image: cs.backgroundImage, colour: cs.backgroundColor, cursor: cs.cursor };
+          }, id);
+        }
+        await page.mouse.move(w - 2, h - 2);
+        problems.push(...await page.evaluate(([tag, hovered, phone]) => {
+          const out = [];
+          const $ = id => document.getElementById(id);
+          const host = $('kitFixture');
+          const probe = document.createElement('i');
+          host.appendChild(probe);
+          const colour = token => { probe.style.color = `var(${token})`; return getComputedStyle(probe).color; };
+          const cs = el => getComputedStyle(el);
+          const px = v => parseFloat(v) || 0;
+          const near = (got, want, what) => { if (Math.abs(got - want) > 0.5) out.push(`${tag}: ${what} is ${got}px, expected ${want}px`); };
+          const same = (got, want, what) => { if (got !== want) out.push(`${tag}: ${what} is ${got}, expected ${want}`); };
+          const rootPx = px(cs(document.documentElement).fontSize);
+          // K1 — disabled: 45%, no shadow (over a class that draws one), the plain cursor.
+          for (const id of ['kfOff', 'kfAriaOff']) {
+            const s = cs($(id));
+            same(s.opacity, '0.45', `${id} (disabled) opacity`);
+            same(s.boxShadow, 'none', `${id} (disabled) shadow`);
+            same(s.cursor, 'default', `${id} (disabled) cursor`);
+          }
+          // K2 — hover: the look's pale wash over the part's own fill, the pointer; none on a disabled button.
+          const wash = colour('--hover-wash');
+          const washImg = `linear-gradient(${wash}, ${wash})`;
+          for (const [id, fill] of [['kfSec', '--paper'], ['kfMain', '--btn-main'], ['kfChip', '--paper']]) {
+            same(hovered[id].image, washImg, `${id} under the mouse, its wash`);
+            same(hovered[id].colour, colour(fill), `${id} under the mouse, its own fill`);
+            same(hovered[id].cursor, 'pointer', `${id} under the mouse, its cursor`);
+          }
+          // C6: a list row that is a button washes pale too; the plant (a div row, not a button) must be caught.
+          const rowHoverFaults = (h) => (h.image === washImg && h.cursor === 'pointer') ? [] : [`its wash is ${h.image}, cursor ${h.cursor}`];
+          rowHoverFaults(hovered.kfRow).forEach(f => out.push(`${tag}: a kit row (a button) under the mouse: ${f}`));
+          if (!rowHoverFaults(hovered.kfRowDone).length) out.push(`${tag}: the row hover check missed its plant (a div row, which is no button, washed)`);
+          same(hovered.kfOff.image, 'none', 'a disabled button under the mouse, its wash');
+          same(hovered.kfOff.cursor, 'default', 'a disabled button under the mouse, its cursor');
+          if (cs($('kfSec')).backgroundImage !== 'none') out.push(`${tag}: the wash stays after the mouse leaves`);
+          // K6 — full width; K7 — the green ok button.
+          near($('kfBlock').getBoundingClientRect().width, $('kfCol').getBoundingClientRect().width, 'the full-width button');
+          /* C8 (owner 2026-10-12): the button jobs, exact, and every fill / text
+             pair at least 4.5:1. Each check meets a plant it must catch. */
+          const rgbOf = hex => { const n = parseInt(hex.slice(1), 16); return `rgb(${n >> 16}, ${(n >> 8) & 255}, ${n & 255})`; };
+          const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+          const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+          window.__kitContrast = window.__kitContrast || {};
+          const pairFaults = (el, fill, ink, what) => {
+            const s = cs(el), f = [];
+            if (s.backgroundColor !== rgbOf(fill)) f.push(`${what} fill is ${s.backgroundColor}, C8 says ${fill} (${rgbOf(fill)})`);
+            if (s.color !== rgbOf(ink)) f.push(`${what} text is ${s.color}, C8 says ${ink} (${rgbOf(ink)})`);
+            const r = ratio(s.backgroundColor, s.color);
+            window.__kitContrast[`${what} ${fill} / ${ink}`] = r.toFixed(2);
+            if (!(r >= 4.5)) f.push(`${what} is ${r.toFixed(2)}:1, under 4.5:1`);
+            return f;
+          };
+          const look = document.documentElement.getAttribute('data-look');
+          const mainPair = look === 'calm' ? ['#5b4fd6', '#ffffff'] : ['#ffc83d', '#1c2240'];
+          pairFaults($('kfMain'), ...mainPair, 'the main button').forEach(f => out.push(`${tag}: ${f}`));
+          pairFaults($('kfOk'), '#2f7d55', '#ffffff', 'the ok button').forEach(f => out.push(`${tag}: ${f}`));
+          pairFaults($('kfDanger'), '#b8441f', '#ffffff', 'the danger button').forEach(f => out.push(`${tag}: ${f}`));
+          pairFaults($('kfSec'), '#ffffff', '#1c2240', 'the secondary button').forEach(f => out.push(`${tag}: ${f}`));
+          near(px(cs($('kfSec')).borderTopWidth), 2, 'the secondary button border');
+          same(cs($('kfSec')).borderTopColor, rgbOf('#1c2240'), 'the secondary button border colour');
+          $('kfOk').style.background = '#6fc292';
+          if (!pairFaults($('kfOk'), '#2f7d55', '#ffffff', 'plant').length) out.push(`${tag}: the button colour check missed its plant (the old green ok fill)`);
+          $('kfOk').style.background = '';
+          $('kfDanger').style.background = '#ffc83d';
+          if (!pairFaults($('kfDanger'), '#ffc83d', '#ffffff', 'plant').some(f => /under 4\.5:1/.test(f))) out.push(`${tag}: the contrast check missed its plant (white on yellow)`);
+          $('kfDanger').style.background = '';
+          // C1/C2/C8: picked, per area and look; yellow never picked.
+          const pickedWant = { money: ['#2f7f77', '#ffffff'], planner: look === 'calm' ? ['#1c2240', '#ffffff'] : ['#2f7f77', '#ffffff'], parent: ['#1c2240', '#ffffff'] };
+          for (const [area, [fill, ink]] of Object.entries(pickedWant)) {
+            const root = $(`kfArea-${area}`);
+            [[root.querySelector('.ui-chip'), 'a picked chip'], [root.querySelector('.ui-kids > [aria-pressed="true"]'), 'the chosen girl'],
+             [root.querySelector('.ui-tabs > [aria-selected="true"]'), 'the current tab'], [root.querySelector('.ui-days > button'), 'the chosen day']].forEach(([el, what]) =>
+              pairFaults(el, fill, ink, `${area}: ${what}`).forEach(f => out.push(`${tag}: ${f}`)));
+          }
+          /* Reviewer findings: every older picker (.on / .selected / .checked) wears its
+             area's picked colour, never yellow; the Record sheet (#recordOverlay, money) too. */
+          const YELLOWS = [rgbOf('#ffd166'), rgbOf('#ffc83d')];
+          const legacySel = '.cp-kid.on, .ck-segbtn.on, .emoji-cell.selected, .vibe-mood.selected, .stamp-cell.selected, .obj-item.checked, .rc-chip.on, .rc-toggle.on';
+          const legacyFaults = (el, fill, what) => {
+            const s = cs(el), f = [];
+            if (YELLOWS.includes(s.backgroundColor)) f.push(`${what} is filled yellow ${s.backgroundColor}`);
+            if (s.backgroundColor !== rgbOf(fill)) f.push(`${what} fill is ${s.backgroundColor}, want its area's picked ${fill}`);
+            return f;
+          };
+          for (const [area, [fill]] of Object.entries(pickedWant)) {
+            const els = [...$(`kfArea-${area}`).querySelectorAll(legacySel)];
+            if (els.length !== 8) out.push(`${tag}: ${area}: ${els.length} older picked elements drawn, want 8`);
+            els.forEach(el => legacyFaults(el, fill, `${area}: ${el.className}`).forEach(f => out.push(`${tag}: ${f}`)));
+          }
+          const recEls = [...document.querySelectorAll('#kfRecordFx > *')];
+          if (recEls.length !== 2) out.push(`${tag}: the Record sheet fixture drew ${recEls.length} of 2 picked parts`);
+          recEls.forEach(el => {
+            legacyFaults(el, '#2f7f77', `Record sheet: ${el.className}`).forEach(f => out.push(`${tag}: ${f}`));
+            if (cs(el).color !== rgbOf('#ffffff')) out.push(`${tag}: Record sheet: ${el.className} text is ${cs(el).color}, want white`);
+            if (cs(el).borderTopLeftRadius !== '11px') out.push(`${tag}: Record sheet: ${el.className} corner is ${cs(el).borderTopLeftRadius}, want 11px`);
+          });
+          recEls[0].style.background = '#ffc83d';
+          if (!legacyFaults(recEls[0], '#2f7f77', 'plant').length) out.push(`${tag}: the Record sheet colour check missed its plant (a yellow picked chip)`);
+          recEls[0].style.background = '';
+          const legacyPlant = $('kfArea-planner').querySelector('.cp-kid');
+          legacyPlant.style.background = '#ffd166';
+          if (!legacyFaults(legacyPlant, '#2f7f77', 'plant').some(f => /yellow/.test(f))) out.push(`${tag}: the older-picker colour check missed its plant (a yellow picked kid)`);
+          legacyPlant.style.background = '';
+          // A secondary button recoloured is caught (reviewer finding 8).
+          $('kfSec').style.background = '#ffc83d';
+          if (!pairFaults($('kfSec'), '#ffffff', '#1c2240', 'plant').length) out.push(`${tag}: the secondary button colour check missed its plant (a yellow secondary)`);
+          $('kfSec').style.background = '';
+          const plantChip = $('kfArea-money').querySelector('.ui-chip');
+          plantChip.style.background = '#ffc83d';
+          if (!pairFaults(plantChip, '#2f7f77', '#ffffff', 'plant').length) out.push(`${tag}: the picked colour check missed its plant (a yellow picked chip in money)`);
+          plantChip.style.background = '';
+          // K11 — a picked chip wears the selected colour; K12 — chip sides.
+          same(cs($('kfChipOn')).backgroundColor, colour('--sel'), 'a picked chip fill (the selected colour)');
+          same(cs($('kfChipOn')).color, colour('--sel-ink'), 'a picked chip ink');
+          // C3: a chip is a rounded rectangle (11px), a − / + round; each with a plant.
+          const cornerFaults = (el, want, what) => ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].filter(c => cs(el)[`border${c}Radius`] !== want).map(c => `${what}'s ${c} corner is ${cs(el)[`border${c}Radius`]}, want ${want}`);
+          cornerFaults($('kfChip'), '11px', 'a chip').forEach(f => out.push(`${tag}: ${f}`));
+          [...$('kfStep').children, ...$('kfStepKid').children].forEach(b => cornerFaults(b, '999px', 'a stepper button (round)').forEach(f => out.push(`${tag}: ${f}`)));
+          $('kfChip').style.borderRadius = '999px';
+          if (!cornerFaults($('kfChip'), '11px', 'plant').length) out.push(`${tag}: the chip shape check missed its plant (a pill chip)`);
+          $('kfChip').style.borderRadius = '';
+          $('kfStep').firstElementChild.style.borderRadius = '11px';
+          if (!cornerFaults($('kfStep').firstElementChild, '999px', 'plant').length) out.push(`${tag}: the stepper shape check missed its plant (an 11px stepper)`);
+          $('kfStep').firstElementChild.style.borderRadius = '';
+          if (phone) same(cs($('kfChip')).flexShrink, '0', 'a chip on a phone, its shrink');
+          near(px(cs($('kfChip')).paddingLeft), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
+          near(px(cs($('kfChip')).paddingRight), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
+          if (phone && $('kfChipOne').getBoundingClientRect().width < 44 - 0.5) out.push(`${tag}: a one-figure chip is ${$('kfChipOne').getBoundingClientRect().width}px wide, under 44`);
+          // K4 — the joined kid switch.
+          const [k1, k2] = $('kfKids').children;
+          const s1 = cs(k1), s2 = cs(k2);
+          near(k1.getBoundingClientRect().height, 44, 'a kid switch cell');
+          near(k2.getBoundingClientRect().left, k1.getBoundingClientRect().right, 'the second kid cell (joined: no gap)');
+          for (const side of ['Top', 'Bottom', 'Left']) near(px(s1[`border${side}Width`]), 2, `the kid switch frame (${side})`);
+          near(px(s2.borderRightWidth), 2, 'the kid switch frame (Right)');
+          near(px(s1.borderRightWidth) + px(s2.borderLeftWidth), 2, 'the kid switch divider');
+          same(s1.borderTopColor, colour('--ink'), 'the kid switch frame colour');
+          same(s1.borderTopLeftRadius, '999px', 'the kid switch start');
+          same(s2.borderTopRightRadius, '999px', 'the kid switch end');
+          same(s1.borderTopRightRadius, '0px', 'the kid switch divider corner');
+          same(s2.backgroundColor, colour('--sel'), 'the chosen girl fill');
+          same(s2.color, colour('--sel-ink'), 'the chosen girl ink');
+          same(s1.backgroundColor, colour('--paper'), 'the other girl fill');
+          near(px(s1.paddingLeft), 0.75 * rootPx, 'a kid switch cell side');
+          // C4: the switch fills its row, the girls in equal halves; a plant (inline-flex) must be caught.
+          const fillFaults = (kids) => {
+            const f = [], row = kids.parentElement, rs = cs(row), want = row.clientWidth - px(rs.paddingLeft) - px(rs.paddingRight);
+            const w = kids.getBoundingClientRect().width, cells = [...kids.children].map(b => b.getBoundingClientRect().width);
+            if (Math.abs(w - want) > 0.5) f.push(`the kid switch is ${w}px wide, its row ${want}px`);
+            if (cells.some(cw => Math.abs(cw - cells[0]) > 0.5)) f.push(`the kid switch halves are ${cells.join(' / ')}px, want equal`);
+            return f;
+          };
+          fillFaults($('kfKids')).forEach(f => out.push(`${tag}: ${f}`));
+          $('kfKids').style.display = 'inline-flex';
+          if (!fillFaults($('kfKids')).length) out.push(`${tag}: the kid switch width check missed its plant (an inline switch)`);
+          $('kfKids').style.display = '';
+          // K5 — the seven-day row.
+          const days = [...$('kfDays').children];
+          if (days.length !== 7) out.push(`${tag}: the seven-day row has ${days.length} cells`);
+          const r0 = days[0].getBoundingClientRect();
+          days.forEach((d, i) => {
+            const r = d.getBoundingClientRect(), s = cs(d);
+            if (Math.abs(r.top - r0.top) > 0.5) out.push(`${tag}: day cell ${i + 1} is not on the row (top ${r.top}, the first ${r0.top})`);
+            near(r.width, r0.width, `day cell ${i + 1}'s width`);
+            if (r.height < 44 - 0.5) out.push(`${tag}: day cell ${i + 1} is ${r.height}px high, under 44`);
+            same(s.borderTopLeftRadius, '12px', `day cell ${i + 1}'s corner`);
+            if (d.getAttribute('aria-current') !== 'date') near(px(s.borderTopWidth), 2, `day cell ${i + 1}'s border`);   // today: its 4px double frame (C8), below
+            if (!(d.getAttribute('aria-label') || '').includes('%')) out.push(`${tag}: day cell ${i + 1} has no spoken name with its %`);
+          });
+          const mark = d => getComputedStyle(d, '::after').content;
+          same(cs(days[0]).backgroundColor, colour('--status-done'), 'a confirmed day fill');
+          same(mark(days[0]), '"✓"', 'a confirmed day mark');
+          same(mark(days[1]), '"• ✓"', 'today confirmed, its marks');
+          // C8: today is a double navy frame, no fill of its own; a plant (a solid frame) must be caught.
+          const todayFaults = (d) => {
+            const s = cs(d), f = [];
+            if (s.borderTopStyle !== 'double' || s.borderLeftStyle !== 'double') f.push(`today's frame is ${s.borderTopStyle}, want double`);
+            if (Math.abs(px(s.borderTopWidth) - 4) > 0.5) f.push(`today's frame is ${s.borderTopWidth}, want 4px (two lines)`);
+            if (s.borderTopColor !== rgbOf('#1c2240')) f.push(`today's frame is ${s.borderTopColor}, want #1c2240`);
+            if (s.backgroundColor !== colour('--paper')) f.push(`today's fill is ${s.backgroundColor}, want none (the paper)`);
+            return f;
+          };
+          todayFaults(days[2]).forEach(f => out.push(`${tag}: ${f}`));
+          same(cs(days[2]).color, colour('--ink'), "today's ink");
+          same(cs(days[1]).backgroundColor, colour('--status-done'), 'today confirmed, its fill (the green stays)');
+          days[2].style.borderStyle = 'solid';
+          if (!todayFaults(days[2]).length) out.push(`${tag}: the today frame check missed its plant (a solid frame)`);
+          days[2].style.borderStyle = '';
+          // C5: seven tiles in a 300px column wrap onto a second row, all one width, each with its parts.
+          const tileFaults = (row) => {
+            const f = [], tiles = [...row.children], rects = tiles.map(t => t.getBoundingClientRect());
+            if (new Set(rects.map(r => Math.round(r.top))).size < 2) f.push('seven tiles in 300px stay on one row');
+            if (rects.some(r => Math.abs(r.width - rects[0].width) > 0.5 || r.width < 72 - 0.5)) f.push(`the tiles are ${rects.map(r => Math.round(r.width)).join('/')}px, want one width, at least 72`);
+            tiles.forEach((t, i) => ['ui-day-dow', 'ui-day-date', 'ui-day-pct', 'ui-day-state'].forEach(c => { const e = t.querySelector('.' + c); if (!e || !e.getClientRects().length) f.push(`tile ${i + 1} shows no .${c}`); }));
+            return f;
+          };
+          tileFaults($('kfTiles')).forEach(f => out.push(`${tag}: ${f}`));
+          $('kfTiles').style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
+          if (!tileFaults($('kfTiles')).length) out.push(`${tag}: the tile check missed its plant (seven squeezed columns)`);
+          $('kfTiles').style.gridTemplateColumns = '';
+          same(mark(days[2]), '"•"', "today's mark");
+          same(cs(days[3]).backgroundColor, colour('--sel'), 'the chosen day fill');
+          same(cs(days[3]).color, colour('--sel-ink'), 'the chosen day ink');
+          same(cs(days[4]).borderTopStyle, 'dashed', 'a day to come, its border');
+          same(cs(days[4]).color, colour('--ink-light'), 'a day to come, its ink');
+          same(mark(days[5]), 'none', 'a plain day mark');
+          // K8 — the list row; K9 — inner corners 11px, the card 14px.
+          const row = $('kfRow'), rs = cs(row);
+          near(row.getBoundingClientRect().height, 52, "a kid's row");
+          near($('kfRowP').getBoundingClientRect().height, 44, "a parent's row");
+          near(px(rs.borderTopWidth), 2, 'a row border');
+          same(rs.borderTopLeftRadius, '11px', 'a row corner');
+          same(cs($('kfRowAdd')).borderTopStyle, 'dashed', 'the add row border');
+          same(cs($('kfRowDone')).backgroundColor, colour('--status-done-wash'), 'a done row fill');
+          if (!cs($('kfRowDone').querySelector('.ui-row-name')).textDecorationLine.includes('line-through')) out.push(`${tag}: a done row's name is not struck through`);
+          const end = row.querySelector('.ui-row-end').getBoundingClientRect(), rr = row.getBoundingClientRect();
+          near(end.right, rr.right - px(rs.borderRightWidth) - px(rs.paddingRight), "the row's right-hand slot");
+          if (row.querySelector('.ui-row-icon').getBoundingClientRect().right > row.querySelector('.ui-row-name').getBoundingClientRect().left + 0.5) out.push(`${tag}: the row's icon is not before its name`);
+          for (const [el, what] of [[$('kfSec'), 'a kit button'], [$('kfCard').querySelector('button'), 'a tab']]) same(cs(el).borderTopLeftRadius, '11px', `${what}'s corner`);
+          same(cs($('kfCard')).borderTopLeftRadius, '14px', "a card's corner");
+          // K10 — the stepper: 44px, the girl's 52px.
+          const sb = $('kfStep').firstElementChild.getBoundingClientRect(), kb = $('kfStepKid').firstElementChild.getBoundingClientRect();
+          near(sb.width, 44, 'a stepper button width'); near(sb.height, 44, 'a stepper button height');
+          near(kb.width, 52, "the girl's stepper button width"); near(kb.height, 52, "the girl's stepper button height");
+          host.remove();
+          document.getElementById('kfRecordFx').remove();
+          document.documentElement.setAttribute('data-look', window.__kitLookWas || 'pop');
+          return out;
+        }, [tag, hovered, size === 'phone']));
+      }
+    }
     await page.setViewportSize(before);
+    const contrast = await page.evaluate(() => { const t = window.__kitContrast || {}; window.__kitContrast = null; return t; });
+    console.log('theComponentKitHoldsItsSizes: C8 contrast ' + Object.entries(contrast).filter(([k]) => !/^plant/.test(k)).map(([k, v]) => `${k} ${v}:1`).join(' · '));
     checks.theComponentKitHoldsItsSizes = problems.length ? problems : true;
   }
 
@@ -27717,7 +27917,7 @@ function findChromium() {
                 if (!name || !/Jenn/.test(name.textContent)) out.push(`${tag}: the sub-bar does not name Jenn`);
                 const back = sub.querySelector('.pb-back-btn');
                 if (!back || back.getAttribute('aria-label') !== 'Back to the parent hub') out.push(`${tag}: the sub-bar's way back is missing or misnamed`);
-                const acts = [...sub.querySelectorAll('.pv-btn, .pb-back-btn')].filter(shown);
+                const acts = [...sub.querySelectorAll('.pv-btn, .pb-back-btn, .pb-switch')].filter(shown);
                 acts.forEach(b => box(b, Object.assign({}, want.action, b.classList.contains('pv-btn--main') && want.confirmFill ? { bg: want.confirmFill[0], fg: want.confirmFill[1], weight: '600' } : b.classList.contains('pb-action--notdone') || b.classList.contains('on') ? { skipFill: true } : {}), `"${b.getAttribute('aria-label')}"`));
                 if (open === 'view-day') {
                   const labels = acts.map(b => b.getAttribute('aria-label') || '');
@@ -28059,6 +28259,8 @@ function findChromium() {
 
   // The parent portal on the kit: tests/smoke-parts/parent.js.
   await parentPortal({ page, want, checks, setLook, clearLooks });
+  // Sister Sync and the profile screens on the kit: tests/smoke-parts/social.js.
+  await socialChecks({ page, want, checks, setLook, clearLooks });
 
   // The money click sweep: tests/smoke-parts/money-screens.js.
   await moneyScreens.moneyClicks({ page, want, checks });

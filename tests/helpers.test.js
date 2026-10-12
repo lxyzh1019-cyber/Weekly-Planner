@@ -230,7 +230,10 @@ check('noPrint marks the header no-print; without it the header prints',
 // stylesheet, and this list is also what tests/check-dead-css.js reads while
 // no screen uses the kit yet (PRs 4–12 replace that with real markup).
 const UI_KIT_CLASSES = ['ui-btn', 'ui-btn--primary', 'ui-btn--secondary', 'ui-btn--icon', 'ui-btn--danger', 'ui-btn--lg', 'ui-btn--two-line',
-  'ui-chip', 'ui-tabs', 'ui-card', 'ui-sect-head', 'ui-sheet', 'ui-kids', 'ui-stepper'];
+  'ui-btn--ok', 'ui-btn--block',
+  'ui-chip', 'ui-tabs', 'ui-card', 'ui-sect-head', 'ui-sheet', 'ui-kids', 'ui-stepper', 'ui-stepper--kid',
+  'ui-days', 'ui-day--ok', 'ui-day--future', 'ui-days--tiles', 'ui-day-dow', 'ui-day-date', 'ui-day-pct', 'ui-day-state',
+  'ui-row', 'ui-row--parent', 'ui-row--done', 'ui-row--add', 'ui-row-icon', 'ui-row-name', 'ui-row-end'];
 {
   const fs = require('fs');
   const path = require('path');

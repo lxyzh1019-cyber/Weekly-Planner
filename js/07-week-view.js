@@ -405,7 +405,7 @@ function weekRenderHeader() {
        child mid-meeting loses the sitting, so the meeting lock hides Switch
        rather than leaving a control that quietly discards your place. */
     sub: parentViewSub('week', 'parentWeekActions',
-      `<button type="button" class="ui-btn ui-btn--secondary no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${escapeAttr(kidLabel(parentViewing === 'jenn' ? 'jess' : 'jenn').name)}">Switch</button>`),
+      `<button type="button" class="pv-btn pb-action no-print pb-switch" onclick="parentSwitchView()" aria-label="Switch to ${escapeAttr(kidLabel(parentViewing === 'jenn' ? 'jess' : 'jenn').name)}">Switch</button>`),
   });
   /* A week across two months ("Sep 28 – Oct 4") is wider than a phone's room
      at 20px; css/app.css sizes it down only on the widths where it does not
@@ -551,10 +551,10 @@ function renderWeekGlance(keys) {
      in smaller type. `swatch` is a hex the tables own, so it is safe in a style
      attribute. */
   const row = (label, min, note, swatch /* safe: from CAT_HEX */) => `
-    <div class="glance-row">
-      <span class="glance-row-label">
-        <span class="glance-dot" style="background:${swatch}"></span>${label}</span>
-      <span class="glance-row-figs">
+    <div class="ui-row">
+      <span class="ui-row-icon glance-dot" style="background:${swatch}"></span>
+      <span class="ui-row-name">${label}</span>
+      <span class="ui-row-end">
         <b class="glance-per-day">${fmtHrsMin(Math.round(min / t.days))}/day</b>
         <span class="glance-total">${note || fmtHrsMin(min) + ' this week'}</span></span>
     </div>`;

@@ -217,7 +217,7 @@ function guTabBar() {
   const cur = guIsTab(mnyParentSection) ? mnyParentSection : 'commit';
   return `<div class="gu-tabs" role="group" aria-label="Money">
       ${GU_TABS.map(t =>
-    `<button type="button" class="gu-tab${cur === t.id ? ' on' : ''}" aria-pressed="${cur === t.id}" data-mnyp-action="gutab" data-mnyp-id="${t.id}">${escapeHtml(t.label)}</button>`).join('')}
+    `<button type="button" class="ui-chip" aria-pressed="${cur === t.id}" data-mnyp-action="gutab" data-mnyp-id="${t.id}">${escapeHtml(t.label)}</button>`).join('')}
       <span class="gu-tools">${rcDoorHint()}<button type="button" class="gu-btn gu-record" data-mny-action="record-any">✍️ Record</button><button type="button" class="gu-btn" data-mny-action="tourpar" aria-label="How this page works">?</button></span></div>`;
 }
 
@@ -239,9 +239,11 @@ function guHead(title, strap) {
   return `<div class="gu-head"><h2 class="gu-title">${escapeHtml(title)}</h2><span class="gu-strap">${escapeHtml(strap)}</span></div>`;
 }
 function guOpt(label, on, action, attrs, off) {
-  return `<button type="button" class="gu-opt${label === '−' || label === '+' ? ' mny-step' : ''}${on ? ' on' : ''}" data-mnyp-action="${action}"${attrs || ''}${off ? ' disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
+  const step = label === '−' || label === '+';   // a − or + sits in a .ui-stepper (guStepper); anything else is a chip
+  return `<button type="button"${step ? '' : ` class="ui-chip" aria-pressed="${!!on}"`} data-mnyp-action="${action}"${attrs || ''}${off ? ' disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
 }
 // The value between a stepper's − and +: plain text, not a button (Money fit and logic PR 5).
+function guStepper(inner) { return `<span class="ui-stepper">${inner}</span>`; }
 function guVal(label) { return `<span class="mny-stepval">${escapeHtml(label)}</span>`; }
 function guFormRow(q, opts) {
   return `<div class="gu-formrow"><span class="gu-q">${escapeHtml(q)}</span><div class="gu-opts">${opts}</div></div>`;
@@ -339,18 +341,18 @@ function guApproveCard(q) {
      the stamp and ↺ Undo, which puts the question back to waiting. */
   const adj = !q.status && q.kind === 'comp';
   const buttons = !q.status ? `<div class="gu-answer">
-      <button type="button" class="gu-yes" data-mnyp-action="guyes"${ids}>${escapeHtml(v.yesLabel)}</button>
-      <button type="button" class="gu-talk" data-mnyp-action="gutalk"${ids}>💬 Talk first</button>
-      <button type="button" class="gu-no" data-mnyp-action="guno"${ids}>✗ No</button>
+      <button type="button" class="ui-btn ui-btn--ok" data-mnyp-action="guyes"${ids}>${escapeHtml(v.yesLabel)}</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mnyp-action="gutalk"${ids}>💬 Talk first</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mnyp-action="guno"${ids}>✗ No</button>
     </div>` : '';
   const done = q.status ? `<div class="gu-done">
       <span class="gu-stamp ${'gu-stamp--' + st}">${escapeHtml(v.stamp)}</span>
       <span class="gu-after">${escapeHtml(v.after)}</span>
-      <button type="button" class="gu-undo" data-mnyp-action="guundo"${ids}>↺ Undo</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mnyp-action="guundo"${ids}>↺ Undo</button>
     </div>` : '';
   return `<div class="gu-req ${'gu-req--' + st}">
       <div class="gu-req-top">${guKidChip(q.kid)}<span class="gu-tag" data-gu-tag="${escapeAttr(tk)}">${escapeHtml(sdRequestTag(q.kind, (q.record || {}).to) || '❔ Ask')}</span><span class="gu-kind">${escapeHtml(GU_KIND_LABEL[tk] || q.kind)}</span>
-        <span class="gu-amt">${adj ? `<button type="button" class="gu-step" data-mnyp-action="gupay" data-mnyp-d="-1"${ids} aria-label="One dollar less">−</button>` : ''}<b>${escapeHtml(v.amtLabel)}</b>${adj ? `<button type="button" class="gu-step" data-mnyp-action="gupay" data-mnyp-d="1"${ids} aria-label="One dollar more">+</button>` : ''}</span></div>
+        <span class="gu-amt">${adj ? `<span class="ui-stepper"><button type="button" data-mnyp-action="gupay" data-mnyp-d="-1"${ids} aria-label="One dollar less">−</button><b>${escapeHtml(v.amtLabel)}</b><button type="button" data-mnyp-action="gupay" data-mnyp-d="1"${ids} aria-label="One dollar more">+</button></span>` : `<b>${escapeHtml(v.amtLabel)}</b>`}</span></div>
       <div class="gu-req-text">${escapeHtml(q.icon)} ${escapeHtml(q.text)}</div>
       <div class="gu-req-rules">${escapeHtml(v.rulesLine)}</div>
       <div class="gu-check">${escapeHtml(v.check)}</div>
@@ -380,7 +382,7 @@ function guOverrideRows(kid) {
   return `${toggle}
     ${mnyStrip(wk, kid, -1)}
     ${GU_OV_LINES.map(([ch, label]) => `<div class="gu-ovrow"><span>${escapeHtml(label)}${ov[ch] ? ` <s class="gu-was">${escapeHtml(fmtMoney(b.original[ch] != null ? b.original[ch] : cur[ch]))}</s>` : ''}</span>
-      <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="guov" data-mnyp-d="-1"${ids(ch)} aria-label="A dollar less">−</button><b class="gu-num">${escapeHtml(fmtMoney(cur[ch]))}</b><button type="button" class="gu-step" data-mnyp-action="guov" data-mnyp-d="1"${ids(ch)} aria-label="A dollar more">+</button>${ov[ch] ? `<button type="button" class="gu-step" data-mnyp-action="guovreset"${ids(ch)} aria-label="Back to the planner's number">↺</button>` : ''}</span></div>`).join('')}
+      <span class="ui-stepper"><button type="button" data-mnyp-action="guov" data-mnyp-d="-1"${ids(ch)} aria-label="A dollar less">−</button><b class="gu-num">${escapeHtml(fmtMoney(cur[ch]))}</b><button type="button" data-mnyp-action="guov" data-mnyp-d="1"${ids(ch)} aria-label="A dollar more">+</button>${ov[ch] ? `<button type="button" data-mnyp-action="guovreset"${ids(ch)} aria-label="Back to the planner's number">↺</button>` : ''}</span></div>`).join('')}
     ${edited ? `<div class="gu-opts"><span class="gu-line">Why:</span>${MNY_REASONS.map(r =>
       guOpt(r.label, reason === r.id, 'guovreason', ` data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(r.id)}"`)).join('')}</div>
       ${reason ? '' : '<div class="gu-line">Pick why — Sunday waits for a reason.</div>'}` : ''}`;
@@ -410,7 +412,7 @@ function guGrandfatherCreditCard() {
       <div class="gu-line">${n} week${n === 1 ? '' : 's'} outside the review window had no family meeting.${plan.skipped ? ` ${plan.skipped} week${plan.skipped === 1 ? '' : 's'} had a family meeting — left alone.` : ''}</div>
       ${perKid}
       ${plan.saved
-        ? `<button type="button" class="gu-save ready" data-mnyp-action="grandma">Credit ${escapeHtml(fmtMoney(plan.total))} across ${n} week${n === 1 ? '' : 's'}</button>
+        ? `<button type="button" class="ui-btn ui-btn--primary" data-mnyp-action="grandma">Credit ${escapeHtml(fmtMoney(plan.total))} across ${n} week${n === 1 ? '' : 's'}</button>
            <div class="gu-line">Shown before anything moves, and asked once more before it does.</div>`
         : `<div class="gu-line">Enter the start week first, in ⚙️ Rules › 👴 Grandfather rule.</div>
            <button type="button" class="gu-btn" data-mnyp-action="gutab" data-mnyp-id="rules">⚙️ Go to Rules</button>`}
@@ -559,14 +561,14 @@ function guCommitMain() {
   const rows = [
     guFormRow('Type', guOpt('🆕 Commitment', !sur, 'gucmtype', ' data-mnyp-id="commit"') + guOpt('🌧️ Surprise cost', sur, 'gucmtype', ' data-mnyp-id="surprise"')),
     guFormRow('For', GU_KIDS.map(k => guOpt(kidLabel(k).name, c.kid === k, 'gucmkid', ` data-mnyp-id="${k}"`)).join('')),
-    guFormRow('Cost', guOpt('−', false, 'gucmcost', ' data-mnyp-d="-5" aria-label="Five dollars less"') + guVal(fmtMoney(c.cost)) + guOpt('+', false, 'gucmcost', ' data-mnyp-d="5" aria-label="Five dollars more"')),
+    guFormRow('Cost', guStepper(guOpt('−', false, 'gucmcost', ' data-mnyp-d="-5" aria-label="Five dollars less"') + guVal(fmtMoney(c.cost)) + guOpt('+', false, 'gucmcost', ' data-mnyp-d="5" aria-label="Five dollars more"'))),
   ];
   if (!sur) {
-    rows.push(guFormRow('Her share', guOpt('−', false, 'gucmshare', ' data-mnyp-d="-5" aria-label="Less"') + guVal(c.share + '%')
-      + guOpt('+', false, 'gucmshare', ' data-mnyp-d="5" aria-label="More"')));   // one 50 %: the stepper is the control (PR 5)
-    rows.push(guFormRow('Pay it over', guOpt('−', false, 'gucmweeks', ' data-mnyp-d="-1" aria-label="A week less"')
+    rows.push(guFormRow('Her share', guStepper(guOpt('−', false, 'gucmshare', ' data-mnyp-d="-5" aria-label="Less"') + guVal(c.share + '%')
+      + guOpt('+', false, 'gucmshare', ' data-mnyp-d="5" aria-label="More"'))));   // one 50 %: the stepper is the control (PR 5)
+    rows.push(guFormRow('Pay it over', guStepper(guOpt('−', false, 'gucmweeks', ' data-mnyp-d="-1" aria-label="A week less"')
       + guVal(c.weeks + (c.weeks === 1 ? ' week' : ' weeks'))
-      + guOpt('+', false, 'gucmweeks', ' data-mnyp-d="1" aria-label="A week more"')
+      + guOpt('+', false, 'gucmweeks', ' data-mnyp-d="1" aria-label="A week more"'))
       + [[13, '3 months'], [26, '6 months'], [52, '1 year']].map(([w, l]) => guOpt(l, c.weeks === w, 'gucmweeksset', ` data-mnyp-id="${w}"`)).join('')));
   }
   return `${guHead('➕ Commitments', 'Each one is its own row on her wall, paid oldest first.')}
@@ -604,7 +606,7 @@ function guCommitSide() {
       ${lines.map(([k, v]) => `<div class="gu-kv"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('')}
       <div class="gu-verdict">${escapeHtml(verdict)}</div>
       ${tick ? `<button type="button" class="gu-btn" role="checkbox" aria-checked="${m.ticked}" data-mnyp-action="gucmtick">${m.ticked ? '✅' : '⬜'} I checked this with her</button>` : ''}
-      <button type="button" class="gu-save${can ? ' ready' : ''}" data-mnyp-action="gucmsave">${m.sur ? 'Send her the 🌧️ card' : 'Add to her wall'}</button>
+      <button type="button" class="ui-btn ${can ? 'ui-btn--primary' : 'ui-btn--secondary'}" data-mnyp-action="gucmsave">${m.sur ? 'Send her the 🌧️ card' : 'Add to her wall'}</button>
       <div class="gu-line">${m.sur ? 'Not a fine: nobody did anything wrong. 🛟 Savings pays first; the rest becomes a row on her wall. Savings refills first after.'
         : `Her weekly payment goes up from next Sunday. Her 10% down comes out of Savings above the 🛟 ${escapeHtml(fmtMoney(m.safety))}; the rest joins the new row.`}</div>
     </div>`;
@@ -657,8 +659,8 @@ function guOneOffCard() {
       <div class="gu-cardtitle">➕ One-off club session</div>
       ${guFormRow('For', GU_KIDS.map(k => guOpt(kidLabel(k).name, o.kid === k, 'gu1kid', ` data-mnyp-id="${k}"`)).join(''))}
       ${guFormRow('Day', GU_DAY_NAMES.map((d, i) => guOpt(d, o.dayIdx === i, 'gu1day', ` data-mnyp-id="${i}"`)).join(''))}
-      ${guFormRow('Starts', guOpt('−', false, 'gu1time', ' data-mnyp-d="-30" aria-label="Half an hour earlier"') + guVal(t) + guOpt('+', false, 'gu1time', ' data-mnyp-d="30" aria-label="Half an hour later"'))}
-      <button type="button" class="gu-save ready" data-mnyp-action="gu1place">⛸️ Put it on her planner</button>
+      ${guFormRow('Starts', guStepper(guOpt('−', false, 'gu1time', ' data-mnyp-d="-30" aria-label="Half an hour earlier"') + guVal(t) + guOpt('+', false, 'gu1time', ' data-mnyp-d="30" aria-label="Half an hour later"')))}
+      <button type="button" class="ui-btn ui-btn--primary" data-mnyp-action="gu1place">⛸️ Put it on her planner</button>
       <div class="gu-line">It pays like any club session she goes to; Sunday asks whether she went.</div>
     </div>`;
 }
@@ -742,7 +744,7 @@ function guFinesMain() {
         <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(kidLabel(kid).name)} · this week</span>${total > 0 ? `<b class="gu-fig gu-fig--fine">−${fmtMoney(total)}</b>` : ''}</div>
         ${list.map(x => `<div class="gu-finerow"><b>${escapeHtml(x.day)}</b><span class="gu-ellip">${escapeHtml(x.what)}${x.who ? ' · ' + escapeHtml(x.who) : ''}</span>
           <b class="gu-num">${x.amt > 0 ? '−' + fmtMoney(x.amt) : 'free'}</b>
-          <button type="button" class="gu-x" data-mnyp-action="gufinedel" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(x.f.id)}" aria-label="Take this fine off">✕</button></div>`).join('')}
+          <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" data-mnyp-action="gufinedel" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(x.f.id)}" aria-label="Take this fine off">✕</button></div>`).join('')}
         ${list.length ? '' : '<span class="gu-line">Nothing logged this week. 🎉</span>'}
         ${logged.map(id => `<span class="gu-line">${escapeHtml(guFineLabel(id))}: ${escapeHtml(guStandingLine(mrFineStanding(wk, kid, id)))}</span>`).join('')}
       </div>`;
@@ -756,7 +758,7 @@ function guFinesMain() {
       ${guFormRow('Logged by', ['Mom', 'Dad'].map(w => guOpt(w, f.who === w, 'gufnwho', ` data-mnyp-id="${w}"`)).join(''))}
       <div class="gu-line">${escapeHtml(kidLabel(f.kid).name)} · ${escapeHtml(guFineLabel(f.itemId))}: ${escapeHtml(guStandingLine(st))}</div>
       <div class="gu-remind">Log every one, even a free one. The free ones are still on her record, and she sees each one on Sunday.</div>
-      <button type="button" class="gu-save ready gu-save--end" data-mnyp-action="gufnsave">📦 Log it</button>
+      <button type="button" class="ui-btn ui-btn--primary gu-save--end" data-mnyp-action="gufnsave">📦 Log it</button>
     </div>
     <div class="gu-cards2">${GU_KIDS.map(kidCard).join('')}</div>`;
 }
@@ -804,9 +806,9 @@ function guExpectMain() {
     return `<div class="gu-card ${'gu-tint--' + kid}">
         <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(kidLabel(kid).name)}</span><span class="gu-line">next 5 months</span><b class="gu-fig">≈ ${fmtMoney(total)}</b></div>
         ${rows.map(e => `<div class="gu-exrow"><span class="gu-ellip">${escapeHtml(e.label)}</span>
-          <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="guexmon" data-mnyp-d="-1"${ids(e)} aria-label="A month earlier">◀</button><b class="gu-num">${escapeHtml(guMonthShort(e.month))}</b><button type="button" class="gu-step" data-mnyp-action="guexmon" data-mnyp-d="1"${ids(e)} aria-label="A month later">▶</button></span>
-          <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="guexamt" data-mnyp-d="-5"${ids(e)} aria-label="Five dollars less">−</button><b class="gu-num">${fmtMoney(e.amount)}</b><button type="button" class="gu-step" data-mnyp-action="guexamt" data-mnyp-d="5"${ids(e)} aria-label="Five dollars more">+</button></span>
-          <button type="button" class="gu-x" data-mnyp-action="guexdel"${ids(e)} aria-label="Take this off">✕</button></div>`).join('')}
+          <span class="ui-stepper"><button type="button" data-mnyp-action="guexmon" data-mnyp-d="-1"${ids(e)} aria-label="A month earlier">◀</button><b class="gu-num">${escapeHtml(guMonthShort(e.month))}</b><button type="button" data-mnyp-action="guexmon" data-mnyp-d="1"${ids(e)} aria-label="A month later">▶</button></span>
+          <span class="ui-stepper"><button type="button" data-mnyp-action="guexamt" data-mnyp-d="-5"${ids(e)} aria-label="Five dollars less">−</button><b class="gu-num">${fmtMoney(e.amount)}</b><button type="button" data-mnyp-action="guexamt" data-mnyp-d="5"${ids(e)} aria-label="Five dollars more">+</button></span>
+          <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" data-mnyp-action="guexdel"${ids(e)} aria-label="Take this off">✕</button></div>`).join('')}
         <div class="gu-adds"><span class="gu-line">➕ add</span>${GU_EXPECT_ADDS.map(([l, a], i) =>
           `<button type="button" class="gu-addchip" data-mnyp-action="guexadd" data-mnyp-kid="${kid}" data-mnyp-id="${i}">${escapeHtml(l)}</button>`).join('')}</div>
       </div>`;
@@ -892,10 +894,10 @@ function guGrandfatherCard() {
       <label class="gu-rule"><span class="gu-rule-words"><span>Starts the week of</span></span>
         <input class="gu-input gu-date" type="date" value="${escapeAttr(f.from)}" data-mnyp-action="gmfrom"></label>
       <div class="gu-rule"><div class="gu-rule-words"><span>Each girl, each week</span></div>
-        <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="gmamt" data-mnyp-d="-0.5" aria-label="Less">−</button>
+        <span class="ui-stepper"><button type="button" data-mnyp-action="gmamt" data-mnyp-d="-0.5" aria-label="Less">−</button>
         <b class="gu-ruleval">${escapeHtml(fmtMoney(f.amount))}</b>
-        <button type="button" class="gu-step" data-mnyp-action="gmamt" data-mnyp-d="0.5" aria-label="More">+</button></span></div>
-      <button type="button" class="gu-save${changed ? ' ready' : ''}" data-mnyp-action="gmsave">${rule.saved ? (changed ? 'Save the change' : 'Saved ✓') : 'Save the start week'}</button>
+        <button type="button" data-mnyp-action="gmamt" data-mnyp-d="0.5" aria-label="More">+</button></span></div>
+      <button type="button" class="ui-btn ${changed ? 'ui-btn--primary' : 'ui-btn--secondary'}" data-mnyp-action="gmsave">${rule.saved ? (changed ? 'Save the change' : 'Saved ✓') : 'Save the start week'}</button>
       <div class="gu-line">${rule.saved ? `Saved: from the week of ${escapeHtml(fmtDay(rule.from, 'dated'))}, ${escapeHtml(fmtMoney(rule.amount))} a week.` : 'Not saved yet — nothing is credited until the start week is.'}</div>
       <label class="gu-rule"><span class="gu-rule-words"><span>Pocket money started</span><span class="gu-she">the meeting looks back no further${derived ? ' · worked out from the earliest week on file' : ''}</span></span>
         <input class="gu-input gu-date" type="date" value="${escapeAttr(String(mrStartWeek()))}" data-mnyp-action="startweek"></label>
@@ -996,9 +998,9 @@ function guRuleRowHtml(r, saved, R) {
   const she = (r.she ? r.she(now, R) : '');
   const attrs = ` data-mnyp-path="${escapeAttr(r.path)}" data-mnyp-label="${escapeAttr(r.label)}"`;
   return `<div class="gu-rule${ch ? ' changed' : ''}"><div class="gu-rule-words"><span>${escapeHtml(r.label)}</span><span class="gu-she">${escapeHtml(she)}</span></div>
-      <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="gurule" data-mnyp-d="${-r.step}"${attrs} aria-label="Less">−</button>
+      <span class="ui-stepper"><button type="button" data-mnyp-action="gurule" data-mnyp-d="${-r.step}"${attrs} aria-label="Less">−</button>
       <span class="gu-rulevalbox"><b class="gu-ruleval${ch ? ' changed' : ''}">${escapeHtml(guFmt(r.unit, now))}</b>${ch ? `<span class="gu-was">was ${escapeHtml(guFmt(r.unit, was))}</span>` : ''}</span>
-      <button type="button" class="gu-step" data-mnyp-action="gurule" data-mnyp-d="${r.step}"${attrs} aria-label="More">+</button></span></div>`;
+      <button type="button" data-mnyp-action="gurule" data-mnyp-d="${r.step}"${attrs} aria-label="More">+</button></span></div>`;
 }
 function guRulesMain(secs = guRuleSections()) {
   const saved = guSavedRules(), R = guPendingRules();
@@ -1059,7 +1061,7 @@ function guSundayRulesCard() {
       <div class="gu-cardtitle">☀️ The Sunday rules are not in this rulebook yet</div>
       ${pending.map(p => `<div class="gu-kv"><span>${escapeHtml(p.item)} — ${escapeHtml(p.field)}</span><b>${escapeHtml(guRuleWord(p.from))} → ${escapeHtml(guRuleWord(p.value))}</b></div>`).join('')}
       <div class="gu-line">Added as one dated change from this week's Monday. Nothing already lived is re-priced, and the family's own figures stay.</div>
-      <button type="button" class="gu-save ready" data-mnyp-action="gusundayrules">Put ${pending.length === 1 ? 'it' : 'them'} into the rulebook</button>
+      <button type="button" class="ui-btn ui-btn--primary" data-mnyp-action="gusundayrules">Put ${pending.length === 1 ? 'it' : 'them'} into the rulebook</button>
     </div>`;
 }
 /* A typical week for the impact preview: her last 4 settled weeks, averaged —
@@ -1130,10 +1132,10 @@ function guSaveStrip() {
       <div class="gu-opts gu-reasons"><span class="gu-line">Why:</span>${MR_REASONS.map(r =>
         guOpt(r.label, guRuleReason === r.id, 'gureason', ` data-mnyp-id="${escapeAttr(r.id)}"`)).join('')}</div>
       <div class="gu-saverow">
-        <button type="button" class="gu-btn" data-mnyp-action="gurulediscard">↺ Undo</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mnyp-action="gurulediscard">↺ Undo</button>
         <button type="button" class="gu-check-toggle${guRuleThisWeek ? ' on' : ''}" role="checkbox" aria-checked="${guRuleThisWeek}" data-mnyp-action="guthisweek"><span class="gu-box" aria-hidden="true">${guRuleThisWeek ? '✓' : ''}</span>start this week instead</button>
         <span class="gu-line">weeks already signed keep their rules</span>
-        <button type="button" class="gu-save${changed.length ? ' ready' : ''}" data-mnyp-action="gurulesave">Save · starts next Sunday</button>
+        <button type="button" class="ui-btn ${changed.length ? 'ui-btn--primary' : 'ui-btn--secondary'}" data-mnyp-action="gurulesave">Save · starts next Sunday</button>
       </div>
     </div>`;
 }
@@ -1198,7 +1200,7 @@ function guTypedWeekFields(kid, r) {
   const gap = money2(inTotal - money2(r.fines) - outTotal);
   return `<div class="gu-weekfix">
       ${GU_LED_FIELDS.map(([f, label, step]) => `<div class="gu-ovrow"><span>${escapeHtml(label)}</span>
-        <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="guled"${ids(f, -step)} aria-label="Less">−</button><b class="gu-num">${escapeHtml(f === 'fines' ? sdOff$(r[f]) : fmtMoney(r[f]))}</b><button type="button" class="gu-step" data-mnyp-action="guled"${ids(f, step)} aria-label="More">+</button></span></div>`).join('')}
+        <span class="ui-stepper"><button type="button" data-mnyp-action="guled"${ids(f, -step)} aria-label="Less">−</button><b class="gu-num">${escapeHtml(f === 'fines' ? sdOff$(r[f]) : fmtMoney(r[f]))}</b><button type="button" data-mnyp-action="guled"${ids(f, step)} aria-label="More">+</button></span></div>`).join('')}
       <div class="gu-kv"><span>In minus out</span><b>${escapeHtml(fmtMoney(gap, { signed: true }))}</b></div>
       ${Math.abs(gap) > 0.005 ? `<div class="gu-line gu-warnline">These do not balance yet — ${escapeHtml(fmtMoney(Math.abs(gap)))} is unaccounted for.</div>` : ''}
       <button type="button" class="gu-btn" data-mnyp-action="guleddel" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(r.weekKey)}">Remove this week</button>
@@ -1424,15 +1426,15 @@ function guRenderSheet() {
   }
   title.textContent = t;
   body.innerHTML = `<div class="gu">${html}
-      <button type="button" class="gu-save ready gu-save--end" data-mnyp-action="gusheetclose">Done</button></div>`;
+      <button type="button" class="ui-btn ui-btn--primary gu-save--end" data-mnyp-action="gusheetclose">Done</button></div>`;
 }
 function guFixLoanBody(kid, d) {
   const ids = ` data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(d.id)}"`;
   const icons = MNY_DEBT_ICONS.concat(['🆕', '🌧️'].concat(MNY_DEBT_ICONS.indexOf(d.icon) < 0 && ['🆕', '🌧️'].indexOf(d.icon) < 0 && d.icon ? [d.icon] : []));
   const num = (label, f, step, pct) => `<div class="gu-rule"><div class="gu-rule-words"><span>${escapeHtml(label)}</span></div>
-      <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="gufixdebt" data-mnyp-f="${f}" data-mnyp-d="${-step}"${ids} aria-label="Less">−</button>
+      <span class="ui-stepper"><button type="button" data-mnyp-action="gufixdebt" data-mnyp-f="${f}" data-mnyp-d="${-step}"${ids} aria-label="Less">−</button>
       <b class="gu-ruleval">${escapeHtml(pct ? money2(d[f]) + '%' : fmtMoney(d[f]))}</b>
-      <button type="button" class="gu-step" data-mnyp-action="gufixdebt" data-mnyp-f="${f}" data-mnyp-d="${step}"${ids} aria-label="More">+</button></span></div>`;
+      <button type="button" data-mnyp-action="gufixdebt" data-mnyp-f="${f}" data-mnyp-d="${step}"${ids} aria-label="More">+</button></span></div>`;
   return `<div class="gu-card gu-form ${'gu-tint--' + kid}">
       <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(kidLabel(kid).name)} · ${escapeHtml(d.icon || '')} ${escapeHtml(d.name)}</span><b class="gu-fig">${escapeHtml(fmtMoney(loanBalance(kid, d.id)))} left</b></div>
       <label class="gu-q" for="guFixLoanName">What it is called — she sees this everywhere</label>
@@ -1453,12 +1455,12 @@ function guFixOwnsBody(kid) {
   const cards = mnyHoldings(kid).map(h => {
     const ids = ` data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(h.id)}"`;
     const bump = (label, f, step) => `<div class="gu-rule"><div class="gu-rule-words"><span>${escapeHtml(label)}</span></div>
-        <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="gufixhold" data-mnyp-f="${f}" data-mnyp-d="${-step}"${ids} aria-label="Less">−</button>
+        <span class="ui-stepper"><button type="button" data-mnyp-action="gufixhold" data-mnyp-f="${f}" data-mnyp-d="${-step}"${ids} aria-label="Less">−</button>
         <b class="gu-ruleval">${escapeHtml(f === 'rateAnnual' ? mnyPctOf(h[f]) : f === 'units' ? String(Math.round(h.units * 1000) / 1000) : fmtMoney(h[f]))}</b>
-        <button type="button" class="gu-step" data-mnyp-action="gufixhold" data-mnyp-f="${f}" data-mnyp-d="${step}"${ids} aria-label="More">+</button></span></div>`;
+        <button type="button" data-mnyp-action="gufixhold" data-mnyp-f="${f}" data-mnyp-d="${step}"${ids} aria-label="More">+</button></span></div>`;
     return `<div class="gu-card gu-form">
         <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(h.name)}</span><b class="gu-fig">${escapeHtml(fmtMoney(mnyHoldingValue(h)))}</b>
-          <button type="button" class="gu-x" data-mnyp-action="gufixholddel"${ids} aria-label="Remove this">✕</button></div>
+          <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" data-mnyp-action="gufixholddel"${ids} aria-label="Remove this">✕</button></div>
         <div class="gu-opts">${MNY_HOLDING_KINDS.map(k => guOpt(k.icon + ' ' + k.label, h.kind === k.id, 'gufixholdkind', `${ids} data-mnyp-k="${k.id}"`)).join('')}</div>
         <input class="gu-input" type="text" value="${escapeAttr(h.name)}" data-mnyp-action="gufixholdname"${ids} aria-label="What she calls it">
         ${h.ticker ? bump('How many', 'units', 1) : ''}
@@ -1597,7 +1599,9 @@ function guInput(a, el, type) {
   if (a === 'gucmwhat') {
     guCommit().what = String(el.value || '').slice(0, 40);
     const b = document.querySelector('#mnyRulesWrap [data-mnyp-action="gucmsave"]');
-    if (b) b.classList.toggle('ready', !!guCommit().what.trim());
+    // C8: Save is the main action once it can be pressed: the same test as the first draw (guCommitSide)
+    const m = guCommitMath(), ready = !!String(m.c.what || '').trim() && (m.sur || !m.plan.needsTick || m.ticked);
+    if (b) { b.classList.toggle('ui-btn--primary', ready); b.classList.toggle('ui-btn--secondary', !ready); }
     return;
   }
   if (type !== 'change') return;

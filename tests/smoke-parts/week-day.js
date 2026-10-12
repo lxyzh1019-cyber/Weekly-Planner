@@ -1,4 +1,4 @@
-// Smoke group: Week and Day (PR 8, Stage 36). Week and Day draw their buttons and chips from the component kit (.ui-btn, .ui-chip, css/app.css); this group checks they keep the kit's 44px on both screens. tests/smoke.js calls it at its place in the run, on its one shared page; it seeds what it measures and puts it back.
+// Smoke group: Week and Day (PR 8, Stage 36). Week and Day draw their buttons and chips from the component kit (.ui-btn, .ui-chip, css/app.css); this group checks they keep the kit's 44px on both screens, and (Stage 55) that the Week summary's and the Day's checklist rows are the kit's list row (.ui-row). tests/smoke.js calls it at its place in the run, on its one shared page; it seeds what it measures and puts it back.
 module.exports = async ({ page, want, checks }) => {
   /* Every kit button and chip on the Full week and on the Day view, at the
      iPad and the phone size: at least 44 x 44, and the tap at its centre lands
@@ -65,6 +65,36 @@ module.exports = async ({ page, want, checks }) => {
             if (!hit || !(hit === el || el.contains(hit))) out.push(`${size} ${name}: the tap at its centre lands on ${hit ? (hit.id || String(hit.className) || hit.tagName).slice(0, 40) : 'nothing'}`);
           });
         };
+        /* Stage 55 (owner answers G8, G10): the Week summary's rows and the
+           Day's checklist rows are the kit's list row — at least 52px, a 2px
+           border and an 11px corner on every side, the icon before the name, a
+           ticked one in the done look. A planted 18px corner must be caught. */
+        const rowFaults = (el) => {
+          const cs = getComputedStyle(el), p = [];
+          const floor = el.classList.contains('ui-row--parent') ? 44 : 52;
+          const h = el.getBoundingClientRect().height;
+          if (h < floor - 0.5) p.push(`is ${h.toFixed(1)}px high, under ${floor}`);
+          ['Top', 'Right', 'Bottom', 'Left'].forEach(s => { if (cs[`border${s}Width`] !== '2px') p.push(`its ${s.toLowerCase()} border is ${cs[`border${s}Width`]}, want 2px`); });
+          ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].forEach(c => { if (cs[`border${c}Radius`] !== '11px') p.push(`its ${c} corner is ${cs[`border${c}Radius`]}, want 11px`); });
+          const icon = el.querySelector(':scope > .ui-row-icon'), name = el.querySelector(':scope > .ui-row-name');
+          if (!name) p.push('has no name slot (.ui-row-name)');
+          else if (icon && icon.getBoundingClientRect().right > name.getBoundingClientRect().left + 0.5) p.push('has its icon after its name');
+          if (el.classList.contains('ui-row--done') && name && !/line-through/.test(getComputedStyle(name).textDecorationLine)) p.push('is done but its name is not struck through');
+          return p;
+        };
+        const rowKit = (scope, where, min) => {
+          if (!scope) { out.push(`${size} ${where}: not drawn`); return; }
+          const rows = [...scope.querySelectorAll('.ui-row')].filter(el => el.getClientRects().length);
+          if (rows.length < min) out.push(`${size} ${where}: ${rows.length} kit rows (.ui-row) drawn, expected at least ${min}`);
+          rows.forEach(el => rowFaults(el).forEach(f => out.push(`${size} ${where}: the row "${el.textContent.replace(/\s+/g, ' ').trim().slice(0, 30)}" ${f}`)));
+          const planted = document.createElement('div');
+          planted.className = 'ui-row'; planted.style.borderRadius = '18px';
+          planted.innerHTML = '<span class="ui-row-icon">✳</span><span class="ui-row-name">Planted</span>';
+          scope.appendChild(planted);
+          if (!rowFaults(planted).some(f => /corner is 18px/.test(f))) out.push(`${size} ${where}: the row check missed a planted row with an 18px corner`);
+          planted.remove();
+        };
+        const wasGlance = weekGlanceOpen();
         try {
           profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
           setDayBlocks(k, saved.concat([
@@ -79,6 +109,9 @@ module.exports = async ({ page, want, checks }) => {
           ]), 'jenn');
           goWeek(); setWeekView('full');
           measure('screen-week', 'Week', [['.ui-btn', 'Sign this week / Unsign button']]);
+          if (!weekGlanceOpen()) toggleWeekGlance();
+          rowKit(document.querySelector('#weekGlanceBody .glance-rows'), 'Week summary', 2);
+          if (weekGlanceOpen() !== wasGlance) toggleWeekGlance();
           const keys = getDayKeys(0);
           openDay(k, keys.indexOf(k));
           if (!document.getElementById('block-kit44-30m')) out.push(`${size} Day: the 30-minute block is not drawn`);
@@ -202,6 +235,21 @@ module.exports = async ({ page, want, checks }) => {
             if (drawnAs['kit44-solo'] && drawnAs['kit44-solo'] !== 'both') out.push(`${at} Day: the block alone in its lane draws ${drawnAs['kit44-solo']}, expected the ✓ and the ⏱`);
           }
           if (wasSpan == null) localStorage.removeItem(DAY_SPAN_LS_KEY); else localStorage.setItem(DAY_SPAN_LS_KEY, wasSpan);
+          /* The Day's checklist rows: a training block's sheet, with two
+             objectives, one training check ticked and one packing item ticked. */
+          setDayBlocks(k, [{ id: 'kit44-train', actId: 'training', startMin: 10 * 60, durationMin: 60, tag: 'skating',
+            objectives: ['Land the jump', 'Spin three times'], trainingCheck: { [TRAINING_CHECKS[0].id]: true } }], 'jenn');
+          openDay(k, keys.indexOf(k));
+          openKidTrainingQuick('kit44-train');
+          const gearFirst = document.querySelector('#kidTrainingGear .ui-row');
+          if (gearFirst) gearFirst.click();
+          rowKit(document.getElementById('kidTrainingObjectives'), 'Day training objectives', 2);
+          rowKit(document.getElementById('kidTrainingChecks'), 'Day training checks', TRAINING_CHECKS.length);
+          rowKit(document.getElementById('kidTrainingGear'), 'Day packing list', 1);
+          ['kidTrainingChecks', 'kidTrainingGear'].forEach(id => {
+            if (!document.querySelector(`#${id} .ui-row--done`)) out.push(`${size} Day: no ticked row in the done look (.ui-row--done) in #${id}`);
+          });
+          closeSheet('kidTrainingOverlay');
           // The overrun hatch over a clashing block.
           setDayBlocks(k, [
             { id: 'kit44-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
@@ -220,6 +268,8 @@ module.exports = async ({ page, want, checks }) => {
           out.push(`${size}: threw ${e.message}`);
         } finally {
           if (document.getElementById('editOverlay').classList.contains('open')) closeSheet('editOverlay');
+          if (document.getElementById('kidTrainingOverlay').classList.contains('open')) closeSheet('kidTrainingOverlay');
+          if (weekGlanceOpen() !== wasGlance) toggleWeekGlance();
           if (wasSpan == null) localStorage.removeItem(DAY_SPAN_LS_KEY); else localStorage.setItem(DAY_SPAN_LS_KEY, wasSpan);
           setDayBlocks(k, saved, 'jenn');
           // The sheet ticks may have paid XP or stars: put the whole state back.
