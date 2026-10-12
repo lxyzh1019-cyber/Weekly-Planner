@@ -1594,7 +1594,7 @@ function applySeriesEdit(seriesId, sourceBlockId, fields) {
    outside the new span that nothing has been done on yet. Read only — the
    confirm counts them (owner P9) and seriesExtendTo removes exactly these. */
 function seriesTrimPlan(seriesId, endKey, p = activeProfile()) {
-  const plan = { members: [], want: new Set(), drop: [], kept: 0 };
+  const plan = { members: [], want: new Set(), drop: [], kept: 0, days: [] };
   if (!seriesId || !endKey) return plan;
   const weeks = getProfData(p).weeks || {};
   const members = plan.members;
@@ -1611,6 +1611,7 @@ function seriesTrimPlan(seriesId, endKey, p = activeProfile()) {
     // it actually lands on are the next best answer, and a true one.
     : [...new Set(members.map(m => (formatDayKey(m.dayKey).getDay() + 6) % 7))];
   const startKey = template.seriesStart || first.dayKey;
+  plan.days = days;
   plan.want = new Set(seriesDayKeys({
     days, everyWeeks: template.seriesEvery, anchorKey: startKey, startKey, endKey,
   }));
@@ -1633,6 +1634,7 @@ function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
   const first = members[0];
   const template = first.b;
   const want = plan.want;
+  const days = plan.days;
 
   // Trim what falls outside the new span, keeping anything already lived.
   const drop = plan.drop;
