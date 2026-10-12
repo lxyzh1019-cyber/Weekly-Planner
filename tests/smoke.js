@@ -15960,7 +15960,7 @@ function findChromium() {
         if (!/activities marked public/i.test(panel.textContent)) bad.push('the parent choice does not say "activities marked public"');
         pick('busy-only').click();
         if (state.shared.sisterVisibilityMode !== 'busy-only') bad.push(`the parent's "busy only" wrote "${state.shared.sisterVisibilityMode}"`);
-        if (!(pick('busy-only') || {}).classList?.contains('active')) bad.push('the parent choice does not show busy only as chosen');
+        if ((pick('busy-only') || {}).getAttribute?.('aria-pressed') !== 'true') bad.push('the parent choice does not show busy only as chosen');
         [pick('public'), pick('busy-only')].forEach(b => {
           const r = b.getBoundingClientRect();
           if (r.height < 44) bad.push(`a sister-details choice is ${Math.round(r.height)}px tall, under 44px`);
@@ -16660,7 +16660,7 @@ function findChromium() {
       take('Parent › Now', ['#screen-parent > .hdr', '#parentDests > [aria-selected="false"]',
         '#parentDests > [aria-selected="true"]',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
         '#pnWrap .ui-card', '#pnWrap .ui-days > button', '#pnWrap .ui-days > [aria-current="date"]', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
-        '#screen-parent .ui-btn--primary']);
+        '#pnWrap .ui-btn--primary']);
       pnOpenToldSheet(); await wait(300);
       take('Parent › Now › She told me', ['#pnToldBody .ui-days > [aria-pressed="true"]', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
       pnSheetOpen = false; closeSheet('pnToldOverlay');
@@ -23952,7 +23952,7 @@ function findChromium() {
           paApplyTextScale();
           paRenderPrefs();
           const scale = document.getElementById('screen-parent').style.getPropertyValue('--fs-scale').trim();
-          const cur = [...document.querySelectorAll('#paPrefsWrap [data-pa-scale].active')].map(b => b.textContent.trim());
+          const cur = [...document.querySelectorAll('#paPrefsWrap [data-pa-scale][aria-pressed="true"]')].map(b => b.textContent.trim());
           return { scale, cur };
         }, stored);
         const label = stored === null ? 'nothing stored' : 'stored ' + stored;

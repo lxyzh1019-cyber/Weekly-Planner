@@ -195,7 +195,7 @@ function pcwPreviewRow(row) {
     const why = row.days.some(d => d.dropped)
       ? `nothing here that ${escapeHtml(kidLabel(row.dstKid).name)} can use — those activities are not on her list`
       : 'nothing was planned that week';
-    return `<div class="pn-card pcw-preview">
+    return `<div class="ui-card pcw-preview">
         <div class="pcw-who">${escapeHtml(who)}</div>
         <div class="pcw-empty">— ${why}</div>
       </div>`;
@@ -219,7 +219,7 @@ function pcwPreviewRow(row) {
     ? `<p class="pn-note">${dropped} block${dropped === 1 ? '' : 's'} left behind — ${escapeHtml(kidLabel(row.dstKid).name)} does not have
         ${dropped === 1 ? 'that activity' : 'those activities'} on her list. Share it in Setup › Activities and sports first.</p>`
     : '';
-  return `<div class="pn-card pcw-preview">
+  return `<div class="ui-card pcw-preview">
       <div class="pcw-who">${escapeHtml(who)}</div>
       <div class="pcw-days">${days}</div>${note}
     </div>`;
@@ -228,7 +228,7 @@ function pcwPreviewRow(row) {
 function pcwRender() {
   const wrap = document.getElementById('pcwWrap');
   if (!wrap) return;
-  if (!isParent()) { wrap.innerHTML = `<div class="pn-card">Parents only 🔒</div>`; return; }
+  if (!isParent()) { wrap.innerHTML = `<div class="ui-card">Parents only 🔒</div>`; return; }
   const plan = pcwPlan();
   const scoped = parentScopeKid();
 
@@ -244,7 +244,7 @@ function pcwRender() {
   const whoCard = targets
     ? `<p class="pn-cap">Onto whose plan</p>
        <div class="pn-toggle">${targets.map(([id, label]) =>
-          `<button type="button" class="pill-btn${id === cur ? ' active' : ''}"
+          `<button type="button" class="ui-chip" aria-pressed="${id === cur}"
              data-pcw-target="${id}">${escapeHtml(label)}</button>`).join('')}</div>`
     : `<p class="pn-note">Both girls — each one copies from her own plan. Pick a single
         child above to send one girl's plan over to her sister.</p>`;
@@ -254,23 +254,22 @@ function pcwRender() {
   const day = pcwSpan === 'day';
   const spanToggle = [['week', '🗓 A whole week'], ['day', '📅 One day']];
   const dayPicker = (which, cur) => `<div class="pcw-days-pick">${DAY_SHORT.map((d, i) =>
-      `<button type="button" class="pill-btn pcw-daybtn${i === cur ? ' active' : ''}"
-         data-pcw-day="${which}" data-pcw-i="${i}"
-         aria-pressed="${i === cur}">${escapeHtml(d)}</button>`).join('')}</div>`;
+      `<button type="button" class="ui-chip pcw-daybtn" aria-pressed="${i === cur}"
+         data-pcw-day="${which}" data-pcw-i="${i}">${escapeHtml(d)}</button>`).join('')}</div>`;
 
   /* Three empty cases, each saying which one it is — a card must never render
      blank, and "nothing will happen" has three different fixes. */
   let summary;
   if (plan.sameSpot) {
-    summary = `<div class="pn-card pn-clear">Those are the same week. Move one end, or send this
+    summary = `<div class="ui-card pn-clear">Those are the same week. Move one end, or send this
       week over to her sister.</div>`;
   } else if (!plan.copy && !plan.skipped) {
-    summary = `<div class="pn-card pn-clear">Nothing was planned ${day
+    summary = `<div class="ui-card pn-clear">Nothing was planned ${day
       ? `on ${escapeHtml(DAY_LONG[pcwFromDay])} in ${escapeHtml(mmWeekLabel(plan.fromKey))}`
       : `in ${escapeHtml(mmWeekLabel(plan.fromKey))}`},
       so there is nothing to copy. Pick a ${day ? 'day' : 'week'} that has a plan in it.</div>`;
   } else if (!plan.copy) {
-    summary = `<div class="pn-card pn-clear">${day
+    summary = `<div class="ui-card pn-clear">${day
       ? `${escapeHtml(DAY_LONG[pcwToDay])} in ${escapeHtml(mmWeekLabel(plan.toKey))} already has a plan`
       : `Every day in ${escapeHtml(mmWeekLabel(plan.toKey))} already has a plan`},
       so all ${plan.skipped} block${plan.skipped === 1 ? '' : 's'} would be skipped. Choose
@@ -279,24 +278,24 @@ function pcwRender() {
     const where = day
       ? `${DAY_LONG[pcwToDay]}, ${mmWeekLabel(plan.toKey)}`
       : mmWeekLabel(plan.toKey);
-    summary = `<button type="button" class="btn-confirm pn-wide" data-pcw-go="1">📋 Copy ${plan.copy}
+    summary = `<button type="button" class="ui-btn ui-btn--primary ui-btn--block pn-wide" data-pcw-go="1">📋 Copy ${plan.copy}
       block${plan.copy === 1 ? '' : 's'} into ${escapeHtml(where)}</button>`;
   }
 
   wrap.innerHTML = `<p class="pn-cap">Copy a plan</p>
-    <div class="pn-card pn-clear">Take the shape of one week — or one day — and put it somewhere
+    <div class="ui-card pn-clear">Take the shape of one week — or one day — and put it somewhere
       else: a term that repeats, a fortnight nobody planned, or one girl's schedule handed to her
       sister. Every copy arrives as a plan: nothing is ticked, confirmed, or paid.</div>
 
     <div class="pn-toggle" style="margin-top:0.6rem">${spanToggle.map(([id, label]) =>
-      `<button type="button" class="pill-btn${id === pcwSpan ? ' active' : ''}"
+      `<button type="button" class="ui-chip" aria-pressed="${id === pcwSpan}"
          data-pcw-span="${id}">${escapeHtml(label)}</button>`).join('')}</div>
 
     <p class="pn-cap" style="margin-top:0.8rem">Copy from</p>
-    <div class="pn-card">${pcwWeekPicker('from', pcwFromOffset)}${day ? dayPicker('from', pcwFromDay) : ''}</div>
+    <div class="ui-card">${pcwWeekPicker('from', pcwFromOffset)}${day ? dayPicker('from', pcwFromDay) : ''}</div>
 
     <p class="pn-cap" style="margin-top:0.8rem">Copy to</p>
-    <div class="pn-card">${pcwWeekPicker('to', pcwToOffset)}${day ? dayPicker('to', pcwToDay) : ''}</div>
+    <div class="ui-card">${pcwWeekPicker('to', pcwToOffset)}${day ? dayPicker('to', pcwToDay) : ''}</div>
     ${held ? `<p class="pn-note">⚠️ ${escapeHtml(mmWeekLabel(plan.toKey))} was already settled at a meeting.
       The money that was paid does not move, but changing the plan changes what History reads back
       for that week.</p>` : ''}
@@ -305,14 +304,14 @@ function pcwRender() {
 
     <p class="pn-cap" style="margin-top:0.8rem">If a day already has a plan</p>
     <div class="pn-toggle">${clash.map(([id, label]) =>
-      `<button type="button" class="pill-btn${id === pcwOnClash ? ' active' : ''}"
+      `<button type="button" class="ui-chip" aria-pressed="${id === pcwOnClash}"
          data-pcw-clash="${id}">${escapeHtml(label)}</button>`).join('')}</div>
     <p class="pn-note">${pcwOnClash === 'replace'
       ? 'A day that already has blocks is emptied first. Days in every other week are untouched.'
       : 'A day that already has blocks is left exactly as it is — a copy never overwrites a plan somebody made.'}</p>
 
     <p class="pn-cap" style="margin-top:0.8rem">What will happen</p>
-    ${plan.rows.map(pcwPreviewRow).join('') || `<div class="pn-card pn-clear">Nothing to show yet.</div>`}
+    ${plan.rows.map(pcwPreviewRow).join('') || `<div class="ui-card pn-clear">Nothing to show yet.</div>`}
     <div style="margin-top:0.6rem">${summary}</div>`;
 }
 

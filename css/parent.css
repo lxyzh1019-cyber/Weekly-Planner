@@ -266,3 +266,22 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 @media (max-width: 767px) { .gu-exrow .ui-stepper { grid-column: 1 / -1; } }
 /* A chip with one figure or one emoji is still a 44px target on the iPad (K12 does this only on a phone). */
 .gu-opts > .ui-chip, .rq-opts > .ui-chip { min-width: 44px; max-width: 100%; justify-content: center; flex-shrink: 1; }   /* a long label wraps; it does not push the page sideways */
+
+/* Monthly (Stage 62, owner 2026-10-12): seven equal columns that shrink to
+   the screen. minmax(0, 1fr) lets a column go below its content's width, so
+   Sunday's right edge stays on screen on a phone (checked by monthlyFitsAPhone). */
+.pm-dow-row, .pm-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.pm-cell { min-width: 0; }
+@media (max-width: 699px) {
+  .pm-grid-wrap { padding-left: 0.5rem; padding-right: 0.5rem; }
+  .pm-dow-row, .pm-grid { gap: 0.2rem; }
+  .pm-dow { letter-spacing: 0; min-width: 0; }
+  .pm-cell { padding: 0.15rem; overflow: hidden; }
+}
+
+/* Stage 62: the old .pn-card became .ui-card, which the kit block draws after
+   these screens' own rules, so the three that set their own padding or colour
+   say so again. Seven day chips across a phone share the row (Copy a week). */
+.ui-card.pre-board { padding: 0.7rem 0.8rem; }
+.ui-card.pa-stale { border-color: var(--status-warn-strong); background: var(--bg2); }
+.pcw-days-pick > .pcw-daybtn { flex: 1 1 0; justify-content: center; padding: 0 2px; }
