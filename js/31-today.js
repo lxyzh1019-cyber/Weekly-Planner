@@ -875,10 +875,10 @@ function tdInviteNote() {
     const from = [...new Set(waiting.map(i => inviteFacts(i).from))].join(' and ');
     line = `${waiting.length} invites waiting — from ${from}`;
   }
-  return `<button type="button" class="td-row" data-td-action="invites">
-      <span class="td-row-icon">💌</span>
-      <span class="td-row-name">${escapeHtml(line)}</span>
-      <span class="td-row-go" aria-hidden="true">›</span>
+  return `<button type="button" class="ui-row" data-td-action="invites">
+      <span class="ui-row-icon">💌</span>
+      <span class="ui-row-name">${escapeHtml(line)}</span>
+      <span class="ui-row-end td-row-go" aria-hidden="true">›</span>
     </button>`;
 }
 /* ── 🌙 How was today? ──
@@ -917,11 +917,11 @@ function tdReflectRow(kid) {
   const ask = tdReflectAsk(kid);
   if (!ask) return '';
   const line = ask.mood ? `Today felt ${ask.mood}` : reflectDayQuestion(ask.dayKey);
-  return `<button type="button" class="td-row" data-td-action="reflect"
+  return `<button type="button" class="ui-row" data-td-action="reflect"
       data-td-day="${escapeAttr(ask.dayKey)}"${ask.mood ? ' aria-label="Change how today felt"' : ''}>
-      <span class="td-row-icon">🌙</span>
-      <span class="td-row-name">${escapeHtml(line)}</span>
-      <span class="td-row-go" aria-hidden="true">›</span>
+      <span class="ui-row-icon">🌙</span>
+      <span class="ui-row-name">${escapeHtml(line)}</span>
+      <span class="ui-row-end td-row-go" aria-hidden="true">›</span>
     </button>`;
 }
 
@@ -977,16 +977,16 @@ function tdElseBlock(kid, dayKey, when) {
   if (!left.length) return '';
   const day = escapeAttr(dayKey);
   if (tdElseOpen !== dayKey) {
-    return `<button type="button" class="td-row td-else-btn" data-td-action="else" data-td-day="${day}" aria-expanded="false">
-        <span class="td-row-icon" aria-hidden="true">＋</span>
-        <span class="td-row-name">${escapeHtml('I did something else ' + when)}</span>
+    return `<button type="button" class="ui-row ui-row--add" data-td-action="else" data-td-day="${day}" aria-expanded="false">
+        <span class="ui-row-icon" aria-hidden="true">＋</span>
+        <span class="ui-row-name">${escapeHtml('I did something else ' + when)}</span>
       </button>`;
   }
-  const rows = left.map(r => `<button type="button" class="td-row" data-td-action="else-pick"
+  const rows = left.map(r => `<button type="button" class="ui-row" data-td-action="else-pick"
         data-td-day="${day}" data-td-chore="${escapeAttr(r.id)}">
-        <span class="td-row-icon" aria-hidden="true">${escapeHtml(r.icon)}</span>
-        <span class="td-row-name">${escapeHtml(r.label)}</span>
-        <span class="td-row-go" aria-hidden="true">›</span>
+        <span class="ui-row-icon" aria-hidden="true">${escapeHtml(r.icon)}</span>
+        <span class="ui-row-name">${escapeHtml(r.label)}</span>
+        <span class="ui-row-end td-row-go" aria-hidden="true">›</span>
       </button>`).join('');
   return `<div class="td-else">
       <div class="td-sub">Which one did you do? It goes to Mum the same way — she still decides what it was worth.</div>
@@ -1028,11 +1028,11 @@ function tdRoutinesCard(kid) {
   if (!routines.length) return '';
   const body = routines.map(r => {
     const open = !!tdRoutineOpen[r.block.id];
-    return `<button type="button" class="td-row td-routine-head" data-td-action="routine-open"
+    return `<button type="button" class="ui-row td-routine-head" data-td-action="routine-open"
         data-td-block="${escapeAttr(r.block.id)}" aria-expanded="${open}">
-        <span class="td-row-icon" aria-hidden="true">${escapeHtml(r.act.icon || '📋')}</span>
-        <span class="td-row-name">${escapeHtml(r.act.name || '')}</span>
-        <span class="td-row-go">${r.done}/${r.total} ${open ? '▾' : '▸'}</span>
+        <span class="ui-row-icon" aria-hidden="true">${escapeHtml(r.act.icon || '📋')}</span>
+        <span class="ui-row-name">${escapeHtml(r.act.name || '')}</span>
+        <span class="ui-row-end td-row-go">${r.done}/${r.total} ${open ? '▾' : '▸'}</span>
       </button>${open ? `<div class="td-items">${tdRoutineItemRows(today, r)}</div>` : ''}`;
   }).join('');
   return `<div class="ui-card td-routines">
@@ -1153,11 +1153,11 @@ function tdCatchUpSummary(day) {
 }
 function tdCatchUpPanel(kid, day) {
   const key = escapeAttr(day.dayKey);
-  const jobs = day.jobs.map(row => `<button type="button" class="td-row" data-td-action="claim"
+  const jobs = day.jobs.map(row => `<button type="button" class="ui-row" data-td-action="claim"
       data-td-day="${key}" data-td-chore="${escapeAttr(row.id)}">
-      <span class="td-row-icon" aria-hidden="true">${escapeHtml(row.icon)}</span>
-      <span class="td-row-name">${escapeHtml(row.label)}</span>
-      <span class="td-row-go">how did it go? ›</span>
+      <span class="ui-row-icon" aria-hidden="true">${escapeHtml(row.icon)}</span>
+      <span class="ui-row-name">${escapeHtml(row.label)}</span>
+      <span class="ui-row-end td-row-go">how did it go? ›</span>
     </button>`).join('');
   const routines = day.routines.length
     ? day.routines.map(r => `<div class="td-lane-name">${escapeHtml((r.act.icon || '📋') + ' ' + (r.act.name || ''))} · ${r.done}/${r.total}</div>
@@ -1177,10 +1177,10 @@ function tdCatchUpCard(kid) {
   if (!days.length) return '';
   const rows = days.map(day => {
     const open = day.dayKey === tdCatchUpOpen;
-    return `<button type="button" class="td-row td-catchup-day${open ? ' on' : ''}" data-td-action="catchup-day"
+    return `<button type="button" class="ui-row" data-td-action="catchup-day"
         data-td-day="${escapeAttr(day.dayKey)}" aria-expanded="${open}">
-        <span class="td-row-name">${escapeHtml(tdCatchUpSummary(day))}</span>
-        <span class="td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
+        <span class="ui-row-name">${escapeHtml(tdCatchUpSummary(day))}</span>
+        <span class="ui-row-end td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
       </button>${open ? tdCatchUpPanel(kid, day) : ''}`;
   }).join('');
   return `<div class="ui-card td-catchup">
@@ -1217,10 +1217,10 @@ function tdEarlierElseRow(kid) {
     ? `<div class="td-else-earlier-list">${days.map(day =>
         tdElseBlock(kid, day.dayKey, 'on ' + DAY_SHORT[day.d])).join('')}</div>`
     : '';
-  return `<button type="button" class="td-row td-else-btn td-else-earlier" data-td-action="else-earlier" aria-expanded="${open}">
-      <span class="td-row-icon" aria-hidden="true">＋</span>
-      <span class="td-row-name">Add to an earlier day</span>
-      <span class="td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
+  return `<button type="button" class="ui-row ui-row--add td-else-earlier" data-td-action="else-earlier" aria-expanded="${open}">
+      <span class="ui-row-icon" aria-hidden="true">＋</span>
+      <span class="ui-row-name">Add to an earlier day</span>
+      <span class="ui-row-end td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
     </button>${list}`;
 }
 
@@ -1537,23 +1537,21 @@ function tdRenderToday() {
          repeated the affordance the row already offers — and on a busy day
          that phrase was six of the screen's 200-word budget. The chevron keeps
          the visual affordance; aria-label keeps the spoken one. */
-      return `<button type="button" class="td-row" data-td-action="chore"
+      return `<button type="button" class="ui-row" data-td-action="chore"
             data-td-chore="${escapeAttr(j.row.id)}" aria-label="How did ${escapeAttr(j.row.label)} go?">
-          <span class="td-row-icon">${jobIcon(j.row.id)}</span>
-          <span class="td-row-name">${escapeHtml(j.row.label)}</span>
-          ${payTag}
-          <span class="td-row-go" aria-hidden="true">›</span>
+          <span class="ui-row-icon">${jobIcon(j.row.id)}</span>
+          <span class="ui-row-name">${escapeHtml(j.row.label)}</span>
+          <span class="ui-row-end">${payTag}<span class="td-row-go" aria-hidden="true">›</span></span>
         </button>`;
     }
-    // Class names written out rather than built from a ternary: the dead-CSS
-    // check matches literal strings, and a class it cannot see is a class it
-    // reports as dead.
+    /* Waiting with Mum and answered both wear the kit's done look (owner
+       answer G8): neither is hers to act on now. The icon and the words on
+       the right tell the two apart; data-td-action is the hook. */
     const done = j.state === 'answered';
-    const cls = done ? 'td-row td-row--done' : 'td-row td-row--waiting';
-    return `<button type="button" class="${cls}" data-td-action="${done ? 'fresh' : 'waiting'}">
-        <span class="td-row-icon">${done ? '✓' : '⏳'}</span>
-        <span class="td-row-name">${escapeHtml(j.row.label)}</span>
-        <span class="td-row-go">${done ? 'done' : 'with Mum'}</span>
+    return `<button type="button" class="ui-row ui-row--done" data-td-action="${done ? 'fresh' : 'waiting'}">
+        <span class="ui-row-icon">${done ? '✓' : '⏳'}</span>
+        <span class="ui-row-name">${escapeHtml(j.row.label)}</span>
+        <span class="ui-row-end td-row-go">${done ? 'done' : 'with Mum'}</span>
       </button>`;
   }).join('');
   const choreHtml = (jobRows || (jobs.hasPool

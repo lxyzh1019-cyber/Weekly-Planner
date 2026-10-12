@@ -10967,7 +10967,7 @@ function findChromium() {
       door.click();
       const picks = document.querySelectorAll(`#tdWrap [data-td-action="else-pick"][data-td-day="${todayKey()}"]`);
       if (!picks.length) return bad.concat(['"I did something else" offers no chores']);
-      const label = (picks[0].querySelector('.td-row-name') || {}).textContent.trim();
+      const label = (picks[0].querySelector('.ui-row-name') || {}).textContent.trim();
       picks[0].click();
       await new Promise(r => setTimeout(r, 30));
       const choice = document.querySelectorAll('#appDialogOverlay.open .app-dialog-choice')[0];
@@ -10977,7 +10977,7 @@ function findChromium() {
       await new Promise(r => setTimeout(r, 30));   // let the .then re-render land
 
       if (mrClaimQueue(wk, kid).length !== 1) bad.push(`the claim queue holds ${mrClaimQueue(wk, kid).length}, want 1`);
-      const waiting = [...document.querySelectorAll('#tdWrap .td-row--waiting')].map(el => el.textContent.replace(/\s+/g, ' ').trim());
+      const waiting = [...document.querySelectorAll('#tdWrap .ui-row[data-td-action="waiting"]')].map(el => el.textContent.replace(/\s+/g, ' ').trim());
       if (!waiting.some(t => t.includes(label))) bad.push(`Today does not show "${label}" with Mum (waiting rows: ${JSON.stringify(waiting)})`);
       if (mrChoreWeek(wk, kid).paid !== 0) bad.push('the unplanned claim paid before a parent decided');
     } finally {
@@ -11595,7 +11595,7 @@ function findChromium() {
     openDay(dk, 1);
     document.querySelector('#block-nav60 .block-train-chip').click();
     const toSheet = document.getElementById('kidTrainingOverlay').classList.contains('open')
-      && document.querySelectorAll('#kidTrainingChecks .checklist-item').length === TRAINING_CHECKS.length;
+      && document.querySelectorAll('#kidTrainingChecks .ui-row').length === TRAINING_CHECKS.length;
     closeSheet('kidTrainingOverlay');
     setDayBlocks(dk, [], 'jenn');
 
@@ -13186,7 +13186,7 @@ function findChromium() {
       if (row.getAttribute('aria-expanded') !== 'false') bad.push('the earlier-day row does not start closed');
       const r = row.getBoundingClientRect();
       if (r.height < 44) bad.push(`the earlier-day row is ${Math.round(r.height)}px tall`);
-      const name = row.querySelector('.td-row-name') || row;
+      const name = row.querySelector('.ui-row-name') || row;
       if (parseFloat(getComputedStyle(name).fontSize) < 15) bad.push(`the earlier-day row's words are ${getComputedStyle(name).fontSize}`);
       if (document.querySelector('#tdWrap .td-else-earlier-list')) bad.push('the earlier days show before the row is opened');
       row.click();
@@ -13248,7 +13248,7 @@ function findChromium() {
       if (listed.includes(lastKeys[4])) bad.push('an unanswered day LAST week is listed in catch up');
       if (!listed.includes(keys[1])) bad.push(`an unanswered day earlier THIS week (Tue ${keys[1]}) is not listed in catch up (listed ${JSON.stringify(listed)})`);
       const tueBtn = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
-      if (tueBtn && /\d/.test(tueBtn.querySelector('.td-row-name').textContent.split('·')[0])) bad.push(`this week's day is named with a date: "${tueBtn.textContent.trim()}"`);
+      if (tueBtn && /\d/.test(tueBtn.querySelector('.ui-row-name').textContent.split('·')[0])) bad.push(`this week's day is named with a date: "${tueBtn.textContent.trim()}"`);
       const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
       if (!row) bad.push('no "Add to an earlier day" row with Mon and Wed of this week not in catch up');
       else {
@@ -13603,7 +13603,7 @@ function findChromium() {
       goToday();
       const mopLabel = (mrPoolRow('mop', wk) || {}).label || 'Mop';
       if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="mop"]')) bad.push('Mop, already answered, is still offered as a job on Today');
-      const waiting = [...document.querySelectorAll('#tdWrap .td-row--waiting')].some(el => el.textContent.includes(mopLabel));
+      const waiting = [...document.querySelectorAll('#tdWrap .ui-row[data-td-action="waiting"]')].some(el => el.textContent.includes(mopLabel));
       if (!waiting) bad.push('Today does not show Mop as waiting after it was answered elsewhere');
 
       // The owner → Today: a routine tick; then Today → the owner.
@@ -13788,7 +13788,7 @@ function findChromium() {
       goToday();
       if (document.querySelector('#tdWrap [data-td-action="chore"][data-td-chore="dishes"]')) bad.push('a graded job is still offered as a job on Today');
       const label = (mrPoolRow('dishes', wk) || {}).label || 'Dishes';
-      const done = [...document.querySelectorAll('#tdWrap .td-row--done')].find(el => el.textContent.includes(label));
+      const done = [...document.querySelectorAll('#tdWrap .ui-row--done[data-td-action="fresh"]')].find(el => el.textContent.includes(label));
       if (!done) bad.push(`Today does not show ${label} as done once Mum graded it`);
       else {
         done.click();
@@ -15476,11 +15476,11 @@ function findChromium() {
         const box = r.getBoundingClientRect();
         if (box.height < 44) bad.push(`the 🌙 row is ${Math.round(box.height)}px tall, under 44px`);
         // Words she reads to act: 15px. The ›, aria-hidden, is every Today
-        // row's chevron (.td-row-go), an affordance and not text; 13px floor.
+        // row's chevron (.td-row-go, its right-hand slot), an affordance and not text; 13px floor.
         const small = [r, ...r.querySelectorAll('*')].filter(el => el.textContent.trim()
           && el.children.length === 0
           && parseFloat(getComputedStyle(el).fontSize) < (el.getAttribute('aria-hidden') === 'true' ? 13 : 15));
-        if (!r.querySelector('.td-row-name')) bad.push('the 🌙 row has no .td-row-name text');
+        if (!r.querySelector('.ui-row-name')) bad.push('the 🌙 row has no .ui-row-name text');
         if (small.length) bad.push(`the 🌙 row has text under 15px (${getComputedStyle(small[0]).fontSize})`);
         if (!sheetOpen()) bad.push('the yesterday row did not open the reflect sheet');
         else {
@@ -17835,7 +17835,7 @@ function findChromium() {
       if (!/Overnight/.test(text)) bad.push('the glance does not name overnight at all');
       if (!/Unscheduled/.test(text)) bad.push('the glance does not name unscheduled time');
       // Per-day leads. 240 minutes over 7 days is 34 minutes, not 4h.
-      const school = [...body.querySelectorAll('.glance-row')]
+      const school = [...body.querySelectorAll('.ui-row')]
         .find(r => /Brain/.test(r.textContent));
       if (!school) bad.push('no Brain Construction row in the glance');
       else if (!/34m\/day/.test(school.textContent.replace(/\s+/g, ''))) {

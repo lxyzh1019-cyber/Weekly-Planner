@@ -44,21 +44,11 @@
      paragraph. Nothing here is under the 13px floor, and the figure a child
      actually reads — the per-day average — is at 15px. */
   .glance-window { font-size: calc(max(13px, calc(0.82rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light); margin-bottom: 0.45rem; }
+  /* Each category is the kit's list row (.ui-row, css/app.css; Stage 55, owner
+     answer G10): the swatch in the icon slot, the category as the name, the
+     figures in the right-hand slot. */
   .glance-rows { display: flex; flex-direction: column; gap: 0.2rem; }
-  .glance-row {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 0.6rem; padding: 0.18rem 0;
-    border-bottom: 1.5px dashed var(--paper-line);
-  }
-  .glance-row:last-child { border-bottom: 0; }
-  .glance-row-label {
-    display: inline-flex; align-items: center; gap: 0.35rem; min-width: 0;
-    font-size: calc(max(13px, calc(0.86rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 700; color: var(--ink);
-  }
-  .glance-row-figs {
-    display: flex; align-items: baseline; gap: 0.45rem;
-    flex: 0 0 auto; text-align: right; white-space: nowrap;
-  }
+  .glance-rows .ui-row-end { white-space: nowrap; }
   .glance-per-day { font-size: calc(max(15px, calc(0.94rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; color: var(--ink); }
   .glance-total { font-size: calc(max(13px, calc(0.8rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light); }
   .glance-dot {
@@ -72,6 +62,10 @@
   .glance-notes { margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1.5px dashed var(--paper-line); }
   .glance-notes-title { font-weight: 800; font-size: calc(max(13px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1)); margin-bottom: 0.25rem; }
   .glance-note { font-size: calc(max(13px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink); margin-bottom: 0.15rem; }
+  /* A training block's checks, packing list and objectives (renderTrainingChecks,
+     renderTrainingGearChecklist, openKidTrainingQuick in js/08-day-view.js) are
+     the kit's list rows (Stage 55, owner answer G10); the lists only space them. */
+  .checklist-wrap > .ui-row, #kidTrainingObjectives > .ui-row { margin-bottom: 0.35rem; }
   /* Placed blocks */
   .placed-block {
     position: absolute;

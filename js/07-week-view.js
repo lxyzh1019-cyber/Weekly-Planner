@@ -551,10 +551,10 @@ function renderWeekGlance(keys) {
      in smaller type. `swatch` is a hex the tables own, so it is safe in a style
      attribute. */
   const row = (label, min, note, swatch /* safe: from CAT_HEX */) => `
-    <div class="glance-row">
-      <span class="glance-row-label">
-        <span class="glance-dot" style="background:${swatch}"></span>${label}</span>
-      <span class="glance-row-figs">
+    <div class="ui-row">
+      <span class="ui-row-icon glance-dot" style="background:${swatch}"></span>
+      <span class="ui-row-name">${label}</span>
+      <span class="ui-row-end">
         <b class="glance-per-day">${fmtHrsMin(Math.round(min / t.days))}/day</b>
         <span class="glance-total">${note || fmtHrsMin(min) + ' this week'}</span></span>
     </div>`;
