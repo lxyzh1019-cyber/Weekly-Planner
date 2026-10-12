@@ -41,6 +41,7 @@ const PARTS = {
     'thePortalKitHolds44px',
     'sisterSyncIsOnTheKit',
     'theProfileScreensAreOnTheKit',
+    'oneSheetAndOneDialogEverywhere',
     'everyMoneyControlClicksClean',
     'theSundayKitHolds44pxInItsBoxes',
     'theSundayChooseRowFitsTwoRows',

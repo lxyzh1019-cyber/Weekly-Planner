@@ -392,10 +392,11 @@
 
 <!-- The Record sheet: one door for a chore grade, a meet, a gift, a fine and a move -->
 <div class="overlay" id="recordOverlay" data-area="money" onclick="overlayClick(event,'recordOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rcSheetTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="rcSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="rcSheetTitle">✍️ Record something</h3>
     <div id="recordBody"></div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeRecordSheet()">✕</button>
   </div>
 </div>
 
@@ -403,7 +404,7 @@
      put in, draw in advance, a new goal, everything she asked (js/45-requests.js).
      Chrome here, body filled by JS, the recordOverlay pattern. -->
 <div class="overlay" id="requestOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'requestOverlay')">
-  <div class="sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
+  <div class="ui-sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
     <h3 id="rqSheetTitle">✋ Ask parents</h3>
     <div id="requestBody"></div>
   </div>
@@ -412,7 +413,7 @@
 <!-- 🗣️ Dad's card on Sunday — ASK / SAY / WAIT for the step (js/44-sunday.js).
      Chrome here, body filled by JS, the recordOverlay pattern. -->
 <div class="overlay" id="sundayOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'sundayOverlay')">
-  <div class="sheet sd-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
     <h3 id="sdSheetTitle">🗣️ Parent's card</h3>
     <div id="sundayBody"></div>
   </div>
@@ -425,25 +426,27 @@
      sheet. Body filled by pnRenderToldSheet (js/32-parent-now.js); its
      data-pn-action controls go to pnHandleClick (js/99-main.js). -->
 <div class="overlay" id="pnToldOverlay" data-area="parent" data-money-surface onclick="overlayClick(event,'pnToldOverlay')">
-  <div class="sheet pn-told-sheet" role="dialog" aria-modal="true" aria-labelledby="pnToldTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="pnToldTitle">
     <h3 id="pnToldTitle">🚪 She told me… — on her behalf</h3>
     <div id="pnToldBody"></div>
   </div>
 </div>
 
 <div class="overlay" id="grownupsOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'grownupsOverlay')">
-  <div class="sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
+  <div class="ui-sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
     <h3 id="guSheetTitle">✏️ Fix</h3>
     <div id="grownupsBody"></div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="guCloseSheet()">✕</button>
   </div>
 </div>
 
 <!-- Quick profile switcher (tap the profile icon) -->
 <div class="overlay" id="profileSwitchOverlay" data-area="planner" onclick="overlayClick(event,'profileSwitchOverlay')">
-  <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
     <div class="sheet-handle"></div>
     <h3 id="profileSwitchTitle">Switch profile 👤</h3>
     <div class="profile-switch-list" id="profileSwitchBody"></div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('profileSwitchOverlay')">✕</button>
   </div>
 </div>
 
@@ -717,7 +720,7 @@
 
 <!-- Training Sheet -->
 <div class="overlay" id="trainingOverlay" onclick="overlayClick(event,'trainingOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="trainingSheetTitle">
+  <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="trainingSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="trainingSheetTitle">🏋️ Competitive Sports Session</h3>
 
@@ -806,9 +809,9 @@
     </div>
 
     <div class="sheet-action-row">
-      <button class="sheet-close-x" type="button" aria-label="Close training sheet" onclick="cancelCreatePlacement('trainingOverlay')">×</button>
       <button class="btn-confirm" onclick="confirmTraining()">Place Training ✅</button>
     </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="cancelCreatePlacement('trainingOverlay')">✕</button>
   </div>
 </div>
 
@@ -816,17 +819,18 @@
 <!-- Quick activity picker: opens when a kid taps an empty time slot without
      having selected an activity first (item 6). -->
 <div class="overlay" id="slotPickerOverlay" onclick="overlayClick(event,'slotPickerOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="slotPickerTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="slotPickerTitle">
     <div class="sheet-handle"></div>
     <h3 id="slotPickerTitle">Add an activity</h3>
     <p class="slot-picker-hint" id="slotPickerHint">Pick what goes here.</p>
     <div class="slot-picker-filter" id="slotPickerFilter"></div>
     <div class="slot-picker-list" id="slotPickerList"></div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('slotPickerOverlay')">✕</button>
   </div>
 </div>
 
 <div class="overlay" id="activityOverlay" onclick="overlayClick(event,'activityOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="activitySheetTitle">
+  <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="activitySheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="activitySheetTitle"></h3>
     <div class="sheet-time-grid-row">
@@ -895,15 +899,15 @@
       </div>
     </div>
     <div class="sheet-action-row">
-      <button class="sheet-close-x" type="button" aria-label="Close activity sheet" onclick="cancelCreatePlacement('activityOverlay')">×</button>
       <button class="btn-confirm" onclick="confirmActivity()">Place Block ✅</button>
     </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="cancelCreatePlacement('activityOverlay')">✕</button>
   </div>
 </div>
 
 <!-- Edit Sheet -->
 <div class="overlay" id="editOverlay" onclick="overlayClick(event,'editOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="editSheetTitle">
+  <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="editSheetTitle">
     <div class="sheet-handle"></div>
     <div class="edit-title-row">
       <h3 id="editSheetTitle"></h3>
@@ -1074,24 +1078,26 @@
       <button class="btn-danger" onclick="removeBlock()">🗑 Remove this block</button>
       <button class="btn-confirm" style="margin-top:0.4rem" onclick="saveEditChanges()">Save Changes ✅</button>
     </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('editOverlay')">✕</button>
   </div>
 </div>
 
 <!-- Kid quick view: routine checklist + auto stopwatch -->
 <div class="overlay kid-block-overlay" id="kidRoutineOverlay" onclick="overlayClick(event,'kidRoutineOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="kidRoutineTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="kidRoutineTitle">
     <div class="sheet-handle"></div>
     <h3 id="kidRoutineTitle"></h3>
     <div class="checklist-wrap" id="kidRoutineChecklist"></div>
     <div class="kid-run-stopwatch" id="kidRoutineStopwatch" style="display:none"></div>
     <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="kidRoutineOpenEdit()">✏️ Edit (times, notes, stopwatch…)</button>
     <button type="button" class="btn-confirm" style="margin-top:0.45rem" onclick="closeSheet('kidRoutineOverlay')">Done ✨</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('kidRoutineOverlay')">✕</button>
   </div>
 </div>
 
 <!-- Kid quick view: training objectives + gear -->
 <div class="overlay kid-block-overlay" id="kidTrainingOverlay" onclick="overlayClick(event,'kidTrainingOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="kidTrainingTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="kidTrainingTitle">
     <div class="sheet-handle"></div>
     <h3 id="kidTrainingTitle"></h3>
     <p style="font-size:calc(0.92rem * var(--text-scale, 1));color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
@@ -1103,6 +1109,7 @@
     <div class="checklist-wrap" id="kidTrainingGear"></div>
     <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="kidTrainingOpenEdit()">✏️ Edit (objectives, times, travel…)</button>
     <button type="button" class="btn-confirm" style="margin-top:0.45rem" onclick="closeSheet('kidTrainingOverlay')">Done ✨</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('kidTrainingOverlay')">✕</button>
   </div>
 </div>
 
@@ -1117,7 +1124,7 @@
      copying a day you actually planned does what they did. The ids keep their
      old names (templateOverlay, templateSheetTitle). -->
 <div class="overlay" id="templateOverlay" onclick="overlayClick(event,'templateOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="templateSheetTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="templateSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="templateSheetTitle">📋 Copy a day</h3>
     <!-- What is on this day now, drawn by renderCopyDayNow, so both days are in
@@ -1148,16 +1155,18 @@
          Down here, last, it keeps them; clearDay's confirm lists what goes. -->
     <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
     <button type="button" class="pill-btn day-over-btn" onclick="clearDay()">🗑 Start this day over</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('templateOverlay')">✕</button>
   </div>
 </div>
 
 <!-- Weekly Wins recap (#6) -->
 <div class="overlay" id="weeklyWinsOverlay" onclick="overlayClick(event,'weeklyWinsOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="weeklyWinsTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="weeklyWinsTitle">
     <div class="sheet-handle"></div>
     <h3 id="weeklyWinsTitle">🎉 This week's wins</h3>
     <div id="weeklyWinsBody"></div>
     <button class="btn-confirm" onclick="closeSheet('weeklyWinsOverlay')">Awesome! 🙌</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('weeklyWinsOverlay')">✕</button>
   </div>
 </div>
 
@@ -1167,7 +1176,7 @@
 
 <!-- Custom Activity -->
 <div class="overlay" id="customOverlay" onclick="overlayClick(event,'customOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="customSheetTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="customSheetTitle">✨ Create Activity</h3>
     <div class="custom-builder">
@@ -1205,6 +1214,7 @@
       </div>
     </div>
     <button class="btn-confirm" onclick="confirmCustomActivity()">Add Activity ✅</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customOverlay')">✕</button>
   </div>
 </div>
 
@@ -1212,7 +1222,7 @@
      the family took up could not be entered at all. Shared by both girls, so a
      grown-up adds it. -->
 <div class="overlay" id="customSportOverlay" onclick="overlayClick(event,'customSportOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="customSportTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customSportTitle">
     <div class="sheet-handle"></div>
     <h3 id="customSportTitle">🤸 Add a sport</h3>
     <div class="custom-builder">
@@ -1227,12 +1237,13 @@
     </div>
     <div class="sport-existing" id="sportExistingList"></div>
     <button class="btn-confirm" onclick="confirmCustomSport()">Add sport ✅</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customSportOverlay')">✕</button>
   </div>
 </div>
 
 <!-- Parent Activity Editor (create + edit) -->
 <div class="overlay" id="parentActivityOverlay" onclick="overlayClick(event,'parentActivityOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="parentActivityHeading">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="parentActivityHeading">
     <div class="sheet-handle"></div>
     <h3 id="parentActivityHeading">✨ Add Activity</h3>
     <div class="custom-builder">
@@ -1288,12 +1299,13 @@
       </select>
     </div>
     <button class="btn-confirm" id="paConfirmBtn" onclick="confirmParentActivity()">Save ✅</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('parentActivityOverlay')">✕</button>
   </div>
 </div>
 
 <!-- Custom Training Task -->
 <div class="overlay" id="customTaskOverlay" onclick="overlayClick(event,'customTaskOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="customTaskSheetTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customTaskSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="customTaskSheetTitle">➕ Custom Training Task</h3>
     <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
@@ -1319,6 +1331,7 @@
       <textarea class="note-input" id="taskNotes" aria-label="Notes for this task" rows="2" placeholder="Focus on form, breathing, etc."></textarea>
     </div>
     <button class="btn-confirm" onclick="confirmCustomTask()">Save Task ✅</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customTaskOverlay')">✕</button>
   </div>
 </div>
 
@@ -1326,7 +1339,7 @@
      openReflectSheet(dayKey)'s argument; the title names it ("How was
      yesterday?") and the Save button is bound to it when the sheet opens. -->
 <div class="overlay" id="reflectOverlay" onclick="overlayClick(event,'reflectOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reflectSheetTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="reflectSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="reflectSheetTitle">🌙 How was today?</h3>
     <h4>Overall vibe</h4>
@@ -1334,24 +1347,26 @@
     <h4>How did each block feel? <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1))">(optional)</span></h4>
     <div id="reflectBlockList"></div>
     <button class="btn-confirm" id="reflectSaveBtn">Save ✨</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('reflectOverlay')">✕</button>
   </div>
 </div>
 
 <!-- My level: tapping the level on Today's hero. Her level, XP and the whole
      privileges ladder (mrPrivileges), filled by tdOpenLevel (js/31-today.js).
-     Read-only: Close is the one control. -->
+     Read-only: Close (or the sheet's ✕) is the one thing to do. -->
 <div class="overlay" id="tdLevelOverlay" onclick="overlayClick(event,'tdLevelOverlay')">
-  <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="tdLevelTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="tdLevelTitle">
     <div class="sheet-handle"></div>
     <h3 id="tdLevelTitle">⭐ My level</h3>
     <div id="tdLevelBody"></div>
     <button type="button" class="td-level-close" onclick="closeSheet('tdLevelOverlay')">Close</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('tdLevelOverlay')">✕</button>
   </div>
 </div>
 
 <!-- New Challenge -->
 <div class="overlay" id="newChallengeOverlay" onclick="overlayClick(event,'newChallengeOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="newChallengeTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="newChallengeTitle">
     <div class="sheet-handle"></div>
     <h3 id="newChallengeTitle">🎯 New Weekly Challenge</h3>
     <div class="custom-builder">
@@ -1375,12 +1390,13 @@
       </div>
     </div>
     <button class="btn-confirm" onclick="confirmNewChallenge()">Create ✨</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newChallengeOverlay')">✕</button>
   </div>
 </div>
 
 <!-- New Level Rule -->
 <div class="overlay" id="newRuleOverlay" onclick="overlayClick(event,'newRuleOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="newRuleTitle">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="newRuleTitle">
     <div class="sheet-handle"></div>
     <h3 id="newRuleTitle">⚙️ New Level-Up Rule</h3>
     <div class="custom-builder">
@@ -1399,12 +1415,13 @@
       <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2" aria-label="Level-up icon (emoji)">
     </div>
     <button class="btn-confirm" onclick="confirmNewRule()">Save Rule ✨</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newRuleOverlay')">✕</button>
   </div>
 </div>
 
 <!-- New Custom Routine -->
 <div class="overlay" id="newRoutineOverlay" onclick="overlayClick(event,'newRoutineOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rbHeading">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="rbHeading">
     <div class="sheet-handle"></div>
     <h3 id="rbHeading">🌅 New Custom Routine</h3>
     <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Add a checklist routine both girls can use.</p>
@@ -1424,6 +1441,7 @@
       <button class="pill-btn" style="margin-top:0.4rem" onclick="addRoutineItem()">＋ Add item</button>
     </div>
     <button class="btn-confirm" id="rbConfirmBtn" style="margin-top:0.8rem" onclick="confirmRoutine()">Save Routine ✨</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newRoutineOverlay')">✕</button>
   </div>
 </div>
 

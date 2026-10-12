@@ -1082,7 +1082,7 @@ function rqRender() {
   // The result sheet's line sits beside its title, on one line (M8-2).
   if (title) title.innerHTML = escapeHtml(MNY_INFO_KINDS.indexOf(d.kind) >= 0 ? mnyInfoSheetTitle(d) : RQ_TITLES[d.kind])
     + (d.kind === 'result' ? ' <span class="rq-titlesub">The official results sheet decides. A parent checks it before anything pays.</span>' : '');
-  const sheet = host.closest('.sheet');
+  const sheet = host.closest('.ui-sheet');
   if (sheet) sheet.setAttribute('data-rq-kind', d.kind);
   if (sheet) sheet.setAttribute('data-rq-mode', d.kind === 'move' ? d.mode : '');
   let body;
@@ -1095,7 +1095,7 @@ function rqRender() {
   else if (d.kind === 'prices') body = rqPricesBody(d);
   else if (MNY_INFO_KINDS.indexOf(d.kind) >= 0) body = mnyInfoSheetBody(d);
   else body = rqListBody(kid);
-  host.innerHTML = `<button type="button" class="ui-btn ui-btn--secondary ui-btn--icon rq-x" data-mny-action="rq-close" aria-label="Close">✕</button>${body}`;
+  host.innerHTML = `${sheetCloseXHtml('data-mny-action="rq-close"')}${body}`;
 }
 
 /* Typing changed something the button and the preview say: update those two,

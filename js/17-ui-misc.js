@@ -5,8 +5,8 @@
 ════════════════════════════════════════════════════════════════ */
 /* ── Styled dialogs — promise-based replacements for native confirm()/prompt()
    so destructive confirms and PIN/text entry stay inside the app's sheet
-   aesthetic instead of the browser's gray boxes. Reuses the .overlay/.sheet
-   styling. showConfirm → Promise<boolean>; showPrompt → Promise<string|null>
+   aesthetic instead of the browser's gray boxes. The kit's one dialog: an
+   .overlay--dialog holding a .ui-dialog (no ✕ — Cancel closes it). showConfirm → Promise<boolean>; showPrompt → Promise<string|null>
    (null on cancel, matching native prompt). ── */
 let _appDialogResolve = null;
 function _closeAppDialog(result) {
@@ -49,7 +49,7 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
   let ov = document.getElementById('appDialogOverlay');
   if (!ov) {
     ov = document.createElement('div');
-    ov.className = 'overlay';
+    ov.className = 'overlay overlay--dialog';
     ov.id = 'appDialogOverlay';
     ov.addEventListener('click', e => { if (e.target === ov) _appDialogCancel(); });
     document.body.appendChild(ov);
@@ -64,8 +64,7 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
     ? `<label class="app-dialog-check"><input type="checkbox" id="appDialogCheck" onchange="_appDialogCheckToggle()"> <span>${escapeHtml(checkLabel)}</span></label>`
     : '';
   ov.innerHTML =
-    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
-      <div class="sheet-handle"></div>
+    `<div class="ui-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
       <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       ${inputHtml}${checkHtml}
       <div class="app-dialog-btns">
@@ -107,7 +106,7 @@ function showChoice(message, options, opts = {}) {
   let ov = document.getElementById('appDialogOverlay');
   if (!ov) {
     ov = document.createElement('div');
-    ov.className = 'overlay';
+    ov.className = 'overlay overlay--dialog';
     ov.id = 'appDialogOverlay';
     ov.addEventListener('click', e => { if (e.target === ov) _appDialogCancel(); });
     document.body.appendChild(ov);
@@ -118,8 +117,7 @@ function showChoice(message, options, opts = {}) {
        ${o.sub ? `<span class="app-dialog-choice-sub">${escapeHtml(o.sub)}</span>` : ''}
      </button>`).join('');
   ov.innerHTML =
-    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
-      <div class="sheet-handle"></div>
+    `<div class="ui-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
       <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       <div class="app-dialog-choices">${btns}</div>
       <div class="app-dialog-btns">
@@ -188,7 +186,7 @@ function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
    safe first stops; failing those, the sheet itself. */
 const SHEET_FOCUSABLE = 'button:not([disabled]), select:not([disabled]), [href], [role="switch"], [tabindex]:not([tabindex="-1"])';
 function sheetFocusIn(ov) {
-  const sheet = ov.querySelector('.sheet') || ov;
+  const sheet = ov.querySelector('.ui-sheet') || ov;
   const first = sheet.querySelector('[autofocus]') || sheet.querySelector(SHEET_FOCUSABLE) || sheet;
   if (first === sheet && !sheet.hasAttribute('tabindex')) sheet.setAttribute('tabindex', '-1');
   try { first.focus({ preventScroll: true }); } catch (e) {}
@@ -198,6 +196,13 @@ function sheetFocusBack(ov) {
   if (back && document.contains(back) && typeof back.focus === 'function') {
     try { back.focus({ preventScroll: true }); } catch (e) {}
   }
+}
+/* The one ✕ of a sheet whose body is built in code (the request, Sunday,
+   She told me and More sheets): the kit icon button .ui-sheet-x, 44×44, top
+   right. `attrs` is a constant written in the caller — its close action. The
+   sheets in index.html write the same button by hand. */
+function sheetCloseXHtml(attrs) {
+  return `<button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" ${attrs}>✕</button>`;
 }
 function topOpenSheetId() {
   const open = document.querySelectorAll('.overlay.open');

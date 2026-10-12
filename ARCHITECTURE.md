@@ -1471,7 +1471,7 @@ function the Chores screen called, so the two could not disagree
 owner ticked all 19 rows of `docs/chore-relocation-map.md`, and the Chores
 screen went — `#screen-chore`, `openChoreTab` / `renderChoreTab`, the kid-tab
 renderers, its money card and matrix, the chore-group editor
-(`#choreGroupOverlay`) and the More 🧹 tile; its smoke checks were ported to
+(`#choreGroupOverlay`, gone; the overlays left are the kit's `.ui-sheet`, under UI rules) and the More 🧹 tile; its smoke checks were ported to
 the new homes or dropped. What its render did for the week (goal bonuses, group
 payouts) is `ctSelfHealWeek`, run by Today's render; the portal keeps
 `ctHandleWrapClick`. To make "the same function" literal, the chore writers are
@@ -1643,7 +1643,25 @@ say which one they are. (checked by smoke: jobsCardIsNeverBlank)
   Parent › Now keeps today (white, navy frame) apart from the selected day
   (navy fill) — `todayAndSelectedDifferInBothLooks`. (checked by smoke: todayAndSelectedDifferInBothLooks)
 - Never white text on the pastel category colors (all fail contrast). (text only)
-- Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`. (text only)
+- **One sheet, one dialog (Stage 43; owner G13, P1–P4, 2026-10-12).** Every
+  pop-up is an `.overlay` (opened and closed only by `openSheet` /
+  `closeSheet`) holding the kit's `.ui-sheet` — the 23 overlays in
+  `index.html` and the ⋯ More sheet (`#tdMoreOverlay`). A sheet is centred on
+  the iPad and comes from the bottom on a phone (≤699px), one paper, border
+  and corner for all, at `--z-sheet`. Each has exactly one ✕, `.ui-sheet-x`
+  on a kit icon button (44×44, top right; `sheetCloseXHtml` writes it for a
+  body built in code), beside its own Cancel / Done. The edit, activity and
+  training forms are `.ui-sheet--docked`: the right-side panel on the iPad
+  (P2, the one exception), from the bottom on a phone. The money sheets
+  (Record, request, Sunday's Parent's card, She told me, Grown-ups' fix
+  sheets) take the same box (P3); their words and buttons keep the area's
+  colours through `[data-area]`, a money surface keeps the 0.62 money scrim
+  (`.overlay[data-money-surface]`), and a sheet that needs another width sets
+  `--sheet-w` and nothing else. The one dialog is `appDialog` (`showConfirm`,
+  `showAlert`, `showCheckConfirm`, `showPrompt`, `showChoice`):
+  `.overlay--dialog` holding a `.ui-dialog`, centred everywhere, at
+  `--z-dialog`, with no ✕ — Cancel is its way out. Never native
+  `confirm()` / `prompt()`, and no rule outside the kit draws a sheet's box. (checked by tests/check-sheet-family.js and smoke: oneSheetAndOneDialogEverywhere)
 
 **IF IT LOOKS LIKE A CONTROL AND IS ANNOUNCED AS ONE, IT HAS TO BE ONE.** Three
 of the five `.profile-badge`s — Today, the chore tab, Sister Sync — were bare
@@ -4214,8 +4232,8 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   `sdSegHitsBox`, js/43): in the shaded gap of the newest past segment that
   fits, else beside or above/below the signed point, box-checked against
   every line. **The own line is the reference green**, `--sd-own` (#2f7f62). (checked by tests/sunday.test.js)
-- **The request sheet closes with its ×** (`.rq-x`, drawn by `rqRender`
-  inside `#requestBody` so the delegated listener hears it); the doors'
+- **The request sheet closes with its ✕** (the sheet's `.ui-sheet-x`, drawn by `rqRender`
+  through `sheetCloseXHtml` inside `#requestBody` so the delegated listener hears it); the doors'
   sheets have no "Done", the Move · Cash sheet has no "Not now" and one title
   for its four modes. ⏪ Draw early is the reference's compact body
   (`rqAdvBody`: one plain line, How much −/+, three reasons). (text only)
@@ -4382,7 +4400,8 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   and steppers use `--bw-chip`. The two selected meanings are under PR 3
   above. (text only)
 - **The sheet scrim** `--mny-v15-scrim` is 0.62 in both looks, so the page's
-  numbers do not read beside a sheet. (text only)
+  numbers do not read beside a sheet; every `[data-money-surface]` overlay
+  reads it as its `--scrim` (Stage 43). (text only)
 - **Held by** smoke `aSundayRowOpensItsSheet` and the unit case in
   `tests/sunday.test.js`. (checked by tests/sunday.test.js and smoke: aSundayRowOpensItsSheet)
 - **The money fit check (PR 5 part 2, build 2026-10-06e)** is smoke
@@ -4442,7 +4461,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   is one number with a check rather than two that drift: **bump both
   together.** `theBuildNumberIsOnThePage` in `tests/smoke.js` holds both
   surfaces.
-- Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 19 overlays carry their
+- Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 23 overlays carry their
   ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
   (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and
   Escape for sheets live in `openSheet`/`closeSheet` (`js/17-ui-misc.js`) — do

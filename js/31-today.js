@@ -2130,7 +2130,7 @@ function tdOpenMore() {
     });
     document.body.appendChild(ov);
   }
-  ov.innerHTML = `<div class="sheet td-more-sheet" role="dialog" aria-modal="true" aria-label="More places to go">
+  ov.innerHTML = `<div class="ui-sheet" role="dialog" aria-modal="true" aria-label="More places to go">
       <div class="sheet-handle"></div>
       <div class="td-cap">More</div>
       <div class="td-more-grid">
@@ -2140,6 +2140,7 @@ function tdOpenMore() {
           </button>`).join('')}
       </div>
       <p class="app-build">Build ${escapeHtml(APP_BUILD)}</p>
+      ${sheetCloseXHtml(`onclick="closeSheet('tdMoreOverlay')"`)}
     </div>`;
   ov.classList.add('open');
 }

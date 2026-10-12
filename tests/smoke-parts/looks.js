@@ -202,7 +202,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
         await snap('picker', w);
         await ev('More', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); tdOpenMore(); });
         await settle(450);
-        const more = await ev('More', (lab) => contrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
+        const more = await ev('More', (lab) => contrastFindings(document.querySelector('#tdMoreOverlay .ui-sheet'), lab), `⋯ More@${w}`);
         if (more) bad.push(...more);
         await page.screenshot({ path: shot(`look-${look}-more-${w}`) });
         await ev('More close', () => { const ov = document.getElementById('tdMoreOverlay'); if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay'); });
@@ -215,7 +215,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
           openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('pop-edit');
         });
         await settle(450);
-        const edit = await ev('edit', (lab) => contrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
+        const edit = await ev('edit', (lab) => contrastFindings(document.querySelector('#editOverlay .ui-sheet'), lab), `block edit sheet@${w}`);
         if (edit) bad.push(...edit);
         await page.screenshot({ path: shot(`look-${look}-edit-sheet-${w}`) });
         await ev('edit close', () => { closeSheet('editOverlay'); setDayBlocks(todayKey(), window.__popHad, 'jenn'); });
@@ -393,7 +393,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks, KID_SCR
             await ev(where(name), `(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); (${open.toString()})(); })()`);
             await settle(450);
             await take(where(name), ([o, lab]) => {
-              const sheet = document.querySelector(`#${o}.open .sheet`);
+              const sheet = document.querySelector(`#${o}.open .ui-sheet`);
               return sheet ? lookFontFindings(sheet, lab) : { found: ['the sheet did not open, so nothing on it was measured'], exempt: 0 };
             }, [ov, where(name)]);
             await ev(`${where(name)} close`, (o) => {

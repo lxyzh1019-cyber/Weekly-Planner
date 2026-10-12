@@ -1391,7 +1391,7 @@ function sdOpenDad() {
       ${step === 0 && sun.asked ? `<div class="sd-note">${sun.premarked ? '✓ Sunday routine marked for her' : sun.done ? '✓ Sunday routine ticked' : '○ Sunday routine not ticked yet'}</div>` : ''}
       <div class="sd-teal">${escapeHtml(check)}</div>
       <button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>
-    </div>`;
+    </div>${sheetCloseXHtml('data-mny-action="sd-dadclose"')}`;
   openSheet('sundayOverlay');
 }
 
@@ -1411,7 +1411,7 @@ function sdSheetOpen(title, html) {
   if (!body) return;
   const t = document.getElementById('sdSheetTitle');
   if (t) t.textContent = title;
-  body.innerHTML = `${html}<button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>`;
+  body.innerHTML = `${html}<button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>${sheetCloseXHtml('data-mny-action="sd-dadclose"')}`;
   if (!document.getElementById('sundayOverlay').classList.contains('open')) openSheet('sundayOverlay');
 }
 function sdOpenLine(tile, edit) {

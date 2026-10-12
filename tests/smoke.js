@@ -16,6 +16,7 @@ const parentPortal = require('./smoke-parts/parent');
 const weekDay = require('./smoke-parts/week-day');
 const todayChecks = require('./smoke-parts/today');
 const socialChecks = require('./smoke-parts/social');
+const sheetChecks = require('./smoke-parts/sheets');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -164,6 +165,7 @@ function findChromium() {
     theSundayKitHolds44pxInItsBoxes: [],
     parentReadingSizeDefaultsToLarger: [],
     withMumReadsInBothLooks: [],
+    oneSheetAndOneDialogEverywhere: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
@@ -1342,7 +1344,7 @@ function findChromium() {
     currentDayKey = getDayKeys(0)[0];
     openSlotPicker(15 * 60 + 30);
     const list = document.getElementById('slotPickerList');
-    const sheet = document.querySelector('#slotPickerOverlay .sheet');
+    const sheet = document.querySelector('#slotPickerOverlay .ui-sheet');
     const chipRow = document.getElementById('slotPickerFilter');
     if (!list || !sheet || !chipRow) return ['the picker did not open'];
     const chips = [...chipRow.querySelectorAll('.filter-chip')];
@@ -13854,9 +13856,10 @@ function findChromium() {
         const want = p.unlocked ? 'yours' : `level ${p.levelReq}`;
         if (!row.textContent.includes(want)) bad.push(`"${p.label}" does not say "${want}"`);
       });
-      // Read-only: the one control is Close.
-      const controls = [...sheet.querySelectorAll('button, input, select')];
-      if (controls.length !== 1 || !controls[0].classList.contains('td-level-close')) bad.push(`My level has ${controls.length} controls, want only Close`);
+      // Read-only: the one control is Close, beside the sheet's ✕ (Stage 43, P4).
+      const controls = [...sheet.querySelectorAll('button, input, select')].filter(c => !c.classList.contains('ui-sheet-x'));
+      if (controls.length !== 1 || !controls[0].classList.contains('td-level-close')) bad.push(`My level has ${controls.length} controls besides its ✕, want only Close`);
+      if (sheet.querySelectorAll('.ui-sheet-x').length !== 1) bad.push('My level has no ✕ (or more than one)');
       const tiny = [...sheet.querySelectorAll('*')].filter(el =>
         [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
       if (tiny.length) bad.push(`My level has text under 13px (.${tiny[0].className})`);
@@ -15655,7 +15658,7 @@ function findChromium() {
       if (document.getElementById('undoToast').hidden) bad.push('the undo toast did not come up, so the sheet was not measured under it');
       openReflectSheet(key);
       await new Promise(r => setTimeout(r, 400)); // the sheet slides up (0.3s)
-      const sheet = document.querySelector('#reflectOverlay .sheet');
+      const sheet = document.querySelector('#reflectOverlay .ui-sheet');
       const overall = [...document.querySelectorAll('#reflectOverallMoods .vibe-mood')];
       const perBlock = [...document.querySelectorAll('#reflectBlockList .vibe-mood')];
       if (overall.length !== 5) bad.push(`${overall.length} overall mood buttons, expected 5`);
@@ -16631,7 +16634,7 @@ function findChromium() {
       mnyOpenMyMoney('jenn');
       take('My money', ['#screen-mymoney .mv2-card', '#screen-mymoney .hdr-tab[aria-current="page"]', '#screen-mymoney > * > .hdr .hdr-btn', '#screen-mymoney .mv2-act']);
       goToday(); tdOpenMore(); await wait(350);
-      take('More', ['#tdMoreOverlay .sheet', '#tdMoreOverlay .td-more-tile']);
+      take('More', ['#tdMoreOverlay .ui-sheet', '#tdMoreOverlay .td-more-tile']);
       closeSheet('tdMoreOverlay');
       parentUnlockedThisSession = true; selectProfile('parent');
       // Plan v9 §N: PIN, the look and Exit sit in the one-row header's 🔒 Parent ▾ menu.
@@ -25386,7 +25389,7 @@ function findChromium() {
         btn(fine.id).click();
         if (!rqDraft || rqDraft.kind !== 'dispute') bad.push('the button did not open the dispute sheet');
         if (!/This fine is wrong/.test(document.getElementById('rqSheetTitle').textContent)) bad.push('the sheet is not titled "This fine is wrong"');
-        if (!document.querySelector('#requestBody [data-mny-action="rq-close"].rq-x')) bad.push('the sheet has no × to close it');
+        if (!document.querySelector('#requestBody [data-mny-action="rq-close"].ui-sheet-x')) bad.push('the sheet has no × to close it');
         const head = document.querySelector('#requestBody .rq-fine');
         if (!head || !/−\$/.test(head.textContent)) bad.push('the sheet does not show the fine with its amount negative');
         const chip = document.querySelector('#requestBody [data-mny-action="rq-why"]');
@@ -25564,7 +25567,7 @@ function findChromium() {
             const h3 = [...document.querySelectorAll('#requestBody .rq-prices h3')].map(h => h.textContent.trim());
             if (h3.join(' / ') !== '🏆 Competitions / 📦 Box fine') bad.push('the price sheet opens on ' + h3.join(' / '));
             const fineRows = document.querySelectorAll('#requestBody .rq-prices .chore-card:last-child .ct-item');
-            const sheetBox = document.querySelector('#requestOverlay .sheet').getBoundingClientRect();
+            const sheetBox = document.querySelector('#requestOverlay .ui-sheet').getBoundingClientRect();
             const lastFine = fineRows.length ? fineRows[fineRows.length - 1].getBoundingClientRect().bottom : 1e4;
             if (lastFine > sheetBox.bottom) bad.push(`the Box fine rows end at ${Math.round(lastFine)}px, below the sheet (${Math.round(sheetBox.bottom)}px)`);
             rqClose();
@@ -25926,7 +25929,7 @@ function findChromium() {
                 .forEach(t => { if (txt.indexOf(t) < 0) bad.push(where + ': the sheet has no ' + t); });
               if (wk === newest.weekKey && txt.indexOf('Loan left after' + ' ' + fmtMoney(612.34)) < 0 && txt.indexOf('Loan left after' + fmtMoney(612.34)) < 0) bad.push(where + ': no "Loan left after ' + fmtMoney(612.34) + '": ' + txt.slice(0, 200));
               if (!/Settled without a sign/.test(txt)) bad.push(where + ': a seeded row with no sign does not say "Settled without a sign"');
-              const sheet = ov.querySelector('.sheet').getBoundingClientRect();
+              const sheet = ov.querySelector('.ui-sheet').getBoundingClientRect();
               body.querySelectorAll('*').forEach(el => {
                 if (!shown(el) || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
                 const a = el.getBoundingClientRect();
@@ -26655,7 +26658,7 @@ function findChromium() {
     // Every static overlay's sheet is a labelled modal dialog.
     document.querySelectorAll('.overlay[id]').forEach(ov => {
       if (ov.id === 'appDialogOverlay') return;
-      const sheet = ov.querySelector('.sheet');
+      const sheet = ov.querySelector('.ui-sheet');
       if (!sheet) { bad.push(`${ov.id}: no sheet`); return; }
       if (sheet.getAttribute('role') !== 'dialog') bad.push(`${ov.id}: sheet is not role=dialog`);
       if (sheet.getAttribute('aria-modal') !== 'true') bad.push(`${ov.id}: not aria-modal`);
@@ -26688,7 +26691,7 @@ function findChromium() {
     closeSheet('templateOverlay');
     // The runtime dialogs are named too.
     const q = showConfirm('sure?');
-    const dlg = document.querySelector('#appDialogOverlay .sheet');
+    const dlg = document.querySelector('#appDialogOverlay .ui-dialog');
     const by = dlg && dlg.getAttribute('aria-labelledby');
     if (!by || !document.getElementById(by) || !document.getElementById(by).textContent.trim()) bad.push('the app dialog has no accessible name');
     _appDialogCancel(); await q;
@@ -28226,7 +28229,7 @@ function findChromium() {
     profile = 'jenn'; parentViewing = 'jenn';
     goToday();
     if (!click('#kidNav [data-td-nav="more"]')) problems.push('the kid nav has no More button');
-    const sheet = document.querySelector('#tdMoreOverlay .td-more-sheet');
+    const sheet = document.querySelector('#tdMoreOverlay .ui-sheet');
     if (!sheet) {
       problems.push('the More sheet did not open');
     } else {
@@ -28261,6 +28264,8 @@ function findChromium() {
   await parentPortal({ page, want, checks, setLook, clearLooks });
   // Sister Sync and the profile screens on the kit: tests/smoke-parts/social.js.
   await socialChecks({ page, want, checks, setLook, clearLooks });
+  // One sheet and one dialog, every pop-up (Stage 43): tests/smoke-parts/sheets.js.
+  await sheetChecks({ page, want, checks });
 
   // The money click sweep: tests/smoke-parts/money-screens.js.
   await moneyScreens.moneyClicks({ page, want, checks });

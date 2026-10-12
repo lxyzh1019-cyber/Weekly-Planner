@@ -248,7 +248,6 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 .pn-owns-fix { display: flex; gap: 6px; flex-wrap: wrap; }
 .pn-sidebtns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pn-tidy { display: flex; flex-direction: column; gap: 8px; }
-.pn-told-sheet { max-width: 620px; }
 
 /* ── Grown-ups and the request sheets on the kit (Stage 51) ─────────────────
    Their buttons, chips and steppers are the kit's; this keeps their layout.

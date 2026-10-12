@@ -373,7 +373,7 @@ function pnOpenToldSheet() {
 function pnRenderToldSheet() {
   const body = document.getElementById('pnToldBody');
   if (!body || !pnSheetOpen) return;
-  body.innerHTML = `${pnAnswerCard()}<button type="button" class="ui-btn ui-btn--primary ui-btn--block" data-pn-action="told-close">Done</button>`;
+  body.innerHTML = `${pnAnswerCard()}<button type="button" class="ui-btn ui-btn--primary ui-btn--block" data-pn-action="told-close">Done</button>${sheetCloseXHtml('data-pn-action="told-close"')}`;
 }
 
 /* ── On her behalf (R5 §5 rows 7 and 8, C1 — 2026-09-24) ─────────────────
