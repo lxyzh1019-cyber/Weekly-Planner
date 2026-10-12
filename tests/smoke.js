@@ -16647,7 +16647,7 @@ function findChromium() {
       take('Parent › Now', ['#screen-parent > .hdr', '#parentDests > [aria-selected="false"]',
         '#parentDests > [aria-selected="true"]',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
         '#pnWrap .ui-card', '#pnWrap .ui-days > button', '#pnWrap .ui-days > [aria-current="date"]', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
-        '#screen-parent .ui-btn--primary']);
+        '#pnWrap .ui-btn--primary']);
       pnOpenToldSheet(); await wait(300);
       take('Parent › Now › She told me', ['#pnToldBody .ui-days > [aria-pressed="true"]', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
       pnSheetOpen = false; closeSheet('pnToldOverlay');

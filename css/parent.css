@@ -271,12 +271,12 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
    the screen. minmax(0, 1fr) lets a column go below its content's width, so
    Sunday's right edge stays on screen on a phone (checked by monthlyFitsAPhone). */
 .pm-dow-row, .pm-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.pm-cell { min-width: 0; overflow: hidden; }
+.pm-cell { min-width: 0; }
 @media (max-width: 699px) {
   .pm-grid-wrap { padding-left: 0.5rem; padding-right: 0.5rem; }
   .pm-dow-row, .pm-grid { gap: 0.2rem; }
   .pm-dow { letter-spacing: 0; min-width: 0; }
-  .pm-cell { padding: 0.15rem; }
+  .pm-cell { padding: 0.15rem; overflow: hidden; }
 }
 
 /* Stage 62: the old .pn-card became .ui-card, which the kit block draws after
