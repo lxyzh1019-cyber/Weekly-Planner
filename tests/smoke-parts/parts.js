@@ -41,6 +41,7 @@ const PARTS = {
     'thePortalKitHolds44px',
     'everyMoneyControlClicksClean',
     'theSundayKitHolds44pxInItsBoxes',
+    'theSundayChooseRowFitsTwoRows',
   ],
   2: [
     'weekOpensOnTheLayoutYouCanPlanIn',

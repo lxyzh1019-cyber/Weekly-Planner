@@ -369,7 +369,7 @@ function sdGuessMain(c) {
   const paState = open ? `${open} to tick` : (s.attended ? `✓ ${s.attended} × ${fmtMoney(rate)}` : '$0 · missed');
   const chips = s.sessions.map(x => {
     const v = x.attended;
-    return `<button type="button" class="ui-btn${v == null ? ' open' : v ? ' yes' : ' no'}" data-mny-action="sd-att" data-sd-block="${escapeAttr(x.blockId)}" data-sd-day="${escapeAttr(x.dayKey)}">${escapeHtml(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(x.dayKey).getDay()] + ' ' + formatDayKey(x.dayKey).getDate())} ${v == null ? '?' : v ? '✓' : '✗'}</button>`;
+    return `<button type="button" class="ui-btn${v == null ? ' open' : v ? ' ui-btn--ok' : ' no'}" data-mny-action="sd-att" data-sd-block="${escapeAttr(x.blockId)}" data-sd-day="${escapeAttr(x.dayKey)}">${escapeHtml(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(x.dayKey).getDay()] + ' ' + formatDayKey(x.dayKey).getDate())} ${v == null ? '?' : v ? '✓' : '✗'}</button>`;
   }).join('') || `<span class="sd-note">No club sessions on the planner this week.</span>`;
   const sun = sdSundayRoutine(c);
   const cats = sdCats(c).map(([k, icon, name], i) => {
@@ -379,7 +379,7 @@ function sdGuessMain(c) {
         <b class="sd-pill">${v == null ? '? tap' : v ? '💰 yes' : '🚫 none'}</b></button>`;
     if (k !== 'streak' || !sun.asked) return tile;
     // Decision 15: the meeting Sunday's routine is pre-marked (counted without the tick).
-    return `<div class="sd-catwrap">${tile}<button type="button" class="ui-btn${sun.done ? ' on' : ''}" data-mny-action="sd-sunroutine">${sun.premarked ? '✓ Sunday routine — marked for you' : sun.done ? '✓ Sunday routine done' : '☀️ Sunday routine? tick'}</button></div>`;
+    return `<div class="sd-catwrap">${tile}<button type="button" class="ui-btn${sun.done ? ' on ui-btn--ok' : ''}" data-mny-action="sd-sunroutine">${sun.premarked ? '✓ Sunday routine — marked for you' : sun.done ? '✓ Sunday routine done' : '☀️ Sunday routine? tick'}</button></div>`;
   }).join('');
   const u = sdUnsettled(c.kid, c.wk);
   const hist = c.f.hist;
@@ -427,7 +427,7 @@ function sdAskRow(c, it) {
   let btns = '';
   if (it.kind === 'meet') {
     const p = it.meet;
-    btns = `<button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-meet" data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}" data-sport="${escapeAttr(p.sport || '')}">✓ result</button>
+    btns = `<button type="button" class="ui-btn ui-btn--ok" data-mny-action="sd-meet" data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}" data-sport="${escapeAttr(p.sport || '')}">✓ result</button>
       <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="comp-zero" data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}" data-sport="${escapeAttr(p.sport || 'swim')}">No criteria met · $0</button>`;
   } else if (it.open && it.status === 'talk' && q) {
     /* 💬 Talk first, at the meeting (Plan v9 §N, Deviation 41): what she
@@ -443,14 +443,14 @@ function sdAskRow(c, it) {
           <span class="sd-agree-asked">asked ${escapeHtml(fig(asked))}</span>
           <span class="sd-agree-set ui-stepper"><span>agreed</span><button type="button" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="-1" aria-label="A dollar less">−</button><b>${escapeHtml(fig(agreed))}</b><button type="button" data-mny-action="sd-agreed" data-sd-id="${escapeAttr(it.id)}" data-sd-d="1" aria-label="A dollar more">+</button></span>
         </div>
-        <button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-agree" data-sd-id="${escapeAttr(it.id)}">✓ Agree</button>
+        <button type="button" class="ui-btn ui-btn--ok" data-mny-action="sd-agree" data-sd-id="${escapeAttr(it.id)}">✓ Agree</button>
         <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">Not this time</button>`;
     } else {
-      btns = `<button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
+      btns = `<button type="button" class="ui-btn ui-btn--ok" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
         <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-no" data-sd-id="${escapeAttr(it.id)}">✗ No</button>`;
     }
   } else if (it.open) {
-    btns = `<button type="button" class="ui-btn ui-btn--primary" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
+    btns = `<button type="button" class="ui-btn ui-btn--ok" data-mny-action="sd-yes" data-sd-id="${escapeAttr(it.id)}">✓ Yes</button>
       <button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-adjust" data-sd-id="${escapeAttr(it.id)}" aria-expanded="${d.adjust === it.id}">✏️ Adjust</button>
       ${it.status === 'talk' ? '' : `<button type="button" class="ui-btn ui-btn--secondary" data-mny-action="sd-talk" data-sd-id="${escapeAttr(it.id)}">💬 Talk first</button>`}`;
   }
@@ -683,7 +683,7 @@ function sdPaydayMain(c) {
     : f.advOwed ? `${f.advReqs.map(r => r.why || r.day).filter(Boolean).join(' · ') || 'asked parents'} · spent`
     : d.advMan ? 'I forgot to ask · a parent checks it' : 'forgot to ask? tap +';
   const savingsFree = Math.floor(Math.max(0, mnySavedTotal(c.kid) - sdRule(c.rules, 'pots.safety')) + 1e-9);
-  const pull = (k, name, sub) => `<div class="sd-pull ui-stepper"><div class="sd-pull-name"><span class="sd-nowrap">${escapeHtml(name)}</span><span class="sd-note">${escapeHtml(sub)}</span></div>
+  const pull = (k, name, sub) => `<div class="sd-pull ui-stepper ui-stepper--kid"><div class="sd-pull-name"><span class="sd-nowrap">${escapeHtml(name)}</span><span class="sd-note">${escapeHtml(sub)}</span></div>
       <button type="button" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="-1" aria-label="Less">−</button><b>${fmtMoney(Number(d.pull[k]) || 0)}</b>
       <button type="button" class="sd-step--gold" data-mny-action="sd-pull" data-sd-k="${k}" data-sd-d="1" aria-label="More">+</button></div>`;
   // 📥 Money that came in since last Sunday joins the pile on its own
@@ -735,7 +735,7 @@ function sdPaydayMain(c) {
           <div class="sd-offs">
             <button type="button" class="sd-off" data-mny-action="sd-line" data-sd-tile="fines"><span>📦 ${escapeHtml(fineDays ? 'Box fine' : 'Fines')}</span>
               <span class="sd-off-foot"><span class="sd-note">${escapeHtml(fineDays || tile('fines').note)}${fineFloor ? ' · ' + escapeHtml(fineFloor) : ''}</span>${-P.income.fine > 0.004 || fineFloor ? `<b class="sd-red">${escapeHtml(sdOff$(fineFloor ? fineRaw : P.income.fine))}</b>` : ''}</span></button>
-            <div class="sd-off sd-off--adv ui-stepper">
+            <div class="sd-off sd-off--adv ui-stepper ui-stepper--kid">
               <div class="sd-pull-name"><span class="sd-nowrap">⏪ Drawn early <b${adv ? ' class="sd-red"' : ''}>${escapeHtml(sdOff$(adv))}</b></span><span class="sd-note">${escapeHtml(advNote)}</span></div>
               <button type="button" data-mny-action="sd-adv" data-sd-d="-1" aria-label="Less">−</button>
               <button type="button" class="sd-step--peach" data-mny-action="sd-adv" data-sd-d="1" aria-label="More">+</button>

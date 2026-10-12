@@ -112,7 +112,6 @@
 .sd-atts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
 .sd-atts > .ui-btn { padding: 0 6px; font-size: calc(0.9375rem * var(--text-scale, 1)); white-space: nowrap; }
 .sd-atts > .ui-btn.open { border-style: dashed; }
-.sd-atts > .ui-btn.yes { background: var(--mny-v15-green); }
 .sd-atts > .ui-btn.no { background: var(--mny-v15-no); }
 .sd-cat-icon { font-size: calc(1.75rem * var(--text-scale, 1)); line-height: 1; }
 .sd-catwrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -126,7 +125,7 @@
 .sd-cat.tilt-l { transform: rotate(-1.5deg); }
 .sd-cat.tilt-r { transform: rotate(1.5deg); }
 .sd-catwrap > .ui-btn { border-style: dashed; white-space: normal; font-size: calc(0.875rem * var(--text-scale, 1)); line-height: 1.1; padding: 2px 6px; }
-.sd-catwrap > .ui-btn.on { border-style: solid; background: var(--mny-v15-green); }
+.sd-catwrap > .ui-btn.on { border-style: solid; }
 .sd-stairs { height: 230px; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; align-items: end; border-bottom: var(--bw-rule) solid var(--mny-v15-ink); padding: 0 2px; }
 /* E1: no band above the stairs. A bar's height is its share (--f, 0.2 to 1) of
    the stairs less the 58px its words need; the words sit on its top. */
@@ -297,7 +296,10 @@
 .sd-sign-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--sd-press); }
 .sd-presets { display: flex; gap: 6px; align-items: center; flex: none; flex-wrap: wrap; }
 @media (min-width: 768px) { .sd-presets { flex-wrap: nowrap; } }
-.sd-presets > .ui-chip { padding: 0 10px; font-size: calc(0.875rem * var(--text-scale, 1)); }
+.sd-presets > .ui-chip { font-size: calc(0.875rem * var(--text-scale, 1)); }
+/* G7 (Stage 52): on a phone ◀ My pile takes the chips' sides and size (K12), so
+   the whole choose row fits two rows at 390px. */
+@media (max-width: 699px) { .sd-presets > .ui-btn { padding: 0 0.6rem; font-size: calc(0.875rem * var(--text-scale, 1)); } }
 .sd-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) var(--sd-legend-w); gap: 6px; flex: 1 1 auto; min-height: 330px; }
 .sd-col { border: var(--bw-rule) solid var(--mny-v15-ink); border-radius: var(--radius-md); box-shadow: var(--mny-shadow-card); display: flex; flex-direction: column; padding: 6px 7px 8px; gap: 2px; min-width: 0; min-height: 0; overflow: hidden; }
 .sd-col--loan { background: var(--mny-v15-loan); }
