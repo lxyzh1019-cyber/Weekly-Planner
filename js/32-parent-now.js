@@ -277,12 +277,7 @@ function pnSundayCard() {
   let days = '';
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
-    const k = ctDateToKey(date);
-    const isOk = mmIsDayConfirmed(d), isToday = k === todayKey(), isFuture = k > todayKey();
-    const cls = [isOk ? 'ui-day--ok' : '', isFuture ? 'ui-day--future' : ''].filter(Boolean).join(' ');
-    days += `<button type="button"${cls ? ` class="${cls}"` : ''}${isToday ? ' aria-current="date"' : ''}
-        data-pn-action="day" data-day="${d}" aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate() + (isToday ? ', today' : '') + (isOk ? ', confirmed' : ', not confirmed yet'))}">
-        <span>${DAY_SHORT[d]}</span><span>${date.getDate()}</span></button>`;
+    days += meetingDayTile(d, date, `data-pn-action="day" data-day="${d}"`);
   }
   const sunday = new Date(info.sun);
   const kids = ['jenn', 'jess'].map(kid => {
@@ -303,7 +298,7 @@ function pnSundayCard() {
         <span class="pn-side-meta">${nConfirmed} of 7 days confirmed</span></div>
       <p class="pn-purpose">Is payday ready? What still blocks it.</p>
       ${kids}
-      <div class="ui-days">${days}</div>
+      <div class="ui-days ui-days--tiles">${days}</div>
       ${cta}
       <button type="button" class="ui-btn ui-btn--secondary ui-btn--block" data-pn-action="fullweek">📋 Open her full week ›</button>
     </div>`;

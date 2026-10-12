@@ -653,6 +653,8 @@
   .td-rates > .ui-chip { min-width: 44px; justify-content: center; }
   /* Amber like the family chip: something is waiting, nothing is wrong. */
   .td-catchup { background: var(--surface-catchup); border-color: var(--status-todo-border); }
+  /* C6 (owner 2026-10-12): the open catch-up day turns pale again. */
+  .td-catchup .ui-row[data-td-action="catchup-day"][aria-expanded="true"] { background: var(--bg2); }
   .td-catchup-title { font-size: calc(max(15px, calc(1.05rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; }
   .td-catchup-panel {
     margin: 0.3rem 0 0.4rem 0.3rem; padding-left: 0.5rem;

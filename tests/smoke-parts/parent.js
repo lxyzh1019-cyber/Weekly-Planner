@@ -47,7 +47,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
                 if (come && toCome === 'future' && (!c.classList.contains('ui-day--future') || c.disabled || cs.cursor !== 'pointer')) out.push(`${tag} ${where}: to-come day cell ${i + 1} must be .ui-day--future, tappable, pointer`);
                 if (come && toCome === 'disabled' && !c.disabled) out.push(`${tag} ${where}: to-come day cell ${i + 1} should be disabled`);
                 if (come && Number(cs.opacity) < 1) out.push(`${tag} ${where}: to-come day cell ${i + 1} has dropped opacity ${cs.opacity}`);
-                if (c.getAttribute('aria-pressed') === 'true' && cs.backgroundColor !== fillOf('--sel')) out.push(`${tag} ${where}: chosen day cell ${i + 1} is not the selected colour`);
+                if (c.getAttribute('aria-pressed') === 'true' && cs.backgroundColor !== fillOf('--sel', row)) out.push(`${tag} ${where}: chosen day cell ${i + 1} is not its area's picked colour`);
               });
             } else out.push(`${tag} ${where}: today is cell ${todayIdx + 1}, want 3 (Wed) on the smoke date, so to-come cells were not checked`);
             cells.forEach((c, i) => {
@@ -65,9 +65,48 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
             if (!bs.length) { out.push(`${tag} ${where}: no ${sel} drawn`); return; }
             bs.forEach(b => { const r = b.getBoundingClientRect(); if (Math.abs(r.width - w) > 0.5 || Math.abs(r.height - h) > 0.5) out.push(`${tag} ${where}: "${(b.getAttribute('aria-label') || b.textContent).trim().slice(0, 30)}" is ${Math.round(r.width)}×${Math.round(r.height)}, want ${w}×${h}`); });
           };
-          const fillOf = (token) => { const p = document.createElement('i'); p.style.background = `var(${token})`; document.body.appendChild(p); const v = getComputedStyle(p).backgroundColor; p.remove(); return v; };
+          const fillOf = (token, where) => { const p = document.createElement('i'); p.style.background = `var(${token})`; (where || document.body).appendChild(p); const v = getComputedStyle(p).backgroundColor; p.remove(); return v; };
+          /* C5 (owner 2026-10-12): a day tile on Now and the Meeting hub shows its
+             weekday, date, 🐥 %, 🦊 % and "Review ›" (or "Confirmed"). */
+          const tileFaults = (c) => {
+            const f = [], part = (cl) => { const e = c.querySelector('.' + cl); return e ? e.textContent.trim() : null; };
+            if (!/^[A-Za-z]{3}$/.test(part('ui-day-dow') || '')) f.push(`shows no weekday (${part('ui-day-dow')})`);
+            if (!/^\d{1,2}$/.test(part('ui-day-date') || '')) f.push(`shows no date (${part('ui-day-date')})`);
+            const pcts = [...c.querySelectorAll('.ui-day-pct')].map(e => e.textContent.trim());
+            if (pcts.length !== 2 || !/^🐥\d+%$/u.test(pcts[0]) || !/^🦊\d+%$/u.test(pcts[1])) f.push(`shows ${JSON.stringify(pcts)}, want 🐥 % and 🦊 %`);
+            const st = part('ui-day-state'), stWant = c.classList.contains('ui-day--ok') ? 'Confirmed' : 'Review ›';
+            if (st !== stWant) f.push(`says "${st}", want "${stWant}"`);
+            return f;
+          };
+          const tilesCheck = (where, row) => {
+            const cells = row ? [...row.children] : [];
+            cells.forEach((c, i) => tileFaults(c).forEach(f => out.push(`${tag} ${where}: day tile ${i + 1} ${f}`)));
+            cells.forEach((c, i) => { if (c.scrollWidth > c.clientWidth + 1) out.push(`${tag} ${where}: day tile ${i + 1}'s words overflow it (${c.scrollWidth} in ${c.clientWidth})`); });
+            // The phone wraps the tiles (as before C5); every tile one width.
+            const rects = cells.map(c => c.getBoundingClientRect());
+            if (rects.some(r => Math.abs(r.width - rects[0].width) > 0.5)) out.push(`${tag} ${where}: the day tiles are ${rects.map(r => Math.round(r.width)).join('/')}px, want one width`);
+            if (size === 'phone' && new Set(rects.map(r => Math.round(r.top))).size < 2) out.push(`${tag} ${where}: the day tiles do not wrap on a phone`);
+            const plant = cells[0] && cells[0].cloneNode(true);
+            if (plant) { plant.querySelectorAll('.ui-day-pct').forEach(e => e.remove()); if (!tileFaults(plant).length) out.push(`${tag} ${where}: the tile check missed its plant (a tile without its %)`); }
+          };
+          /* C4: the kid switch fills what its row leaves it, the girls in equal
+             parts. C1/C8: in the parent area the chosen girl is navy with white. */
+          const switchFaults = (kids) => {
+            const f = [], row = kids.parentElement, rs = getComputedStyle(row), rr = row.getBoundingClientRect(), k = kids.getBoundingClientRect();
+            const cells = [...kids.children].map(b => b.getBoundingClientRect().width);
+            if (cells.some(w => Math.abs(w - cells[0]) > 0.5)) f.push(`has cells of ${cells.map(Math.round).join(' / ')}px, want equal`);
+            const next = kids.nextElementSibling && kids.nextElementSibling.getBoundingClientRect();
+            const end = next && Math.abs(next.top - k.top) < 1 ? next.left - (parseFloat(rs.columnGap) || 0) : rr.right - parseFloat(rs.paddingRight) - parseFloat(rs.borderRightWidth);
+            if (Math.abs(k.right - end) > 1) f.push(`ends at ${Math.round(k.right)}px, its row leaves it to ${Math.round(end)}px`);
+            const line = [...row.children].filter(e => e.getClientRects().length && Math.abs(e.getBoundingClientRect().top - k.top) < 1);
+            const rowEnd = rr.right - parseFloat(rs.paddingRight) - parseFloat(rs.borderRightWidth), lineEnd = line.length ? line[line.length - 1].getBoundingClientRect().right : k.right;
+            if (Math.abs(lineEnd - rowEnd) > 1) f.push(`leaves ${Math.round(rowEnd - lineEnd)}px of its row empty`);
+            const on = kids.querySelector('[aria-pressed="true"]'), oc = on && getComputedStyle(on);
+            if (on && (oc.backgroundColor !== 'rgb(28, 34, 64)' || oc.color !== 'rgb(255, 255, 255)')) f.push(`has the chosen girl in ${oc.backgroundColor} / ${oc.color}, want the parent's #1c2240 / #fff`);
+            return f;
+          };
           // The classes this stage retired from the portal, Grown-ups and the request sheet.
-          const OLD = ['.gu-yes', '.gu-talk', '.gu-no', '.gu-undo', '.gu-tab', '.gu-opt', '.gu-step', '.gu-pair', '.gu-x', '.mny-step', '.rq-opt', '.pn-day', '.pn-days', '.review-day-row'];
+          const OLD = ['.gu-yes', '.gu-talk', '.gu-no', '.gu-undo', '.gu-tab', '.gu-opt', '.gu-step', '.gu-pair', '.gu-x', '.mny-step', '.rq-opt', '.pn-day', '.pn-days', '.review-day-row', '.hub-pct'];
           const fullWidth = (btn) => { const p = btn.parentElement, cs = getComputedStyle(p); return Math.abs(btn.getBoundingClientRect().width - (p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight))) <= 1.5; };
           const confirmBefore = state.shared.parentDayConfirm;
           const fx = document.createElement('div');
@@ -87,9 +126,18 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           if (phone) measure('the bottom bar', document.getElementById('parentNav'), '.ui-btn');
           setParentTab('now'); await wait(60);
           measure('Now', document.getElementById('pnWrap'), '.ui-days > button');
-          daysCheck('Now', document.querySelector('#pnWrap .pn-sun .ui-days'), /^[A-Za-z]{3} \d+(, today)?, (confirmed|not confirmed yet)$/);
+          daysCheck('Now', document.querySelector('#pnWrap .pn-sun .ui-days'), /^[A-Za-z]{3} \d+, (confirmed|not confirmed yet)(, today)?, Jenn \d+%, Jess \d+%$/);
+          tilesCheck('Now', document.querySelector('#pnWrap .pn-sun .ui-days'));
           const nowKids = [...document.querySelectorAll('#screen-parent .ui-kids')].filter(shown);
           if (nowKids.length !== 1) out.push(`${tag} Now: ${nowKids.length} girl switches on show, want one .ui-kids`);
+          else {
+            switchFaults(nowKids[0]).forEach(f => out.push(`${tag} Now: the girl switch ${f}`));
+            const toggles = nowKids[0].parentElement, head = toggles.parentElement, hr = head.getBoundingClientRect();
+            if (Math.abs(toggles.getBoundingClientRect().right - (hr.right - parseFloat(getComputedStyle(head).paddingRight))) > 1) out.push(`${tag} Now: the girl switch's toggles do not reach the end of their row`);
+            nowKids[0].style.flex = 'none';
+            if (!switchFaults(nowKids[0]).length) out.push(`${tag} Now: the switch width check missed its plant (a switch that does not grow)`);
+            nowKids[0].style.flex = '';
+          }
           const runBtn = document.querySelector('#pnWrap .pn-sun [data-pn-action="meeting"]');
           if (!runBtn || !runBtn.classList.contains('ui-btn--block') || !fullWidth(runBtn)) out.push(`${tag} Now: Run family meeting is not the full-width kit button`);
           // Her rating shows only on a day with training: give Jenn's today one, put back after.
@@ -100,6 +148,11 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
             measure('Now › She told me', document.getElementById('pnToldBody'), '.pn-answer-kids > button');
             const kidCells = [...document.querySelectorAll('#pnToldBody .pn-answer-kids > button')];
             if (kidCells.length !== 2 || Math.abs(kidCells[1].getBoundingClientRect().left - kidCells[0].getBoundingClientRect().right) > 0.6) out.push(`${tag} Now › She told me: the girl switch cells are not joined (no gap)`);
+            const toldKids = document.querySelector('#pnToldBody .pn-answer-kids');
+            if (toldKids) switchFaults(toldKids).forEach(f => out.push(`${tag} Now › She told me: the girl switch ${f}`));
+            const chosenDay = document.querySelector('#pnToldBody .ui-days > [aria-pressed="true"]'), cd = chosenDay && getComputedStyle(chosenDay);
+            if (!chosenDay) out.push(`${tag} Now › She told me: no chosen day`);
+            else if (cd.backgroundColor !== 'rgb(28, 34, 64)' || cd.color !== 'rgb(255, 255, 255)') out.push(`${tag} Now › She told me: the chosen day is ${cd.backgroundColor} / ${cd.color}, want the parent's #1c2240 / #fff`);
             daysCheck('Now › She told me', document.querySelector('#pnToldBody .ui-days'), /^[A-Za-z]{3} \d+/, false, 'disabled');
             const doneBtn = document.querySelector('#pnToldBody [data-pn-action="told-close"]');
             if (!doneBtn || !doneBtn.classList.contains('ui-btn--block')) out.push(`${tag} Now › She told me: Done is not the full-width kit button`);
@@ -123,9 +176,14 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           setParentDest('meeting'); await wait(60);
           measure('Meeting', document.getElementById('ptab-review'), '.ui-days > button');
           daysCheck('Meeting', document.querySelector('#meetingHub .ui-days'), /^[A-Za-z]{3} \d+, (confirmed|not confirmed yet)(, today)?, Jenn \d+%, Jess \d+%$/);
-          [...document.querySelectorAll('#meetingHub .ui-days > button')].forEach((c, i) => { if (!/^[A-Za-z]{3}\s*\d{1,2}$/.test(c.textContent.trim())) out.push(`${tag} Meeting: day cell ${i + 1} shows "${c.textContent.trim()}", want only the day and date`); });
+          tilesCheck('Meeting', document.querySelector('#meetingHub .ui-days'));
+          // C5: the tiles carry the %, so the status line no longer lists them; a plant (the old list) must be caught.
+          const pctList = (el) => (el.textContent.match(/(🐥|🦊)\d+%/gu) || []).length;
           const hubStatus = document.querySelector('#meetingHub .hub-status');
-          if (!hubStatus || (hubStatus.textContent.match(/🐥\d+%/g) || []).length !== 7 || (hubStatus.textContent.match(/🦊\d+%/g) || []).length !== 7) out.push(`${tag} Meeting: the status line does not carry the seven days' 🐥 and 🦊 figures`);
+          if (!hubStatus) out.push(`${tag} Meeting: no status line`);
+          else if (pctList(hubStatus)) out.push(`${tag} Meeting: the status line still lists ${pctList(hubStatus)} day figures`);
+          const plantLine = document.createElement('div'); plantLine.textContent = 'Mon 🐥40% 🦊20% · Tue 🐥0% 🦊0%';
+          if (!pctList(plantLine)) out.push(`${tag} Meeting: the status line check missed its plant (the old % list)`);
           const hubBtn = document.querySelector('#meetingHub .hub-cta .ui-btn--block');
           if (!hubBtn || !fullWidth(hubBtn)) out.push(`${tag} Meeting: Run family meeting is not the full-width kit button`);
           setParentDest('history'); await wait(60);
@@ -146,7 +204,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           document.body.appendChild(fx);
           const yes = fx.querySelector('[data-mnyp-action="guyes"]');
           if (!yes || !yes.matches('.ui-btn.ui-btn--ok')) out.push(`${tag} Grown-ups: the yes button is not a kit ok button`);
-          else if (getComputedStyle(yes).backgroundColor !== fillOf('--status-done')) out.push(`${tag} Grown-ups: the ok button fill is ${getComputedStyle(yes).backgroundColor}, not --status-done`);
+          else if (getComputedStyle(yes).backgroundColor !== 'rgb(47, 125, 85)') out.push(`${tag} Grown-ups: the ok button fill is ${getComputedStyle(yes).backgroundColor}, not C8's #2f7d55`);
           ['gutalk', 'guno', 'guundo'].forEach(a => { const b = fx.querySelector(`[data-mnyp-action="${a}"]`); if (!b || !b.matches('.ui-btn.ui-btn--secondary') || b.matches('.ui-btn--danger')) out.push(`${tag} Grown-ups: ${a} is not a kit secondary button`); });
           const gsave = fx.querySelector('[data-mnyp-action="gurulesave"]');
           if (!gsave || !gsave.matches('.ui-btn.ui-btn--secondary')) out.push(`${tag} Grown-ups: Save is not a kit secondary button`);

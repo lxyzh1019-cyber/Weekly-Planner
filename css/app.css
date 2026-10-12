@@ -124,6 +124,15 @@
     --radius-pill: var(--radius-full);
     /* Kit 1.1 K5: a seven-day row's cell corner (.ui-days). */
     --radius-cell: 12px;
+    /* C8 (owner 2026-10-12): today's day tile is a double navy frame, no fill. */
+    --bw-today: 4px;
+    /* C8: the kit's button jobs, each pointing at a value app.css already
+       has — Yes / OK green #2f7d55 with white (5.02:1), Danger (deletes
+       only) #b8441f with white (5.41:1). Same in both looks. */
+    --btn-ok: var(--status-done-strong);
+    --btn-ok-ink: var(--ink-on-strong);
+    --btn-danger: var(--mny-v15-red);
+    --btn-danger-ink: var(--mny-v15-white);
     --z-header: 100;
     --z-nav:    60;
     --z-sheet:  300;
@@ -416,9 +425,9 @@
     /* Secondary text inside the filled Now card: navy, because the muted text
        does not reach 4.5:1 on a block colour. */
     --now-ink-soft: var(--ink);
-    /* Main buttons and the selected tab: yellow, navy text; the selected tab
-       has no ring. Selected pills: the selected colour (Kit 1.1 K11, D72:
-       one selected colour app-wide). */
+    /* Main buttons: yellow, navy text (C8: yellow means only the main
+       action). Picked pills: the picked colour of their area (--pill-on is
+       --sel; owner corrections C1/C2, 2026-10-12). */
     --btn-main: #ffc83d;
     --btn-main-ink: var(--ink);
     --nav-on: #ffc83d;
@@ -515,15 +524,10 @@
     --mytime-surface: #fff8e1;
     --mytime-paper: #fffdf5;
     --mytime-glow: rgba(255,209,102,0.3);
-    /* Selected tabs (the portal's five, Copy a day's sister tabs, the chore
-       lanes): Pop yellow with navy text, Calm navy with white. */
-    --tab-on: var(--accent-yellow);
-    --tab-on-ink: var(--ink);
-    /* Parent › Now's today square, beside a selected day that is navy-filled:
-       Pop fills today with the strong accent, white text, no ring. */
-    --day-now-bg: var(--accent-strong);
-    --day-now-ink: var(--ink-on-strong);
-    --day-now-ring: none;
+    /* Selected tabs (Copy a day's sister tabs, the chore lanes, .ui-tabs):
+       the picked colour (C8: tabs are picked; yellow is never picked). */
+    --tab-on: var(--sel);
+    --tab-on-ink: var(--sel-ink);
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--accent-yellow);
     --series-jess: var(--accent);
@@ -531,8 +535,14 @@
        the selected cell, the badge, the meeting's ring, the date's ink and the
        buttons' hard shadow. Badge, ring and ink are the same literals in both
        looks in the owner's source (SRC 52, 209, 51). */
-    --sel: #ffc83d;
-    --sel-ink: #1c2240;
+    /* The picked colour (C1/C8, owner 2026-10-12): the planner's — Pop teal
+       #2f7f77 with white (--mny-v15-teal, 4.75:1); never yellow, so it never
+       clashes with Jenn's 🐥. An area root sets its own (css kit block,
+       [data-area]); outside one, the planner's. */
+    --sel-planner: var(--mny-v15-teal);
+    --sel-planner-ink: var(--mny-v15-white);
+    --sel: var(--sel-planner);
+    --sel-ink: var(--sel-planner-ink);
     --hdr-badge-bg: #ffe4ec;
     --hdr-ring: #ff5c8a;
     --hdr-label-ink: #1c2240;
@@ -580,8 +590,8 @@
     /* On the white Now card the secondary text is the look's own. */
     --now-ink-soft: var(--ink-light);
     /* Purple main button, white text. Selected tab: the page tint ringed in
-       navy (an inset ring, so no box moves). Selected pills: the selected
-       colour, navy with white text (Kit 1.1 K11, D72). */
+       navy (an inset ring, so no box moves). Picked pills: the picked
+       colour of their area (--pill-on is --sel; C1/C2, 2026-10-12). */
     --btn-main: #5b4fd6;
     --btn-main-ink: #fff;
     --nav-on: #eef2f9;
@@ -679,23 +689,21 @@
     --mytime-surface: #ffeef3;
     --mytime-paper: #ffffff;
     --mytime-glow: rgba(255,92,138,0.25);
-    /* Selected tabs (the portal's five, Copy a day's sister tabs, the chore
-       lanes): Pop yellow with navy text, Calm navy with white. */
-    --tab-on: var(--ink);
-    --tab-on-ink: #fff;
-    /* Parent › Now's today square: Calm's selected pill is navy-filled, so
-       today is navy by frame (L9) — white inside, navy text, an inset navy
-       ring on the navy border (inset, so no box moves). */
-    --day-now-bg: var(--paper);
-    --day-now-ink: var(--ink);
-    --day-now-ring: inset 0 0 0 2px var(--today-mark);
+    /* Selected tabs (Copy a day's sister tabs, the chore lanes, .ui-tabs):
+       the picked colour (C8: tabs are picked). */
+    --tab-on: var(--sel);
+    --tab-on-ink: var(--sel-ink);
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
     --series-jenn: var(--jenn);
     --series-jess: var(--jess);
     /* The rebuilt header (Stage 20): navy selected with white text, the
        2px shadow; badge, ring and ink as Pop (SRC 612, 615). */
-    --sel: #1c2240;
-    --sel-ink: #fff;
+    /* The picked colour (C1/C8): the planner's — Calm navy #1c2240 with white
+       (15.5:1). An area root sets its own ([data-area]). */
+    --sel-planner: var(--ink);
+    --sel-planner-ink: var(--ink-on-strong);
+    --sel: var(--sel-planner);
+    --sel-ink: var(--sel-planner-ink);
     --hdr-badge-bg: #ffe4ec;
     --hdr-ring: #ff5c8a;
     --hdr-label-ink: #1c2240;
@@ -4801,10 +4809,13 @@
   cursor: pointer;
 }
 .ui-btn--primary { background: var(--btn-main); color: var(--btn-main-ink); }
-.ui-btn--secondary { background: var(--paper); color: var(--ink); }
-.ui-btn--danger { background: var(--status-danger-wash); color: var(--status-danger-ink); border-color: var(--status-danger-ink); }
-/* Kit 1.1 K7: the green "ok" button (Approve, She bought it, ✓ Yes / Agree). */
-.ui-btn--ok { background: var(--status-done); color: var(--status-done-ink); }
+.ui-btn--secondary { background: var(--paper); color: var(--ink); border-width: var(--bw-chip); }
+/* C8 (owner 2026-10-12): Danger is for a delete that cannot be undone —
+   #b8441f with white, both looks; never for "No" or "Not now". */
+.ui-btn--danger { background: var(--btn-danger); color: var(--btn-danger-ink); }
+/* Kit 1.1 K7, C8: the green "ok" button (Approve, She bought it, ✓ Yes /
+   Agree, Set it): #2f7d55 with white, both looks. */
+.ui-btn--ok { background: var(--btn-ok); color: var(--btn-ok-ink); }
 /* Kit 1.1 K6: a screen's one leading action, the full width of its column. */
 .ui-btn--block { width: 100%; }
 .ui-btn--icon { width: 44px; padding: 0; }
@@ -4819,18 +4830,23 @@
   box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-1);
   min-height: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
   font-family: var(--font-text); font-weight: 700; font-size: calc(0.95rem * var(--text-scale, 1));
   white-space: nowrap;
 }
-/* Kit 1.1 K11: a picked chip wears the one selected colour (--pill-on is --sel). */
+/* C3 (owner 2026-10-12, overrides the kit's pill): a chip, an amount
+   button among them, is a rounded rectangle, 11px corners. A picked chip
+   wears its area's picked colour (--pill-on is --sel, C1/C2). */
 .ui-chip[aria-pressed="true"] { background: var(--pill-on); color: var(--pill-on-ink); }
 
 /* Kit 1.1 K2: a mouse pointing at a kit button or chip washes it pale (over
    its own fill, so a main or ok button keeps its colour) and shows the
-   pointer. Fingers on the iPad see no difference: no hover there. */
+   pointer; so does a list row that is a button (C6, owner 2026-10-12: the
+   row hover hint comes back). Fingers on the iPad see no difference: no
+   hover there. */
 @media (hover: hover) {
-  .ui-btn:hover:not(:disabled):not([aria-disabled="true"]), .ui-chip:hover:not(:disabled):not([aria-disabled="true"]) {
+  .ui-btn:hover:not(:disabled):not([aria-disabled="true"]), .ui-chip:hover:not(:disabled):not([aria-disabled="true"]),
+  button.ui-row:hover:not(:disabled) {
     background-image: linear-gradient(var(--hover-wash), var(--hover-wash)); cursor: pointer;
   }
 }
@@ -4866,12 +4882,16 @@
 
 /* Kit 1.1 K4 (D49): one kid switch everywhere — the header's joined switch
    (the parent header's girl switch, .parent-scope): a 2px ink frame with pill
-   ends, 2px ink dividers, the chosen girl in the look's --sel (Pop yellow,
-   Calm navy with white). The cells draw the frame, and the end and divider
+   ends, 2px ink dividers, the chosen girl in her area's picked colour (--sel,
+   C1/C2). C4 (owner 2026-10-12): it fills the width of its row, the girls in
+   equal parts, one grid column each (in a flex row it grows: Now's
+   toggles, the money sub-bar).
+   The cells draw the frame, and the end and divider
    rules use :where() so they weigh no more than the base cell rule: a screen
    that draws its girls its own way (the meeting's round pictures, .sd-avs;
-   the portal's framed .parent-scope) keeps its look. */
-.ui-kids { display: inline-flex; gap: 0; }
+   the portal's framed .parent-scope, whose cells the header table sizes)
+   keeps its look. */
+.ui-kids { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; }
 .ui-kids > button {
   box-sizing: border-box; min-height: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
@@ -4883,10 +4903,26 @@
 .ui-kids > button:where(:not(:first-child)) { border-left-width: 0; }
 .ui-kids > button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); }
 
+/* C1 / C2 / C8 (owner 2026-10-12): two colours, two jobs. Picked (a chip, an
+   amount, a day, a kid switch, a tab) is one colour per area, set ONCE here
+   at the area's root ([data-area] on the screen or sheet, index.html):
+   money teal #2f7f77 in both looks (My money, Money school, Sunday and the
+   meeting, Grown-ups, the request sheets); the planner Pop teal, Calm navy
+   (Today, Week, Day, Sister Sync, Profile; the look's own --sel); the
+   parent navy #1c2240 in both (Now, She told me, the Meeting hub, Monthly).
+   White text on each (4.75:1 teal, 15.5:1 navy). The main action is the
+   look's --btn-main (Pop yellow, Calm violet): yellow is never picked.
+   --pill-on and --tab-on are re-read here, so they follow the area. */
+[data-area="money"] { --sel: var(--mny-v15-teal); --sel-ink: var(--mny-v15-white); }
+[data-area="planner"] { --sel: var(--sel-planner); --sel-ink: var(--sel-planner-ink); }
+[data-area="parent"] { --sel: var(--ink); --sel-ink: var(--ink-on-strong); }
+[data-area] { --pill-on: var(--sel); --pill-on-ink: var(--sel-ink); --tab-on: var(--sel); --tab-on-ink: var(--sel-ink); }
+
 /* Kit 1.1 K5 (D50): one seven-day row — 7 equal cells, 12px corners, day over
-   date. Four states, never colour alone (G1): today (aria-current="date") the
-   look's today square and a dot; confirmed (.ui-day--ok) green and a ✓; chosen
-   (aria-pressed="true") the selected colour; still to come dashed in the
+   date. Four states, never colour alone (G1): today (aria-current="date") a
+   double navy frame and a dot, no fill of its own (C8, owner 2026-10-12);
+   confirmed (.ui-day--ok) green and a ✓; chosen (aria-pressed="true") its
+   area's picked colour; still to come dashed in the
    lighter ink (:disabled when it cannot be tapped, .ui-day--future when it can). Each cell carries its spoken name (aria-label), which
    may say its %. */
 .ui-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); }
@@ -4898,7 +4934,7 @@
   font-family: var(--font-text); font-weight: 700; font-size: calc(0.9rem * var(--text-scale, 1)); line-height: 1.15;
   cursor: pointer;
 }
-.ui-days > button[aria-current="date"] { background: var(--day-now-bg); color: var(--day-now-ink); box-shadow: var(--day-now-ring); }
+.ui-days > button[aria-current="date"] { border: var(--bw-today) double var(--today-mark); }
 .ui-days > button[aria-current="date"]::after { content: '\2022'; }
 .ui-days > .ui-day--ok { background: var(--status-done); color: var(--status-done-ink); }
 .ui-days > .ui-day--ok::after { content: '\2713'; }
@@ -4907,6 +4943,15 @@
 .ui-days > button:disabled { background: var(--paper); color: var(--ink-light); border-style: dashed; box-shadow: none; cursor: default; }
 /* Still to come but tappable (Now, the Meeting hub): the same dashed look, the pointer stays. */
 .ui-days > .ui-day--future { background: var(--paper); color: var(--ink-light); border-style: dashed; box-shadow: none; }
+/* C5 (owner 2026-10-12, overrides K5 on Now and the Meeting hub): a day tile
+   tells its day — weekday, date, 🐥 % and 🦊 %, "Review ›" (Confirmed once
+   it is) — and the tiles wrap onto a second row where seven 72px tiles do
+   not fit (a phone, Now's side card), all the same width. */
+.ui-days--tiles { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: var(--space-1); }
+.ui-days--tiles > button { gap: 2px; padding: var(--space-2) 2px; }
+.ui-day-dow { font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 800; text-transform: uppercase; }
+.ui-day-date { font-family: var(--font-display); font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; line-height: 1; }
+.ui-day-pct, .ui-day-state { font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 700; white-space: nowrap; }
 
 /* Kit 1.1 K8 (D53, corrected by the owner 2026-10-11, G8): one list row — an
    icon, the name, and things on the right; a kid's row 52px, a parent's
@@ -4928,12 +4973,13 @@
 .ui-row--add { border-style: dashed; }
 
 /* Kit 1.1 K10 (D71, G4): the only stepper. Its − / + are 44px where only a
-   parent uses it, 52px where the girl does (.ui-stepper--kid). */
+   parent uses it, 52px where the girl does (.ui-stepper--kid). C3 (owner
+   2026-10-12, overrides K10's shape): the − / + are round again. */
 .ui-stepper { display: inline-flex; align-items: center; gap: var(--space-2); }
 .ui-stepper > button {
   box-sizing: border-box; width: 44px; height: 44px; padding: 0;
   background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-full);
   font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
 }
 .ui-stepper--kid > button { width: 52px; height: 52px; }
@@ -5061,7 +5107,7 @@
 .hdr-r2-start, .hdr-r2-end { display: flex; align-items: center; gap: var(--hdr-r2-gap); min-width: 0; }
 .hdr-r2-end { flex: none; }
 .hdr-week { white-space: nowrap; font-weight: 600; }
-.hdr-sub .ui-kids { margin-left: auto; }
+.hdr-sub .ui-kids { margin-left: auto; flex: 1 1 auto; }
 /* Money: 72px, its buttons and badge 54px, ◀ 18px, ? 24px 600, the badge's
    emoji 26px; her two tabs are pills in the head font, 26px × the look's
    scale, the current one --sel (SRC 168-176). No title and no date: the

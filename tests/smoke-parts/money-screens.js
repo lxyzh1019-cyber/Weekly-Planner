@@ -502,7 +502,7 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
      Each stage names controls that must be drawn, so a stage that did not
      open cannot measure clean. Stage 52 (Kit 1.1): the ✓ result / ✓ Agree /
      ✓ Yes buttons, a club session she went to and the ticked Sunday routine
-     are the kit's ok button (K7: --status-done fill, --status-done-ink ink);
+     are the kit's ok button (K7, C8: #2f7d55 with white, both looks); every chip 11px and every − / + round (C3), a picked chip the money teal (C1/C8);
      a stepper the girl uses (From home / From my bank, Drawn early) is 52×52
      (.ui-stepper--kid), one only a parent uses (✏️ Adjust, 💬 Talk first,
      the must-pay steppers, a line edit) 44×44 (K10, G4). Puts back the
@@ -526,6 +526,7 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
           const name = (b) => (b.getAttribute('aria-label') || b.textContent).trim().replace(/\s+/g, ' ').slice(0, 40);
           const measure = (where, roots, wants) => {
             roots = roots.filter(Boolean);
+            shapeCheck(where, roots);
             if (!roots.length) { out.push(`${tag} ${where}: not drawn`); return; }
             wants.forEach(sel => { if (!roots.some(r => r.querySelector(sel))) out.push(`${tag} ${where}: no ${sel} drawn, so it was not measured`); });
             const all = roots.flatMap(r => [...r.querySelectorAll(KIT)]).filter(shown);
@@ -546,15 +547,24 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
               }
             });
           };
-          // K7: the ok green, read from the look's tokens, not typed.
-          const okWant = (() => {
-            const p = document.createElement('i');
-            p.style.background = 'var(--status-done)'; p.style.color = 'var(--status-done-ink)';
-            document.body.appendChild(p);
-            const cs = getComputedStyle(p), v = [cs.backgroundColor, cs.color];
-            p.remove();
-            return v;
-          })();
+          // K7, C8 (owner 2026-10-12): the ok green #2f7d55 with white, both looks.
+          const okWant = ['rgb(47, 125, 85)', 'rgb(255, 255, 255)'];
+          /* C3: every chip on the Sunday screens is a rounded rectangle (11px), every
+             − / + round; C1/C8: a picked chip in the money area is teal #2f7f77 with
+             white in both looks. Each meets a plant it must catch. */
+          const shapeFaults = (b) => {
+            const cs = getComputedStyle(b);
+            if (b.matches('.ui-chip') && cs.borderTopLeftRadius !== '11px') return [`chip "${name(b)}" has a ${cs.borderTopLeftRadius} corner, want 11px`];
+            if (b.matches('.ui-stepper > button') && cs.borderTopLeftRadius !== '999px') return [`− / + "${name(b)}" has a ${cs.borderTopLeftRadius} corner, want round`];
+            if (b.matches('.ui-chip[aria-pressed="true"]') && (cs.backgroundColor !== 'rgb(47, 127, 119)' || cs.color !== 'rgb(255, 255, 255)')) return [`picked chip "${name(b)}" is ${cs.backgroundColor} / ${cs.color}, want the money teal #2f7f77 / #fff`];
+            return [];
+          };
+          let shapes = 0;
+          const shapeCheck = (where, roots) => roots.filter(Boolean).forEach(r => r.querySelectorAll('.ui-chip, .ui-stepper > button').forEach(b => {
+            if (!shown(b)) return;
+            shapes++;
+            shapeFaults(b).forEach(f => out.push(`${tag} ${where}: ${f}`));
+          }));
           const okLook = (where, what, els) => {
             els = els.filter(shown);
             if (!els.length) { out.push(`${tag} ${where}: no ${what} drawn, so its ok look was not measured`); return; }
@@ -637,6 +647,14 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
             if (!signed || signed.ok === false) out.push(`${tag} Signed: the sign refused (${JSON.stringify(signed)})`);
             mnyMeetKid = kid; mmGoTo('money'); await draw();
             measure('Signed', [step(), head()], ['.sd-tm > .ui-chip', '.sd-more.ui-btn']);
+            if (!shapes) out.push(`${tag}: no chip or − / + was drawn, so no shape was measured`);
+            const fx = document.createElement('div');
+            fx.setAttribute('data-area', 'money');
+            fx.innerHTML = '<button type="button" class="ui-chip" style="border-radius:999px">pill</button><span class="ui-stepper"><button type="button" style="border-radius:11px">−</button></span><button type="button" class="ui-chip" aria-pressed="true" style="background:#ffc83d">$5</button>';
+            document.getElementById('sundayOverlay').appendChild(fx);
+            const caught = [...fx.querySelectorAll('button')].filter(b => shapeFaults(b).length).length;
+            fx.remove();
+            if (caught !== 3) out.push(`${tag}: the shape and picked-colour checks caught ${caught} of their 3 plants (a pill chip, an 11px − / +, a yellow picked chip)`);
           } finally {
             if (document.getElementById('sundayOverlay').classList.contains('open')) { sdSheet = null; closeSheet('sundayOverlay'); }
             if (mmIsOpen()) mmHide();

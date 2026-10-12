@@ -84,7 +84,7 @@
      SCREEN: PROFILE SELECT
 ════════════════════════════════════════════════════════ -->
 <main>
-<div class="screen active" id="screen-profile">
+<div class="screen active" id="screen-profile" data-area="planner">
   <div class="profile-header">
     <h1>My Weekly Planner</h1>
     <p>Who's here today? <span class="sync-dot" id="syncDot"></span></p>
@@ -135,7 +135,7 @@
 
      Reachable from the week's tab bar; not yet the default landing.
 ════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-today">
+<div class="screen" id="screen-today" data-area="planner">
   <!-- The standard page header (pageHeader, js/47-header.js): Today, the date,
        the profile badge. Drawn by tdRenderToday; the date comes from
        todayKey(), the family's clock rather than the device's — the same
@@ -242,7 +242,7 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: WEEK VIEW
 ════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-week">
+<div class="screen" id="screen-week" data-area="planner">
   <!-- The standard page header, drawn by renderWeek (weekRenderHeader): My
        Week, the week stepper, the Full / Print preview tabs, Print only on
        the preview, the profile badge. One row at every size; a parent viewing
@@ -365,17 +365,17 @@
      the bank (kids read-only, parent transacts), and the rules editor
      (parent only — the tab itself is hidden for kids). -->
 <!-- 1 💰 My money — the kid's own money page -->
-<div class="screen" id="screen-mymoney">
+<div class="screen" id="screen-mymoney" data-area="money">
   <div class="chore-wrap" id="mnyPage1Wrap"></div>
 </div>
 
 <!-- 🌊 My money story — the flow first, then every week that was settled -->
-<div class="screen" id="screen-moneystory">
+<div class="screen" id="screen-moneystory" data-area="money">
   <div class="chore-wrap" id="mnyStoryWrap"></div>
 </div>
 
 <!-- 5 🎓 Money school -->
-<div class="screen" id="screen-moneyschool">
+<div class="screen" id="screen-moneyschool" data-area="money">
   <div class="chore-wrap" id="mnySchoolWrap"></div>
 </div>
 
@@ -384,14 +384,14 @@
      A Sunday sitting is the longest task in this app: two children, a week of
      days, a reflection each and a money split. Inside a floating sheet that
      meant scrolling a small window up and down the whole way through. -->
-<div class="screen" id="screen-meeting">
+<div class="screen" id="screen-meeting" data-area="money">
   <div class="mm-screen">
     <div id="familyMeetingBody"></div>
   </div>
 </div>
 
 <!-- The Record sheet: one door for a chore grade, a meet, a gift, a fine and a move -->
-<div class="overlay" id="recordOverlay" onclick="overlayClick(event,'recordOverlay')">
+<div class="overlay" id="recordOverlay" data-area="money" onclick="overlayClick(event,'recordOverlay')">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rcSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="rcSheetTitle">✍️ Record something</h3>
@@ -402,7 +402,7 @@
 <!-- Her request sheets — Tell Dad a result, club sessions, move / cash out /
      put in, draw in advance, a new goal, everything she asked (js/45-requests.js).
      Chrome here, body filled by JS, the recordOverlay pattern. -->
-<div class="overlay" id="requestOverlay" data-money-surface onclick="overlayClick(event,'requestOverlay')">
+<div class="overlay" id="requestOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'requestOverlay')">
   <div class="sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
     <h3 id="rqSheetTitle">✋ Ask parents</h3>
     <div id="requestBody"></div>
@@ -411,7 +411,7 @@
 
 <!-- 🗣️ Dad's card on Sunday — ASK / SAY / WAIT for the step (js/44-sunday.js).
      Chrome here, body filled by JS, the recordOverlay pattern. -->
-<div class="overlay" id="sundayOverlay" data-money-surface onclick="overlayClick(event,'sundayOverlay')">
+<div class="overlay" id="sundayOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'sundayOverlay')">
   <div class="sheet sd-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
     <h3 id="sdSheetTitle">🗣️ Parent's card</h3>
     <div id="sundayBody"></div>
@@ -424,14 +424,14 @@
 <!-- 🚪 "She told me…" (Parent › Now, Plan v9 §N): the On-her-behalf card in a
      sheet. Body filled by pnRenderToldSheet (js/32-parent-now.js); its
      data-pn-action controls go to pnHandleClick (js/99-main.js). -->
-<div class="overlay" id="pnToldOverlay" data-money-surface onclick="overlayClick(event,'pnToldOverlay')">
+<div class="overlay" id="pnToldOverlay" data-area="parent" data-money-surface onclick="overlayClick(event,'pnToldOverlay')">
   <div class="sheet pn-told-sheet" role="dialog" aria-modal="true" aria-labelledby="pnToldTitle">
     <h3 id="pnToldTitle">🚪 She told me… — on her behalf</h3>
     <div id="pnToldBody"></div>
   </div>
 </div>
 
-<div class="overlay" id="grownupsOverlay" data-money-surface onclick="overlayClick(event,'grownupsOverlay')">
+<div class="overlay" id="grownupsOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'grownupsOverlay')">
   <div class="sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
     <h3 id="guSheetTitle">✏️ Fix</h3>
     <div id="grownupsBody"></div>
@@ -439,7 +439,7 @@
 </div>
 
 <!-- Quick profile switcher (tap the profile icon) -->
-<div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
+<div class="overlay" id="profileSwitchOverlay" data-area="planner" onclick="overlayClick(event,'profileSwitchOverlay')">
   <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
     <div class="sheet-handle"></div>
     <h3 id="profileSwitchTitle">Switch profile 👤</h3>
@@ -450,7 +450,7 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: DAY EDITOR
 ════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-day">
+<div class="screen" id="screen-day" data-area="planner">
   <!-- The day's paid chores, graded where the day is. Parent-only, filled by
        renderParentChoreStrip, and deliberately EMPTY when the planner put no
        chore on this day: the plan is what says there is anything to grade. -->
@@ -484,7 +484,7 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: SISTER SYNC
 ════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-sync">
+<div class="screen" id="screen-sync" data-area="planner">
   <!-- The standard page header, drawn by renderSync: Sister Sync and the
        profile badge. No ◀ — it is a nav tab. -->
   <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
@@ -518,7 +518,7 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: PARENT HOME
 ════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-parent">
+<div class="screen" id="screen-parent" data-area="parent">
   <!-- The parent header (PR 5, D35): pageHeader({variant:'parent'}), drawn
        once by parentRenderHeader (js/11-parent.js) — 🔒 Parent ▾ (PIN, the
        look, Exit inside it), the six destinations, then who is shown, on one
@@ -668,7 +668,7 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: PARENT MONTHLY HEATMAP
 ════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-parent-monthly">
+<div class="screen" id="screen-parent-monthly" data-area="parent">
   <!-- The parent header (PR 5): ◀ back to the portal, Monthly, ◀ month ▶ in
        the middle and the Jenn / Jess switch, drawn by renderParentMonthly. -->
   <header class="hdr hdr--parent"><div class="hdr-row"></div></header>
@@ -695,7 +695,7 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: PRINT
 ════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-print">
+<div class="screen" id="screen-print" data-area="planner">
   <!-- The standard page header, drawn by openPrint, never printed: ◀ back
        through the one back stack, Print week, 🖨 Print. -->
   <header class="hdr hdr--standard no-print"><div class="hdr-row"></div></header>

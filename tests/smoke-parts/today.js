@@ -1,4 +1,4 @@
-// Smoke group: Today (Consistency PR 7) — withMumReadsInBothLooks, which since Stage 55 also measures Today's kit rows (.ui-row) and "Coming up" card corners in both looks. tests/smoke.js calls it after the looks walks, on its one shared page; the check seeds the "with Mum" row it measures and puts back what it seeded.
+// Smoke group: Today (Consistency PR 7) — withMumReadsInBothLooks, which since Stage 55 also measures Today's kit rows (.ui-row) and "Coming up" card corners in both looks, and since the owner's correction C6 (2026-10-12) the pale open catch-up day. tests/smoke.js calls it after the looks walks, on its one shared page; the check seeds the "with Mum" row it measures and puts back what it seeded.
 module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
   /* D18 — a chore she has claimed and Mum has not answered reads "with Mum"
      on Today's Jobs I can do card. In Calm the words were the look's
@@ -141,9 +141,36 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
         document.getElementById('tdWrap').appendChild(planted);
         if (!faults(planted).some(f => /corner is 18px/.test(f))) out.push('the row check missed a planted row with an 18px corner');
         planted.remove();
-        return { out, rows: rows.length, cards: cards.length };
+        /* C6 (owner 2026-10-12): an open catch-up day turns pale (--bg2), a
+           closed one stays paper. Measured on a Catch up card as Today draws it
+           (the real one when Today shows one, and a copy of its markup always);
+           a plant (an open day forced to paper) must be caught. */
+        const ink = (v) => { const p = document.createElement('i'); p.style.background = v; document.body.appendChild(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; };
+        const pale = ink('var(--bg2)'), paper = ink('var(--paper)');
+        const paleFaults = (row) => {
+          const open = row.getAttribute('aria-expanded') === 'true', bg = getComputedStyle(row).backgroundColor;
+          return bg === (open ? pale : paper) ? [] : [`an ${open ? 'open' : 'closed'} catch-up day is ${bg}, want ${open ? 'the pale ' + pale : 'the paper ' + paper}`];
+        };
+        const fx = document.createElement('div');
+        fx.className = 'ui-card td-catchup';
+        fx.innerHTML = ['true', 'false'].map(o => `<button type="button" class="ui-row" data-td-action="catchup-day" aria-expanded="${o}"><span class="ui-row-name">Mon</span></button>`).join('');
+        document.getElementById('tdWrap').appendChild(fx);
+        [...fx.children].forEach(r => paleFaults(r).forEach(f => out.push(f)));
+        fx.firstElementChild.style.background = 'var(--paper)';
+        if (!paleFaults(fx.firstElementChild).length) out.push('the catch-up check missed its plant (an open day drawn paper)');
+        fx.remove();
+        const real = document.querySelector('#tdWrap .td-catchup [data-td-action="catchup-day"]');
+        let realSeen = false;
+        if (real && typeof tdCatchUpOpen !== 'undefined') {
+          tdCatchUpOpen = real.getAttribute('data-td-day'); tdRenderToday();
+          const openRow = document.querySelector('#tdWrap .td-catchup [data-td-action="catchup-day"][aria-expanded="true"]');
+          if (!openRow) out.push('Today drew no open catch-up day after opening one');
+          else { realSeen = true; paleFaults(openRow).forEach(f => out.push(`Today: ${f}`)); }
+          tdCatchUpOpen = null; tdRenderToday();
+        }
+        return { out, rows: rows.length, cards: cards.length, realSeen };
       });
-      console.log(`withMumReadsInBothLooks: ${look} ${kit.rows} kit rows, ${kit.cards} Coming up cards measured`);
+      console.log(`withMumReadsInBothLooks: ${look} ${kit.rows} kit rows, ${kit.cards} Coming up cards measured; the open catch-up day measured on ${kit.realSeen ? 'Today\'s own card and ' : ''}a copy of its markup`);
       kit.out.forEach(f => bad.push(`${look}: ${f}`));
     }
   } finally {

@@ -144,7 +144,6 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 /* ── Meeting: the hub (read-only; a day opens the meeting) ────────────────── */
 .hub-week { font-weight: 800; margin-bottom: 0.4rem; }
 .hub-status { margin-top: 0.55rem; font-size: calc(0.88rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; background: var(--bg2); border: 2px dashed var(--paper-line); border-radius: 10px; padding: 6px 10px; }
-.hub-pct { margin-top: 2px; font-weight: 600; }
 .hub-status-done { background: var(--accent-green); border-style: solid; border-color: var(--ink); }
 .hub-cta { margin-top: 0.6rem; }
 
@@ -208,8 +207,10 @@ body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)
 .pn-wait-title { margin: 0; font-family: var(--font-head); font-size: calc(1.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .pn-count { background: var(--mny-v15-red); color: var(--mny-v15-white); border-radius: var(--radius-full); padding: 1px 10px; font-weight: 800; font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .pn-strap { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-muted); }
-.pn-wait-toggles { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
-/* Whose questions (a .ui-kids) and Group them (.ui-chip, in .pn-seg). */
+.pn-wait-toggles { margin-left: auto; flex: 1 1 auto; display: flex; gap: 8px; flex-wrap: wrap; }
+/* Whose questions (a .ui-kids, C4: it fills the rest of the row, the girls in
+   equal parts) and Group them (.ui-chip, in .pn-seg). */
+.pn-wait-toggles > .ui-kids { flex: 1 1 auto; }
 .pn-seg { display: inline-flex; gap: var(--space-2); }
 .pn-lines { display: flex; flex-direction: column; gap: 6px; }
 .pn-line {

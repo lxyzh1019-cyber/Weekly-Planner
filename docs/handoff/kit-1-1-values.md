@@ -70,6 +70,38 @@ mode removed, light scheme on the root) was Stage 49 and is checked by
 | K12 chip width, at 699px and below | at least 44px, so a short chip stays a 44px target with the narrower sides (a Sunday chip was 40px wide without it) | — | `a one-figure chip is …px wide, under 44` |
 | K12 chip shrink, at 699px and below | flex-shrink 0: the 44px min-width replaces flex's content minimum, so without it a long chip was squeezed under its label (Sunday choose row, run 38197271036) | — | `a chip on a phone, its shrink` |
 
+## Owner corrections C1–C6, C8 (2026-10-12) — these rows override the K rows above
+
+From `docs/handoff/kit-gaps-pr7-10.md` § "Owner corrections after Round 1"
+and § "C8 — Button colours". Where a C row and a K row disagree, the C row
+holds: K4's colour and width, K5's today fill and plain cells on Now and the
+Meeting hub, K9's stepper corner, K10's shape, K11's one colour app-wide.
+Measured by `theComponentKitHoldsItsSizes` unless named; every check meets a
+plant it must catch (a yellow picked chip, white on yellow, the old green ok
+fill, a pill chip, an 11px − / +, an inline switch, a solid today frame,
+seven squeezed tiles, a div row under the mouse, an open catch-up day drawn
+paper, a tile without its %, the old % status line, a switch that does not grow).
+
+| Part | Value | Token | Check |
+|---|---|---|---|
+| C1/C2 picked, money area (`[data-area="money"]`) | #2f7f77 fill, #fff text, both looks | `--sel: var(--mny-v15-teal)` / `--sel-ink: var(--mny-v15-white)` | `money: a picked chip` / `the chosen girl` / `the current tab` / `the chosen day`; `theSundayKitHolds44pxInItsBoxes` (picked chip) |
+| C1/C2 picked, planner area (`[data-area="planner"]`, and outside any area) | Pop #2f7f77 / #fff, Calm #1c2240 / #fff | `--sel-planner` / `--sel-planner-ink` (both look blocks) | `planner: …` |
+| C1/C2 picked, parent area (`[data-area="parent"]`) | #1c2240 / #fff, both looks | `--sel: var(--ink)` / `--sel-ink: var(--ink-on-strong)` | `parent: …`; `thePortalKitHolds44px` (She told me's girl and day, Now's girl) |
+| C1/C2 one picked colour per area | `--pill-on`, `--tab-on` re-read at the area root, so a picked chip and a tab follow it | `[data-area] { --pill-on: var(--sel); --tab-on: var(--sel) }` | as above |
+| C8 main action | Pop #ffc83d / #1c2240, Calm #5b4fd6 / #fff | `--btn-main` / `--btn-main-ink` | `the main button` |
+| C8 Yes / OK (`.ui-btn--ok`) | #2f7d55 / #fff, both looks | `--btn-ok: var(--status-done-strong)` / `--btn-ok-ink` | `the ok button`; `theSundayKitHolds44pxInItsBoxes`, `thePortalKitHolds44px` (Grown-ups) |
+| C8 Danger (`.ui-btn--danger`, deletes only) | #b8441f / #fff, both looks | `--btn-danger: var(--mny-v15-red)` / `--btn-danger-ink` | `the danger button` |
+| C8 Secondary (`.ui-btn--secondary`) | #fff fill, 2px #1c2240 border, #1c2240 text | `--paper`, `--bw-chip`, `--ink` | `the secondary button`, `… border`, `… border colour` |
+| C8 contrast | every pair above at least 4.5:1: teal 4.75, navy 15.53, Pop main 10.04, Calm main 5.94, ok 5.02, danger 5.41, secondary 15.53 — no fill darkened | — | `… under 4.5:1` (printed: `C8 contrast` line) |
+| C8 today (`[aria-current="date"]`) | a double #1c2240 frame, 4px (two lines), no fill of its own (a confirmed today stays green) | `--bw-today`, `--today-mark` | `today's frame` / `today's fill` / `today confirmed, its fill` |
+| C3 chip (`.ui-chip`) | a rounded rectangle, 11px corners (overrides the pill) | `--radius-btn` | `a chip's … corner`; `theSundayKitHolds44pxInItsBoxes` |
+| C3 stepper (`.ui-stepper > button`) | round (overrides K9/K10's 11px) | `--radius-full` | `a stepper button (round)`; `theSundayKitHolds44pxInItsBoxes` |
+| C4 kid switch (`.ui-kids`) | fills its row, the girls in equal grid columns; in a flex row it grows (Now's toggles, the money sub-bar). The portal's header girl switch (`.parent-scope`) keeps the header table's cells (pad 0 16 / 0 14, phone 46×44) | — | `the kid switch is …px wide` / `halves`; `thePortalKitHolds44px` (Now, She told me) |
+| C5 day tiles (`.ui-days--tiles`, Now and the Meeting hub) | weekday (`.ui-day-dow`), date (`.ui-day-date`), 🐥 % and 🦊 % (`.ui-day-pct`), "Review ›" or "Confirmed" (`.ui-day-state`); one width, at least 72px, wrapping where seven do not fit; the spoken name says day, date, state, today and both % | — | `the tiles are …`; `thePortalKitHolds44px` (`day tile n …`, spoken names) |
+| C5 hub status line | no % list (the tiles carry it) | — | `thePortalKitHolds44px` (`the status line still lists`) |
+| C6 row hover (`button.ui-row`, mouse only) | the pale wash, the pointer | `--hover-wash` | `a kit row (a button) under the mouse` |
+| C6 open catch-up day (Today) | `--bg2`; a closed one paper | `--bg2` | `withMumReadsInBothLooks` (`an open catch-up day`) |
+
 Modifiers chosen here: the list row's parent size is `.ui-row--parent` (the
 kid's 52px is the default: Today's and Week/Day rows are the girls'); the
 stepper's girl size is `.ui-stepper--kid` (the 44px default is the parent
