@@ -15,6 +15,7 @@ const looksWalks = require('./smoke-parts/looks');
 const parentPortal = require('./smoke-parts/parent');
 const weekDay = require('./smoke-parts/week-day');
 const todayChecks = require('./smoke-parts/today');
+const socialChecks = require('./smoke-parts/social');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -28107,6 +28108,8 @@ function findChromium() {
 
   // The parent portal on the kit: tests/smoke-parts/parent.js.
   await parentPortal({ page, want, checks, setLook, clearLooks });
+  // Sister Sync and the profile screens on the kit: tests/smoke-parts/social.js.
+  await socialChecks({ page, want, checks, setLook, clearLooks });
 
   // The money click sweep: tests/smoke-parts/money-screens.js.
   await moneyScreens.moneyClicks({ page, want, checks });

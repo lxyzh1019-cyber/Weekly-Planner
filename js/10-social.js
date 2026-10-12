@@ -705,7 +705,7 @@ function renderChallenges() {
   const weekStart = dateToLocalKey(getWeekStart(weekOffset));
   const challenges = (state.shared.challenges||[]).filter(c=>c.weekStart===weekStart);
   if (!challenges.length) {
-    list.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.95rem * var(--text-scale, 1))">No goals yet. Tap ＋ to add one!</p>';
+    list.innerHTML = '<p class="sync-empty">No goals yet. Tap ＋ to add one!</p>';
   } else {
     challenges.forEach(c=>{
       const card = document.createElement('div');
@@ -723,14 +723,14 @@ function renderChallenges() {
           </div>`;
       }).join('');
       const teamNote = c.who==='both'
-        ? `<div class="ct-meta" style="font-style:italic;margin-bottom:0.2rem">You're a team on this one — cheer each other on! 🤝</div>`
+        ? `<div class="ct-meta challenge-team">You're a team on this one — cheer each other on! 🤝</div>`
         : '';
       card.innerHTML = `
         <div class="challenge-title">${escapeHtml(c.title)}</div>
         ${teamNote}
         ${rows}
-        <div style="display:flex;justify-content:flex-end;margin-top:0.4rem">
-          <button class="btn-icon" onclick="deleteChallenge('${escapeJsAttr(c.id)}')" style="padding:2px 8px">🗑</button>
+        <div class="challenge-actions">
+          <button type="button" class="ui-btn ui-btn--danger ui-btn--icon" onclick="deleteChallenge('${escapeJsAttr(c.id)}')" aria-label="Delete challenge">🗑</button>
         </div>
       `;
       list.appendChild(card);
@@ -787,7 +787,7 @@ function renderInvites() {
   const myInvites = invitesWaitingFor(profile);
   const missed = invitesMissedFor(profile);
   if (!myInvites.length && !missed.length) {
-    inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.95rem * var(--text-scale, 1))">No invites right now. Tap one of your own activities above to invite your sister.</p>';
+    inviteList.innerHTML = '<p class="sync-empty">No invites right now. Tap one of your own activities above to invite your sister.</p>';
     return;
   }
   myInvites.forEach(inv=>{
@@ -801,8 +801,8 @@ function renderInvites() {
       <div>💌 <b>${escapeHtml(f.from)}</b> invited you to<br>
       ${what} ${inv.series ? '·' : 'on'} ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
       <div class="invite-actions">
-        <button class="pill-btn" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
-        <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
+        <button type="button" class="ui-btn ui-btn--ok" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
       </div>
     `;
     inviteList.appendChild(el);
@@ -812,7 +812,7 @@ function renderInvites() {
      clears it. */
   if (!missed.length) return;
   const head = document.createElement('p');
-  head.style.cssText = 'color:var(--ink-light);font-size:calc(0.95rem * var(--text-scale, 1));margin:0.7rem 0 0.3rem';
+  head.className = 'invite-missed-head';
   head.textContent = 'Missed';
   inviteList.appendChild(head);
   missed.forEach(inv => {
@@ -823,8 +823,8 @@ function renderInvites() {
     el.innerHTML = `
       <div>💌 <b>${escapeHtml(f.from)}</b> invited you to ${what} · ${escapeHtml(f.day)} — ${inv.series ? 'those days have' : 'that day has'} passed</div>
       <div class="invite-actions">
-        <button class="pill-btn" onclick="addInviteAnyway('${escapeJsAttr(inv.id)}')">📌 ${inv.series ? 'Add them to my plan' : `Add it to my ${escapeHtml(f.day)}`} anyway</button>
-        <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="addInviteAnyway('${escapeJsAttr(inv.id)}')">📌 ${inv.series ? 'Add them to my plan' : `Add it to my ${escapeHtml(f.day)}`} anyway</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
       </div>
     `;
     inviteList.appendChild(el);

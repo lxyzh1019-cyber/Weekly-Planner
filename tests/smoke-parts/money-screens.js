@@ -1,4 +1,4 @@
-// Smoke group: the money screens (noLabelIsCutOnTheMoneyScreens, everyMoneyControlClicksClean, theSundayKitHolds44pxInItsBoxes). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; since PR 14 the fit check puts back its own copy of the state it found before every row, not the shared snapshots; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names.
+// Smoke group: the money screens (noLabelIsCutOnTheMoneyScreens, everyMoneyControlClicksClean, theSundayKitHolds44pxInItsBoxes, theSundayChooseRowFitsTwoRows). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; since PR 14 the fit check puts back its own copy of the state it found before every row, not the shared snapshots; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names.
 async function moneyFit({ page, want, checks, setLook, clearLooks, MV2_SEED_SRC, KID_SCREENS, KID_SHEETS }) {
   /* ✂️ The money fit check (Plan v6 §M 5a, grown by Money fit and logic PR 5).
      Every money screen and sheet — My money, Money school, All my Sundays, By
@@ -500,8 +500,14 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
      whole inside every box that clips it (overflow hidden or clip: the step's
      card, an I choose column), at 390×844 and 1194×834, in Pop and in Calm.
      Each stage names controls that must be drawn, so a stage that did not
-     open cannot measure clean. Puts back the state (sdRestore), the clock,
-     the look, the size and the profile. */
+     open cannot measure clean. Stage 52 (Kit 1.1): the ✓ result / ✓ Agree /
+     ✓ Yes buttons, a club session she went to and the ticked Sunday routine
+     are the kit's ok button (K7: --status-done fill, --status-done-ink ink);
+     a stepper the girl uses (From home / From my bank, Drawn early) is 52×52
+     (.ui-stepper--kid), one only a parent uses (✏️ Adjust, 💬 Talk first,
+     the must-pay steppers, a line edit) 44×44 (K10, G4). Puts back the
+     state (sdRestore), the clock, the look, the size and the profile. */
+  await sundayChooseRow({ page, want, checks, setLook, clearLooks });
   if (!want('theSundayKitHolds44pxInItsBoxes')) return;
   const before = page.viewportSize();
   const problems = [];
@@ -540,6 +546,32 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
               }
             });
           };
+          // K7: the ok green, read from the look's tokens, not typed.
+          const okWant = (() => {
+            const p = document.createElement('i');
+            p.style.background = 'var(--status-done)'; p.style.color = 'var(--status-done-ink)';
+            document.body.appendChild(p);
+            const cs = getComputedStyle(p), v = [cs.backgroundColor, cs.color];
+            p.remove();
+            return v;
+          })();
+          const okLook = (where, what, els) => {
+            els = els.filter(shown);
+            if (!els.length) { out.push(`${tag} ${where}: no ${what} drawn, so its ok look was not measured`); return; }
+            els.forEach(b => {
+              const cs = getComputedStyle(b);
+              if (!b.classList.contains('ui-btn--ok')) out.push(`${tag} ${where}: ${what} "${name(b)}" is not the kit ok button (.ui-btn--ok)`);
+              else if (cs.backgroundColor !== okWant[0] || cs.color !== okWant[1]) out.push(`${tag} ${where}: ${what} "${name(b)}" is ${cs.backgroundColor} on ${cs.color}, not the ok green ${okWant[0]} on ${okWant[1]}`);
+            });
+          };
+          const stepperSize = (where, root, sel, px) => {
+            const bs = root ? [...root.querySelectorAll(sel)].filter(shown) : [];
+            if (!bs.length) { out.push(`${tag} ${where}: no ${sel} drawn, so its size was not measured`); return; }
+            bs.forEach(b => {
+              const r = b.getBoundingClientRect();
+              if (Math.abs(r.width - px) > 0.5 || Math.abs(r.height - px) > 0.5) out.push(`${tag} ${where}: stepper button "${name(b)}" (${sel}) is ${Math.round(r.width)}×${Math.round(r.height)}, not ${px}×${px} (${px === 52 ? 'the girl uses it' : 'only a parent uses it'})`);
+            });
+          };
           const step = () => document.querySelector('#familyMeetingBody .sd');
           const head = () => document.querySelector('#familyMeetingBody .sd-avs');
           const sheet = () => (document.getElementById('sundayOverlay').classList.contains('open') ? document.getElementById('sundayBody') : null);
@@ -564,16 +596,27 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
             await draw();
             measure('Guess · new row on my wall', [step(), head()], ['.sd-scrim > .ui-card .ui-btn--primary', '.sd-avs > button']);
             sdClick('[data-mny-action="sd-newok"]'); await draw();
-            measure('Guess', [step()], ['.sd-ask .ui-btn--primary', '.sd-atts > .ui-btn', '.sd-adds > .ui-btn']);
+            measure('Guess', [step()], ['.sd-ask .ui-btn--ok', '.sd-atts > .ui-btn', '.sd-adds > .ui-btn']);
+            okLook('Guess', '✓ Yes', [...step().querySelectorAll('[data-mny-action="sd-yes"], [data-mny-action="sd-meet"]')]);
+            okLook('Guess', 'a club session she went to', [...step().querySelectorAll('.sd-atts > .ui-btn')].filter(b => /✓$/.test(b.textContent.trim())));
+            // The ticked Sunday routine shows when the meeting Sunday has routine sessions to ask about.
+            if (sdSundayRoutine({ kid, wk }).asked) okLook('Guess', 'the ticked Sunday routine', [...step().querySelectorAll('[data-mny-action="sd-sunroutine"]')]);
             sdClick('[data-mny-action="sd-adjust"]'); await draw();
             measure('Guess · ✏️ Adjust', [step()], ['.sd-adj-row.ui-stepper > button']);
+            stepperSize('Guess · ✏️ Adjust', step(), '.sd-adj-row.ui-stepper > button', 44);
             sdClick('[data-mny-action="sd-talk"]'); await draw();
             measure('Guess · 💬 Talk first', [step()], ['.sd-agree-set.ui-stepper > button']);
+            stepperSize('Guess · 💬 Talk first', step(), '.sd-agree-set.ui-stepper > button', 44);
+            okLook('Guess · 💬 Talk first', '✓ Agree', [...step().querySelectorAll('[data-mny-action="sd-agree"]')]);
             const d = sdCur();
             d.step = 1; d.shown = 99; d.guess = 40; sdSave(d); await draw();
             measure('Payday', [step()], ['.sd-pull.ui-stepper > button', '.sd-off--adv.ui-stepper > button', '.sd-payfoot .ui-stepper > button', '.sd-row > .ui-btn--primary']);
+            stepperSize('Payday', step(), '.sd-pull.ui-stepper > button', 52);
+            stepperSize('Payday', step(), '.sd-off--adv.ui-stepper > button', 52);
+            stepperSize('Payday', step(), '.sd-payfoot .ui-stepper > button', 44);
             sdOpenLine('home', true); await wait(350);
             measure('Payday · 🏠 Home changed by a parent', [sheet()], ['.sd-adj-row.ui-stepper > button', '[data-mny-action="sd-dadclose"]']);
+            stepperSize('Payday · 🏠 Home changed by a parent', sheet(), '.sd-adj-row.ui-stepper > button', 44);
             // A line edit brings the "Why" reason chips (sdTileDetail).
             const more = document.querySelector('#sundayBody [data-mny-action="sd-ov"][data-sd-d="1"]');
             if (more) { more.click(); await wait(60); } else out.push(`${tag} Payday · line edit: no + to change a line`);
@@ -614,6 +657,68 @@ async function sundayKit({ page, want, checks, setLook, clearLooks }) {
     }, was);
   }
   checks.theSundayKitHolds44pxInItsBoxes = problems.length ? [...new Set(problems)] : true;
+}
+
+async function sundayChooseRow({ page, want, checks, setLook, clearLooks }) {
+  /* G7 (Stage 52, Kit 1.1 K12): the whole Sunday choose row as she sees it —
+     ◀ My pile, the preset chips, ↺ All back and 📊 Everything — takes at most
+     2 rows on a 390×844 phone in Pop, for each girl. A row is the controls
+     whose boxes overlap in height; each named control must be drawn. Puts
+     back the state (sdRestore), the clock, the look, the size and the
+     profile. */
+  if (!want('theSundayChooseRowFitsTwoRows')) return;
+  const before = page.viewportSize();
+  const problems = [];
+  const was = await page.evaluate(() => ({ profile, unlocked: parentUnlockedThisSession, viewing: parentViewing, meetKid: mnyMeetKid }));
+  try {
+    await setLook('pop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(100);
+    problems.push(...await page.evaluate(async () => {
+      const out = [];
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+      const name = (b) => (b.getAttribute('aria-label') || b.textContent).trim().replace(/\s+/g, ' ').slice(0, 30);
+      for (const kid of ['jenn', 'jess']) {
+        const snap = sdSnap(), unpin = sdPin(3);
+        try {
+          sdSeedWeek(kid);
+          const d = sdCur();
+          d.step = 2; d.shown = 99; d.guess = 40; sdSave(d);
+          profile = kid; renderMeetingMode(); await wait(60);
+          const row = document.querySelector('#familyMeetingBody .sd-presets');
+          if (!row) { out.push(`${kid}: I choose drew no choose row (.sd-presets)`); continue; }
+          const items = [...row.children].filter(shown);
+          ['sd-back', 'sd-preset', 'sd-clear', 'sd-all'].forEach(a => {
+            if (!items.some(e => e.getAttribute('data-mny-action') === a)) out.push(`${kid}: the choose row shows no ${a} control, so it was not counted`);
+          });
+          const rows = [];
+          items.map(e => ({ e, r: e.getBoundingClientRect() })).sort((a, b) => a.r.top - b.r.top).forEach(({ e, r }) => {
+            const last = rows[rows.length - 1];
+            if (!last || r.top >= last.bottom - 1) rows.push({ bottom: r.bottom, names: [name(e)] });
+            else { last.bottom = Math.max(last.bottom, r.bottom); last.names.push(name(e)); }
+          });
+          if (rows.length > 2) out.push(`${kid}: the choose row takes ${rows.length} rows at 390×844 in Pop, over 2: ${rows.map(x => '[' + x.names.join(' | ') + ']').join(' ')}`);
+        } catch (e) {
+          out.push(`${kid}: threw ${e.message}`);
+        } finally {
+          if (mmIsOpen()) mmHide();
+          unpin(); sdRestore(snap);
+        }
+      }
+      return out;
+    }));
+  } catch (e) {
+    problems.push('threw: ' + e.message);
+  } finally {
+    await page.setViewportSize(before);
+    await clearLooks();
+    await page.evaluate((was) => {
+      profile = was.profile; parentUnlockedThisSession = was.unlocked; parentViewing = was.viewing; mnyMeetKid = was.meetKid;
+      goToday();
+    }, was);
+  }
+  checks.theSundayChooseRowFitsTwoRows = problems.length ? problems : true;
 }
 
 module.exports = { moneyFit, moneyClicks, sundayKit };
