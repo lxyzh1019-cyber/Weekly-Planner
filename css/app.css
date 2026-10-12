@@ -737,6 +737,7 @@
      conditions (no page wider than the window, nothing on html or body that
      captures a fixed child, the bar at the window's foot). */
   html { overflow-x: hidden; }
+  body { overflow-x: clip; }
 
   /* One font everywhere (Looks stage 4C). The browser gives form controls its
      own system font, so without this every button, field and menu with no
@@ -1912,7 +1913,7 @@
     transition: all 0.15s;
   }
   .vibe-mood:hover { transform: scale(1.15); }
-  .vibe-mood.selected { background: var(--accent-yellow); transform: scale(1.2) rotate(-5deg); box-shadow: 2px 2px 0 var(--ink); }
+  .vibe-mood.selected { background: var(--pill-on); color: var(--pill-on-ink); transform: scale(1.2) rotate(-5deg); box-shadow: 2px 2px 0 var(--ink); }
   /* The reflect sheet's moods are what she taps there: 44px, the day's and each
      block's (Plan v6 C2 — they were 36px and 28px). The gap is wide enough for a
      chosen dot's 1.2x to stay off its neighbour's target. Each block's row wraps
@@ -2507,7 +2508,7 @@
   .parent-stamp-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.4rem 0; }
   .parent-stamp-picker { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .stamp-cell { width: 34px; height: 34px; border: 2px solid var(--ink); border-radius: 9px; background: var(--surface-card); font-size: calc(1.15rem * var(--text-scale, 1)); line-height: 1; cursor: pointer; padding: 0; }
-  .stamp-cell.selected { background: var(--accent-yellow); box-shadow: 1.5px 1.5px 0 var(--ink); }
+  .stamp-cell.selected { background: var(--pill-on); color: var(--pill-on-ink); box-shadow: 1.5px 1.5px 0 var(--ink); }
   .badge-stamp { background: var(--surface-reward); }
   /* Evening wind-down reminder inside the day Next-Up banner */
   .bedtime-tip {
@@ -2623,7 +2624,7 @@
     transition: all 0.15s; font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 600;
     font-family: var(--font-text);
   }
-  .obj-item.checked { background: var(--accent-yellow); }
+  .obj-item.checked { background: var(--pill-on); color: var(--pill-on-ink); }
   .obj-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--ink); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); background:var(--surface-card); }
   .obj-item.checked .obj-check { background: var(--accent-strong); color: var(--ink-on-strong); }
   .obj-item .obj-meta { margin-left: auto; font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
@@ -2722,7 +2723,7 @@
     background: var(--surface-card); border: 2px solid transparent; border-radius: 9px;
   }
   .emoji-cell:hover { border-color: var(--paper-line); transform: scale(1.08); }
-  .emoji-cell.selected { border-color: var(--ink); background: var(--accent-yellow); box-shadow: 1.5px 1.5px 0 var(--ink); }
+  .emoji-cell.selected { border-color: var(--ink); background: var(--pill-on); color: var(--pill-on-ink); box-shadow: 1.5px 1.5px 0 var(--ink); }
   @media (max-width: 420px) { .emoji-grid { grid-template-columns: repeat(6, 1fr); } }
 
   /* ═══════════ TOAST ═══════════ */
@@ -3968,7 +3969,7 @@
   .mny-btn[disabled] { background: var(--mny-surface-disabled); color: var(--ink-light); cursor: not-allowed; box-shadow: none; }
 
   .mny-chip {
-    min-height: 34px; border: 2px solid var(--ink); border-radius: 9px; background: var(--paper);
+    min-height: 34px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper);
     color: var(--ink); font: inherit; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.25rem 0.6rem; cursor: pointer;
   }
   .mny-chip.on { background: var(--pill-on); color: var(--pill-on-ink); }
@@ -4129,7 +4130,7 @@
   }
   .ck-segbtn:first-child { border-radius: 11px 0 0 11px; border-right-width: 1px; }
   .ck-segbtn:last-child { border-radius: 0 11px 11px 0; border-left-width: 1px; }
-  .ck-segbtn.on { background: var(--accent-yellow); }
+  .ck-segbtn.on { background: var(--pill-on); color: var(--pill-on-ink); }
   .ck-btn {
     border: 2px solid var(--ck-ink); border-radius: 11px; background: var(--ck-paper); color: var(--ck-ink);
     font-family: inherit; font-size: max(13px, calc(12.5px * var(--text-scale, 1))); font-weight: 800; padding: 8px 15px; cursor: pointer;
@@ -4219,7 +4220,7 @@
     border: 2px solid var(--ink); border-radius: 14px; padding: 0.25rem 0.7rem 0.25rem 0.5rem;
     background: var(--paper); color: var(--ink); font: inherit; cursor: pointer;
   }
-  .cp-kid.on { background: var(--accent-yellow); }
+  .cp-kid.on { background: var(--pill-on); color: var(--pill-on-ink); }
   .cp-kid-icon { font-size: calc(1rem * var(--text-scale, 1)); }
   .cp-kid-name { display: block; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; line-height: 1.15; }
   .cp-kid-badge { display: block; font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); line-height: 1.15; }
@@ -4678,12 +4679,12 @@
   display: inline-flex; align-items: center; justify-content: center;
   flex-direction: column; gap: 0.1rem;
   min-height: 44px; padding: 0.4rem 0.7rem;
-  border: 2px solid var(--ink); border-radius: 999px;
+  border: 2px solid var(--ink); border-radius: var(--radius-btn);
   background: var(--bg2); color: var(--ink);
   font-size: calc(max(13px, 0.9rem) * var(--text-scale, 1)); font-weight: 700; line-height: 1.2;
   cursor: pointer;
 }
-.rc-chip.on { background: var(--ink); color: var(--paper); }
+.rc-chip.on { background: var(--pill-on); color: var(--pill-on-ink); }
 .rc-chip small { font-size: calc(max(13px, 0.78rem) * var(--text-scale, 1)); font-weight: 600; opacity: 0.85; }
 /* Shut, not hidden: a pot Money school has not opened yet is still something
    she can see she is working towards. The refusal beside the button says when. */
@@ -4704,11 +4705,11 @@
 }
 .rc-toggle {
   min-height: 44px; padding: 0.4rem 0.8rem;
-  border: 2px solid var(--ink); border-radius: 999px;
+  border: 2px solid var(--ink); border-radius: var(--radius-btn);
   background: var(--bg2); color: var(--ink);
   font-size: calc(max(13px, 0.9rem) * var(--text-scale, 1)); font-weight: 700; cursor: pointer;
 }
-.rc-toggle.on { background: var(--ink); color: var(--paper); }
+.rc-toggle.on { background: var(--pill-on); color: var(--pill-on-ink); }
 .rc-note { margin: var(--space-2, 0.6rem) 0; font-size: calc(max(13px, 0.88rem) * var(--text-scale, 1)); line-height: 1.4; opacity: 0.9; }
 /* A refusal is never decoration: it is the sentence that says what to change. */
 .rc-no { color: var(--status-warn-strong); opacity: 1; font-weight: 700; }
@@ -5075,7 +5076,7 @@
 .hdr-badge[hidden] { display: none; }
 /* One joined switch (Week's 📋 / 🖨, the Day's 1 2 3, the meeting's steps):
    a 2px ink frame, radius 14, cells 48px high with 2px dividers, the chosen
-   cell the look's --sel (Pop yellow, Calm navy with white) (SRC 67-69, 106-110,
+   cell its area's picked colour --sel (Pop teal, Calm navy, white text) (SRC 67-69, 106-110,
    213-218). */
 .hdr-switch {
   box-sizing: border-box; flex: none; display: flex;
@@ -5316,11 +5317,8 @@
      never the app's navy --shadow-sm/md), the selected fills and the main button. */
   --mny-shadow-card: 3px 3px 0 var(--mny-v15-shadow);
   --mny-shadow-btn: 2px 2px 0 var(--mny-v15-shadow);
-  --sel-tab: var(--mny-v15-ink);
-  --sel-tab-ink: var(--mny-v15-white);
   --sel-opt: var(--mny-v15-teal);
   --sel-opt-ink: var(--mny-v15-white);
-  --btn-main: var(--mny-v15-red);
   --btn-main-ink: var(--mny-v15-white);
   --btn-off: var(--mny-v15-off);
   --btn-off-ink: var(--mny-v15-muted);

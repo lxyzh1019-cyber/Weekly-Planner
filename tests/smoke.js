@@ -23702,7 +23702,10 @@ function findChromium() {
         input.value = 'Winter Invitational entry';
         input.dispatchEvent(new Event('input', { bubbles: true }));
         if (wrap.querySelector('[data-mnyp-action="gucmwhat"]') !== input) bad.push('typing the name redrew the form');
-        if (!wrap.querySelector('[data-mnyp-action="gucmsave"]').classList.contains('ui-btn--primary')) bad.push('the save button did not wake up for a name (C8: the main button once ready)');
+        // C8, reviewer finding 4: typing uses the first draw's test (a name, and the tick when one is asked for).
+        const saveBtn = () => wrap.querySelector('[data-mnyp-action="gucmsave"]');
+        const needsTick = !!wrap.querySelector('[data-mnyp-action="gucmtick"]');
+        if (saveBtn().classList.contains('ui-btn--primary') === needsTick) bad.push(needsTick ? 'the save button went main before the "I checked this with her" tick' : 'the save button did not wake up for a name (C8: the main button once ready)');
         const side = wrap.querySelector('.gu-afford').textContent;
         ['Her share$30', '10% down from her Savings$3', 'New row on her wall$27', 'Weekly loan payment', 'Of her steady income', 'Free by'].forEach(line => {
           if (side.replace(/\s+/g, '').indexOf(line.replace(/\s+/g, '')) < 0) bad.push('the affordability card misses "' + line + '"');
@@ -23710,6 +23713,7 @@ function findChromium() {
         if (!/Can she afford it\?/.test(wrap.textContent)) bad.push('no "Can she afford it?"');
         // Money fit and logic L5: a share her steady money cannot judge needs the parent's ✓ first.
         guPress('[data-mnyp-action="gucmtick"]');
+        if (needsTick && !saveBtn().classList.contains('ui-btn--primary')) bad.push('the save button did not go main once ticked');
         guPress('[data-mnyp-action="gucmsave"]');
         const d = mnyEnsureDebts(kid).find(x => x.name === 'Winter Invitational entry');
         if (!d || d.principal !== 30 || d.paid !== 3 || d.monthly !== money2(27 / 26 * 52 / 12)) bad.push('the new row is not her share, 10% down and the rest over 26 weeks: ' + JSON.stringify(d && [d.principal, d.paid, d.monthly]));
@@ -26853,6 +26857,15 @@ function findChromium() {
           const host = document.createElement('div');
           host.id = 'kitFixture';
           host.style.cssText = 'position:fixed;left:0;top:0;width:min(100%,600px);z-index:2147483647;background:#fff;padding:8px;box-sizing:border-box';
+          /* The older pickers (not kit parts) wear the same picked colour: C1/C2, reviewer findings. */
+          const LEGACY_PICKED = '<button type="button" class="cp-kid on">K</button><button type="button" class="ck-segbtn on">S</button>'
+            + '<button type="button" class="emoji-cell selected">E</button><button type="button" class="vibe-mood selected">V</button>'
+            + '<button type="button" class="stamp-cell selected">T</button><div class="obj-item checked">O</div>'
+            + '<button type="button" class="rc-chip on">R</button><button type="button" class="rc-toggle on">G</button>';
+          const rec = document.createElement('div');
+          rec.id = 'kfRecordFx';
+          rec.innerHTML = '<button type="button" class="rc-chip on">R</button><button type="button" class="rc-toggle on">G</button>';
+          document.getElementById('recordOverlay').appendChild(rec);
           host.innerHTML = '<style>.kit-fx-shadow { box-shadow: 3px 3px 0 #000; }</style>'
             + '<p><button type="button" class="ui-btn ui-btn--secondary" id="kfSec">Sec</button> <button type="button" class="ui-btn ui-btn--primary" id="kfMain">Main</button>'
             + ' <button type="button" class="ui-btn ui-btn--ok" id="kfOk">Ok</button> <button type="button" class="ui-chip" id="kfChip">Chip</button>'
@@ -26879,7 +26892,8 @@ function findChromium() {
             + ['money', 'planner', 'parent'].map(a => `<div data-area="${a}" id="kfArea-${a}"><button type="button" class="ui-chip" aria-pressed="true">On</button>`
               + '<div class="ui-kids"><button type="button" aria-pressed="true">Jenn</button><button type="button" aria-pressed="false">Jess</button></div>'
               + '<div class="ui-tabs"><button type="button" aria-selected="true">A</button><button type="button">B</button></div>'
-              + '<div class="ui-days"><button type="button" aria-pressed="true" aria-label="Mon 5, 10%"><span>Mon</span><span>5</span></button></div></div>').join('')
+              + '<div class="ui-days"><button type="button" aria-pressed="true" aria-label="Mon 5, 10%"><span>Mon</span><span>5</span></button></div>'
+              + LEGACY_PICKED + '</div>').join('')
             /* C5: seven day tiles in a 300px column wrap, all one width. */
             + '<div id="kfTilesCol" style="width:300px"><div class="ui-days ui-days--tiles" id="kfTiles">'
             + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => `<button type="button" aria-label="${d} ${5 + i}, not confirmed yet, Jenn 50%, Jess 40%"><span class="ui-day-dow">${d}</span><span class="ui-day-date">${5 + i}</span><span class="ui-day-pct">🐥50%</span><span class="ui-day-pct">🦊40%</span><span class="ui-day-state">Review ›</span></button>`).join('')
@@ -26970,6 +26984,39 @@ function findChromium() {
              [root.querySelector('.ui-tabs > [aria-selected="true"]'), 'the current tab'], [root.querySelector('.ui-days > button'), 'the chosen day']].forEach(([el, what]) =>
               pairFaults(el, fill, ink, `${area}: ${what}`).forEach(f => out.push(`${tag}: ${f}`)));
           }
+          /* Reviewer findings: every older picker (.on / .selected / .checked) wears its
+             area's picked colour, never yellow; the Record sheet (#recordOverlay, money) too. */
+          const YELLOWS = [rgbOf('#ffd166'), rgbOf('#ffc83d')];
+          const legacySel = '.cp-kid.on, .ck-segbtn.on, .emoji-cell.selected, .vibe-mood.selected, .stamp-cell.selected, .obj-item.checked, .rc-chip.on, .rc-toggle.on';
+          const legacyFaults = (el, fill, what) => {
+            const s = cs(el), f = [];
+            if (YELLOWS.includes(s.backgroundColor)) f.push(`${what} is filled yellow ${s.backgroundColor}`);
+            if (s.backgroundColor !== rgbOf(fill)) f.push(`${what} fill is ${s.backgroundColor}, want its area's picked ${fill}`);
+            return f;
+          };
+          for (const [area, [fill]] of Object.entries(pickedWant)) {
+            const els = [...$(`kfArea-${area}`).querySelectorAll(legacySel)];
+            if (els.length !== 8) out.push(`${tag}: ${area}: ${els.length} older picked elements drawn, want 8`);
+            els.forEach(el => legacyFaults(el, fill, `${area}: ${el.className}`).forEach(f => out.push(`${tag}: ${f}`)));
+          }
+          const recEls = [...document.querySelectorAll('#kfRecordFx > *')];
+          if (recEls.length !== 2) out.push(`${tag}: the Record sheet fixture drew ${recEls.length} of 2 picked parts`);
+          recEls.forEach(el => {
+            legacyFaults(el, '#2f7f77', `Record sheet: ${el.className}`).forEach(f => out.push(`${tag}: ${f}`));
+            if (cs(el).color !== rgbOf('#ffffff')) out.push(`${tag}: Record sheet: ${el.className} text is ${cs(el).color}, want white`);
+            if (cs(el).borderTopLeftRadius !== '11px') out.push(`${tag}: Record sheet: ${el.className} corner is ${cs(el).borderTopLeftRadius}, want 11px`);
+          });
+          recEls[0].style.background = '#ffc83d';
+          if (!legacyFaults(recEls[0], '#2f7f77', 'plant').length) out.push(`${tag}: the Record sheet colour check missed its plant (a yellow picked chip)`);
+          recEls[0].style.background = '';
+          const legacyPlant = $('kfArea-planner').querySelector('.cp-kid');
+          legacyPlant.style.background = '#ffd166';
+          if (!legacyFaults(legacyPlant, '#2f7f77', 'plant').some(f => /yellow/.test(f))) out.push(`${tag}: the older-picker colour check missed its plant (a yellow picked kid)`);
+          legacyPlant.style.background = '';
+          // A secondary button recoloured is caught (reviewer finding 8).
+          $('kfSec').style.background = '#ffc83d';
+          if (!pairFaults($('kfSec'), '#ffffff', '#1c2240', 'plant').length) out.push(`${tag}: the secondary button colour check missed its plant (a yellow secondary)`);
+          $('kfSec').style.background = '';
           const plantChip = $('kfArea-money').querySelector('.ui-chip');
           plantChip.style.background = '#ffc83d';
           if (!pairFaults(plantChip, '#2f7f77', '#ffffff', 'plant').length) out.push(`${tag}: the picked colour check missed its plant (a yellow picked chip in money)`);
@@ -27088,6 +27135,7 @@ function findChromium() {
           near(sb.width, 44, 'a stepper button width'); near(sb.height, 44, 'a stepper button height');
           near(kb.width, 52, "the girl's stepper button width"); near(kb.height, 52, "the girl's stepper button height");
           host.remove();
+          document.getElementById('kfRecordFx').remove();
           document.documentElement.setAttribute('data-look', window.__kitLookWas || 'pop');
           return out;
         }, [tag, hovered, size === 'phone']));

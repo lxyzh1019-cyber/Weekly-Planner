@@ -1599,7 +1599,8 @@ function guInput(a, el, type) {
   if (a === 'gucmwhat') {
     guCommit().what = String(el.value || '').slice(0, 40);
     const b = document.querySelector('#mnyRulesWrap [data-mnyp-action="gucmsave"]');
-    const ready = !!guCommit().what.trim();   // C8: Save, once ready, is the main action
+    // C8: Save is the main action once it can be pressed: the same test as the first draw (guCommitSide)
+    const m = guCommitMath(), ready = !!String(m.c.what || '').trim() && (m.sur || !m.plan.needsTick || m.ticked);
     if (b) { b.classList.toggle('ui-btn--primary', ready); b.classList.toggle('ui-btn--secondary', !ready); }
     return;
   }

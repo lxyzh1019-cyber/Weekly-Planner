@@ -221,20 +221,25 @@ module.exports = async ({ page, want, checks, setupNeeded, setLook, clearLooks, 
   if (want('theBottomNavStaysPinned')) {
     const navFindings = [];
     await page.evaluate(() => { window.__navAuditSnap = JSON.stringify(state); profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0; });
-    const measure = (navId) => page.evaluate(async (nid) => {
-      window.scrollTo(0, document.documentElement.scrollHeight);
-      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    /* Measured at the foot and at the top (scrollTo(0,0)): a page taller than the
+       window shows a nav that a transformed body drags to the page's foot only at the top. */
+    const measure = (navId, skipProps) => page.evaluate(async ([nid, skipProps]) => {
       const out = [];
+      let shown = false;
+      for (const toFoot of [true, false]) {
+      window.scrollTo(0, toFoot ? document.documentElement.scrollHeight : 0);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const at = toFoot ? '' : ' (scrolled to the top)';
       const W = window.innerWidth, H = window.innerHeight;
       const docW = document.documentElement.scrollWidth;
-      if (docW > W) {
+      if (toFoot && docW > W) {
         const wide = [...document.querySelectorAll('body *')].map(el => [el, el.getBoundingClientRect()])
           .filter(([el, r]) => r.width && r.right > W + 1 && !el.closest('.ck-gridwrap, .weekly-full-wrap, .tg-wrap, .day-workspace'))
           .sort((a, b) => b[1].right - a[1].right).slice(0, 3)
           .map(([el, r]) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}.${String(el.className).trim().split(/\s+/)[0]} to ${Math.round(r.right)}`);
         out.push(`the page is ${docW}px wide in a ${W}px window${wide.length ? ' (' + wide.join(', ') + ')' : ''}`);
       }
-      for (const el of [document.documentElement, document.body]) {
+      if (toFoot && !skipProps) for (const el of [document.documentElement, document.body]) {
         const cs = getComputedStyle(el);
         for (const [prop, ok] of [['transform', 'none'], ['filter', 'none'], ['contain', 'none'], ['willChange', 'auto'],
           ['perspective', 'none'], ['backdropFilter', 'none']]) {
@@ -242,15 +247,17 @@ module.exports = async ({ page, want, checks, setupNeeded, setLook, clearLooks, 
         }
       }
       const nav = document.getElementById(nid);
-      const shown = !!nav && !nav.hidden && getComputedStyle(nav).display !== 'none';
+      shown = !!nav && !nav.hidden && getComputedStyle(nav).display !== 'none';
       if (shown) {
         const cs = getComputedStyle(nav), b = nav.getBoundingClientRect();
-        if (cs.position !== 'fixed') out.push(`#${nid} is position ${cs.position}`);
-        if (nav.offsetParent !== null) out.push(`#${nid} has an offset parent`);
-        if (Math.abs(b.bottom - H) > 1) out.push(`#${nid} ends at ${Math.round(b.bottom)}, not the window's foot ${H}`);
+        if (toFoot && cs.position !== 'fixed') out.push(`#${nid} is position ${cs.position}`);
+        if (toFoot && nav.offsetParent !== null) out.push(`#${nid} has an offset parent`);
+        if (Math.abs(b.bottom - H) > 1) out.push(`#${nid} ends at ${Math.round(b.bottom)}, not the window's foot ${H}${at}`);
       }
+      }
+      window.scrollTo(0, 0);
       return { out, shown };
-    }, navId);
+    }, [navId, !!skipProps]);
     for (const look of ['pop', 'calm']) {
       try { await setLook(look); } catch (e) { navFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
       for (const [w, h] of [[1194, 834], [834, 1194]]) {
@@ -260,6 +267,13 @@ module.exports = async ({ page, want, checks, setupNeeded, setLook, clearLooks, 
           await page.evaluate(`(${nav.toString()})()`);
           await settle();
           const r = await measure('kidNav');
+          if (look === 'pop' && w === 1194 && id === 'screen-today') {
+            // The plant: a transformed body with a 3000px child must be caught as "ends at …", then it is removed.
+            await page.evaluate(() => { document.body.style.transform = 'translateZ(0)'; const t = document.createElement('div'); t.id = 'navPlantTall'; t.style.cssText = 'height:3000px;width:1px'; document.body.appendChild(t); });
+            const planted = await measure('kidNav', true);
+            await page.evaluate(() => { document.body.style.transform = ''; document.getElementById('navPlantTall').remove(); });
+            if (!planted.out.some(f => /ends at/.test(f))) navFindings.push('the nav check missed its plant (a transformed body on a 3000px page)');
+          }
           if (id === 'screen-today' && !r.shown) r.out.push('the kid nav is not on show on Today, so it was not measured');
           if (r.out.length) navFindings.push(`[${look}] ${label || id}@${w}x${h}: ${r.out.join(' | ')}`);
         }

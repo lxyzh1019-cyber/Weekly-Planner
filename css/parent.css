@@ -28,7 +28,7 @@
 .parent-menu-pop .ui-btn { width: 100%; }
 
 /* The portal's destinations (.parent-dests, a .ui-tabs; SRC 266-272): 44px, pad
-   0 16, white, 2px ink, radius 12, body 17px; the current one the look's --sel,
+   0 16, white, 2px ink, radius 12, body 17px; the current one the area's picked colour --sel,
    600, with its icon (the others' words alone); ⚙️ App 44×44, 18px. The
    header's picture sets these, not the kit's. A class, not the id: each rule
    weighs the same as the kit's .ui-tabs rule it overrides (css/app.css) and
@@ -41,7 +41,7 @@
   font-family: var(--font-text); font-size: var(--hdr-parent-word-size); font-weight: 400; line-height: 1; white-space: nowrap; cursor: pointer;
 }
 .parent-dests > button:hover { background: var(--accent-yellow); }
-/* The selected destination: Pop yellow, Calm navy with white text. Hovered
+/* The selected destination: the parent area's picked colour (navy, white text). Hovered
    too, or Calm's hover fill would sit under the white label. */
 .parent-dests > button[aria-selected="true"], .parent-dests > button[aria-selected="true"]:hover { background: var(--sel); color: var(--sel-ink); font-weight: 600; }
 .parent-dests > button:not([aria-selected="true"]) .pdest-icon { display: none; }
@@ -50,7 +50,7 @@
 /* The girl switch (a .ui-kids; SRC 273-277): one joined switch, 2px ink,
    radius 999, clipped, white; cells 44px high (the tap floor; the picture's
    42), pad 0 16 (Both) / 0 14, 2px dividers, body 17px; the chosen one the
-   look's --sel, 600. Parent Monthly's Jenn / Jess is the same switch. On a
+   area's picked colour --sel, 600. Parent Monthly's Jenn / Jess is the same switch. On a
    phone 46×44 cells, All 15px, 🐥 🦊 19px. */
 .parent-scope {
   box-sizing: border-box; flex: none; display: flex; gap: 0;

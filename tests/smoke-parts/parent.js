@@ -58,6 +58,17 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
               if (named && !named.test(c.getAttribute('aria-label') || '')) out.push(`${tag} ${where}: day cell ${i + 1} aria-label "${c.getAttribute('aria-label')}" lacks its state or %`);
             });
             if (!cells.some(c => c.getAttribute('aria-current') === 'date')) out.push(`${tag} ${where}: no cell is today`);
+            /* C5: today's tile is no new fill: a plain today looks like a plain day. A plant (today drawn red-orange) must be caught. */
+            const todayCell = cells.find(c => c.getAttribute('aria-current') === 'date' && !c.classList.contains('ui-day--ok') && c.getAttribute('aria-pressed') !== 'true');
+            const plainCell = cells.find(c => !c.hasAttribute('aria-current') && !c.classList.contains('ui-day--ok') && !c.classList.contains('ui-day--future') && c.getAttribute('aria-pressed') !== 'true' && !c.disabled);
+            if (todayCell && plainCell) {
+              const todayFill = () => getComputedStyle(todayCell).backgroundColor === getComputedStyle(plainCell).backgroundColor;
+              if (!todayFill()) out.push(`${tag} ${where}: today's cell is filled ${getComputedStyle(todayCell).backgroundColor}, not like a plain day`);
+              const was = todayCell.style.background;
+              todayCell.style.background = '#e8552d';
+              if (todayFill()) out.push(`${tag} ${where}: the today-fill check missed its plant (today drawn red-orange)`);
+              todayCell.style.background = was;
+            }
             if (needOk && !cells.some(c => c.classList.contains('ui-day--ok'))) out.push(`${tag} ${where}: no confirmed cell, so the ✓ mark was not seen`);
           };
           const sizeOf = (where, sel, root, w, h) => {
@@ -65,6 +76,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
             if (!bs.length) { out.push(`${tag} ${where}: no ${sel} drawn`); return; }
             bs.forEach(b => { const r = b.getBoundingClientRect(); if (Math.abs(r.width - w) > 0.5 || Math.abs(r.height - h) > 0.5) out.push(`${tag} ${where}: "${(b.getAttribute('aria-label') || b.textContent).trim().slice(0, 30)}" is ${Math.round(r.width)}×${Math.round(r.height)}, want ${w}×${h}`); });
           };
+          const dayLabelRe = new RegExp(`^[A-Za-z]{3} \\d+, (confirmed|not confirmed yet)(, today)?, ${kidLabel('jenn').name} \\d+%, ${kidLabel('jess').name} \\d+%$`);
           const fillOf = (token, where) => { const p = document.createElement('i'); p.style.background = `var(${token})`; (where || document.body).appendChild(p); const v = getComputedStyle(p).backgroundColor; p.remove(); return v; };
           /* C5 (owner 2026-10-12): a day tile on Now and the Meeting hub shows its
              weekday, date, 🐥 %, 🦊 % and "Review ›" (or "Confirmed"). */
@@ -126,7 +138,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           if (phone) measure('the bottom bar', document.getElementById('parentNav'), '.ui-btn');
           setParentTab('now'); await wait(60);
           measure('Now', document.getElementById('pnWrap'), '.ui-days > button');
-          daysCheck('Now', document.querySelector('#pnWrap .pn-sun .ui-days'), /^[A-Za-z]{3} \d+, (confirmed|not confirmed yet)(, today)?, Jenn \d+%, Jess \d+%$/);
+          daysCheck('Now', document.querySelector('#pnWrap .pn-sun .ui-days'), dayLabelRe);
           tilesCheck('Now', document.querySelector('#pnWrap .pn-sun .ui-days'));
           const nowKids = [...document.querySelectorAll('#screen-parent .ui-kids')].filter(shown);
           if (nowKids.length !== 1) out.push(`${tag} Now: ${nowKids.length} girl switches on show, want one .ui-kids`);
@@ -137,6 +149,12 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
             nowKids[0].style.flex = 'none';
             if (!switchFaults(nowKids[0]).length) out.push(`${tag} Now: the switch width check missed its plant (a switch that does not grow)`);
             nowKids[0].style.flex = '';
+            const onCell = nowKids[0].querySelector('[aria-pressed="true"]');
+            if (onCell) {
+              onCell.style.background = '#ffc83d';
+              if (!switchFaults(nowKids[0]).some(f => /chosen girl/.test(f))) out.push(`${tag} Now: the girl switch colour check missed its plant (a yellow chosen girl)`);
+              onCell.style.background = '';
+            }
           }
           const runBtn = document.querySelector('#pnWrap .pn-sun [data-pn-action="meeting"]');
           if (!runBtn || !runBtn.classList.contains('ui-btn--block') || !fullWidth(runBtn)) out.push(`${tag} Now: Run family meeting is not the full-width kit button`);
@@ -175,15 +193,19 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           } finally { setDayBlocks(tk, JSON.parse(heldBlocks), 'jenn'); }
           setParentDest('meeting'); await wait(60);
           measure('Meeting', document.getElementById('ptab-review'), '.ui-days > button');
-          daysCheck('Meeting', document.querySelector('#meetingHub .ui-days'), /^[A-Za-z]{3} \d+, (confirmed|not confirmed yet)(, today)?, Jenn \d+%, Jess \d+%$/);
+          daysCheck('Meeting', document.querySelector('#meetingHub .ui-days'), dayLabelRe);
           tilesCheck('Meeting', document.querySelector('#meetingHub .ui-days'));
           // C5: the tiles carry the %, so the status line no longer lists them; a plant (the old list) must be caught.
           const pctList = (el) => (el.textContent.match(/(🐥|🦊)\d+%/gu) || []).length;
           const hubStatus = document.querySelector('#meetingHub .hub-status');
           if (!hubStatus) out.push(`${tag} Meeting: no status line`);
           else if (pctList(hubStatus)) out.push(`${tag} Meeting: the status line still lists ${pctList(hubStatus)} day figures`);
-          const plantLine = document.createElement('div'); plantLine.textContent = 'Mon 🐥40% 🦊20% · Tue 🐥0% 🦊0%';
-          if (!pctList(plantLine)) out.push(`${tag} Meeting: the status line check missed its plant (the old % list)`);
+          if (hubStatus) {
+            const wasLine = hubStatus.textContent;
+            hubStatus.textContent = 'Mon 🐥40% 🦊20% · Tue 🐥0% 🦊0%';
+            if (!pctList(hubStatus)) out.push(`${tag} Meeting: the status line check missed its plant (the old % list)`);
+            hubStatus.textContent = wasLine;
+          }
           const hubBtn = document.querySelector('#meetingHub .hub-cta .ui-btn--block');
           if (!hubBtn || !fullWidth(hubBtn)) out.push(`${tag} Meeting: Run family meeting is not the full-width kit button`);
           setParentDest('history'); await wait(60);

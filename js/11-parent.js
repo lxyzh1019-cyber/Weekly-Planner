@@ -451,7 +451,7 @@ function meetingDayTile(d, date, act) {
   const isToday = k === todayKey(), isFuture = k > todayKey();
   const jenn = mmDayPct('jenn', d), jess = mmDayPct('jess', d);
   const cls = [confirmed ? 'ui-day--ok' : '', isFuture ? 'ui-day--future' : ''].filter(Boolean).join(' ');
-  const label = `${DAY_SHORT[d]} ${date.getDate()}, ${confirmed ? 'confirmed' : 'not confirmed yet'}${isToday ? ', today' : ''}, Jenn ${jenn}%, Jess ${jess}%`;
+  const label = `${DAY_SHORT[d]} ${date.getDate()}, ${confirmed ? 'confirmed' : 'not confirmed yet'}${isToday ? ', today' : ''}, ${kidLabel('jenn').name} ${jenn}%, ${kidLabel('jess').name} ${jess}%`;
   return `<button type="button"${cls ? ` class="${cls}"` : ''}${isToday ? ' aria-current="date"' : ''} ${act}
       aria-label="${escapeAttr(label)}"><span class="ui-day-dow">${DAY_SHORT[d]}</span><span class="ui-day-date">${date.getDate()}</span>
       <span class="ui-day-pct">🐥${jenn}%</span><span class="ui-day-pct">🦊${jess}%</span>

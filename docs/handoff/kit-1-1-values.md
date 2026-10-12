@@ -114,3 +114,5 @@ label wraps instead of pushing the page sideways; min-width 44px still holds.
 Planted faults, each failing the check (2026-10-11, then removed): a disabled
 button at full opacity; a six-cell row; a 999px cell corner; a 40px row; a
 picked-chip colour that differs from the selected colour.
+
+Left for Round 2 (reviewer findings on C1–C8, 2026-10-12): `.pill-btn` (20px corner) and `.filter-chip` (16px corner) are still pills; Stages 62/63 convert them to the 10–12px chip corner. `.mny-chip` is 10px now.
