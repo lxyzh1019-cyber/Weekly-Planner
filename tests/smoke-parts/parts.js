@@ -39,6 +39,7 @@ const PARTS = {
     'oneBackStackGoesWhereYouCameFrom',
     'theBuildNumberIsOnThePage',
     'thePortalKitHolds44px',
+    'monthlyFitsAPhone',
     'sisterSyncIsOnTheKit',
     'theProfileScreensAreOnTheKit',
     'oneSheetAndOneDialogEverywhere',

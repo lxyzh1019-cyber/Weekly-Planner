@@ -14,7 +14,7 @@ function paRenderAccess() {
   const wrap = document.getElementById('paAccessWrap');
   if (!wrap) return;
   wrap.innerHTML = `<p class="pn-cap">Access</p>
-    <div class="pn-card">
+    <div class="ui-card">
       <div class="pn-row pn-static">
         <span class="pn-ico" aria-hidden="true">🔑</span>
         <span class="pn-text"><span class="pn-title">Parent PIN</span>
@@ -22,7 +22,7 @@ function paRenderAccess() {
         <button type="button" class="pn-cta" data-pa-action="pin">Change</button>
       </div>
     </div>
-    <div class="pn-card pn-clear" style="margin-top:0.6rem">
+    <div class="ui-card pn-clear" style="margin-top:0.6rem">
       A second parent identity and stamping who graded each claim are not here
       yet — they touch the sign-in boundary, which is its own piece of work.
     </div>`;
@@ -37,7 +37,7 @@ function paRenderProfiles() {
   if (!wrap) return;
   const card = kid => {
     const name = kidLabel(kid).name;
-    return `<div class="pn-card pa-profile">
+    return `<div class="ui-card pa-profile">
       <div class="pa-prof-head">
         <span class="pa-avatar ${kid === 'jenn' ? 'pa-avatar-jenn' : 'pa-avatar-jess'}">${CT_PROFILE_ICON[kid]}</span>
         <span><span class="pn-title">${name}</span>
@@ -61,14 +61,13 @@ function paRenderProfiles() {
   const vis = [['public', 'Activities marked public', showAll], ['busy-only', 'Busy times only', !showAll]];
   wrap.innerHTML = `<p class="pn-cap">Profiles</p>
     <div class="pa-profiles">${card('jenn')}${card('jess')}</div>
-    <div class="pn-card pn-clear" style="margin-top:0.6rem">
+    <div class="ui-card pn-clear" style="margin-top:0.6rem">
       <p class="pn-title">👯 What each sister sees on Sister Sync</p>
       <p class="pn-sub">Her sister's day is always there. A block shows its name only when
         "👯 Show details to your sister" is on in its edit sheet; everything else reads Busy.
         Busy times only hides every name. The girls see this setting but cannot change it.</p>
       <div class="pn-toggle" style="margin-top:0.6rem">${vis.map(([v, label, on]) =>
-        `<button type="button" class="pill-btn${on ? ' active' : ''}" data-pa-sister-vis="${v}"
-           aria-pressed="${on}">${escapeHtml(label)}</button>`).join('')}</div>
+        `<button type="button" class="ui-chip" aria-pressed="${on}" data-pa-sister-vis="${v}">${escapeHtml(label)}</button>`).join('')}</div>
     </div>`;
 }
 
@@ -110,15 +109,15 @@ function paRenderPrefs() {
   if (!wrap) return;
   const cur = paTextScale();
   wrap.innerHTML = `<p class="pn-cap">Preferences</p>
-    <div class="pn-card pn-clear">
+    <div class="ui-card pn-clear">
       <p class="pn-title">Reading size on grown-up screens</p>
       <p class="pn-sub">These pages are read at arm's length on a tablet. The girls' own
         screens are not affected.</p>
       <div class="pn-toggle" style="margin-top:0.6rem">${PA_SCALES.map(([v, label]) =>
-        `<button type="button" class="pill-btn${v === cur ? ' active' : ''}"
+        `<button type="button" class="ui-chip" aria-pressed="${v === cur}"
            data-pa-scale="${v}">${escapeHtml(label)}</button>`).join('')}</div>
     </div>
-    <div class="pn-card pn-clear" style="margin-top:0.6rem">
+    <div class="ui-card pn-clear" style="margin-top:0.6rem">
       Week start, meeting day and theme are not settings — the week starts Monday
       everywhere in the app, and the meeting happens when you open it.
     </div>`;
@@ -172,12 +171,12 @@ function paRenderSchool() {
   }).join('') || `<p class="pn-note">No more days off before the end of term.</p>`;
 
   wrap.innerHTML = `<p class="pn-cap">School calendar</p>
-    ${stale ? `<div class="pn-card pn-clear pa-stale">⚠️ This calendar has run out. Past
+    ${stale ? `<div class="ui-card pn-clear pa-stale">⚠️ This calendar has run out. Past
         <b>${escapeHtml(term.nextStart)}</b> the app stops claiming to know which days are
         school days and falls back to weekday shape. Set the new term dates below.</div>` : ''}
 
     <p class="pn-cap" style="margin-top:0.8rem">School hours</p>
-    <div class="pn-card">
+    <div class="ui-card">
       ${paSchoolTimeRow('School starts', 'paSchoolStart', h.startMin)}
       ${paSchoolTimeRow('Lunch recess', 'paSchoolLunch', h.lunchStartMin == null ? h.startMin : h.lunchStartMin)}
       <div class="pa-time-row">
@@ -187,15 +186,15 @@ function paRenderSchool() {
       </div>
       ${paSchoolTimeRow('School ends', 'paSchoolEnd', h.endMin)}
       <div class="pn-toggle" style="margin-top:0.5rem">
-        <button type="button" class="pill-btn active" data-pa-school="save-hours">Save hours</button>
-        ${setHours ? `<button type="button" class="pill-btn" data-pa-school="reset-hours">Use the shipped hours</button>` : ''}
+        <button type="button" class="ui-btn ui-btn--primary" data-pa-school="save-hours">Save hours</button>
+        ${setHours ? `<button type="button" class="ui-btn ui-btn--secondary" data-pa-school="reset-hours">Use the shipped hours</button>` : ''}
       </div>
       <p class="pn-note">These drive the coloured bands on the day and both week views, the
         School Day block, and every question the app asks about when school is on.</p>
     </div>
 
     <p class="pn-cap" style="margin-top:0.8rem">Term dates</p>
-    <div class="pn-card">
+    <div class="ui-card">
       <div class="pa-time-row"><label for="paTermStart">Term starts</label>
         <input type="date" id="paTermStart" value="${escapeAttr(term.start)}"></div>
       <div class="pa-time-row"><label for="paTermEnd">Term ends</label>
@@ -203,19 +202,19 @@ function paRenderSchool() {
       <div class="pa-time-row"><label for="paTermNext">Next term starts</label>
         <input type="date" id="paTermNext" value="${escapeAttr(term.nextStart)}"></div>
       <div class="pn-toggle" style="margin-top:0.5rem">
-        <button type="button" class="pill-btn active" data-pa-school="save-term">Save dates</button>
-        ${setTerm ? `<button type="button" class="pill-btn" data-pa-school="reset-term">Use the shipped dates</button>` : ''}
+        <button type="button" class="ui-btn ui-btn--primary" data-pa-school="save-term">Save dates</button>
+        ${setTerm ? `<button type="button" class="ui-btn ui-btn--secondary" data-pa-school="reset-term">Use the shipped dates</button>` : ''}
       </div>
       <div class="pn-kv" style="margin-top:0.4rem"><span>Instructional days</span><span class="pn-n">${days}</span></div>
     </div>
 
     <p class="pn-cap" style="margin-top:0.8rem">Days off</p>
-    <div class="pn-card">${offRows}</div>
-    <div class="pn-card" style="margin-top:0.4rem">
+    <div class="ui-card">${offRows}</div>
+    <div class="ui-card" style="margin-top:0.4rem">
       <div class="pa-time-row">
         <input type="date" id="paOffDate" aria-label="A day with no school">
         <input type="text" id="paOffLabel" maxlength="40" placeholder="why — e.g. staff day" aria-label="Why there is no school">
-        <button type="button" class="pill-btn" data-pa-school="add-off">Add</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-pa-school="add-off">Add</button>
       </div>
       <p class="pn-note">Statutory holidays and breaks are already in the shipped calendar; this is for
         the ones your school adds. Anything you type here syncs to the family's devices, so keep it

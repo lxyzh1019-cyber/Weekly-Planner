@@ -406,17 +406,17 @@ function scRenderImport() {
   const d = scDraft;
 
   const intro = `<p class="pn-cap" style="margin-top:0.8rem">Import a calendar</p>
-    <div class="pn-card pn-clear">Add the school's own <code>.ics</code> — days off, and the term
+    <div class="ui-card pn-clear">Add the school's own <code>.ics</code> — days off, and the term
       dates if the file names them. Nothing is added until you have looked at it.
       ${cal.lastFetched ? `<br><span class="pn-note">Last read ${escapeHtml(String(cal.lastFetched).slice(0, 10))}${cal.source ? ' · ' + escapeHtml(cal.source) : ''}</span>` : ''}
     </div>
     <div class="pn-toggle" style="margin-top:0.5rem">
-      <button type="button" class="pill-btn active" data-sc="pick">📂 Add a .ics file</button>
+      <button type="button" class="ui-btn ui-btn--primary" data-sc="pick">📂 Add a .ics file</button>
     </div>
     <div class="pa-time-row" style="margin-top:0.5rem">
       <input type="url" id="scUrlInput" placeholder="https://… or webcal://…"
         value="${escapeAttr(cal.url || '')}" aria-label="Calendar subscription link">
-      <button type="button" class="pill-btn" data-sc="fetch"${scBusy ? ' disabled' : ''}>${scBusy ? 'Reading…' : 'Read link'}</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-sc="fetch"${scBusy ? ' disabled' : ''}>${scBusy ? 'Reading…' : 'Read link'}</button>
     </div>
     <p class="pn-note">A link only works if the school's server lets a browser read it, and many do
       not. If it fails, download the <code>.ics</code> and use the file button — that always works.
@@ -425,8 +425,8 @@ function scRenderImport() {
   if (!d) { wrap.innerHTML = intro; return; }
 
   const tabs = `<div class="pn-toggle" style="margin-top:0.8rem">
-      <button type="button" class="pill-btn${scTab === 'school' ? ' active' : ''}" data-sc="tab" data-tab="school">🏫 Days off (${d.offDays.length})</button>
-      <button type="button" class="pill-btn${scTab === 'blocks' ? ' active' : ''}" data-sc="tab" data-tab="blocks">📌 Appointments (${d.timed.length})</button>
+      <button type="button" class="ui-chip" aria-pressed="${scTab === 'school'}" data-sc="tab" data-tab="school">🏫 Days off (${d.offDays.length})</button>
+      <button type="button" class="ui-chip" aria-pressed="${scTab === 'blocks'}" data-sc="tab" data-tab="blocks">📌 Appointments (${d.timed.length})</button>
     </div>`;
 
   let body;
@@ -448,10 +448,10 @@ function scRenderImport() {
     body = `<p class="pn-note">Every all-day entry in the file. ${ticked} of ${d.offDays.length}
         ${ticked === 1 ? 'is' : 'are'} ticked because ${ticked === 1 ? 'it reads' : 'they read'} like
         a day off — check the rest yourself, since a picture day is not a day at home.</p>
-      <div class="pn-card">${rows}</div>${term ? `<div class="pn-card" style="margin-top:0.4rem">${term}</div>` : ''}
+      <div class="ui-card">${rows}</div>${term ? `<div class="ui-card" style="margin-top:0.4rem">${term}</div>` : ''}
       <div class="pn-toggle" style="margin-top:0.5rem">
-        <button type="button" class="pill-btn active" data-sc="commit-school">Add the ticked days</button>
-        <button type="button" class="pill-btn" data-sc="discard">Discard</button>
+        <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-school">Add the ticked days</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
       </div>`;
   } else {
     const acts = getAllActivities(scBlockKid).filter(a => !a._locked);
@@ -462,20 +462,20 @@ function scRenderImport() {
         <span class="sc-when">${DAY_SHORT[(dt.getDay() + 6) % 7]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]} · ${escapeHtml(formatTimeFromMin(e.startMin))}</span>
         <span class="sc-what">${escapeHtml(e.summary || 'Appointment')}</span></label>`;
     }).join('') || `<p class="pn-note">No timed events in that file — only all-day entries.</p>`;
-    body = `<div class="pn-card">
+    body = `<div class="ui-card">
         <div class="pn-toggle">${['jenn', 'jess'].map(k =>
-          `<button type="button" class="pill-btn${k === scBlockKid ? ' active' : ''}" data-sc="kid" data-kid="${k}">${escapeHtml(kidLabel(k).icon + ' ' + kidLabel(k).name)}</button>`).join('')}</div>
+          `<button type="button" class="ui-chip" aria-pressed="${k === scBlockKid}" data-sc="kid" data-kid="${k}">${escapeHtml(kidLabel(k).icon + ' ' + kidLabel(k).name)}</button>`).join('')}</div>
         <div class="pa-time-row" style="margin-top:0.5rem">
           <label for="scActSelect">As</label>
           <select id="scActSelect" data-sc="act">${acts.map(a =>
             `<option value="${escapeAttr(a.id)}"${a.id === scBlockActId ? ' selected' : ''}>${escapeHtml(a.icon + ' ' + a.name)}</option>`).join('')}</select>
         </div>
       </div>
-      <div class="pn-card" style="margin-top:0.4rem">${rows}</div>
+      <div class="ui-card" style="margin-top:0.4rem">${rows}</div>
       ${d.timed.length > 60 ? `<p class="pn-note">Showing the first 60 of ${d.timed.length}.</p>` : ''}
       <div class="pn-toggle" style="margin-top:0.5rem">
-        <button type="button" class="pill-btn active" data-sc="commit-blocks">Add the ticked ones</button>
-        <button type="button" class="pill-btn" data-sc="discard">Discard</button>
+        <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-blocks">Add the ticked ones</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
       </div>`;
   }
 
@@ -487,7 +487,7 @@ function scRenderImport() {
 
   wrap.innerHTML = intro
     + `<p class="pn-cap" style="margin-top:0.8rem">What is in it</p>
-       <div class="pn-card pn-clear">${d.total} event${d.total === 1 ? '' : 's'} read${d.source ? ` · ${escapeHtml(d.source)}` : ''}.</div>`
+       <div class="ui-card pn-clear">${d.total} event${d.total === 1 ? '' : 's'} read${d.source ? ` · ${escapeHtml(d.source)}` : ''}.</div>`
     + skipped + tabs + body;
 }
 

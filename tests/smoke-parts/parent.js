@@ -1,5 +1,49 @@
 // Smoke group: the parent portal on the component kit (Consistency PR 10). thePortalKitHolds44px: every kit tab, button, chip and kid switch the portal draws (js/11-parent.js, js/32-parent-now.js) is at least 44×44 at 390×844 and 1194×834, in Pop and in Calm — the day squares, her rating's chips and the learning steppers included (She told me… is opened on every day it offers until each has been drawn). tests/smoke.js calls it near the end of the run, on its one shared page; it gives Jenn's today a training block while She told me… is open (her rating shows only on a training day) and takes it off again, and puts back the look, the size, the profile and the portal's place (unlocked, scope, viewing, tab, History's view), as everyHeaderMeasuresToTheExactValues does.
 module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
+  /* Stage 62 (owner 2026-10-12): Monthly on a phone is 7 equal columns that
+     shrink to fit; Sunday's right edge stays on screen at 360px. Every cell and
+     weekday heading is measured, in both looks, at 360 and 390px, this month
+     and the next. */
+  if (want('monthlyFitsAPhone')) {
+    const beforeM = page.viewportSize();
+    const wasM = await page.evaluate(() => ({ profile, unlocked: parentUnlockedThisSession, offset: parentMonthOffset }));
+    const bad = [];
+    try {
+      for (const look of ['pop', 'calm']) {
+        await setLook(look);
+        for (const [w, h] of [[360, 740], [390, 844]]) {
+          await page.setViewportSize({ width: w, height: h });
+          await page.waitForTimeout(100);
+          bad.push(...await page.evaluate(async ([look, w]) => {
+            const out = [];
+            profile = 'parent'; parentUnlockedThisSession = true;
+            for (const off of [0, 1]) {
+              parentMonthOffset = off;
+              openParentMonthly('jenn');
+              await new Promise(r => setTimeout(r, 30));
+              const tag = `${look} ${w}px, month +${off}`;
+              const grid = document.getElementById('pmGrid'), dows = [...document.querySelectorAll('#screen-parent-monthly .pm-dow')];
+              if (!grid || dows.length !== 7) { out.push(`${tag}: no 7-column Monthly drawn (${dows.length} weekday headings)`); continue; }
+              const cells = [...grid.children];
+              const edge = Math.max(...dows.map(d => d.getBoundingClientRect().right), ...cells.map(c => c.getBoundingClientRect().right));
+              if (edge > innerWidth + 0.5) out.push(`${tag}: Sunday's right edge is at ${edge.toFixed(1)}px, past the ${innerWidth}px screen`);
+              if (document.documentElement.scrollWidth > innerWidth + 1) out.push(`${tag}: the page scrolls sideways (${document.documentElement.scrollWidth}px in ${innerWidth}px)`);
+              const widths = dows.map(d => d.getBoundingClientRect().width);
+              if (Math.max(...widths) - Math.min(...widths) > 0.6) out.push(`${tag}: the 7 columns are not equal (${widths.map(x => x.toFixed(1)).join(', ')})`);
+              const cw = cells.map(c => c.getBoundingClientRect().width);
+              if (Math.max(...cw) - Math.min(...cw) > 0.6) out.push(`${tag}: day cells differ in width (${Math.min(...cw).toFixed(1)}-${Math.max(...cw).toFixed(1)})`);
+            }
+            return out;
+          }, [look, w]));
+        }
+      }
+    } finally {
+      await page.setViewportSize(beforeM);
+      await clearLooks();
+      await page.evaluate((was) => { profile = was.profile; parentUnlockedThisSession = was.unlocked; parentMonthOffset = was.offset; goToday(); }, wasM);
+    }
+    checks.monthlyFitsAPhone = bad.length ? [...new Set(bad)] : true;
+  }
   if (!want('thePortalKitHolds44px')) return;
   const before = page.viewportSize();
   const problems = [];

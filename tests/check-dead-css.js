@@ -38,6 +38,8 @@ const css = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css'
 // Classes assembled at runtime, by builder (file:line where the name is glued).
 // Full names only, never a prefix.
 const BUILT_AT_RUNTIME = {
+  // Stage 62: no screen draws .pn-card any more (cards are .ui-card); the dead rule stays until Stage 45 deletes it, then this line goes.
+  'js/33-parent-app.js:1': ['pn-card'],
   'js/07-week-view.js:1240': ['wf-band-after', 'wf-band-before', 'wf-band-evening', 'wf-band-free', 'wf-band-lunch'],
   'js/10-social.js:152': ['sync-day-col--left', 'sync-day-col--right'],
   'js/16-print.js:185': ['print-band-after', 'print-band-before', 'print-band-evening', 'print-band-free',
