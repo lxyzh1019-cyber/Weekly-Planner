@@ -5049,7 +5049,7 @@
 
 .ui-chip {
   box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-1);
-  min-height: 44px; min-width: 44px; padding: 0 var(--space-3);
+  min-height: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
   border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
   font-family: var(--font-text); font-weight: 700; font-size: calc(0.95rem * var(--text-scale, 1));
@@ -5169,10 +5169,12 @@
 .ui-stepper--kid > button { width: 52px; height: 52px; }
 
 /* Kit 1.1 K12: on a phone a chip's sides are 0.6rem (the Sunday choose row
-   fits two rows at 390px); its 44px min-width keeps a one-figure chip a
-   44px target. */
+   fits two rows at 390px). With the narrower sides a short chip could fall
+   under the 44px target, so there it is at least 44px wide; it does not
+   shrink in a row (min-width replaces flex's content minimum, which kept a
+   long chip from being squeezed under its label). */
 @media (max-width: 699px) {
-  .ui-chip { padding: 0 0.6rem; }
+  .ui-chip { padding: 0 0.6rem; min-width: 44px; flex-shrink: 0; }
 }
 
 /* ══════════════════════════════════════════════════════════════

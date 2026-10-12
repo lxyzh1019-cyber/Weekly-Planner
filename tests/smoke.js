@@ -26922,9 +26922,10 @@ function findChromium() {
           // K11 — a picked chip wears the selected colour; K12 — chip sides.
           same(cs($('kfChipOn')).backgroundColor, colour('--sel'), 'a picked chip fill (the selected colour)');
           same(cs($('kfChipOn')).color, colour('--sel-ink'), 'a picked chip ink');
+          if (phone) same(cs($('kfChip')).flexShrink, '0', 'a chip on a phone, its shrink');
           near(px(cs($('kfChip')).paddingLeft), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
           near(px(cs($('kfChip')).paddingRight), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
-          if ($('kfChipOne').getBoundingClientRect().width < 44 - 0.5) out.push(`${tag}: a one-figure chip is ${$('kfChipOne').getBoundingClientRect().width}px wide, under 44`);
+          if (phone && $('kfChipOne').getBoundingClientRect().width < 44 - 0.5) out.push(`${tag}: a one-figure chip is ${$('kfChipOne').getBoundingClientRect().width}px wide, under 44`);
           // K4 — the joined kid switch.
           const [k1, k2] = $('kfKids').children;
           const s1 = cs(k1), s2 = cs(k2);

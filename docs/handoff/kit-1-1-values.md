@@ -65,7 +65,8 @@ mode removed, light scheme on the root) was Stage 49 and is checked by
 | K11 picked chip (`.ui-chip[aria-pressed="true"]`) | fill equals the selected colour, both looks | `--pill-on: var(--sel)` (both look blocks) | `a picked chip fill (the selected colour)` |
 | K11 picked chip | ink | `--pill-on-ink: var(--sel-ink)` | `a picked chip ink` |
 | K12 chip sides | 0.75rem (12px) on the iPad; 0.6rem (9.6px) at 699px and below | `--space-3` / — | `a chip side` |
-| K12 chip width | at least 44px, so a one-figure chip stays a 44px target with the narrower sides (a Sunday chip was 40px wide without it) | — | `a one-figure chip is …px wide, under 44` |
+| K12 chip width, at 699px and below | at least 44px, so a short chip stays a 44px target with the narrower sides (a Sunday chip was 40px wide without it) | — | `a one-figure chip is …px wide, under 44` |
+| K12 chip shrink, at 699px and below | flex-shrink 0: the 44px min-width replaces flex's content minimum, so without it a long chip was squeezed under its label (Sunday choose row, run 38197271036) | — | `a chip on a phone, its shrink` |
 
 Modifiers chosen here: the list row's parent size is `.ui-row--parent` (the
 kid's 52px is the default: Today's and Week/Day rows are the girls'); the
