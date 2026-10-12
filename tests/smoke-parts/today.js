@@ -1,4 +1,4 @@
-// Smoke group: Today (Consistency PR 7) — withMumReadsInBothLooks. tests/smoke.js calls it after the looks walks, on its one shared page; the check seeds the "with Mum" row it measures and puts back what it seeded.
+// Smoke group: Today (Consistency PR 7) — withMumReadsInBothLooks, which since Stage 55 also measures Today's kit rows (.ui-row) and "Coming up" card corners in both looks. tests/smoke.js calls it after the looks walks, on its one shared page; the check seeds the "with Mum" row it measures and puts back what it seeded.
 module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
   /* D18 — a chore she has claimed and Mum has not answered reads "with Mum"
      on Today's Jobs I can do card. In Calm the words were the look's
@@ -40,7 +40,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
       await setLook(look);
       const r = await page.evaluate(() => {
         goToday();
-        const go = document.querySelector('#tdWrap .td-row--waiting .td-row-go');
+        const go = document.querySelector('#tdWrap .ui-row[data-td-action="waiting"] .ui-row-end');
         if (!go) return { missing: true };
         const parse = (s) => {
           let m = /rgba?\(([^)]*)\)/.exec(s);
@@ -79,7 +79,7 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
         };
         const [hi, lo] = [lum(fg), lum(bg)].sort((a, b) => b - a);
         const hex = c => '#' + c.slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
-        const row = go.closest('.td-row');
+        const row = go.closest('.ui-row');
         return { ratio: (hi + 0.05) / (lo + 0.05), text: go.textContent.trim(), fg: hex(fg), bg: hex(bg),
           colour: getComputedStyle(go).color, opacity: getComputedStyle(row).opacity };
       });
@@ -89,6 +89,57 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
       console.log(`withMumReadsInBothLooks: ${look} "${r.text}" ${r.ratio.toFixed(2)}:1 (text ${r.fg} on ${r.bg}; colour ${r.colour}, row opacity ${r.opacity})`);
       if (r.text !== 'with Mum') bad.push(`${look}: the waiting row reads "${r.text}", want "with Mum"`);
       if (!(r.ratio >= 4.5)) bad.push(`${look}: "with Mum" is ${r.ratio.toFixed(2)}:1 on its row (text ${r.fg} on ${r.bg}), want at least 4.5:1`);
+      /* Stage 55 (owner answers G8, G9): Today's rows are the kit's list row —
+         at least 52px, a 2px border and an 11px corner on every side, the icon
+         before the name; the waiting row in the done look (the green wash, the
+         name struck through); an add row dashed. "Coming up" cards have 11px
+         corners. A planted row with an 18px corner must be caught. */
+      const kit = await page.evaluate(() => {
+        const out = [];
+        const faults = (el) => {
+          const cs = getComputedStyle(el), p = [];
+          const floor = el.classList.contains('ui-row--parent') ? 44 : 52;
+          const h = el.getBoundingClientRect().height;
+          if (h < floor - 0.5) p.push(`is ${h.toFixed(1)}px high, under ${floor}`);
+          ['Top', 'Right', 'Bottom', 'Left'].forEach(s => { if (cs[`border${s}Width`] !== '2px') p.push(`its ${s.toLowerCase()} border is ${cs[`border${s}Width`]}, want 2px`); });
+          ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].forEach(c => { if (cs[`border${c}Radius`] !== '11px') p.push(`its ${c} corner is ${cs[`border${c}Radius`]}, want 11px`); });
+          const icon = el.querySelector(':scope > .ui-row-icon'), name = el.querySelector(':scope > .ui-row-name');
+          if (!name) p.push('has no name slot (.ui-row-name)');
+          else if (icon && icon.getBoundingClientRect().right > name.getBoundingClientRect().left + 0.5) p.push('has its icon after its name');
+          return p;
+        };
+        const label = el => `"${el.textContent.replace(/\s+/g, ' ').trim().slice(0, 30)}"`;
+        const rows = [...document.querySelectorAll('#tdWrap .ui-row')].filter(el => el.getClientRects().length);
+        if (!rows.length) out.push('no kit row (.ui-row) on Today');
+        rows.forEach(el => faults(el).forEach(f => out.push(`the row ${label(el)} ${f}`)));
+        const waiting = document.querySelector('#tdWrap .ui-row[data-td-action="waiting"]');
+        if (waiting) {
+          const wash = getComputedStyle(document.documentElement).getPropertyValue('--status-done-wash').trim();
+          const probe = document.createElement('div'); probe.style.background = wash; document.body.appendChild(probe);
+          const want = getComputedStyle(probe).backgroundColor; probe.remove();
+          if (!waiting.classList.contains('ui-row--done')) out.push('the "with Mum" row is not in the done look (.ui-row--done)');
+          if (getComputedStyle(waiting).backgroundColor !== want) out.push(`the "with Mum" row's fill is ${getComputedStyle(waiting).backgroundColor}, want the done wash ${want}`);
+          const nm = waiting.querySelector('.ui-row-name');
+          if (!nm || !/line-through/.test(getComputedStyle(nm).textDecorationLine)) out.push('the "with Mum" row\'s name is not struck through');
+        }
+        document.querySelectorAll('#tdWrap .ui-row--add').forEach(el => {
+          if (getComputedStyle(el).borderTopStyle !== 'dashed') out.push(`the add row ${label(el)} is not dashed`);
+        });
+        const cards = [...document.querySelectorAll('#tdWrap .quest-card')].filter(el => el.getClientRects().length);
+        cards.forEach(el => {
+          const cs = getComputedStyle(el);
+          ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].forEach(c => { if (cs[`border${c}Radius`] !== '11px') out.push(`the Coming up card ${label(el)} has a ${cs[`border${c}Radius`]} ${c} corner, want 11px`); });
+        });
+        const planted = document.createElement('button');
+        planted.type = 'button'; planted.className = 'ui-row'; planted.style.borderRadius = '18px';
+        planted.innerHTML = '<span class="ui-row-icon">✳</span><span class="ui-row-name">Planted</span>';
+        document.getElementById('tdWrap').appendChild(planted);
+        if (!faults(planted).some(f => /corner is 18px/.test(f))) out.push('the row check missed a planted row with an 18px corner');
+        planted.remove();
+        return { out, rows: rows.length, cards: cards.length };
+      });
+      console.log(`withMumReadsInBothLooks: ${look} ${kit.rows} kit rows, ${kit.cards} Coming up cards measured`);
+      kit.out.forEach(f => bad.push(`${look}: ${f}`));
     }
   } finally {
     try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
