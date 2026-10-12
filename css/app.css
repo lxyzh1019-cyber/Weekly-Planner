@@ -5049,7 +5049,7 @@
 
 .ui-chip {
   box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-1);
-  min-height: 44px; padding: 0 var(--space-3);
+  min-height: 44px; min-width: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
   border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
   font-family: var(--font-text); font-weight: 700; font-size: calc(0.95rem * var(--text-scale, 1));
@@ -5105,7 +5105,7 @@
    the portal's framed .parent-scope) keeps its look. */
 .ui-kids { display: inline-flex; gap: 0; }
 .ui-kids > button {
-  box-sizing: border-box; min-height: 44px; min-width: 44px; padding: 0 var(--space-3);
+  box-sizing: border-box; min-height: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
   border: var(--bw-chip) solid var(--ink); border-radius: 0;
   font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
@@ -5168,12 +5168,11 @@
 }
 .ui-stepper--kid > button { width: 52px; height: 52px; }
 
-/* On a phone: Kit 1.1 K12 — a chip's sides 0.6rem (the Sunday choose row fits
-   two rows at 390px); the kid switch's cells 0 8px (folded in from the
-   header's sub-bar, where the kid switch sits beside five tabs). */
+/* Kit 1.1 K12: on a phone a chip's sides are 0.6rem (the Sunday choose row
+   fits two rows at 390px); its 44px min-width keeps a one-figure chip a
+   44px target. */
 @media (max-width: 699px) {
   .ui-chip { padding: 0 0.6rem; }
-  .ui-kids > button { padding: 0 var(--space-2); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -5396,6 +5395,7 @@
   .hdr-tab:not([aria-current]) .hdr-tab-word, .hdr-tab-tag, .hdr-tabs--many .hdr-tab-word, .hdr-sub .ui-kids .hdr-tab-word { display: none; }
   .hdr-sub .hdr-tabs { flex: none; gap: var(--space-1); border: 0; border-radius: 0; overflow: visible; background: none; }
   .hdr-sub .hdr-tab { box-sizing: border-box; width: auto; height: 44px; min-width: 44px; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); }
+  .hdr-sub .ui-kids > button { min-width: 44px; padding: 0 var(--space-2); }
   /* The meeting on a phone (SRC 235-250): pad 10, no title, steps as
      numbers in 46px cells (✓ 18px, 2 3 19px), no week in row 2. The row's
      gap is 4px, not the picture's 6: with 🔊 Sound kept beside 🗣️

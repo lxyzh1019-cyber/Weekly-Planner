@@ -30,8 +30,8 @@ mode removed, light scheme on the root) was Stage 49 and is checked by
 | K4 kid switch | 2px ink divider between cells | `--bw-chip` | `the kid switch divider` |
 | K4 kid switch | chosen girl fill and ink | `--sel` / `--sel-ink` | `the chosen girl fill` / `ink` |
 | K4 kid switch | the other girl white | `--paper` | `the other girl fill` |
-| K4 kid switch | cell 44px high, at least 44px wide | — | `a kid switch cell` |
-| K4 kid switch | cell sides 0.75rem (12px); 0.5rem (8px) at 699px and below — folded in from the header's sub-bar rule `.hdr-sub .ui-kids > button` | `--space-3` / `--space-2` | `a kid switch cell side` |
+| K4 kid switch | cell 44px high | — | `a kid switch cell` |
+| K4 kid switch | cell sides 0.75rem (12px). The header's sub-bar keeps its own phone rule (`.hdr-sub .ui-kids > button`: at least 44px wide, sides 8px): a kit min-width would also widen the portal's girl switch (`.parent-scope`, content-box cells), a header picture | `--space-3` | `a kid switch cell side` |
 | K5 seven-day row (`.ui-days`) | 7 cells on one row | — | `the seven-day row has` / `day cell n is not on the row` |
 | K5 seven-day row | the 7 cells equal width | — | `day cell n's width` |
 | K5 seven-day row | cell at least 44px high | — | `day cell n is …px high, under 44` |
@@ -65,6 +65,7 @@ mode removed, light scheme on the root) was Stage 49 and is checked by
 | K11 picked chip (`.ui-chip[aria-pressed="true"]`) | fill equals the selected colour, both looks | `--pill-on: var(--sel)` (both look blocks) | `a picked chip fill (the selected colour)` |
 | K11 picked chip | ink | `--pill-on-ink: var(--sel-ink)` | `a picked chip ink` |
 | K12 chip sides | 0.75rem (12px) on the iPad; 0.6rem (9.6px) at 699px and below | `--space-3` / — | `a chip side` |
+| K12 chip width | at least 44px, so a one-figure chip stays a 44px target with the narrower sides (a Sunday chip was 40px wide without it) | — | `a one-figure chip is …px wide, under 44` |
 
 Modifiers chosen here: the list row's parent size is `.ui-row--parent` (the
 kid's 52px is the default: Today's and Week/Day rows are the girls'); the

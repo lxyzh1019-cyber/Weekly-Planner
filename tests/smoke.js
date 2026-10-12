@@ -26855,7 +26855,7 @@ function findChromium() {
           host.innerHTML = '<style>.kit-fx-shadow { box-shadow: 3px 3px 0 #000; }</style>'
             + '<p><button type="button" class="ui-btn ui-btn--secondary" id="kfSec">Sec</button> <button type="button" class="ui-btn ui-btn--primary" id="kfMain">Main</button>'
             + ' <button type="button" class="ui-btn ui-btn--ok" id="kfOk">Ok</button> <button type="button" class="ui-chip" id="kfChip">Chip</button>'
-            + ' <button type="button" class="ui-chip" aria-pressed="true" id="kfChipOn">On</button></p>'
+            + ' <button type="button" class="ui-chip" aria-pressed="true" id="kfChipOn">On</button> <button type="button" class="ui-chip" id="kfChipOne">1</button></p>'
             + '<p><button type="button" class="ui-btn ui-btn--primary kit-fx-shadow" id="kfOff" disabled>Off</button> <button type="button" class="ui-btn kit-fx-shadow" id="kfAriaOff" aria-disabled="true">Off 2</button></p>'
             + '<div id="kfCol" style="width:300px"><button type="button" class="ui-btn ui-btn--primary ui-btn--block" id="kfBlock">Run family meeting</button></div>'
             + '<div class="ui-kids" id="kfKids" role="group" aria-label="Which child"><button type="button" aria-pressed="false">Jenn</button><button type="button" aria-pressed="true">Jess</button></div>'
@@ -26924,11 +26924,11 @@ function findChromium() {
           same(cs($('kfChipOn')).color, colour('--sel-ink'), 'a picked chip ink');
           near(px(cs($('kfChip')).paddingLeft), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
           near(px(cs($('kfChip')).paddingRight), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
+          if ($('kfChipOne').getBoundingClientRect().width < 44 - 0.5) out.push(`${tag}: a one-figure chip is ${$('kfChipOne').getBoundingClientRect().width}px wide, under 44`);
           // K4 — the joined kid switch.
           const [k1, k2] = $('kfKids').children;
           const s1 = cs(k1), s2 = cs(k2);
           near(k1.getBoundingClientRect().height, 44, 'a kid switch cell');
-          for (const k of [k1, k2]) if (k.getBoundingClientRect().width < 44 - 0.5) out.push(`${tag}: a kid switch cell is ${k.getBoundingClientRect().width}px wide, under 44`);
           near(k2.getBoundingClientRect().left, k1.getBoundingClientRect().right, 'the second kid cell (joined: no gap)');
           for (const side of ['Top', 'Bottom', 'Left']) near(px(s1[`border${side}Width`]), 2, `the kid switch frame (${side})`);
           near(px(s2.borderRightWidth), 2, 'the kid switch frame (Right)');
@@ -26940,7 +26940,7 @@ function findChromium() {
           same(s2.backgroundColor, colour('--sel'), 'the chosen girl fill');
           same(s2.color, colour('--sel-ink'), 'the chosen girl ink');
           same(s1.backgroundColor, colour('--paper'), 'the other girl fill');
-          near(px(s1.paddingLeft), (phone ? 0.5 : 0.75) * rootPx, 'a kid switch cell side');
+          near(px(s1.paddingLeft), 0.75 * rootPx, 'a kid switch cell side');
           // K5 — the seven-day row.
           const days = [...$('kfDays').children];
           if (days.length !== 7) out.push(`${tag}: the seven-day row has ${days.length} cells`);
