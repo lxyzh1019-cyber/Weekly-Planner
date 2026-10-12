@@ -115,7 +115,7 @@
       Remember: you're in charge of your own day. Be kind to yourself, try things, and enjoy the week.
     </div>
   </div>
-  <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:max(13px, calc(0.8rem * var(--text-scale, 1)))">
+  <p class="profile-status">
     <span id="fbStatus">⚙️ Connecting...</span>
     <br><span id="syncPendingMsg" role="status" aria-live="polite" class="sync-pending-msg"></span>
     <br><span id="syncDebugMsg" class="sync-debug-msg"></span>
@@ -489,28 +489,28 @@
        profile badge. No ◀ — it is a nav tab. -->
   <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
 
-  <div class="week-nav">
-    <button class="btn-icon" onclick="changeSyncDay(-1)">◀</button>
+  <div class="sync-day-nav">
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" onclick="changeSyncDay(-1)" aria-label="Previous day">◀</button>
     <h3 id="syncDayLabel"></h3>
-    <button class="btn-icon" onclick="changeSyncDay(1)">▶</button>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" onclick="changeSyncDay(1)" aria-label="Next day">▶</button>
   </div>
 
   <div id="syncOverlapWrap"></div>
   <div class="sync-grid" id="syncGrid"></div>
 
   <!-- Challenges now live here under Sisters — friendly weekly goals you race on. -->
-  <div style="padding: 0 0.8rem 0.4rem">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:1rem 0 0.3rem">
-      <h3 style="font-size:calc(1.3rem * var(--text-scale, 1));margin:0">🎯 Our Challenges</h3>
-      <button class="btn-icon" onclick="openNewChallenge()" aria-label="Add challenge">＋</button>
+  <div class="sync-sect">
+    <div class="sync-sect-head">
+      <h3 class="ui-sect-head">🎯 Our Challenges</h3>
+      <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" onclick="openNewChallenge()" aria-label="Add challenge">＋</button>
     </div>
-    <p style="color:var(--ink-light);font-size:calc(0.85rem * var(--text-scale, 1));margin:0 0 0.6rem">Friendly weekly goals you both race on.</p>
+    <p class="sync-sect-note">Friendly weekly goals you both race on.</p>
     <div id="challengesList"></div>
   </div>
 
   <!-- id: Today's 💌 note (tdOpenInvites) scrolls here, so she lands on the invites. -->
-  <div id="invitesSection" style="padding: 0 0.8rem 1rem">
-    <h3 style="font-size:calc(1.3rem * var(--text-scale, 1));margin:1rem 0 0.5rem">💌 Invites</h3>
+  <div id="invitesSection" class="sync-sect sync-sect--last">
+    <h3 class="ui-sect-head">💌 Invites</h3>
     <div id="invitesList"></div>
   </div>
 </div>

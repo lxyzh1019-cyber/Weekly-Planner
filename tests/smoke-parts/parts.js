@@ -39,6 +39,8 @@ const PARTS = {
     'oneBackStackGoesWhereYouCameFrom',
     'theBuildNumberIsOnThePage',
     'thePortalKitHolds44px',
+    'sisterSyncIsOnTheKit',
+    'theProfileScreensAreOnTheKit',
     'everyMoneyControlClicksClean',
     'theSundayKitHolds44pxInItsBoxes',
     'theSundayChooseRowFitsTwoRows',
