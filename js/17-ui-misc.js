@@ -152,7 +152,7 @@ function _appChoiceKey(e) {
 // We swallow a repeat activation of the SAME action button inside a short
 // window. Opening any sheet resets the guard so legitimately re-using the same
 // static button on a fresh sheet is never blocked. `act-guard` marks the kit
-// buttons that were .btn-confirm before Stage 63, so the guard covers the same
+// buttons that were .btn-confirm or .btn-danger before Stage 63 and Part 13, so the guard covers the same
 // buttons as before, not every .ui-btn--primary.
 let _actGuardBtn = null, _actGuardAt = 0;
 function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
@@ -164,7 +164,7 @@ function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
     if (!btn) return;
     const cls = typeof btn.className === 'string' ? btn.className : '';
     const oc = (btn.getAttribute && btn.getAttribute('onclick')) || '';
-    const isAction = /\b(?:act-guard|btn-confirm|btn-danger)\b/.test(cls) || MUTATING.test(oc);
+    const isAction = /\bact-guard\b/.test(cls) || MUTATING.test(oc);
     if (!isAction) return;
     const now = Date.now();
     if (btn === _actGuardBtn && (now - _actGuardAt) < WINDOW_MS) {

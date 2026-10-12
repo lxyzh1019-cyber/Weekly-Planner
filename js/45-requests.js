@@ -145,20 +145,6 @@ function mnyAddRequest(kid, fields) {
   return r;
 }
 
-/* Take back a question nobody has answered. Tombstoned, so the other device
-   does not hand it back. */
-function mnyWithdrawRequest(kid, id) {
-  if (!mnyRequestMayAsk(kid)) return false;
-  const list = mnyEnsureRequests(kid);
-  const i = list.findIndex(r => r && r.id === id);
-  if (i < 0) return false;
-  if (list[i].status === 'yes') { showToast('Already answered — ask a grown-up to change it.'); return false; }
-  list.splice(i, 1);
-  tombstoneIds('req:', [id]);
-  saveAll();
-  return true;
-}
-
 /* ── One reader: every question she has asked, in one shape ──
    {id, store, kind, status, text, icon, amount, open, applied, askedAt,
     answeredAt, weekKey, record}. `open` is "still waiting on a grown-up" —

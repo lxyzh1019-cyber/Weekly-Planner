@@ -143,4 +143,106 @@ module.exports = async ({ page, want, checks }) => {
     await page.waitForTimeout(100);
   }
   checks.oneSheetAndOneDialogEverywhere = bad.length === 0 || bad;
+  await theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks });
 };
+
+/* Part 13 (owner P7–P9, 2026-10-12): the red (danger) OK only on a confirm
+   that cannot be undone. The 14 confirms that carried it, each read from the
+   loaded function's own source with the variant it must have: 'danger', 'main'
+   (no danger option, or danger: false) or 'lost' (red only when planned blocks
+   are lost). The two 'lost' ones are also driven: red, and the question names
+   the real count, when planned blocks go; the main button when none do. */
+async function theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks }) {
+  if (!want('theRedOkIsOnlyForWhatCannotBeUndone')) return;
+  let bad = [];
+  try {
+    bad = await page.evaluate(async () => {
+      const out = [];
+      const tick = () => new Promise(r => setTimeout(r, 30));
+      const LIST = [
+        ['ctClearWeek', 'Reset', 'danger'],                     // js/13 Reset week
+        ['clearDay', 'Start over', 'danger'],                   // js/09 Start day over
+        ['buildGoalRow', 'Remove', 'danger'],                   // js/12 Remove goal
+        ['deleteParentActivity', 'Take it off', 'danger'],      // js/11 future blocks removed
+        ['resetBuiltInRoutine', 'Reset', 'danger'],             // js/11 Reset routine
+        ['deleteRoutine', 'Delete', 'danger'],                  // js/11 Delete routine
+        ['bkHandleImportFile', 'Replace everything', 'danger'], // js/30 backup replace (showCheckConfirm)
+        ['pcwApply', 'Replace them', 'danger'],                 // js/34 Replace blocks
+        ['ctPromptBoxItem', 'Box it anyway', 'main'],           // js/13
+        ['rejectKidTask', 'Take it off', 'main'],               // js/11 exercise off the list
+        ['rejectKidActivity', 'Take it off', 'main'],           // js/11 child-added activity off the list
+        ['coRetire', 'Retire', 'main'],                         // js/29 Retire chore
+        ['applySeriesUntil', 'Update it', 'lost'],              // js/09 a repeat cut short
+        ['confirmCopyDay', 'Copy it', 'lost'],                  // js/09 copy over planned blocks
+      ];
+      for (const [fn, label, variant] of LIST) {
+        const f = window[fn];
+        if (typeof f !== 'function') { out.push(`${fn}: not loaded`); continue; }
+        const src = f.toString().replace(/\s+/g, ' ');
+        const at = src.search(new RegExp(`okLabel: ?'${label}'`));
+        if (at < 0) { out.push(`${fn}: no confirm with OK "${label}"`); continue; }
+        const open = src.lastIndexOf('{', at), close = src.indexOf('}', at);
+        const opts = src.slice(open, close + 1);
+        const d = ((opts.match(/danger: ?([^,}]+)/) || [])[1] || '').trim();
+        const got = !d || d === 'false' ? 'main' : d === 'true' ? 'danger' : /^(lose|lost) > 0$/.test(d) ? 'lost' : 'other: ' + d;
+        if (got !== variant) out.push(`${fn} "${label}": OK is ${got}, want ${variant}`);
+      }
+      const okOf = async (run) => {
+        const p = run();
+        await tick();
+        const ok = document.getElementById('appDialogOkBtn');
+        const msg = (document.getElementById('appDialogMsg') || {}).textContent || '';
+        const cls = ok ? ok.className : '';
+        const cancel = document.querySelector('#appDialogOverlay .app-dialog-cancel');
+        if (cancel) cancel.click(); else _closeAppDialog(false);
+        await p;
+        return { red: /ui-btn--danger/.test(cls), main: /ui-btn--primary/.test(cls), msg };
+      };
+      const wasProfile = profile, wasViewing = parentViewing;
+      const wk = getDayKeys(0);
+      const keep = wk.map(k => [k, getDayBlocksForProfile(k, 'jenn')]);
+      const inp = document.getElementById('seriesUntilInput');
+      const wasVal = inp ? inp.value : '';
+      try {
+        profile = 'jenn'; parentViewing = 'jenn';
+        const [dst, src, empty] = [wk[1], wk[3], wk[5]];
+        // Copy a day: two planned blocks on the target are replaced → red, "2 planned blocks will be replaced".
+        setDayBlocks(dst, [{ id: 'ro-a', actId: 'breakfast', startMin: 480, durationMin: 30 },
+                           { id: 'ro-b', actId: 'dinner', startMin: 1080, durationMin: 30 }], 'jenn');
+        setDayBlocks(src, [{ id: 'ro-c', actId: 'dinner', startMin: 1050, durationMin: 60 }], 'jenn');
+        setDayBlocks(empty, [], 'jenn');
+        copyDaySrcWeek = 0; copyDayDstKid = 'jenn';
+        openDay(dst, 1);
+        let r = await okOf(() => confirmCopyDay(src, 'Thursday'));
+        if (!r.red || !/2 planned blocks will be replaced/.test(r.msg)) out.push(`copy over 2 planned blocks: red ${r.red}, question "${r.msg.slice(0, 120)}"`);
+        // Onto an empty day nothing is lost → the main button, no count.
+        openDay(empty, 1);
+        r = await okOf(() => confirmCopyDay(src, 'Thursday'));
+        if (!r.main || /will be replaced/.test(r.msg)) out.push(`copy onto an empty day: main ${r.main}, question "${r.msg.slice(0, 120)}"`);
+        // A repeat cut short: its later, untouched blocks go → red with the count; made longer → main.
+        if (!inp) out.push('no seriesUntilInput on the page');
+        else {
+          const series = { seriesId: 'ro-s', seriesDays: [0, 1, 2, 3, 4, 5, 6], seriesEvery: 1, seriesStart: wk[0], seriesEnd: wk[6] };
+          wk.forEach((k, i) => setDayBlocks(k, [Object.assign({ id: 'ro-s' + i, actId: 'reading', startMin: 1200, durationMin: 30 }, series)], 'jenn'));
+          openDay(wk[0], 1);
+          currentDayKey = wk[0]; editingBlockId = 'ro-s0';
+          inp.value = wk[3];
+          r = await okOf(() => applySeriesUntil());
+          if (!r.red || !/3 planned blocks will be removed/.test(r.msg)) out.push(`a repeat cut to ${wk[3]}: red ${r.red}, question "${r.msg.slice(0, 160)}"`);
+          inp.value = getDayKeys(1)[6];
+          r = await okOf(() => applySeriesUntil());
+          if (!r.main || /will be removed/.test(r.msg)) out.push(`a repeat made longer: main ${r.main}, question "${r.msg.slice(0, 160)}"`);
+        }
+      } finally {
+        keep.forEach(([k, b]) => setDayBlocks(k, b || [], 'jenn'));
+        if (inp) inp.value = wasVal;
+        profile = wasProfile; parentViewing = wasViewing;
+        goToday();
+      }
+      return out;
+    });
+  } catch (e) {
+    bad = ['the check threw: ' + e.message];
+  }
+  checks.theRedOkIsOnlyForWhatCannotBeUndone = bad.length === 0 || bad;
+}

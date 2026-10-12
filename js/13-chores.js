@@ -523,7 +523,7 @@ async function ctPromptBoxItem() {
   if (hit) {
     const go = await showConfirm(
       `"${label.trim()}" looks like ${hit} — the rulebook says that's never boxed.\nIt goes on Mom's shelf and she asks for it.\n\nBox it anyway?`,
-      { okLabel: 'Box it anyway', cancelLabel: 'Put it on the shelf', danger: true });
+      { okLabel: 'Box it anyway', cancelLabel: 'Put it on the shelf', danger: false });
     if (!go) return;
   }
   const e = mrBoxItem(ctActiveKid(), label, ctWeekKey);

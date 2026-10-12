@@ -400,11 +400,6 @@ function parentTabsKeydown(e) {
   tabs[next].focus();
 }
 
-// Switch which child the parent is reviewing without leaving the dashboard.
-function setParentKid(kid) {
-  setParentScope(kid);
-}
-
 /* The Meeting destination's home. Review & confirm lives in ONE place —
    the meeting itself. This is read-only status for the meeting's week:
    the 7-day strip mirrors the meeting's day-confirms (both kids), and every
@@ -623,7 +618,7 @@ function approveKidTask(id) {
 async function rejectKidTask(id) {
   const t = (state.shared.customTasks || []).find(x => x.id === id);
   if (!t) return;
-  if (!(await showConfirm('Take this exercise off the girls\' list?', { danger: true, okLabel: 'Take it off' }))) return;
+  if (!(await showConfirm('Take this exercise off the girls\' list?', { okLabel: 'Take it off' }))) return;
   t.archived = true;
   t.archivedAt = syncNow();
   delete t.pendingApproval;
@@ -662,7 +657,7 @@ function approveKidActivity(owner, id) {
    waiting for approval, and the old path removed the record and left those
    blocks pointing at nothing, which made them fail to render at all. */
 async function rejectKidActivity(owner, id) {
-  if (!(await showConfirm('Take this activity the child added off the list?', { danger:true, okLabel:'Take it off' }))) return;
+  if (!(await showConfirm('Take this activity the child added off the list?', { okLabel:'Take it off' }))) return;
   const arr = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
   const act = arr.find(x => x.id === id);
   if (!act) return;

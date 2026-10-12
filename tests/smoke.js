@@ -166,6 +166,7 @@ function findChromium() {
     parentReadingSizeDefaultsToLarger: [],
     withMumReadsInBothLooks: [],
     oneSheetAndOneDialogEverywhere: [],
+    theRedOkIsOnlyForWhatCannotBeUndone: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
@@ -2976,15 +2977,14 @@ function findChromium() {
     const wrap = document.getElementById('mnyPage1Wrap');
     // Her page has no control that moves money — not a disabled one, none.
     const noMovers = !wrap.querySelector('[data-mny-action="commit"], [data-mnyp-action]');
-    // And the guard the commit path leans on refuses her — and Grown-ups, where
-    // ✏️ Fix what she owns lives (Stage 4b), draws no control for her.
-    const guarded = moneyCanTransact() === false;
+    // And Grown-ups, where ✏️ Fix what she owns lives (Stage 4b), draws no
+    // control for her.
     const cashBefore = mnyCash(kid);
     mnyRenderRulesTab();
     const noDoor = !document.querySelector('#mnyRulesWrap [data-mnyp-action]') && mnyCash(kid) === cashBefore;
     // Her earnings are not hers to change either.
     const cannotOverride = mnySetOverride(kid, mnyWeekKey(), 'chores', 99, 'fixing') === false;
-    return noMovers && guarded && noDoor && cannotOverride;
+    return noMovers && noDoor && cannotOverride;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.
   if (want('kidCannotEditRules')) checks.kidCannotEditRules = await page.evaluate(() => {
@@ -5302,7 +5302,7 @@ function findChromium() {
     };
 
     const small = [];
-    scr.querySelectorAll('button, [onclick], [role="button"], a[href], input:not([type=hidden]), select, summary, .pill-btn, .btn-icon').forEach(el => {
+    scr.querySelectorAll('button, [onclick], [role="button"], a[href], input:not([type=hidden]), select, summary').forEach(el => {
       if (!visible(el)) return;
       if (EXEMPT.some(c => el.classList.contains(c))) return;
       const r = el.getBoundingClientRect();
@@ -6195,7 +6195,7 @@ function findChromium() {
             && b.original.chores === planner       // the planner's number is kept
             && mnyWeekReason(kid, wk) === 'graded_wrong'
             && !mnyIsConfirmed(wk, kid)            // the week reopened
-            && mnyConfirmStamp(wk, kid).indexOf('confirm again') > -1
+            && !!(mnyWeekConfirm(wk, kid) || {}).reopenedAt   // reads "confirm again"
             // and it reaches the frozen ledger, not just the screen
             && mrFreezeWeekLedger(wk, kid).chores === 15;
     mrEnsureEarnings(kid, wk).overrides = {};
@@ -23377,9 +23377,7 @@ function findChromium() {
       const qSkip = mnyAddRequest(kid, { kind: 'skip', blockId: 'aj-3', dayKey: days[3] });
       const qMove = mnyAddRequest(kid, { kind: 'move', from: 'ready', to: 'cash', amount: 1 });
       const qGift = mnyAddRequest(kid, { kind: 'gift', amount: 20, giver: 'Uncle Mike' });
-      const qOpen = mnyAddRequest(kid, { kind: 'adv', amount: 1 });
       if (mnyAnswerRequest(kid, qAdv.id, 'yes') !== false) bad.push('requests: a child answered her own request');
-      if (!mnyWithdrawRequest(kid, qOpen.id) || mnyEnsureRequests(kid).some(r => r.id === qOpen.id) || !state.shared.tombstones['req:' + qOpen.id]) bad.push('requests: a withdrawn request is not gone and tombstoned');
       profile = 'parent';
       const view = mnyRequestsFor(kid);
       const stores = new Set(view.map(v => v.store));

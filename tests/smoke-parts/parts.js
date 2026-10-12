@@ -43,6 +43,7 @@ const PARTS = {
     'sisterSyncIsOnTheKit',
     'theProfileScreensAreOnTheKit',
     'oneSheetAndOneDialogEverywhere',
+    'theRedOkIsOnlyForWhatCannotBeUndone',
     'everyMoneyControlClicksClean',
     'theSundayKitHolds44pxInItsBoxes',
     'theSundayChooseRowFitsTwoRows',

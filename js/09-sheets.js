@@ -130,7 +130,8 @@ function renderTrainingSheet() {
   const allTags = getTrainingTags();
   allTags.forEach(t=>{
     const b = document.createElement('button');
-    b.className = 'pill-btn'+(ts.tag===t.id?' active':'');
+    b.className = 'ui-chip';
+    b.setAttribute('aria-pressed', String(ts.tag===t.id));
     b.textContent = t.label;
     b.onclick = ()=>{
       // Adopt the topic colour unless the user had picked a non-default custom one.
@@ -143,7 +144,7 @@ function renderTrainingSheet() {
   // by both girls, so it is a household decision rather than a per-kid one.
   if (isParent()) {
     const add = document.createElement('button');
-    add.className = 'pill-btn pill-btn--add';
+    add.className = 'ui-chip ts-add';
     add.textContent = '＋ Sport';
     add.onclick = ()=>openCustomSport();
     tagWrap.appendChild(add);
@@ -156,7 +157,8 @@ function renderTrainingSheet() {
   const durOptions = isCompetition ? [120,180,240,300,360,420,480,540,600] : [30,60,90,120,150,180];
   durOptions.forEach(min=>{
     const b = document.createElement('button');
-    b.className='pill-btn'+(ts.durationMin===min?' active':'');
+    b.className='ui-chip';
+    b.setAttribute('aria-pressed', String(ts.durationMin===min));
     b.textContent = formatDuration(min);
     b.onclick = ()=>{ ts.durationMin=min; renderTrainingSheet(); };
     durWrap.appendChild(b);
@@ -286,7 +288,8 @@ function renderActivitySheet() {
   durWrap.innerHTML = '';
   [15,30,45,60,90,120,180].forEach(min=>{
     const b = document.createElement('button');
-    b.className='pill-btn'+(as_.durationMin===min?' active':'');
+    b.className='ui-chip';
+    b.setAttribute('aria-pressed', String(as_.durationMin===min));
     b.textContent = formatDuration(min);
     b.onclick = ()=>{ as_.durationMin=min; renderActivitySheet(); };
     durWrap.appendChild(b);
@@ -360,7 +363,8 @@ function renderActivitySheet() {
           const b = document.createElement('button');
           const on = as_.choreTags.some(t => t === id
             || (true && (mrPoolRowForTag(t, wk) || {}).id === id));
-          b.className = 'pill-btn' + (on ? ' active' : '');
+          b.className = 'ui-chip';
+          b.setAttribute('aria-pressed', String(on));
           b.textContent = (on ? '✓ ' : '') + label;
           b.onclick = () => {
             as_.choreTags = on
@@ -431,7 +435,7 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   const curMinInHour = curMin%60;
 
   const prevH = document.createElement('button');
-  prevH.className = 'pill-btn';
+  prevH.className = 'ui-btn ui-btn--secondary ui-btn--icon';
   prevH.textContent = '◀';
   prevH.onclick = ()=>{
     const newMin = Math.max(START_MIN, curMin - 60);
@@ -447,7 +451,7 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   hourRow.appendChild(hourLabel);
 
   const nextH = document.createElement('button');
-  nextH.className = 'pill-btn';
+  nextH.className = 'ui-btn ui-btn--secondary ui-btn--icon';
   nextH.textContent = '▶';
   nextH.onclick = ()=>{
     const newMin = Math.min(END_MIN - 15, curMin + 60);
@@ -462,7 +466,8 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   minRow.className = 'minute-picker';
   [0,15,30,45].forEach(m=>{
     const b = document.createElement('button');
-    b.className = 'pill-btn'+(curMinInHour===m?' active':'');
+    b.className = 'ui-chip';
+    b.setAttribute('aria-pressed', String(curMinInHour===m));
     b.textContent = ':'+m.toString().padStart(2,'0');
     b.onclick = ()=>{
       const newMin = curH*60 + m;
@@ -823,10 +828,14 @@ async function applySeriesUntil() {
     startKey: block.seriesStart || currentDayKey, endKey: val,
   });
   const now = countSeriesBlocks(block.seriesId);
+  /* Red only when planned blocks are lost, and the question says how many
+     (owner P9). The dialog escapes the whole message once. */
+  const lose = seriesTrimPlan(block.seriesId, val).drop.length;
   const ok = await showConfirm(
     `Run this repeat until ${escapeHtml(val)}?\n\n${now} now, about ${preview.length} after. `
+    + (lose ? `${lose} planned block${lose === 1 ? '' : 's'} will be removed. ` : '')
     + 'Days already ticked or confirmed are kept either way.',
-    { okLabel: 'Update it', cancelLabel: 'Not now', danger: preview.length < now });
+    { okLabel: 'Update it', cancelLabel: 'Not now', danger: lose > 0 });
   if (!ok) return;
   const res = seriesExtendTo(block.seriesId, val);
   closeSheet('editOverlay');
@@ -1113,7 +1122,8 @@ function renderEditDurationPicker(act) {
     : act.isTraining ? [30,60,90,120,150,180] : [15,30,45,60,90,120,180,240];
   options.forEach(min=>{
     const b = document.createElement('button');
-    b.className='pill-btn'+(editState.durationMin===min?' active':'');
+    b.className='ui-chip';
+    b.setAttribute('aria-pressed', String(editState.durationMin===min));
     b.textContent = formatDuration(min);
     b.onclick = ()=>{ editState.durationMin = min; renderEditDurationPicker(act); };
     durWrap.appendChild(b);
@@ -1163,7 +1173,7 @@ function renderChecklist(block, act, listContainerId, options) {
     addRow.className = 'checklist-add-row';
     addRow.innerHTML = `
       <input type="text" class="checklist-add-input" placeholder="+ Add my own item" maxlength="60">
-      <button class="pill-btn checklist-add-btn">Add</button>
+      <button class="ui-btn ui-btn--secondary checklist-add-btn">Add</button>
     `;
     const inp = addRow.querySelector('input');
     const btn = addRow.querySelector('button');
@@ -1580,15 +1590,18 @@ function applySeriesEdit(seriesId, sourceBlockId, fields) {
    she has ticked, or a parent has confirmed, is a record of a day rather than a
    line in a plan — the same distinction weekCloneBlock draws — so those are
    kept and counted, and the caller says how many. */
-function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
-  const out = { added: 0, removed: 0, kept: 0 };
-  if (!seriesId || !endKey) return out;
+/* The planned blocks a new last day would take away: the series' blocks
+   outside the new span that nothing has been done on yet. Read only — the
+   confirm counts them (owner P9) and seriesExtendTo removes exactly these. */
+function seriesTrimPlan(seriesId, endKey, p = activeProfile()) {
+  const plan = { members: [], want: new Set(), drop: [], kept: 0 };
+  if (!seriesId || !endKey) return plan;
   const weeks = getProfData(p).weeks || {};
-  const members = [];
+  const members = plan.members;
   Object.keys(weeks).forEach(dayKey => (weeks[dayKey] || []).forEach(b => {
     if (b && b.seriesId === seriesId) members.push({ dayKey, b });
   }));
-  if (!members.length) return out;
+  if (!members.length) return plan;
   members.sort((x, y) => (x.dayKey < y.dayKey ? -1 : x.dayKey > y.dayKey ? 1 : 0));
   const first = members[0];
   const template = first.b;
@@ -1598,17 +1611,32 @@ function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
     // it actually lands on are the next best answer, and a true one.
     : [...new Set(members.map(m => (formatDayKey(m.dayKey).getDay() + 6) % 7))];
   const startKey = template.seriesStart || first.dayKey;
-  const want = new Set(seriesDayKeys({
+  plan.want = new Set(seriesDayKeys({
     days, everyWeeks: template.seriesEvery, anchorKey: startKey, startKey, endKey,
   }));
+  // Outside the new span, anything already lived is kept.
+  members.forEach(({ dayKey, b }) => {
+    if (plan.want.has(dayKey)) return;
+    if (b.completed || b.confirmed || Object.keys(b.checklistState || {}).length) { plan.kept++; return; }
+    plan.drop.push({ dayKey, id: b.id });
+  });
+  return plan;
+}
+
+function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
+  const out = { added: 0, removed: 0, kept: 0 };
+  if (!seriesId || !endKey) return out;
+  const weeks = getProfData(p).weeks || {};
+  const plan = seriesTrimPlan(seriesId, endKey, p);
+  const members = plan.members;
+  if (!members.length) return out;
+  const first = members[0];
+  const template = first.b;
+  const want = plan.want;
 
   // Trim what falls outside the new span, keeping anything already lived.
-  const drop = [];
-  members.forEach(({ dayKey, b }) => {
-    if (want.has(dayKey)) return;
-    if (b.completed || b.confirmed || Object.keys(b.checklistState || {}).length) { out.kept++; return; }
-    drop.push({ dayKey, id: b.id });
-  });
+  const drop = plan.drop;
+  out.kept = plan.kept;
   const byDay = {};
   drop.forEach(d => { (byDay[d.dayKey] = byDay[d.dayKey] || []).push(d.id); });
   Object.keys(byDay).forEach(dayKey => {
@@ -2337,7 +2365,7 @@ function renderCopyDayList() {
     panel.id = 'copyDayPanel' + i;
     panel.hidden = true;
     panel.innerHTML = copyDayBlockList(blocks, srcKid)
-      + `<button type="button" class="pill-btn cdr-copy">📋 Copy ${escapeHtml(DAY_LONG[i])} ${escapeHtml(copyDayOntoWords(dstKid))}</button>`;
+      + `<button type="button" class="ui-btn ui-btn--secondary cdr-copy">📋 Copy ${escapeHtml(DAY_LONG[i])} ${escapeHtml(copyDayOntoWords(dstKid))}</button>`;
     panel.querySelector('.cdr-copy').onclick = () => confirmCopyDay(k, DAY_LONG[i]);
     b.setAttribute('aria-expanded', 'false');
     b.setAttribute('aria-controls', panel.id);
@@ -2479,10 +2507,13 @@ async function confirmCopyDay(srcKey, srcLabel) {
     .flatMap(c => plan.keep.filter(k => (c.startMin || 0) < endOf(k) && (k.startMin || 0) < endOf(c))
       .map(k => `${copyDayBlockLine(c, dstKid)} overlaps 📌 ${copyDayBlockLine(k, dstKid)}`));
   let msg = `Copy ${srcLabel}${when}'s ${thing}${whose}?`;
-  if (plan.replace.length) msg += `\n\nThis replaces:\n${lines(plan.replace)}`;
+  /* Red only when planned blocks are lost, and the question says how many
+     (owner P9). The dialog escapes the whole message once. */
+  const lost = plan.replace.length;
+  if (lost) msg += `\n\n${lost} planned block${lost === 1 ? '' : 's'} will be replaced:\n${lines(plan.replace)}`;
   if (plan.keep.length) msg += `\n\n📌 Pinned, so it stays:\n${lines(plan.keep)}`;
   if (overlaps.length) msg += `\n\n⚠️ These would overlap a pinned one:\n${overlaps.join('\n')}`;
-  const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: plan.replace.length > 0 });
+  const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: lost > 0 });
   if (!ok) return;
   const res = copyDayInto(srcKey, currentDayKey, srcKid, dstKid);
   closeSheet('templateOverlay');
@@ -2689,7 +2720,7 @@ function renderCustomSportSheet() {
   list.innerHTML = mine.length
     ? `<div class="ct-meta">Sports you added</div>` + mine.map(s =>
         `<div class="sport-row"><span class="sport-row-name">${escapeHtml(s.icon)} ${escapeHtml(s.name)}</span>
-           <button type="button" class="pill-btn danger" data-sport-retire="${escapeAttr(s.id)}">Retire</button></div>`).join('')
+           <button type="button" class="ui-btn ui-btn--secondary" data-sport-retire="${escapeAttr(s.id)}">Retire</button></div>`).join('')
     : '';
   list.querySelectorAll('[data-sport-retire]').forEach(btn => {
     btn.onclick = () => retireCustomSport(btn.getAttribute('data-sport-retire'));

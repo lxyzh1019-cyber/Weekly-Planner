@@ -1922,12 +1922,6 @@ function mrPlaceActivityBlock(kid, actId, dayKey, startMin, fields) {
   return block;
 }
 
-/* The block a meet is linked to, wherever it is. Reads only. */
-function mrCompetitionBlock(kid, comp) {
-  if (!comp || !comp.dayKey) return null;
-  return (getDayBlocks(comp.dayKey, kid) || []).find(b => b && b.compId === comp.id) || null;
-}
-
 /* Sport → training tag, the inverse of MM_COMP_SPORT_FROM_TAG. One owner per
    direction, so a sport added to one shows up as a missing row in the other
    rather than as a silent null.

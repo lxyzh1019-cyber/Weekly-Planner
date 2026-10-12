@@ -1535,39 +1535,6 @@ function mm2bScale(wk) {
 /* `mmRenderConfirm` (the old "Confirm & record" step, unreachable since the
    meeting became three steps) and `mmConfirmAndRecord` are retired (Sunday
    v15 Stage 4). */
-/* Quarterly review. The rulebook promises the numbers get revisited every three
-   months; this raises it at the meeting with the actual earning data beside it,
-   so the re-tune is argued from what happened rather than from a hunch. */
-function mmRenderQuarterly() {
-  if (typeof mrQuarterlyDue !== 'function' || !mrQuarterlyDue()) return '';
-  const rows = ['jenn','jess'].map(kid => {
-    const y = mrYearToDate(kid);
-    const ch = y.channels;
-    const name = kidLabel(kid).name;
-    if (!y.weeks) return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${name} — no recorded weeks yet.</div>`;
-    return `<div class="ct-meta" style="margin-top:0.3rem">${CT_PROFILE_ICON[kid]} <b>${name}</b> — ${fmtMoney(y.paidTotal)} over ${y.weeks} week${y.weeks === 1 ? '' : 's'}
-        · on this pace <b>${fmtMoney(y.projected)}/yr</b> against a $${y.target.toFixed(0)} target (<b>${y.pctOfTarget}%</b>)</div>
-      <div class="ct-meta">chores ${fmtMoney(ch.chores)} · learning ${fmtMoney(ch.learning)} · streak ${fmtMoney(ch.streak)} · competition ${fmtMoney(ch.competition)} · fines −${fmtMoney(ch.fines)}</div>`;
-  }).join('');
-  return `<div class="mm-recorded" style="margin-top:0.6rem">
-      <div><b>📅 Quarterly review — ${mrQuarterOf(todayKey())}</b></div>
-      <div class="ct-meta">The rulebook says these numbers get looked at every three months. Here's what actually happened.</div>
-      ${rows}
-      <div style="margin-top:0.4rem"><button type="button" class="ui-btn ui-btn--secondary" onclick="mmDoQuarterlyReview()">Open the rules editor</button>
-        <button type="button" class="ui-btn ui-btn--secondary" onclick="mmSkipQuarterlyReview()">Reviewed — no change</button></div>
-    </div>`;
-}
-function mmDoQuarterlyReview() {
-  mrMarkQuarterReviewed();
-  mmHide();
-  mnyGoTab('rules');   // Grown-ups' money rules
-}
-function mmSkipQuarterlyReview() {
-  mrMarkQuarterReviewed();
-  renderMeetingMode();
-  showToast('📅 Quarterly review recorded — rates unchanged');
-}
-
 /* ── ↺ Redo: ONE GIRL'S snapshot, taken at her sign ─────────────────
    Sunday v15 signs one girl at a time, and ↺ Redo my plan returns her and
    only her (Plan v3 §A, Rev 2). The meeting-wide picture that used to sit

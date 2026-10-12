@@ -925,17 +925,6 @@
     }
   }
 
-  .btn-icon {
-    background: var(--paper); border: 2px solid var(--ink);
-    border-radius: 12px; padding: 0.42rem 0.78rem;
-    cursor: pointer; font-size: calc(1.3rem * var(--text-scale, 1));
-    transition: all 0.15s;
-    box-shadow: 2px 2px 0 var(--ink);
-    min-height: 40px;
-    min-width: 40px;
-  }
-  .btn-icon:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
-  .btn-icon:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
   /* The captioned toolbar icons (btn-icon--labeled / btn-icon__label) lived in
      the shortcut rows the persistent nav replaced, and went with them. Named
      without a leading dot here so the dead-class scan does not read a comment as
@@ -944,14 +933,7 @@
   button:focus-visible,
   [role="button"]:focus-visible,
   .filter-chip:focus-visible,
-  .pill-btn:focus-visible,
   .profile-card:focus-visible {
-    outline: 3px solid var(--accent-blue);
-    outline-offset: 2px;
-  }
-  .btn-icon:focus-visible,
-  .filter-chip:focus-visible,
-  .pill-btn:focus-visible {
     outline: 3px solid var(--accent-blue);
     outline-offset: 2px;
   }
@@ -2342,11 +2324,6 @@
     font-size: calc(1rem * var(--text-scale, 1)); line-height: 1.3; cursor: pointer;
   }
   .app-dialog-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }
-  .app-dialog-btns .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
-  /* Anywhere else too. "Close the week" is offered disabled until both girls'
-     days are reviewed, and at full strength it reads as pressable — a button
-     that looks ready and does nothing is worse than one that says why not. */
-  .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
   @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
   .sheet-time-summary {
@@ -2532,20 +2509,9 @@
     .edit-primary-toggle-row { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0.35rem; }
   }
 
-  .pill-btn {
-    background: var(--paper); border: 2px solid var(--ink);
-    border-radius: 20px; padding: 0.35rem 0.9rem;
-    cursor: pointer; font-size: calc(1.09rem * var(--text-scale, 1)); font-weight: 700;
-    font-family: var(--font-text);
-    box-shadow: 2px 2px 0 var(--ink);
-    transition: all 0.15s;
-    min-height: 38px;
-  }
-  .pill-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
-  .pill-btn.active { background: var(--pill-on); color: var(--pill-on-ink); }
   /* "＋ Sport" beside the sport tags — dashed, so it reads as a way to add one
      rather than as a fifth sport. */
-  .pill-btn--add { border-style: dashed; background: transparent; font-weight: 800; }
+  .ui-chip.ts-add { border-style: dashed; background: transparent; font-weight: 800; }
 
   /* The sports a family added, listed inside the add-a-sport sheet so retiring
      one happens where adding one does. */
@@ -2624,20 +2590,6 @@
   .day-pick.active { background: var(--pill-on); color: var(--pill-on-ink); }
   .day-pick-presets { display:flex; gap: 0.3rem; margin-bottom: 0.4rem; flex-wrap:wrap; }
 
-  .btn-confirm {
-    width: 100%; background: var(--btn-main); color: var(--btn-main-ink);
-    border: 2px solid var(--ink); border-radius: 14px; padding: 0.85rem;
-    font-size: calc(1.1rem * var(--text-scale, 1)); font-weight: 700; font-family: var(--font-display);
-    cursor: pointer; box-shadow: 3px 3px 0 var(--ink);
-  }
-  .btn-confirm:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
-  .btn-danger {
-    width: 100%; background: var(--status-danger-wash); color: var(--status-danger-ink);
-    border: 2px solid var(--ink); border-radius: 14px; padding: 0.85rem;
-    font-size: calc(1rem * var(--text-scale, 1)); font-weight: 700; font-family: var(--font-display);
-    cursor: pointer; margin-top: 0.4rem; box-shadow: 3px 3px 0 var(--ink);
-  }
-  .btn-danger:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
 
   /* Custom activity builder */
   .custom-builder input, .custom-builder select, .custom-builder textarea {
@@ -2944,7 +2896,6 @@
 
   /* History's toggle: one screen, two readings of the same eight weeks. */
   .pn-toggle { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
-  .pn-toggle .pill-btn { min-height: 44px; }
 
   /* ── Five destinations ──
      One strip, never wrapping onto three lines the way ten tabs did. Below the
@@ -2964,10 +2915,6 @@
      Queue on the left, week rail on the right; one column below the tablet
      breakpoint. Every row is a link, so all of them clear 44px. */
   .pn-cap { font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); margin-bottom: var(--space-2); }
-  .pn-card {
-    background: var(--paper); border: 2px solid var(--ink); border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm); overflow: hidden;
-  }
   .pn-clear { padding: var(--space-3); font-size: calc(max(13px, calc(0.9rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
   .pn-row {
     display: flex; align-items: center; gap: var(--space-2); width: 100%;
@@ -3259,7 +3206,6 @@
     display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.5rem;
     align-items: center;
   }
-  .minute-picker .pill-btn { padding: 0.34rem 0.76rem; font-size: calc(1.04rem * var(--text-scale, 1)); }
   .time-display {
     font-family: var(--font-display);
     font-size: calc(1.5rem * var(--text-scale, 1));
@@ -3581,7 +3527,6 @@
     font-weight: 700; color: var(--ink);
   }
   .pa-time-row input { flex: 1 1 8rem; min-width: 0; min-height: 44px; }
-  .pa-time-row .pill-btn { min-height: 44px; }
   .pa-time-hint { flex: 1 1 100%; margin: 0; }
   .pa-x {
     min-width: 32px; min-height: 32px; margin-left: 0.4rem;

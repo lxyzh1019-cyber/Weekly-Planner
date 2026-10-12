@@ -554,32 +554,6 @@ function mnyAddSurprise(kid, fields) {
     monthly: 0, downPayment: 0, downPaymentDue: '' });
 }
 
-/* Pay extra, any amount — this is the one that earns the 10%.
-
-   This is also the "loan-surplus choice" the honesty ladder withdraws at step
-   3, so a strike on record this week closes it. */
-async function loanPayExtraPrompt(kid, debtId) {
-  if (typeof mrLosesChoices === 'function' && mrLosesChoices(kid)) {
-    showToast('Loan choices are paused this week ⚖️ — decided together on Sunday');
-    return;
-  }
-  const w = ensureWallet(kid);
-  const d = loanState(kid, debtId);
-  const bonus = Number(d.bonusRate) || 0;
-  const v = await showPrompt(
-    `Pay extra off ${d.name} ${d.icon}\nAnything you pay early earns ${bonus}% — $100 clears $${(100 * (1 + bonus / 100)).toFixed(0)}.\nHow much? (you have ${fmtMoney(w.cash)})`,
-    { value: '', type: 'number' });
-  if (v == null || v === '') return;
-  const amt = money2(Math.min(parseFloat(v) || 0, w.cash));
-  if (!(amt > 0)) { showToast('Enter an amount like 20'); return; }
-  w.cash = money2(w.cash - amt);
-  evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: amt,
-                  ref: d.id, note: 'Extra off ' + (d.name || 'her loan') });
-  const rec = loanRecordPayment(kid, amt, 'early', d.id);
-  showToast(`${d.icon} Paid ${fmtMoney(amt)} — cleared ${fmtMoney(rec ? rec.credited : amt)} with the ${bonus}% bonus`);
-  if (typeof mnyRerenderMoney === 'function') mnyRerenderMoney();
-}
-
 /* Are they on pace? What has been paid against what the weekly must-pay
    says should have been by now, counted in Sundays since the row was taken
    on (Sunday v15 terms — the old deposit-then-monthly schedule is retired),

@@ -1426,14 +1426,6 @@ function mnyReopenWeek(kid, weekKey) {
   saveAll();
   return true;
 }
-function mnyConfirmStamp(weekKey, kid) {
-  const s = mnyWeekConfirm(weekKey, kid);
-  if (!s || !s.at) return '';
-  if (s.reopenedAt) return 'Changed after confirming — confirm again';
-  const d = new Date(s.at);
-  return 'Confirmed by ' + s.by + ' · ' + d.getDate() + ' ' +
-         ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
-}
 /* The parent's before-we-start checklist, stored beside the confirm. */
 function mnyChecks(weekKey, kid) {
   const c = mnyEnsureWeekMaps();
