@@ -122,6 +122,8 @@
        .hdr page header (100), the nav the kid's bottom bar .kid-nav (60), a sheet the
        .overlay (300), a dialog #appDialogOverlay (500). */
     --radius-pill: var(--radius-full);
+    /* Kit 1.1 K5: a seven-day row's cell corner (.ui-days). */
+    --radius-cell: 12px;
     --z-header: 100;
     --z-nav:    60;
     --z-sheet:  300;
@@ -415,13 +417,16 @@
        does not reach 4.5:1 on a block colour. */
     --now-ink-soft: var(--ink);
     /* Main buttons and the selected tab: yellow, navy text; the selected tab
-       has no ring. Selected pills: the strong accent, white text. */
+       has no ring. Selected pills: the selected colour (Kit 1.1 K11, D72:
+       one selected colour app-wide). */
     --btn-main: #ffc83d;
     --btn-main-ink: var(--ink);
     --nav-on: #ffc83d;
     --nav-on-ring: none;
-    --pill-on: var(--accent-strong);
-    --pill-on-ink: var(--ink-on-strong);
+    --pill-on: var(--sel);
+    --pill-on-ink: var(--sel-ink);
+    /* Kit 1.1 K2: the pale wash a kit button or chip wears under a mouse. */
+    --hover-wash: rgba(184, 68, 31, 0.08);
     /* The Now card's tick: a navy tile. Progress bar: navy on white — none of
        the running block's colour in it. */
     --tick-bg: var(--ink);
@@ -516,7 +521,7 @@
     --tab-on-ink: var(--ink);
     /* Parent › Now's today square, beside a selected day that is navy-filled:
        Pop fills today with the strong accent, white text, no ring. */
-    --day-now-bg: var(--pill-on);
+    --day-now-bg: var(--accent-strong);
     --day-now-ink: var(--ink-on-strong);
     --day-now-ring: none;
     /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
@@ -575,13 +580,16 @@
     /* On the white Now card the secondary text is the look's own. */
     --now-ink-soft: var(--ink-light);
     /* Purple main button, white text. Selected tab: the page tint ringed in
-       navy (an inset ring, so no box moves). Selected pills: navy, white text. */
+       navy (an inset ring, so no box moves). Selected pills: the selected
+       colour, navy with white text (Kit 1.1 K11, D72). */
     --btn-main: #5b4fd6;
     --btn-main-ink: #fff;
     --nav-on: #eef2f9;
     --nav-on-ring: inset 0 0 0 2px var(--ink);
-    --pill-on: var(--ink);
-    --pill-on-ink: #fff;
+    --pill-on: var(--sel);
+    --pill-on-ink: var(--sel-ink);
+    /* Kit 1.1 K2: the pale wash a kit button or chip wears under a mouse. */
+    --hover-wash: rgba(28, 34, 64, 0.07);
     /* Purple tick, white check. Progress bar in the running block's colour. */
     --tick-bg: #5b4fd6;
     --tick-ink: #fff;
@@ -1608,7 +1616,7 @@
     font-family: var(--font-text); font-weight: 700;
     font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1));
   }
-  .refl-kid.on { background: var(--pill-on); color: var(--ink-on-strong); }
+  .refl-kid.on { background: var(--pill-on); color: var(--pill-on-ink); }
   .refl-kid-n { font-size: calc(0.86rem * var(--fs-scale, 1) * var(--text-scale, 1)); opacity: 0.85; }
   .refl-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
   .refl-tab {
@@ -2767,7 +2775,7 @@
     font-family: var(--font-text);
     box-shadow: 2px 2px 0 var(--ink);
   }
-  .day-pick.active { background: var(--pill-on); color: var(--ink-on-strong); }
+  .day-pick.active { background: var(--pill-on); color: var(--pill-on-ink); }
   .day-pick-presets { display:flex; gap: 0.3rem; margin-bottom: 0.4rem; flex-wrap:wrap; }
 
   .btn-confirm {
@@ -4997,7 +5005,11 @@
    radii, borders, layers and header sizes all read a :root or look token, so
    both looks reach every piece. Every target is at least 44px. The header is
    kept minimal until its picture is approved (Stage 17); its sizes follow the
-   owner's header pictures (PR 4, D21).
+   owner's header pictures (PR 4, D21). Kit 1.1 (K1–K12) adds the disabled
+   and hover looks, the joined kid switch, the seven-day row (.ui-days), the
+   ok and full-width buttons, the list row (.ui-row) and the kid stepper; every
+   value is in docs/handoff/kit-1-1-values.md, measured by
+   theComponentKitHoldsItsSizes.
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 699px) {
   /* The page header on a phone (SRC 122-125, 133-151, 184-192, 235-250). */
@@ -5023,11 +5035,17 @@
 .ui-btn--primary { background: var(--btn-main); color: var(--btn-main-ink); }
 .ui-btn--secondary { background: var(--paper); color: var(--ink); }
 .ui-btn--danger { background: var(--status-danger-wash); color: var(--status-danger-ink); border-color: var(--status-danger-ink); }
+/* Kit 1.1 K7: the green "ok" button (Approve, She bought it, ✓ Yes / Agree). */
+.ui-btn--ok { background: var(--status-done); color: var(--status-done-ink); }
+/* Kit 1.1 K6: a screen's one leading action, the full width of its column. */
+.ui-btn--block { width: 100%; }
 .ui-btn--icon { width: 44px; padding: 0; }
 /* The money size: 54px in a money row, 66px for a two-line action button. */
 .ui-btn--lg { min-height: 54px; min-width: 54px; }
 .ui-btn--lg.ui-btn--two-line { min-height: 66px; flex-direction: column; gap: 0; }
 .ui-btn--icon.ui-btn--lg { width: 54px; }
+/* Kit 1.1 K1: a button that cannot act now — 45%, no shadow, the plain cursor. */
+.ui-btn:disabled, .ui-btn[aria-disabled="true"] { opacity: 0.45; box-shadow: none; cursor: default; }
 
 .ui-chip {
   box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--space-1);
@@ -5037,7 +5055,17 @@
   font-family: var(--font-text); font-weight: 700; font-size: calc(0.95rem * var(--text-scale, 1));
   white-space: nowrap;
 }
+/* Kit 1.1 K11: a picked chip wears the one selected colour (--pill-on is --sel). */
 .ui-chip[aria-pressed="true"] { background: var(--pill-on); color: var(--pill-on-ink); }
+
+/* Kit 1.1 K2: a mouse pointing at a kit button or chip washes it pale (over
+   its own fill, so a main or ok button keeps its colour) and shows the
+   pointer. Fingers on the iPad see no difference: no hover there. */
+@media (hover: hover) {
+  .ui-btn:hover:not(:disabled):not([aria-disabled="true"]), .ui-chip:hover {
+    background-image: linear-gradient(var(--hover-wash), var(--hover-wash)); cursor: pointer;
+  }
+}
 
 .ui-tabs { display: flex; gap: var(--space-2); }
 .ui-tabs > button {
@@ -5048,6 +5076,9 @@
 }
 .ui-tabs > button[aria-selected="true"] { background: var(--tab-on); color: var(--tab-on-ink); }
 
+/* Kit 1.1 K9: a card keeps --radius-md (14px); everything inside it (buttons,
+   tabs, steppers, rows) takes --radius-btn (11px), so no row is rounder than
+   its card. */
 .ui-card {
   box-sizing: border-box; background: var(--paper); color: var(--ink);
   border: var(--bw-card) solid var(--ink); border-radius: var(--radius-md);
@@ -5065,21 +5096,84 @@
   border-top: var(--bw-card) solid var(--ink); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
-.ui-kids { display: inline-flex; gap: var(--space-2); }
+/* Kit 1.1 K4 (D49): one kid switch everywhere — the header's joined switch
+   (the parent header's girl switch, .parent-scope): a 2px ink frame with pill
+   ends, 2px ink dividers, the chosen girl in the look's --sel (Pop yellow,
+   Calm navy with white). The cells draw the frame, and the end and divider
+   rules use :where() so they weigh no more than the base cell rule: a screen
+   that draws its girls its own way (the meeting's round pictures, .sd-avs;
+   the portal's framed .parent-scope) keeps its look. */
+.ui-kids { display: inline-flex; gap: 0; }
 .ui-kids > button {
-  box-sizing: border-box; min-height: 44px; padding: 0 var(--space-3);
+  box-sizing: border-box; min-height: 44px; min-width: 44px; padding: 0 var(--space-3);
   background: var(--paper); color: var(--ink);
-  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-pill);
+  border: var(--bw-chip) solid var(--ink); border-radius: 0;
   font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
 }
-.ui-kids > button[aria-pressed="true"] { background: var(--pill-on); color: var(--pill-on-ink); }
+.ui-kids > button:where(:first-child) { border-top-left-radius: var(--radius-pill); border-bottom-left-radius: var(--radius-pill); }
+.ui-kids > button:where(:last-child) { border-top-right-radius: var(--radius-pill); border-bottom-right-radius: var(--radius-pill); }
+.ui-kids > button:where(:not(:first-child)) { border-left-width: 0; }
+.ui-kids > button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); }
 
+/* Kit 1.1 K5 (D50): one seven-day row — 7 equal cells, 12px corners, day over
+   date. Four states, never colour alone (G1): today (aria-current="date") the
+   look's today square and a dot; confirmed (.ui-day--ok) green and a ✓; chosen
+   (aria-pressed="true") the selected colour; still to come (:disabled) dashed
+   in the lighter ink. Each cell carries its spoken name (aria-label), which
+   may say its %. */
+.ui-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); }
+.ui-days > button {
+  box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  min-width: 0; min-height: 44px; margin: 0; padding: var(--space-1) 0;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-cell);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(0.9rem * var(--text-scale, 1)); line-height: 1.15;
+  cursor: pointer;
+}
+.ui-days > button[aria-current="date"] { background: var(--day-now-bg); color: var(--day-now-ink); box-shadow: var(--day-now-ring); }
+.ui-days > button[aria-current="date"]::after { content: '\2022'; }
+.ui-days > .ui-day--ok { background: var(--status-done); color: var(--status-done-ink); }
+.ui-days > .ui-day--ok::after { content: '\2713'; }
+.ui-days > .ui-day--ok[aria-current="date"]::after { content: '\2022\00a0\2713'; }
+.ui-days > button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); }
+.ui-days > button:disabled { background: var(--paper); color: var(--ink-light); border-style: dashed; box-shadow: none; cursor: default; }
+
+/* Kit 1.1 K8 (D53, corrected by the owner 2026-10-11, G8): one list row — an
+   icon, the name, and things on the right; a kid's row 52px, a parent's
+   (.ui-row--parent) 44px; 2px ink, 11px corners. Done: the green wash and
+   the name struck through (not colour alone). Add: dashed. */
+.ui-row {
+  box-sizing: border-box; display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; min-height: 52px; margin: 0; padding: 0 var(--space-3); text-align: left;
+  background: var(--paper); color: var(--ink);
+  border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
+  font-family: var(--font-text); font-weight: 700; font-size: calc(1rem * var(--text-scale, 1));
+}
+.ui-row--parent { min-height: 44px; }
+.ui-row-icon { flex: none; }
+.ui-row-name { flex: 1 1 auto; min-width: 0; }
+.ui-row-end { flex: none; display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.ui-row--done { background: var(--status-done-wash); }
+.ui-row--done .ui-row-name { text-decoration: line-through; }
+.ui-row--add { border-style: dashed; }
+
+/* Kit 1.1 K10 (D71, G4): the only stepper. Its − / + are 44px where only a
+   parent uses it, 52px where the girl does (.ui-stepper--kid). */
 .ui-stepper { display: inline-flex; align-items: center; gap: var(--space-2); }
 .ui-stepper > button {
   box-sizing: border-box; width: 44px; height: 44px; padding: 0;
   background: var(--paper); color: var(--ink);
   border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn);
   font-family: var(--font-text); font-weight: 700; font-size: calc(1.1rem * var(--text-scale, 1));
+}
+.ui-stepper--kid > button { width: 52px; height: 52px; }
+
+/* On a phone: Kit 1.1 K12 — a chip's sides 0.6rem (the Sunday choose row fits
+   two rows at 390px); the kid switch's cells 0 8px (folded in from the
+   header's sub-bar, where the kid switch sits beside five tabs). */
+@media (max-width: 699px) {
+  .ui-chip { padding: 0 0.6rem; }
+  .ui-kids > button { padding: 0 var(--space-2); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -5302,7 +5396,6 @@
   .hdr-tab:not([aria-current]) .hdr-tab-word, .hdr-tab-tag, .hdr-tabs--many .hdr-tab-word, .hdr-sub .ui-kids .hdr-tab-word { display: none; }
   .hdr-sub .hdr-tabs { flex: none; gap: var(--space-1); border: 0; border-radius: 0; overflow: visible; background: none; }
   .hdr-sub .hdr-tab { box-sizing: border-box; width: auto; height: 44px; min-width: 44px; border: var(--bw-chip) solid var(--ink); border-radius: var(--radius-btn); }
-  .hdr-sub .ui-kids > button { min-width: 44px; padding: 0 var(--space-2); }
   /* The meeting on a phone (SRC 235-250): pad 10, no title, steps as
      numbers in 46px cells (✓ 18px, 2 3 19px), no week in row 2. The row's
      gap is 4px, not the picture's 6: with 🔊 Sound kept beside 🗣️

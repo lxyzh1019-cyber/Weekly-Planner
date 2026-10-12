@@ -26835,6 +26835,161 @@ function findChromium() {
         return out;
       }, [size]));
     }
+    /* Kit 1.1 (Stage 50, K1–K12): every value of docs/handoff/kit-1-1-values.md
+       measured on one fixture per part, at the iPad and the phone size, in Pop
+       and in Calm (the look is set on <html> for the measure and put back).
+       Colours are compared with the token's own computed value, read through a
+       probe, so the check follows the token, not a typed colour. The hover look
+       (K2) is real: the mouse is moved onto each part, since the kit draws it
+       only under @media (hover: hover). */
+    for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
+      await page.setViewportSize({ width: w, height: h });
+      for (const look of ['pop', 'calm']) {
+        const tag = `${size} ${look}`;
+        const centres = await page.evaluate(([look]) => {
+          window.__kitLookWas = document.documentElement.getAttribute('data-look');
+          document.documentElement.setAttribute('data-look', look);
+          const host = document.createElement('div');
+          host.id = 'kitFixture';
+          host.style.cssText = 'position:fixed;left:0;top:0;width:min(100%,600px);z-index:2147483647;background:#fff;padding:8px;box-sizing:border-box';
+          host.innerHTML = '<style>.kit-fx-shadow { box-shadow: 3px 3px 0 #000; }</style>'
+            + '<p><button type="button" class="ui-btn ui-btn--secondary" id="kfSec">Sec</button> <button type="button" class="ui-btn ui-btn--primary" id="kfMain">Main</button>'
+            + ' <button type="button" class="ui-btn ui-btn--ok" id="kfOk">Ok</button> <button type="button" class="ui-chip" id="kfChip">Chip</button>'
+            + ' <button type="button" class="ui-chip" aria-pressed="true" id="kfChipOn">On</button></p>'
+            + '<p><button type="button" class="ui-btn ui-btn--primary kit-fx-shadow" id="kfOff" disabled>Off</button> <button type="button" class="ui-btn kit-fx-shadow" id="kfAriaOff" aria-disabled="true">Off 2</button></p>'
+            + '<div id="kfCol" style="width:300px"><button type="button" class="ui-btn ui-btn--primary ui-btn--block" id="kfBlock">Run family meeting</button></div>'
+            + '<div class="ui-kids" id="kfKids" role="group" aria-label="Which child"><button type="button" aria-pressed="false">Jenn</button><button type="button" aria-pressed="true">Jess</button></div>'
+            + '<div class="ui-days" id="kfDays">'
+            + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => {
+              const attrs = [i === 0 ? ' class="ui-day--ok"' : '', i === 1 ? ' class="ui-day--ok" aria-current="date"' : '',
+                i === 2 ? ' aria-current="date"' : '', i === 3 ? ' aria-pressed="true"' : '', i === 4 ? ' disabled' : ''].join('');
+              return `<button type="button"${attrs} aria-label="${d} ${5 + i} October, ${i * 10}%"><span>${d}</span><span>${5 + i}</span></button>`;
+            }).join('') + '</div>'
+            + '<button type="button" class="ui-row" id="kfRow"><span class="ui-row-icon">🎹</span><span class="ui-row-name">Piano</span><span class="ui-row-end">✓</span></button>'
+            + '<button type="button" class="ui-row ui-row--parent" id="kfRowP"><span class="ui-row-name">Piano</span></button>'
+            + '<div class="ui-row ui-row--done" id="kfRowDone"><span class="ui-row-name">Done</span></div>'
+            + '<button type="button" class="ui-row ui-row--add" id="kfRowAdd"><span class="ui-row-name">+ Add</span></button>'
+            + '<div class="ui-card" id="kfCard"><div class="ui-tabs"><button type="button" aria-selected="true">A</button><button type="button">B</button></div></div>'
+            + '<span class="ui-stepper" id="kfStep"><button type="button">−</button><button type="button">+</button></span>'
+            + '<span class="ui-stepper ui-stepper--kid" id="kfStepKid"><button type="button">−</button><button type="button">+</button></span>';
+          document.body.appendChild(host);
+          const c = id => { const r = document.getElementById(id).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+          return { kfSec: c('kfSec'), kfMain: c('kfMain'), kfChip: c('kfChip'), kfOff: c('kfOff') };
+        }, [look]);
+        const hovered = {};
+        for (const id of Object.keys(centres)) {
+          await page.mouse.move(centres[id][0], centres[id][1]);
+          hovered[id] = await page.evaluate(id => {
+            const cs = getComputedStyle(document.getElementById(id));
+            return { image: cs.backgroundImage, colour: cs.backgroundColor, cursor: cs.cursor };
+          }, id);
+        }
+        await page.mouse.move(w - 2, h - 2);
+        problems.push(...await page.evaluate(([tag, hovered, phone]) => {
+          const out = [];
+          const $ = id => document.getElementById(id);
+          const host = $('kitFixture');
+          const probe = document.createElement('i');
+          host.appendChild(probe);
+          const colour = token => { probe.style.color = `var(${token})`; return getComputedStyle(probe).color; };
+          const cs = el => getComputedStyle(el);
+          const px = v => parseFloat(v) || 0;
+          const near = (got, want, what) => { if (Math.abs(got - want) > 0.5) out.push(`${tag}: ${what} is ${got}px, expected ${want}px`); };
+          const same = (got, want, what) => { if (got !== want) out.push(`${tag}: ${what} is ${got}, expected ${want}`); };
+          const rootPx = px(cs(document.documentElement).fontSize);
+          // K1 — disabled: 45%, no shadow (over a class that draws one), the plain cursor.
+          for (const id of ['kfOff', 'kfAriaOff']) {
+            const s = cs($(id));
+            same(s.opacity, '0.45', `${id} (disabled) opacity`);
+            same(s.boxShadow, 'none', `${id} (disabled) shadow`);
+            same(s.cursor, 'default', `${id} (disabled) cursor`);
+          }
+          // K2 — hover: the look's pale wash over the part's own fill, the pointer; none on a disabled button.
+          const wash = colour('--hover-wash');
+          const washImg = `linear-gradient(${wash}, ${wash})`;
+          for (const [id, fill] of [['kfSec', '--paper'], ['kfMain', '--btn-main'], ['kfChip', '--paper']]) {
+            same(hovered[id].image, washImg, `${id} under the mouse, its wash`);
+            same(hovered[id].colour, colour(fill), `${id} under the mouse, its own fill`);
+            same(hovered[id].cursor, 'pointer', `${id} under the mouse, its cursor`);
+          }
+          same(hovered.kfOff.image, 'none', 'a disabled button under the mouse, its wash');
+          same(hovered.kfOff.cursor, 'default', 'a disabled button under the mouse, its cursor');
+          if (cs($('kfSec')).backgroundImage !== 'none') out.push(`${tag}: the wash stays after the mouse leaves`);
+          // K6 — full width; K7 — the green ok button.
+          near($('kfBlock').getBoundingClientRect().width, $('kfCol').getBoundingClientRect().width, 'the full-width button');
+          same(cs($('kfOk')).backgroundColor, colour('--status-done'), 'the ok button fill');
+          same(cs($('kfOk')).color, colour('--status-done-ink'), 'the ok button ink');
+          // K11 — a picked chip wears the selected colour; K12 — chip sides.
+          same(cs($('kfChipOn')).backgroundColor, colour('--sel'), 'a picked chip fill (the selected colour)');
+          same(cs($('kfChipOn')).color, colour('--sel-ink'), 'a picked chip ink');
+          near(px(cs($('kfChip')).paddingLeft), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
+          near(px(cs($('kfChip')).paddingRight), phone ? 0.6 * rootPx : 0.75 * rootPx, 'a chip side');
+          // K4 — the joined kid switch.
+          const [k1, k2] = $('kfKids').children;
+          const s1 = cs(k1), s2 = cs(k2);
+          near(k1.getBoundingClientRect().height, 44, 'a kid switch cell');
+          for (const k of [k1, k2]) if (k.getBoundingClientRect().width < 44 - 0.5) out.push(`${tag}: a kid switch cell is ${k.getBoundingClientRect().width}px wide, under 44`);
+          near(k2.getBoundingClientRect().left, k1.getBoundingClientRect().right, 'the second kid cell (joined: no gap)');
+          for (const side of ['Top', 'Bottom', 'Left']) near(px(s1[`border${side}Width`]), 2, `the kid switch frame (${side})`);
+          near(px(s2.borderRightWidth), 2, 'the kid switch frame (Right)');
+          near(px(s1.borderRightWidth) + px(s2.borderLeftWidth), 2, 'the kid switch divider');
+          same(s1.borderTopColor, colour('--ink'), 'the kid switch frame colour');
+          same(s1.borderTopLeftRadius, '999px', 'the kid switch start');
+          same(s2.borderTopRightRadius, '999px', 'the kid switch end');
+          same(s1.borderTopRightRadius, '0px', 'the kid switch divider corner');
+          same(s2.backgroundColor, colour('--sel'), 'the chosen girl fill');
+          same(s2.color, colour('--sel-ink'), 'the chosen girl ink');
+          same(s1.backgroundColor, colour('--paper'), 'the other girl fill');
+          near(px(s1.paddingLeft), (phone ? 0.5 : 0.75) * rootPx, 'a kid switch cell side');
+          // K5 — the seven-day row.
+          const days = [...$('kfDays').children];
+          if (days.length !== 7) out.push(`${tag}: the seven-day row has ${days.length} cells`);
+          const r0 = days[0].getBoundingClientRect();
+          days.forEach((d, i) => {
+            const r = d.getBoundingClientRect(), s = cs(d);
+            if (Math.abs(r.top - r0.top) > 0.5) out.push(`${tag}: day cell ${i + 1} is not on the row (top ${r.top}, the first ${r0.top})`);
+            near(r.width, r0.width, `day cell ${i + 1}'s width`);
+            if (r.height < 44 - 0.5) out.push(`${tag}: day cell ${i + 1} is ${r.height}px high, under 44`);
+            same(s.borderTopLeftRadius, '12px', `day cell ${i + 1}'s corner`);
+            near(px(s.borderTopWidth), 2, `day cell ${i + 1}'s border`);
+            if (!(d.getAttribute('aria-label') || '').includes('%')) out.push(`${tag}: day cell ${i + 1} has no spoken name with its %`);
+          });
+          const mark = d => getComputedStyle(d, '::after').content;
+          same(cs(days[0]).backgroundColor, colour('--status-done'), 'a confirmed day fill');
+          same(mark(days[0]), '"✓"', 'a confirmed day mark');
+          same(mark(days[1]), '"• ✓"', 'today confirmed, its marks');
+          same(cs(days[2]).backgroundColor, colour('--day-now-bg'), "today's fill");
+          same(cs(days[2]).color, colour('--day-now-ink'), "today's ink");
+          same(mark(days[2]), '"•"', "today's mark");
+          same(cs(days[3]).backgroundColor, colour('--sel'), 'the chosen day fill');
+          same(cs(days[3]).color, colour('--sel-ink'), 'the chosen day ink');
+          same(cs(days[4]).borderTopStyle, 'dashed', 'a day to come, its border');
+          same(cs(days[4]).color, colour('--ink-light'), 'a day to come, its ink');
+          same(mark(days[5]), 'none', 'a plain day mark');
+          // K8 — the list row; K9 — inner corners 11px, the card 14px.
+          const row = $('kfRow'), rs = cs(row);
+          near(row.getBoundingClientRect().height, 52, "a kid's row");
+          near($('kfRowP').getBoundingClientRect().height, 44, "a parent's row");
+          near(px(rs.borderTopWidth), 2, 'a row border');
+          same(rs.borderTopLeftRadius, '11px', 'a row corner');
+          same(cs($('kfRowAdd')).borderTopStyle, 'dashed', 'the add row border');
+          same(cs($('kfRowDone')).backgroundColor, colour('--status-done-wash'), 'a done row fill');
+          if (!cs($('kfRowDone').querySelector('.ui-row-name')).textDecorationLine.includes('line-through')) out.push(`${tag}: a done row's name is not struck through`);
+          const end = row.querySelector('.ui-row-end').getBoundingClientRect(), rr = row.getBoundingClientRect();
+          near(end.right, rr.right - px(rs.borderRightWidth) - px(rs.paddingRight), "the row's right-hand slot");
+          if (row.querySelector('.ui-row-icon').getBoundingClientRect().right > row.querySelector('.ui-row-name').getBoundingClientRect().left + 0.5) out.push(`${tag}: the row's icon is not before its name`);
+          for (const [el, what] of [[$('kfSec'), 'a kit button'], [$('kfCard').querySelector('button'), 'a tab'], [$('kfStep').firstElementChild, 'a stepper button']]) same(cs(el).borderTopLeftRadius, '11px', `${what}'s corner`);
+          same(cs($('kfCard')).borderTopLeftRadius, '14px', "a card's corner");
+          // K10 — the stepper: 44px, the girl's 52px.
+          const sb = $('kfStep').firstElementChild.getBoundingClientRect(), kb = $('kfStepKid').firstElementChild.getBoundingClientRect();
+          near(sb.width, 44, 'a stepper button width'); near(sb.height, 44, 'a stepper button height');
+          near(kb.width, 52, "the girl's stepper button width"); near(kb.height, 52, "the girl's stepper button height");
+          host.remove();
+          document.documentElement.setAttribute('data-look', window.__kitLookWas || 'pop');
+          return out;
+        }, [tag, hovered, size === 'phone']));
+      }
+    }
     await page.setViewportSize(before);
     checks.theComponentKitHoldsItsSizes = problems.length ? problems : true;
   }
