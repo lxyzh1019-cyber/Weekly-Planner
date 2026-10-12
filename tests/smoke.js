@@ -23702,7 +23702,7 @@ function findChromium() {
         input.value = 'Winter Invitational entry';
         input.dispatchEvent(new Event('input', { bubbles: true }));
         if (wrap.querySelector('[data-mnyp-action="gucmwhat"]') !== input) bad.push('typing the name redrew the form');
-        if (!wrap.querySelector('[data-mnyp-action="gucmsave"]').classList.contains('ready')) bad.push('the save button did not wake up for a name');
+        if (!wrap.querySelector('[data-mnyp-action="gucmsave"]').classList.contains('ui-btn--primary')) bad.push('the save button did not wake up for a name (C8: the main button once ready)');
         const side = wrap.querySelector('.gu-afford').textContent;
         ['Her share$30', '10% down from her Savings$3', 'New row on her wall$27', 'Weekly loan payment', 'Of her steady income', 'Free by'].forEach(line => {
           if (side.replace(/\s+/g, '').indexOf(line.replace(/\s+/g, '')) < 0) bad.push('the affordability card misses "' + line + '"');
