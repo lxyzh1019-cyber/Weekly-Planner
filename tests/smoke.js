@@ -7839,7 +7839,8 @@ function findChromium() {
       profile = 'jenn';
       ['result', 'club', 'move', 'adv', 'goal', 'list'].forEach(kind => {
         mnyOpenRequestSheet(kind, { kid: 'jenn' });
-        if (!document.querySelector('#requestBody [data-mny-action]')) problems.push('the ' + kind + ' sheet drew no controls');
+        // Stage 63: the ✕ is one static button after #requestBody (onclick rqClose), so a list with no rows draws no data-mny-action of its own.
+        if (!document.querySelector(kind === 'list' ? '#requestOverlay .ui-sheet > .ui-sheet-x[onclick]' : '#requestBody [data-mny-action]')) problems.push('the ' + kind + ' sheet drew no controls');
         sweep('Request sheet › ' + kind); rqClose();
       });
       profile = 'parent';
