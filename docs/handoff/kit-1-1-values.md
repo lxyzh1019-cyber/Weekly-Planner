@@ -84,7 +84,7 @@ paper, a tile without its %, the old % status line, a switch that does not grow)
 
 | Part | Value | Token | Check |
 |---|---|---|---|
-| C1/C2 picked, money area (`[data-area="money"]`) | #2f7f77 fill, #fff text, both looks | `--sel: var(--mny-v15-teal)` / `--sel-ink: var(--mny-v15-white)` | `money: a picked chip` / `the chosen girl` / `the current tab` / `the chosen day`; `theSundayKitHolds44pxInItsBoxes` (picked chip) |
+| C1/C2 picked, money area (`[data-area="money"]`: My money, Money school, Sunday, the Meeting screen, Grown-ups, request sheets, the Record sheet; owner R1 2026-10-12) | #2f7f77 fill, #fff text, both looks | `--sel: var(--mny-v15-teal)` / `--sel-ink: var(--mny-v15-white)` | `money: a picked chip` / `the chosen girl` / `the current tab` / `the chosen day`; `theSundayKitHolds44pxInItsBoxes` (picked chip) |
 | C1/C2 picked, planner area (`[data-area="planner"]`, and outside any area) | Pop #2f7f77 / #fff, Calm #1c2240 / #fff | `--sel-planner` / `--sel-planner-ink` (both look blocks) | `planner: …` |
 | C1/C2 picked, parent area (`[data-area="parent"]`) | #1c2240 / #fff, both looks | `--sel: var(--ink)` / `--sel-ink: var(--ink-on-strong)` | `parent: …`; `thePortalKitHolds44px` (She told me's girl and day, Now's girl) |
 | C1/C2 one picked colour per area | `--pill-on`, `--tab-on` re-read at the area root, so a picked chip and a tab follow it | `[data-area] { --pill-on: var(--sel); --tab-on: var(--sel) }` | as above |

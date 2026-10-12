@@ -36,7 +36,7 @@ Use exactly these. Values already exist in css/app.css; point the kit tokens at 
 
 | Job | Pop | Calm | Where |
 |---|---|---|---|
-| **Picked** (chips, amount, day, kid switch, tabs) — money area | #2f7f77 fill, #fff text (`--mny-v15-teal`, 4.7:1) | same | My money, Money school, Sunday, Grown-ups, request sheets |
+| **Picked** (chips, amount, day, kid switch, tabs) — money area | #2f7f77 fill, #fff text (`--mny-v15-teal`, 4.7:1) | same | My money, Money school, Sunday, the Meeting screen, Grown-ups, request sheets, the Record sheet |
 | **Picked** — planner area | #2f7f77 fill, #fff text | #1c2240 fill, #fff text (`--ink`) | Today, Week, Day, Sister Sync, Profile |
 | **Picked** — parent area | #1c2240 fill, #fff text | #1c2240 fill, #fff text | Parent Now, She told me, Meeting hub, Monthly |
 | **Main action** (one per screen) | #ffc83d fill, #1c2240 text (`--btn-main`) | #5b4fd6 fill, #fff text | Send to parents, Run family meeting, Print, Save (ready) |
