@@ -125,7 +125,7 @@ spot), `tests/check-money-words.js`, `tests/check-steady-share.js` (no division
 by steady money outside `js/43-sunday-core.js`), `tests/check-money-surface.js`
 (the money text size and font are set through `[data-money-surface]` only),
 `tests/check-dead-css.js`,
-`tests/check-dead-ids.js`, `tests/check-dead-actions.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
+`tests/check-dead-ids.js`, `tests/check-dead-actions.js`, `tests/check-sw-shell.js` and `tests/check-ui-guards.js` (the Part 13 guards, UI rules) (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
 
@@ -443,6 +443,7 @@ Kid-facing copy is a product surface, not filler. The rules:
 ## UI rules
 
 - **Where styles live (Stage 33).** Each screen's own rules go in its file — `css/today.css`, `css/week-day.css`, `css/money.css`, `css/parent.css`, `css/social.css`, linked after `css/app.css` in that order; shared parts (kit, header, tokens) and the sheets stay in `css/app.css`; `css/floors.css` (the minimum-size floors) is linked last so the minimum sizes win, and every file in `css/` must be linked in `index.html` and listed in `sw.js` SHELL. (checked by tests/check-sw-shell.js, tests/check-dead-css.js, tests/check-look-tokens.js)
+- **The Part 13 guards (Stage 45, `tests/check-ui-guards.js`, in `npm run check`).** One page header per screen (index.html's static `<header class="hdr">`, `hdrMount`, and the listed `pageHeader(` builders); header buttons at least 44px and named (`aria:` on every step, title and action button); header text at least 15px; no new `*-btn`, `*-tab`, `*-card` or `*-sheet` class outside the kit (the 50 private parts on file are listed with their reasons) and none of the retired `.pill-btn`, `.btn-icon`, `.btn-confirm`, `.btn-danger`, `.pn-card`; a z-index is a `--z-*` token or a number under `--z-nav` (60, local stacking), and an `@media` width is one of the breakpoints (699/700, 767/768, 819, 820-979, 980 landscape, 899, 1099/1100); no selector lists 4 or more screens by hand; every `setInterval` in js/08, js/09, js/44 is stopped on screen change or sheet close (TIMERS). `tests/check-look-tokens.js` rule 4 also floors text: a font size that can come out under 13px has `max(13px, …)` or a `css/floors.css` rule (the ones on file are in FLOOR_ALLOW). Every allowlist entry says why; a stale one fails. The red (danger) OK is only for a confirm that cannot be undone (owner P7–P9; smoke: theRedOkIsOnlyForWhatCannotBeUndone). (checked by tests/check-ui-guards.js, tests/check-look-tokens.js)
 - **Touch targets ≥ 44×44px** on every interactive element, including week
   arrows and small chips. Enforced on the four kid screens by
   `kidScreensMeetTheHouseRules` in `tests/smoke.js`, which probes the real hit
@@ -3533,8 +3534,9 @@ Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
   is a real answer, and a child should see her request was answered rather than
   find it simply gone. (text only)
 
-`moneyCanTransact` is called by two functions and **none of the primitives check
-`isParent()` themselves**, so `mnyMoveMoney` carries that gate explicitly.
+**None of the money primitives check `isParent()` themselves**, so
+`mnyMoveMoney` carries that gate explicitly (`moneyCanTransact`, called by
+nothing, was deleted in Consistency Part 13).
 
 ## The Flow — the screen the stream was stored for
 
