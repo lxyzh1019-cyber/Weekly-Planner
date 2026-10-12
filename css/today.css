@@ -488,11 +488,13 @@
   }
 
   /* A job that is no longer hers to act on — waiting with a grown-up, or
-     answered — wears the kit's done look (.ui-row--done: the green wash, the
-     name struck through). Still a row, because "it happened" is what the card
+     answered — wears the kit's done look (.ui-row--done: the green wash; the
+     name struck through only when answered). Still a row, because "it happened" is what the card
      is for. D18 (PR 7): its words are ink, not --accent-strong, so "with Mum"
      stays over 4.5:1 in both looks (withMumReadsInBothLooks). */
   .ui-row--done .td-row-go { color: var(--ink); }
+  /* Waiting with Mum keeps the wash but is not struck through: it is not done, only not hers. */
+  .ui-row--done[data-td-action="waiting"] .ui-row-name { text-decoration: none; }
   .td-earlier-btn, .td-later-btn { margin-top: 0.4rem; }
 
   /* ── The day as a row of squares ──────────────────────────────────────────

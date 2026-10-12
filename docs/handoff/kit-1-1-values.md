@@ -43,15 +43,17 @@ mode removed, light scheme on the root) was Stage 49 and is checked by
 | K5 confirmed (`.ui-day--ok`) | green fill | `--status-done` | `a confirmed day fill` |
 | K5 confirmed | a ✓ mark (G1) | — | `a confirmed day mark` |
 | K5 today and confirmed | both marks • ✓ | — | `today confirmed, its marks` |
-| K5 chosen (`[aria-pressed="true"]`) | the selected colour | `--sel` / `--sel-ink` | `the chosen day fill` / `ink` |
-| K5 to come (`:disabled`) | dashed border | — | `a day to come, its border` |
+| K5 chosen (`[aria-pressed="true"]`) = the day whose review/answer is open on that screen | the selected colour | `--sel` / `--sel-ink` | `the chosen day fill` / `ink` |
+| K5 chosen, where a screen has no open day | Now's Sunday card and the Meeting hub have none (a tap opens the meeting or the answer sheet), so they draw no chosen cell; only Now › She told me does | — | — |
+| K5 to come, not tappable (`:disabled`) | dashed border (Now › She told me) | — | `a day to come, its border` |
+| K5 to come, tappable (`.ui-day--future`) | the same dashed border, no opacity drop, pointer stays (Now's Sunday card, the Meeting hub) | — | `to-come day cell n is drawn …, want dashed` / `must be .ui-day--future, tappable, pointer` |
 | K5 to come | the lighter ink | `--ink-light` | `a day to come, its ink` |
 | K5 a plain day | no mark | — | `a plain day mark` |
 | K6 full-width button (`.ui-btn--block`) | width 100% of its column | — | `the full-width button` |
 | K7 ok button (`.ui-btn--ok`) | green fill, both looks | `--status-done` | `the ok button fill` |
 | K7 ok button | its ink | `--status-done-ink` | `the ok button ink` |
 | K8 list row (`.ui-row`) | a kid's row 52px | — | `a kid's row` |
-| K8 list row, parent size (`.ui-row--parent`) | a parent's row 44px | — | `a parent's row` |
+| K8 list row, parent size (`.ui-row--parent`) | a parent's row 44px (no user yet: defined and listed, no screen draws it) | — | `a parent's row` |
 | K8 list row | border 2px | `--bw-chip` | `a row border` |
 | K8 list row | corner 11px | `--radius-btn` | `a row corner` |
 | K8 list row | slots: icon (`.ui-row-icon`) before the name (`.ui-row-name`), the right-hand slot (`.ui-row-end`) at the row's right inner edge | — | `the row's icon is not before its name` / `the row's right-hand slot` |
@@ -61,7 +63,7 @@ mode removed, light scheme on the root) was Stage 49 and is checked by
 | K9 inner corners | a kit button, a tab, a stepper button 11px (and the row, K8) | `--radius-btn` | `a kit button's corner` / `a tab's corner` / `a stepper button's corner` |
 | K9 card | 14px | `--radius-md` | `a card's corner` |
 | K10 stepper (`.ui-stepper`) | − / + 44×44 where only a parent uses it | — | `a stepper button width` / `height` |
-| K10 stepper, kid size (`.ui-stepper--kid`) | − / + 52×52 where the girl uses it (G4) | — | `the girl's stepper button width` / `height` |
+| K10 stepper, kid size (`.ui-stepper--kid`) | − / + 52×52 where the girl uses it: the request sheet and Sunday's girl steppers (G4) | — | `the girl's stepper button width` / `height` |
 | K11 picked chip (`.ui-chip[aria-pressed="true"]`) | fill equals the selected colour, both looks | `--pill-on: var(--sel)` (both look blocks) | `a picked chip fill (the selected colour)` |
 | K11 picked chip | ink | `--pill-on-ink: var(--sel-ink)` | `a picked chip ink` |
 | K12 chip sides | 0.75rem (12px) on the iPad; 0.6rem (9.6px) at 699px and below | `--space-3` / — | `a chip side` |
@@ -70,8 +72,12 @@ mode removed, light scheme on the root) was Stage 49 and is checked by
 
 Modifiers chosen here: the list row's parent size is `.ui-row--parent` (the
 kid's 52px is the default: Today's and Week/Day rows are the girls'); the
-stepper's girl size is `.ui-stepper--kid` (the 44px default keeps every
-current stepper as it is: Sunday's and the parent screens').
+stepper's girl size is `.ui-stepper--kid` (the 44px default is the parent
+screens'; Sunday's girl steppers and the request sheet's are 52px, `--kid`).
+
+Local exception to K12: `css/parent.css` l.268, `.gu-opts > .ui-chip,
+.rq-opts > .ui-chip` set `flex-shrink: 1` (K12 says 0 on a phone), so a long
+label wraps instead of pushing the page sideways; min-width 44px still holds.
 
 Planted faults, each failing the check (2026-10-11, then removed): a disabled
 button at full opacity; a six-cell row; a 999px cell corner; a 40px row; a

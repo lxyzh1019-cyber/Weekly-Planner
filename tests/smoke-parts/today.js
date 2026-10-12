@@ -120,12 +120,17 @@ module.exports = async ({ page, want, checks, shot, setLook, clearLooks }) => {
           if (!waiting.classList.contains('ui-row--done')) out.push('the "with Mum" row is not in the done look (.ui-row--done)');
           if (getComputedStyle(waiting).backgroundColor !== want) out.push(`the "with Mum" row's fill is ${getComputedStyle(waiting).backgroundColor}, want the done wash ${want}`);
           const nm = waiting.querySelector('.ui-row-name');
-          if (!nm || !/line-through/.test(getComputedStyle(nm).textDecorationLine)) out.push('the "with Mum" row\'s name is not struck through');
+          if (!nm) out.push('the "with Mum" row has no name');
+          else if (/line-through/.test(getComputedStyle(nm).textDecorationLine)) out.push('the "with Mum" row\'s name is struck through; only an answered row is');
         }
+        document.querySelectorAll('#tdWrap .ui-row[data-td-action="fresh"] .ui-row-name').forEach(nm => {
+          if (!/line-through/.test(getComputedStyle(nm).textDecorationLine)) out.push('an answered row\'s name is not struck through');
+        });
         document.querySelectorAll('#tdWrap .ui-row--add').forEach(el => {
           if (getComputedStyle(el).borderTopStyle !== 'dashed') out.push(`the add row ${label(el)} is not dashed`);
         });
         const cards = [...document.querySelectorAll('#tdWrap .quest-card')].filter(el => el.getClientRects().length);
+        if (cards.length === 0) out.push('no Coming up card is drawn, so no corner was measured');
         cards.forEach(el => {
           const cs = getComputedStyle(el);
           ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].forEach(c => { if (cs[`border${c}Radius`] !== '11px') out.push(`the Coming up card ${label(el)} has a ${cs[`border${c}Radius`]} ${c} corner, want 11px`); });

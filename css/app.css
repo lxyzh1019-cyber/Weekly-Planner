@@ -4821,7 +4821,7 @@
    its own fill, so a main or ok button keeps its colour) and shows the
    pointer. Fingers on the iPad see no difference: no hover there. */
 @media (hover: hover) {
-  .ui-btn:hover:not(:disabled):not([aria-disabled="true"]), .ui-chip:hover {
+  .ui-btn:hover:not(:disabled):not([aria-disabled="true"]), .ui-chip:hover:not(:disabled):not([aria-disabled="true"]) {
     background-image: linear-gradient(var(--hover-wash), var(--hover-wash)); cursor: pointer;
   }
 }
@@ -4877,8 +4877,8 @@
 /* Kit 1.1 K5 (D50): one seven-day row — 7 equal cells, 12px corners, day over
    date. Four states, never colour alone (G1): today (aria-current="date") the
    look's today square and a dot; confirmed (.ui-day--ok) green and a ✓; chosen
-   (aria-pressed="true") the selected colour; still to come (:disabled) dashed
-   in the lighter ink. Each cell carries its spoken name (aria-label), which
+   (aria-pressed="true") the selected colour; still to come dashed in the
+   lighter ink (:disabled when it cannot be tapped, .ui-day--future when it can). Each cell carries its spoken name (aria-label), which
    may say its %. */
 .ui-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); }
 .ui-days > button {
@@ -4896,6 +4896,8 @@
 .ui-days > .ui-day--ok[aria-current="date"]::after { content: '\2022\00a0\2713'; }
 .ui-days > button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); }
 .ui-days > button:disabled { background: var(--paper); color: var(--ink-light); border-style: dashed; box-shadow: none; cursor: default; }
+/* Still to come but tappable (Now, the Meeting hub): the same dashed look, the pointer stays. */
+.ui-days > .ui-day--future { background: var(--paper); color: var(--ink-light); border-style: dashed; box-shadow: none; }
 
 /* Kit 1.1 K8 (D53, corrected by the owner 2026-10-11, G8): one list row — an
    icon, the name, and things on the right; a kid's row 52px, a parent's

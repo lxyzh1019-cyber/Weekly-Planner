@@ -423,10 +423,11 @@ function renderMeetingHub() {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
     const confirmed = mmIsDayConfirmed(d);
-    const isToday = k === todayKey();
+    const isToday = k === todayKey(), isFuture = k > todayKey();
+    const cls = [confirmed ? 'ui-day--ok' : '', isFuture ? 'ui-day--future' : ''].filter(Boolean).join(' ');
     const pcts = `Jenn ${mmDayPct('jenn', d)}%, Jess ${mmDayPct('jess', d)}%`;
     figures.push(`${DAY_SHORT[d]} 🐥${mmDayPct('jenn', d)}% 🦊${mmDayPct('jess', d)}%`);
-    days += `<button type="button"${confirmed ? ' class="ui-day--ok"' : ''}${isToday ? ' aria-current="date"' : ''} onclick="openFamilyMeetingAt(1,${d})"
+    days += `<button type="button"${cls ? ` class="${cls}"` : ''}${isToday ? ' aria-current="date"' : ''} onclick="openFamilyMeetingAt(1,${d})"
         aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate() + ', ' + (confirmed ? 'confirmed' : 'not confirmed yet') + (isToday ? ', today' : '') + ', ' + pcts)}">
         <span>${DAY_SHORT[d]}</span><span>${date.getDate()}</span></button>`;
   }

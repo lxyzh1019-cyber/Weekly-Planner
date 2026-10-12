@@ -278,8 +278,9 @@ function pnSundayCard() {
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
-    const isOk = mmIsDayConfirmed(d), isToday = k === todayKey();
-    days += `<button type="button"${isOk ? ' class="ui-day--ok"' : ''}${isToday ? ' aria-current="date"' : ''}
+    const isOk = mmIsDayConfirmed(d), isToday = k === todayKey(), isFuture = k > todayKey();
+    const cls = [isOk ? 'ui-day--ok' : '', isFuture ? 'ui-day--future' : ''].filter(Boolean).join(' ');
+    days += `<button type="button"${cls ? ` class="${cls}"` : ''}${isToday ? ' aria-current="date"' : ''}
         data-pn-action="day" data-day="${d}" aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate() + (isToday ? ', today' : '') + (isOk ? ', confirmed' : ', not confirmed yet'))}">
         <span>${DAY_SHORT[d]}</span><span>${date.getDate()}</span></button>`;
   }

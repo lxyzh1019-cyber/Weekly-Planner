@@ -31,9 +31,25 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           /* A seven-day row (Stage 51, G1/G2): 7 cells, each with a spoken name, and its marks
              by CSS (• today, ✓ confirmed, both when both) that agree with the cell's state. */
           const markOf = (c) => { const m = getComputedStyle(c, '::after').content; return m === 'none' || m === 'normal' ? '' : m.replace(/^"|"$/g, '').replace(/ /g, ' '); };
-          const daysCheck = (where, row, named, needOk = true) => {
+          const inkOf = (token) => { const p = document.createElement('i'); p.style.color = `var(${token})`; document.body.appendChild(p); const v = getComputedStyle(p).color; p.remove(); return v; };
+          const daysCheck = (where, row, named, needOk = true, toCome = 'future') => {
             const cells = row ? [...row.children] : [];
             if (cells.length !== 7) { out.push(`${tag} ${where}: ${cells.length} day cells, want 7`); return; }
+            // Still to come (G2): the smoke date is Wed 2026-10-07, so Thu–Sun (cells 4–7) are dashed in the
+            // lighter ink. Now and the hub keep them tappable (.ui-day--future, pointer); the sheet's are :disabled.
+            const todayIdx = cells.findIndex(c => c.getAttribute('aria-current') === 'date');
+            if (todayIdx === 2) {
+              cells.forEach((c, i) => {
+                const cs = getComputedStyle(c), come = i > todayIdx;
+                if (come && cs.borderTopStyle !== 'dashed') out.push(`${tag} ${where}: to-come day cell ${i + 1} is drawn ${cs.borderTopStyle}, want dashed`);
+                if (come && cs.color !== inkOf('--ink-light')) out.push(`${tag} ${where}: to-come day cell ${i + 1} is not in the lighter ink`);
+                if (!come && cs.borderTopStyle === 'dashed') out.push(`${tag} ${where}: day cell ${i + 1} is dashed but is not still to come`);
+                if (come && toCome === 'future' && (!c.classList.contains('ui-day--future') || c.disabled || cs.cursor !== 'pointer')) out.push(`${tag} ${where}: to-come day cell ${i + 1} must be .ui-day--future, tappable, pointer`);
+                if (come && toCome === 'disabled' && !c.disabled) out.push(`${tag} ${where}: to-come day cell ${i + 1} should be disabled`);
+                if (come && Number(cs.opacity) < 1) out.push(`${tag} ${where}: to-come day cell ${i + 1} has dropped opacity ${cs.opacity}`);
+                if (c.getAttribute('aria-pressed') === 'true' && cs.backgroundColor !== fillOf('--sel')) out.push(`${tag} ${where}: chosen day cell ${i + 1} is not the selected colour`);
+              });
+            } else out.push(`${tag} ${where}: today is cell ${todayIdx + 1}, want 3 (Wed) on the smoke date, so to-come cells were not checked`);
             cells.forEach((c, i) => {
               const ok = c.classList.contains('ui-day--ok'), now = c.getAttribute('aria-current') === 'date';
               const want = (now ? '•' : '') + (now && ok ? ' ' : '') + (ok ? '✓' : '');
@@ -84,7 +100,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
             measure('Now › She told me', document.getElementById('pnToldBody'), '.pn-answer-kids > button');
             const kidCells = [...document.querySelectorAll('#pnToldBody .pn-answer-kids > button')];
             if (kidCells.length !== 2 || Math.abs(kidCells[1].getBoundingClientRect().left - kidCells[0].getBoundingClientRect().right) > 0.6) out.push(`${tag} Now › She told me: the girl switch cells are not joined (no gap)`);
-            daysCheck('Now › She told me', document.querySelector('#pnToldBody .ui-days'), /^[A-Za-z]{3} \d+/, false);
+            daysCheck('Now › She told me', document.querySelector('#pnToldBody .ui-days'), /^[A-Za-z]{3} \d+/, false, 'disabled');
             const doneBtn = document.querySelector('#pnToldBody [data-pn-action="told-close"]');
             if (!doneBtn || !doneBtn.classList.contains('ui-btn--block')) out.push(`${tag} Now › She told me: Done is not the full-width kit button`);
             // Each girl, every day she can be answered for, until her rating and a learning stepper have been drawn.
