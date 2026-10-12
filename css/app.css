@@ -718,8 +718,17 @@
     /* Calm lines its figures up (tabular); Pop draws them as the font does. */
     font-variant-numeric: var(--num-variant);
     min-height: 100vh;
-    overflow-x: hidden;
   }
+
+  /* No sideways scroll, set on html rather than body (Fix C7). The bottom navs
+     are position:fixed against the layout viewport. iOS Safari is known not to
+     heed overflow-x on body alone, and a page wider than the screen there is
+     zoomed out to fit, which leaves a fixed bar part way up the glass. On html
+     the clip is the viewport's own in every browser; body stays overflow
+     visible. Not reproduced in Chrome; theBottomNavStaysPinned holds the
+     conditions (no page wider than the window, nothing on html or body that
+     captures a fixed child, the bar at the window's foot). */
+  html { overflow-x: hidden; }
 
   /* One font everywhere (Looks stage 4C). The browser gives form controls its
      own system font, so without this every button, field and menu with no

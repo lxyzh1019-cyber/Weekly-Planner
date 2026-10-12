@@ -297,6 +297,7 @@ Each line says what you see or what the app does, then the test that proves it. 
 ## Profile and navigation
 
 - Kid nav has five places, one fixed bar: Today, Week, Money, Sister Sync, More; no second nav row — Proof: kidNavIsUsableAndScoped
+- The kid and parent bottom bars stay pinned to the foot of the window (Fix C7, the iPad): scrolled to the end of every kid screen and portal destination, both looks, 1194×834 and 834×1194 (and 390 for the portal), the bar is fixed, has no offset parent and ends at the window's foot ±1px; no page is wider than the window; html and body carry no transform, filter, contain, will-change, perspective or backdrop-filter; the no-sideways-scroll clip is on html, not body — Proof: theBottomNavStaysPinned
 - Sister Sync is a tab with aria-current, fits on one line at 375px also in the fallback font — Proof: sisterSyncIsABottomTab, sisterSyncTabFitsInTheFallbackFont
 - The kid nav shows only on a child's screens and never for a parent — Proof: kidNavIsUsableAndScoped
 - More holds exactly Switch (and the look tile), then the build number; Chores (retired 2026-10-08), Sisters, Money story and Money school tiles are gone — Proof: moreHasNoMoneySchool

@@ -1,4 +1,4 @@
-// Smoke group: the house-rules walks (kidScreensMeetTheHouseRules, parentScreensMeetTheHouseRules). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names. Each walk sets up its own starting point and data (Stage 25), so it passes alone (SMOKE_ONLY) and in its part.
+// Smoke group: the house-rules walks (kidScreensMeetTheHouseRules, parentScreensMeetTheHouseRules) and the bottom-nav walk (theBottomNavStaysPinned, Fix C7). Moved out of tests/smoke.js (Stage 23) so one worker can edit this group alone; tests/smoke.js calls it at the same point in the run, on its one shared page, with the helpers it names. Each walk sets up its own starting point and data (Stage 25), so it passes alone (SMOKE_ONLY) and in its part.
 module.exports = async ({ page, want, checks, setupNeeded, setLook, clearLooks, kidStandards, KID_SCREENS, KID_SHEETS }) => {
   /* Waits until what a row drew is at rest, instead of a fixed 200 ms (250 on
      the portal) per row: two frames, so layout and any requestAnimationFrame
@@ -204,4 +204,91 @@ module.exports = async ({ page, want, checks, setupNeeded, setLook, clearLooks, 
     if (parentSmallPrint.size) console.log(`Parent portal small print under 13px in both looks (predates the looks; listed, not failed): ${parentSmallPrint.size}\n  ${[...parentSmallPrint].slice(0, 40).join('\n  ')}`);
   }
   if (want('parentScreensMeetTheHouseRules')) checks.parentScreensMeetTheHouseRules = parentFindings.length === 0 || parentFindings;
+
+  /* Fix C7 (owner, 2026-10-12): on the iPad the bottom nav floated mid-screen.
+     A position:fixed bar is placed against the layout viewport, so it leaves
+     the bottom of the screen when something gives the fixed bar a different
+     containing block (a transform, filter, contain, will-change, perspective or
+     backdrop-filter on html or body) or when the page is wider than the screen:
+     iPad Safari then zooms the page out to fit the wider page and the bar sits
+     at the foot of the shrunken layout viewport, part way up the glass.
+     body's overflow-x hides that overflow in Chrome; it does not stop Safari
+     measuring it. So on every kid screen and every portal destination, both
+     looks, the iPad both ways (and the phone for the portal, the only width
+     where its bar is shown): scrolled to the end, no page wider than the
+     window, nothing on html or body that captures a fixed child, and a nav that
+     is on show is fixed, has no offset parent and ends at the window's foot. */
+  if (want('theBottomNavStaysPinned')) {
+    const navFindings = [];
+    await page.evaluate(() => { window.__navAuditSnap = JSON.stringify(state); profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0; });
+    const measure = (navId) => page.evaluate(async (nid) => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const out = [];
+      const W = window.innerWidth, H = window.innerHeight;
+      const docW = document.documentElement.scrollWidth;
+      if (docW > W) {
+        const wide = [...document.querySelectorAll('body *')].map(el => [el, el.getBoundingClientRect()])
+          .filter(([el, r]) => r.width && r.right > W + 1 && !el.closest('.ck-gridwrap, .weekly-full-wrap, .tg-wrap, .day-workspace'))
+          .sort((a, b) => b[1].right - a[1].right).slice(0, 3)
+          .map(([el, r]) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}.${String(el.className).trim().split(/\s+/)[0]} to ${Math.round(r.right)}`);
+        out.push(`the page is ${docW}px wide in a ${W}px window${wide.length ? ' (' + wide.join(', ') + ')' : ''}`);
+      }
+      for (const el of [document.documentElement, document.body]) {
+        const cs = getComputedStyle(el);
+        for (const [prop, ok] of [['transform', 'none'], ['filter', 'none'], ['contain', 'none'], ['willChange', 'auto'],
+          ['perspective', 'none'], ['backdropFilter', 'none']]) {
+          if (cs[prop] && cs[prop] !== ok) out.push(`${el.tagName.toLowerCase()} has ${prop} ${cs[prop]}`);
+        }
+      }
+      const nav = document.getElementById(nid);
+      const shown = !!nav && !nav.hidden && getComputedStyle(nav).display !== 'none';
+      if (shown) {
+        const cs = getComputedStyle(nav), b = nav.getBoundingClientRect();
+        if (cs.position !== 'fixed') out.push(`#${nid} is position ${cs.position}`);
+        if (nav.offsetParent !== null) out.push(`#${nid} has an offset parent`);
+        if (Math.abs(b.bottom - H) > 1) out.push(`#${nid} ends at ${Math.round(b.bottom)}, not the window's foot ${H}`);
+      }
+      return { out, shown };
+    }, navId);
+    for (const look of ['pop', 'calm']) {
+      try { await setLook(look); } catch (e) { navFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
+      for (const [w, h] of [[1194, 834], [834, 1194]]) {
+        await page.setViewportSize({ width: w, height: h });
+        for (const [id, nav, label] of KID_SCREENS) {
+          await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; window.scrollTo(0, 0); });
+          await page.evaluate(`(${nav.toString()})()`);
+          await settle();
+          const r = await measure('kidNav');
+          if (id === 'screen-today' && !r.shown) r.out.push('the kid nav is not on show on Today, so it was not measured');
+          if (r.out.length) navFindings.push(`[${look}] ${label || id}@${w}x${h}: ${r.out.join(' | ')}`);
+        }
+      }
+      for (const [w, h] of [[1194, 834], [834, 1194], [390, 844]]) {
+        await page.setViewportSize({ width: w, height: h });
+        for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
+          await page.evaluate((d) => {
+            window.scrollTo(0, 0);
+            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+            showScreen('parent'); renderParentHome(); setParentDest(d);
+          }, dest);
+          await settle();
+          const r = await measure('parentNav');
+          if (w < 700 && !r.shown) r.out.push('the parent nav is not on show on the phone, so it was not measured');
+          if (r.out.length) navFindings.push(`[${look}] Parent › ${dest}@${w}x${h}: ${r.out.join(' | ')}`);
+        }
+      }
+    }
+    await clearLooks();
+    await page.evaluate(() => {
+      const s = JSON.parse(window.__navAuditSnap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      window.__navAuditSnap = null;
+      saveLocal();
+      profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); window.scrollTo(0, 0);
+    });
+    await page.setViewportSize({ width: 900, height: 1100 });
+    checks.theBottomNavStaysPinned = navFindings.length === 0 || navFindings;
+  }
 };

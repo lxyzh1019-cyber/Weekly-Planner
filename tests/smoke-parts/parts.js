@@ -161,6 +161,7 @@ const PARTS = {
     'kitButtonsHold44pxOnWeekAndDay',
     'kidScreensMeetTheHouseRules',
     'parentScreensMeetTheHouseRules',
+    'theBottomNavStaysPinned',
     'portalFitsAPhone',
     'meetingUndoIsComplete',
     'loanInterestEveryFourSundays',
