@@ -4,7 +4,7 @@
 
 **Summary**
 - Round 2 is built and green on GitHub, pictures included. It goes to you as one pull request; it is the last build of this plan.
-- Every popup now has one look: centred on the iPad, from the bottom on a phone, with one finger-sized ✕. Yes/no questions have one dialog look. Old buttons and cards are gone; the app uses the kit everywhere.
+- Popups follow your answers P1–P6: 22 sheets are centred on the iPad; the edit, activity and training forms keep the right-side panel on the iPad (P2); all come from the bottom on a phone. Money popups keep their area colours (P3). Every sheet has one finger-sized ✕; yes/no questions have no ✕ (P4). Old buttons and cards are gone; the app uses the kit everywhere.
 - Part 13 adds seven guards that stop new private styles, removes 7 unused functions, stops two leaking timers, and moves old history notes to the archive. The parent backup screen shows one read-only line about the Sunday-start money rule.
 
 **What changed from the plan**
