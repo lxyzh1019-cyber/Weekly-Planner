@@ -12,6 +12,7 @@
 - Emoji are not hidden in the picture test: hiding them moved the text next to each emoji. The retries stay, and a planted 1-pixel red outline on a plain button proves a real change still fails.
 - The Sunday-start money option stays (P10 A). Removing it is a later pull request, only if neither iPad has that rule.
 - Copy a day says "N blocks will be replaced", not "planned blocks": the count includes ticked blocks.
+- The ✕ sat at the bottom right of short sheets and out of view on tall ones (Stage 63's fix); it is now pinned to the top right of every sheet, and the check measures it before and after scrolling.
 - Stage 63's first worker reached its test-run limit; an Opus worker finished it. Stage 64 reads the saved rules directly, because the usual reader creates a rule set when none exists.
 
 **Decisions during the work**
