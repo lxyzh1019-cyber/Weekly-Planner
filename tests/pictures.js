@@ -50,8 +50,7 @@ const ALLOWED_PIXELS = 0;
    colour emoji are scaled from a bitmap font, and their edges came out a few
    levels apart between two runs of the same code (parent-money, phone, Pop:
    14 pixels on the ⛸️ of one button), while a real change differs every time.
-   The emoji are now hidden before every shot (hideEmoji); the retries stay for
-   the rest. The self-check does not retry. */
+   The self-check does not retry. */
 const RETRIES = 2;
 
 const SIZES = { ipad: { width: 1194, height: 834 }, phone: { width: 390, height: 844 } };
@@ -402,100 +401,6 @@ async function fixBuildStamp(page) {
   });
 }
 
-// Colour emoji are scaled from a bitmap font on the CI runner, and their edges
-// came out a few levels apart between two runs of the same code (see RETRIES).
-// So every emoji is drawn invisible before every shot. This is a test-only
-// step, in the page and never in css/. Each run of emoji text is wrapped in a
-// <px-emoji> element (display: contents, so it makes no box of its own) whose
-// text is transparent. The glyph keeps its width and its place, and nothing
-// moves. Placeholders and input values that are only emoji are made
-// transparent the same way. The step checks itself: every element's box is
-// read before and after, and a picture whose layout moved fails. "Moved" is
-// more than MOVE_PX: the wrapper is a new inline item, and Chromium rounds
-// each item's width to its layout unit (1/64 px), so text after an emoji can
-// shift by one or two 64ths of a pixel (seen: 0.02-0.03 px) and no more.
-// The limit: a button or chip whose label is only an emoji (🗑, 🔁, 📌, ⛸️)
-// becomes a blank box, so a change of that icon alone is invisible to the
-// picture test. A <select>'s option text is not wrapped. Returns the emoji
-// boxes (page pixels, rounded outward) for tools/emoji-diff-check.js.
-const MOVE_PX = 0.05;
-const EMOJI_ONE = '(?:\\p{Emoji_Presentation}|\\p{Extended_Pictographic}\\uFE0F)(?:\\p{Emoji_Modifier}|\\uFE0F|\\u20E3)*'
-  + '(?:\\u200D\\p{Extended_Pictographic}\\uFE0F?\\p{Emoji_Modifier}?)*';
-async function hideEmoji(page) {
-  return page.evaluate(({ ONE, MOVE_PX }) => {
-    const RUN = new RegExp(`(?:${ONE})+`, 'gu');
-    const ONLY = new RegExp(`^\\s*(?:${ONE}\\s*)+$`, 'u');
-    const HIDE = 'color:transparent!important;-webkit-text-fill-color:transparent!important;'
-      + 'text-shadow:none!important;-webkit-text-stroke:0!important';
-    if (!document.getElementById('px-emoji-style')) {
-      const st = document.createElement('style');
-      st.id = 'px-emoji-style';
-      st.textContent = `[data-px-emoji-ph]::placeholder{${HIDE}} [data-px-emoji-val]{${HIDE}}`;
-      document.head.appendChild(st);
-    }
-    const layout = () => {
-      const out = [];
-      document.querySelectorAll('body *').forEach(e => {
-        if (e.localName === 'px-emoji') return;
-        const r = e.getBoundingClientRect();
-        out.push([e, r.x, r.y, r.width, r.height]);
-      });
-      return out;
-    };
-    const before = layout();
-    const hits = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const p = n.parentElement;
-      if (!p || p.localName === 'px-emoji' || p.namespaceURI !== 'http://www.w3.org/1999/xhtml'
-        || /^(script|style|textarea|option|title|noscript)$/.test(p.localName)) continue;
-      RUN.lastIndex = 0;
-      if (RUN.test(n.data)) hits.push(n);
-    }
-    hits.forEach(n => {
-      const frag = document.createDocumentFragment();
-      let last = 0;
-      n.data.replace(RUN, (m, at) => {
-        if (at > last) frag.append(n.data.slice(last, at));
-        const e = document.createElement('px-emoji');
-        e.setAttribute('style', 'display:contents!important;' + HIDE);
-        e.textContent = m;
-        frag.append(e);
-        last = at + m.length;
-        return m;
-      });
-      if (last < n.data.length) frag.append(n.data.slice(last));
-      n.replaceWith(frag);
-    });
-    document.querySelectorAll('input, textarea').forEach(e => {
-      if (e.placeholder && ONLY.test(e.placeholder)) e.setAttribute('data-px-emoji-ph', '');
-      if (e.value && ONLY.test(e.value)) e.setAttribute('data-px-emoji-val', '');
-    });
-    const after = layout();
-    let moved = after.length !== before.length ? `${before.length} elements before, ${after.length} after` : '';
-    for (let i = 0; !moved && i < before.length; i++) {
-      const [e, ...a] = before[i], b = after[i].slice(1);
-      if (after[i][0] !== e || a.some((v, k) => Math.abs(v - b[k]) > MOVE_PX)) {
-        moved = `<${e.localName}${e.id ? '#' + e.id : ''}${e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''}>`
-          + ` from ${a.map(v => v.toFixed(2)).join(',')} to ${b.map(v => v.toFixed(2)).join(',')}`;
-      }
-    }
-    const boxes = [];
-    const add = (q) => {
-      if (!q.width || !q.height) return;
-      const x = Math.floor(q.left + scrollX), y = Math.floor(q.top + scrollY);
-      boxes.push([x, y, Math.ceil(q.right + scrollX) - x, Math.ceil(q.bottom + scrollY) - y]);
-    };
-    document.querySelectorAll('px-emoji').forEach(e => {
-      const r = document.createRange();
-      r.selectNodeContents(e);
-      [...r.getClientRects()].forEach(add);
-    });
-    document.querySelectorAll('[data-px-emoji-ph], [data-px-emoji-val]').forEach(e => add(e.getBoundingClientRect()));
-    return { moved, boxes };
-  }, { ONE: EMOJI_ONE, MOVE_PX });
-}
-
 // A picture is kept only when two taken in a row are the same, so a late
 // re-render (a web font arriving, a measured label re-drawn) cannot be caught
 // half way. Up to five tries.
@@ -506,11 +411,9 @@ async function stillShot(page, sheet) {
   for (let i = 0; i < 5; i++) {
     await unstick(page);
     await fixBuildStamp(page);
-    const emoji = await hideEmoji(page);
-    if (emoji.moved) throw new Error(`hiding the emoji moved the layout: ${emoji.moved}`);
     await settle(page);
     const png = await page.screenshot({ fullPage: !sheet, animations: 'disabled', caret: 'hide' });
-    if (last && last.equals(png)) return { png, emoji: emoji.boxes };
+    if (last && last.equals(png)) return png;
     last = png;
   }
   return null;
@@ -542,9 +445,8 @@ async function buildStorage(browser) {
 }
 
 // One size in one look: every state, each from a fresh load of the fixture.
-// With `only` (a picture name), just that one picture, in a context of its own;
-// with `plant` too, a real change planted first (plantInPage, the self-check).
-async function shootAll(browser, size, look, storage, settledWeek, only, plant) {
+// With `only` (a picture name), just that one picture, in a context of its own.
+async function shootAll(browser, size, look, storage, settledWeek, only) {
   const ctx = await newContext(browser, size, FIXTURE.now);
   await ctx.addInitScript(({ storage, look }) => {
     localStorage.clear();
@@ -595,10 +497,9 @@ async function shootAll(browser, size, look, storage, settledWeek, only, plant) 
         if (s.shows && !(await page.evaluate((sel) => !!document.querySelector(sel), s.shows))) {
           throw new Error(`${s.shows} is not on show after open`);
         }
-        const planted = plant ? await page.evaluate(plantInPage, { kind: plant, one: EMOJI_ONE }) : null;
-        const shot = await stillShot(page, !!s.sheet);
-        if (!shot) problems.push(`${name}: never held still for two pictures in a row`);
-        else shots.push({ name, png: shot.png, emoji: shot.emoji, size, look, planted });
+        const png = await stillShot(page, !!s.sheet);
+        if (!png) problems.push(`${name}: never held still for two pictures in a row`);
+        else shots.push({ name, png, size, look });
         if (errors.length) problems.push(`${name}: the app reported an error — ${errors.join(' | ')}`);
       } catch (e) {
         if (/^ABORTING/.test(e.message)) throw e;
@@ -665,33 +566,6 @@ function plantPixelInPage({ a, x, y }) {
   });
 }
 
-// A real change for the self-check, on the first button whose label has no
-// emoji: 'size' makes it 1px wider, 'colour' moves its text colour by 24 levels
-// of red. Returns its label and the box it covers before and after.
-function plantInPage({ kind, one }) {
-  const EMOJI = new RegExp(one, 'u');
-  const el = [...document.querySelectorAll('button')].find(b => {
-    const r = b.getBoundingClientRect();
-    return b.offsetParent && r.width >= 24 && r.height >= 24 && r.top >= 0 && r.bottom <= innerHeight
-      && b.textContent.trim() && !EMOJI.test(b.textContent) && getComputedStyle(b).visibility === 'visible';
-  });
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  if (kind === 'size') {
-    el.style.setProperty('width', (r.width + 1) + 'px', 'important');
-    el.style.setProperty('min-width', '0', 'important');
-    el.style.setProperty('max-width', 'none', 'important');
-    el.style.setProperty('flex', 'none', 'important');
-  } else {
-    const c = getComputedStyle(el).color.match(/[\d.]+/g).map(Number);
-    el.style.setProperty('color', `rgb(${c[0] < 128 ? c[0] + 24 : c[0] - 24}, ${c[1]}, ${c[2]})`, 'important');
-  }
-  const q = el.getBoundingClientRect();
-  const x = Math.floor(Math.min(r.left, q.left) + scrollX), y = Math.floor(Math.min(r.top, q.top) + scrollY);
-  return { label: el.textContent.trim().replace(/\s+/g, ' ').slice(0, 40),
-    box: { x, y, w: Math.ceil(Math.max(r.right, q.right) + scrollX) - x, h: Math.ceil(Math.max(r.bottom, q.bottom) + scrollY) - y } };
-}
-
 const dataUrl = (buf) => 'data:image/png;base64,' + buf.toString('base64');
 const fromDataUrl = (u) => Buffer.from(u.slice(u.indexOf(',') + 1), 'base64');
 
@@ -707,29 +581,6 @@ async function selfCheck(cmp, png) {
   }
   if (!(caught.count > ALLOWED_PIXELS)) problems.push('one planted pixel does not fail its picture under the allowed-pixel count');
   return problems;
-}
-
-/* With the emoji hidden, a real change must still fail. On a picture that has
-   emoji (some hidden), a button with no emoji is made 1px wider, then its text
-   colour is moved; each planted shot is compared with the clean shot of the
-   same run, and must differ, inside that button's box. */
-const PLANT_ON = 'today-jenn-ipad-pop';
-async function plantCheck(cmp, browser, storage, settledWeek, shots) {
-  const clean = shots.find(s => s.name === PLANT_ON);
-  if (!clean) return { problems: [`${PLANT_ON} was not taken, so the planted-change check could not run`] };
-  if (!clean.emoji.length) return { problems: [`${PLANT_ON}: no emoji were hidden, so the planted-change check proves nothing`] };
-  const problems = [], seen = [];
-  for (const kind of ['size', 'colour']) {
-    const one = (await shootAll(browser, 'ipad', 'pop', storage, settledWeek, PLANT_ON, kind)).shots[0];
-    if (!one || !one.planted) { problems.push(`planted ${kind}: no button without emoji to change on ${PLANT_ON}`); continue; }
-    const r = await cmp.evaluate(compareInPage, { a: dataUrl(clean.png), b: dataUrl(one.png), tol: CHANNEL_TOLERANCE, wantDiff: false });
-    const p = one.planted.box;
-    const inside = r.box && r.box.x < p.x + p.w && p.x < r.box.x + r.box.w && r.box.y < p.y + p.h && p.y < r.box.y + r.box.h;
-    if (!(r.count > ALLOWED_PIXELS) || !inside) {
-      problems.push(`planted ${kind} on "${one.planted.label}" (box ${JSON.stringify(p)}) gave ${r.count} differing pixels at ${JSON.stringify(r.box)}, expected a failure inside the box`);
-    } else seen.push(`${kind} on "${one.planted.label}" = ${r.count} pixels`);
-  }
-  return { problems, line: `self-check with ${clean.emoji.length} emoji hidden on ${PLANT_ON}: planted ${seen.join(', ')} — caught` };
 }
 
 (async () => {
@@ -766,17 +617,11 @@ async function plantCheck(cmp, browser, storage, settledWeek, shots) {
       return;
     }
     console.log('self-check: a picture against itself = 0 differences; one planted pixel = caught');
-    const planted = await plantCheck(cmp, browser, storage, settledWeek, shots);
-    if (planted.problems.length) openProblems.push(...planted.problems.map(p => 'emoji hiding self-check: ' + p));
-    else console.log(planted.line);
 
     fs.rmSync(NEW_DIR, { recursive: true, force: true });
     fs.rmSync(DIFF_DIR, { recursive: true, force: true });
     fs.mkdirSync(NEW_DIR, { recursive: true });
-    shots.forEach(s => {
-      fs.writeFileSync(path.join(NEW_DIR, s.name + '.png'), s.png);
-      fs.writeFileSync(path.join(NEW_DIR, s.name + '.emoji.json'), JSON.stringify(s.emoji));
-    });
+    shots.forEach(s => fs.writeFileSync(path.join(NEW_DIR, s.name + '.png'), s.png));
 
     if (UPDATE) {
       fs.mkdirSync(REF_DIR, { recursive: true });
