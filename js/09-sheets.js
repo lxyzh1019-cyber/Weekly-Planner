@@ -832,7 +832,7 @@ async function applySeriesUntil() {
      (owner P9). The dialog escapes the whole message once. */
   const lose = seriesTrimPlan(block.seriesId, val).drop.length;
   const ok = await showConfirm(
-    `Run this repeat until ${escapeHtml(val)}?\n\n${now} now, about ${preview.length} after. `
+    `Run this repeat until ${val}?\n\n${now} now, about ${preview.length} after. `
     + (lose ? `${lose} planned block${lose === 1 ? '' : 's'} will be removed. ` : '')
     + 'Days already ticked or confirmed are kept either way.',
     { okLabel: 'Update it', cancelLabel: 'Not now', danger: lose > 0 });
@@ -2509,10 +2509,12 @@ async function confirmCopyDay(srcKey, srcLabel) {
     .flatMap(c => plan.keep.filter(k => (c.startMin || 0) < endOf(k) && (k.startMin || 0) < endOf(c))
       .map(k => `${copyDayBlockLine(c, dstKid)} overlaps 📌 ${copyDayBlockLine(k, dstKid)}`));
   let msg = `Copy ${srcLabel}${when}'s ${thing}${whose}?`;
-  /* Red only when planned blocks are lost, and the question says how many
-     (owner P9). The dialog escapes the whole message once. */
+  /* Red only when blocks are lost, and the question says how many (owner
+     P9). Every unpinned block is replaced, ticked or confirmed ones too, so
+     it says "blocks", not "planned blocks". The dialog escapes the whole
+     message once. */
   const lost = plan.replace.length;
-  if (lost) msg += `\n\n${lost} planned block${lost === 1 ? '' : 's'} will be replaced:\n${lines(plan.replace)}`;
+  if (lost) msg += `\n\n${lost} block${lost === 1 ? '' : 's'} will be replaced:\n${lines(plan.replace)}`;
   if (plan.keep.length) msg += `\n\n📌 Pinned, so it stays:\n${lines(plan.keep)}`;
   if (overlaps.length) msg += `\n\n⚠️ These would overlap a pinned one:\n${overlaps.join('\n')}`;
   const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: lost > 0 });

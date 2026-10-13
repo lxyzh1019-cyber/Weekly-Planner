@@ -149,9 +149,9 @@ module.exports = async ({ page, want, checks }) => {
 /* Part 13 (owner P7–P9, 2026-10-12): the red (danger) OK only on a confirm
    that cannot be undone. The 14 confirms that carried it, each read from the
    loaded function's own source with the variant it must have: 'danger', 'main'
-   (no danger option, or danger: false) or 'lost' (red only when planned blocks
-   are lost). The two 'lost' ones are also driven: red, and the question names
-   the real count, when planned blocks go; the main button when none do. */
+   (no danger option, or danger: false) or 'lost' (red only when blocks are
+   lost). The two 'lost' ones are also driven: red, and the question names the
+   real count, when blocks go; the main button when none do. */
 async function theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks }) {
   if (!want('theRedOkIsOnlyForWhatCannotBeUndone')) return;
   let bad = [];
@@ -173,7 +173,7 @@ async function theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks }) {
         ['rejectKidActivity', 'Take it off', 'main'],           // js/11 child-added activity off the list
         ['coRetire', 'Retire', 'main'],                         // js/29 Retire chore
         ['applySeriesUntil', 'Update it', 'lost'],              // js/09 a repeat cut short
-        ['confirmCopyDay', 'Copy it', 'lost'],                  // js/09 copy over planned blocks
+        ['confirmCopyDay', 'Copy it', 'lost'],                  // js/09 copy over a day's blocks
       ];
       for (const [fn, label, variant] of LIST) {
         const f = window[fn];
@@ -199,6 +199,8 @@ async function theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks }) {
         return { red: /ui-btn--danger/.test(cls), main: /ui-btn--primary/.test(cls), msg };
       };
       const wasProfile = profile, wasViewing = parentViewing;
+      const wasDay = currentDayKey, wasBlock = editingBlockId;
+      const wasSrcWeek = copyDaySrcWeek, wasDstKid = copyDayDstKid;
       const wk = getDayKeys(0);
       const keep = wk.map(k => [k, getDayBlocksForProfile(k, 'jenn')]);
       const inp = document.getElementById('seriesUntilInput');
@@ -206,7 +208,7 @@ async function theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks }) {
       try {
         profile = 'jenn'; parentViewing = 'jenn';
         const [dst, src, empty] = [wk[1], wk[3], wk[5]];
-        // Copy a day: two planned blocks on the target are replaced → red, "2 planned blocks will be replaced".
+        // Copy a day: two blocks on the target are replaced → red, "2 blocks will be replaced".
         setDayBlocks(dst, [{ id: 'ro-a', actId: 'breakfast', startMin: 480, durationMin: 30 },
                            { id: 'ro-b', actId: 'dinner', startMin: 1080, durationMin: 30 }], 'jenn');
         setDayBlocks(src, [{ id: 'ro-c', actId: 'dinner', startMin: 1050, durationMin: 60 }], 'jenn');
@@ -214,7 +216,7 @@ async function theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks }) {
         copyDaySrcWeek = 0; copyDayDstKid = 'jenn';
         openDay(dst, 1);
         let r = await okOf(() => confirmCopyDay(src, 'Thursday'));
-        if (!r.red || !/2 planned blocks will be replaced/.test(r.msg)) out.push(`copy over 2 planned blocks: red ${r.red}, question "${r.msg.slice(0, 120)}"`);
+        if (!r.red || !/2 blocks will be replaced/.test(r.msg)) out.push(`copy over 2 planned blocks: red ${r.red}, question "${r.msg.slice(0, 120)}"`);
         // Onto an empty day nothing is lost → the main button, no count.
         openDay(empty, 1);
         r = await okOf(() => confirmCopyDay(src, 'Thursday'));
@@ -237,6 +239,8 @@ async function theRedOkIsOnlyForWhatCannotBeUndone({ page, want, checks }) {
         keep.forEach(([k, b]) => setDayBlocks(k, b || [], 'jenn'));
         if (inp) inp.value = wasVal;
         profile = wasProfile; parentViewing = wasViewing;
+        currentDayKey = wasDay; editingBlockId = wasBlock;
+        copyDaySrcWeek = wasSrcWeek; copyDayDstKid = wasDstKid;
         goToday();
       }
       return out;
