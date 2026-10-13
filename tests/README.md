@@ -232,7 +232,7 @@ emoji hidden — a button with no emoji made 1px wider, and its text colour move
 limit:** a button or chip whose label is only an emoji (🗑, 🔁, 📌, ⛸️) becomes
 a blank box, so a change of that icon alone is invisible to the picture test;
 a `<select>`'s option text is not hidden. For every differing picture the run
-also writes `pictures-diff/<name>.emoji.json` (the hidden emoji's boxes), and
+also writes `pictures-new/<name>.emoji.json` (the hidden emoji's boxes) beside each picture, and
 `node tools/emoji-diff-check.js <artifact folder>` says per picture group
 whether every differing pixel lies inside those boxes — run it before a
 refresh that should only touch emoji.

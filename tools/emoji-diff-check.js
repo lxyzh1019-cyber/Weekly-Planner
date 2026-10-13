@@ -1,16 +1,19 @@
-// Emoji-only check: for every picture a CI `pictures` artifact lists as different, are all its differing pixels inside the emoji boxes the picture test hid?
+// Emoji-only check: does a CI `pictures` artifact differ from tests/reference/ only inside the emoji boxes the picture test hid?
 //
 // Run:  node tools/emoji-diff-check.js <artifact folder> [pad px]
 //   <artifact folder>  the downloaded CI artifact `pictures`
 //                      (gh run download <run-id> -n pictures -D <folder>);
-//                      it holds pictures-diff/<name>.png (differing pixels pure
-//                      red) and pictures-diff/<name>.emoji.json (the emoji
-//                      boxes tests/pictures.js hid on that picture).
+//                      it holds pictures-new/<name>.png and
+//                      pictures-new/<name>.emoji.json (the boxes of the emoji
+//                      tests/pictures.js hid on that picture).
 //   [pad px]           how far outside a box a differing pixel may lie (the
 //                      glyph's anti-aliased edge), default 1.
-// Prints one line per picture group (state-user) and exits 1 when any picture
-// has a differing pixel outside every emoji box, with that pixel area's box.
-// Use it before refreshing references after a change to the emoji hiding.
+// Every new picture is compared with tests/reference/<name>.png the way the
+// test compares (a channel may differ by 2), so it does not depend on the
+// run's retries or on the run finishing its compare. Run it BEFORE copying the
+// new set into tests/reference/. Prints one line per picture group
+// (state-user) and exits 1 when any picture differs outside every emoji box,
+// with the box of those pixels.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -53,40 +56,51 @@ function decodePng(buf) {
 const [dir, padArg] = process.argv.slice(2);
 if (!dir) { console.error('usage: node tools/emoji-diff-check.js <artifact folder> [pad px]'); process.exit(2); }
 const pad = padArg === undefined ? 1 : Number(padArg);
-const diffDir = [path.join(dir, 'pictures-diff'), path.join(dir, 'tests', 'out', 'pictures-diff')].find(p => fs.existsSync(p));
-if (!diffDir) { console.error('no pictures-diff/ in ' + dir); process.exit(1); }
-const names = fs.readdirSync(diffDir).filter(f => f.endsWith('.png')).map(f => f.replace(/\.png$/, '')).sort();
+const TOL = 2;  // CHANNEL_TOLERANCE in tests/pictures.js
+const newDir = [path.join(dir, 'pictures-new'), path.join(dir, 'tests', 'out', 'pictures-new')].find(p => fs.existsSync(p));
+if (!newDir) { console.error('no pictures-new/ in ' + dir); process.exit(1); }
+const REF = path.join(__dirname, '..', 'tests', 'reference');
+const names = fs.readdirSync(newDir).filter(f => f.endsWith('.png')).map(f => f.replace(/\.png$/, '')).sort();
 const groups = new Map();
-let bad = 0;
+let bad = 0, differ = 0;
 for (const name of names) {
-  const jsonPath = path.join(diffDir, name + '.emoji.json');
-  const boxes = fs.existsSync(jsonPath) ? JSON.parse(fs.readFileSync(jsonPath, 'utf8')) : null;
-  const { w, h, px } = decodePng(fs.readFileSync(path.join(diffDir, name + '.png')));
+  const group = name.replace(/-(ipad|phone)-(pop|calm)$/, '');
+  const g = groups.get(group) || { pictures: 0, differ: 0, px: 0, outside: [] };
+  g.pictures++;
+  groups.set(group, g);
+  const refPath = path.join(REF, name + '.png'), jsonPath = path.join(newDir, name + '.emoji.json');
+  if (!fs.existsSync(refPath)) { g.outside.push(`${name}: no reference`); continue; }
+  const a = decodePng(fs.readFileSync(refPath)), b = decodePng(fs.readFileSync(path.join(newDir, name + '.png')));
+  const boxes = fs.existsSync(jsonPath) ? JSON.parse(fs.readFileSync(jsonPath, 'utf8')) : [];
+  const w = Math.max(a.w, b.w), h = Math.max(a.h, b.h);
   const inBox = new Uint8Array(w * h);
-  (boxes || []).forEach(([x, y, bw, bh]) => {
+  boxes.forEach(([x, y, bw, bh]) => {
     for (let yy = Math.max(0, y - pad); yy < Math.min(h, y + bh + pad); yy++) {
       for (let xx = Math.max(0, x - pad); xx < Math.min(w, x + bw + pad); xx++) inBox[yy * w + xx] = 1;
     }
   });
-  let red = 0, out = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
-  for (let i = 0; i < w * h; i++) {
-    if (px[i * 4] !== 255 || px[i * 4 + 1] !== 0 || px[i * 4 + 2] !== 0) continue;
-    red++;
-    if (inBox[i]) continue;
-    out++;
-    const x = i % w, y = (i - x) / w;
-    if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y;
+  let n = 0, out = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const inA = x < a.w && y < a.h, inB = x < b.w && y < b.h;
+      let same = inA === inB;
+      if (same && inA) {
+        const i = (y * a.w + x) * 4, j = (y * b.w + x) * 4;
+        for (let k = 0; k < 4 && same; k++) same = Math.abs(a.px[i + k] - b.px[j + k]) <= TOL;
+      }
+      if (same) continue;
+      n++;
+      if (inBox[y * w + x]) continue;
+      out++;
+      if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y;
+    }
   }
-  const group = name.replace(/-(ipad|phone)-(pop|calm)$/, '');
-  const g = groups.get(group) || { pictures: 0, red: 0, outside: [] };
-  g.pictures++; g.red += red;
-  if (!boxes) g.outside.push(`${name}: no ${name}.emoji.json`);
-  else if (out) g.outside.push(`${name}: ${out} of ${red} differing pixels outside the ${boxes.length} emoji boxes, box x=${x0} y=${y0} w=${x1 - x0 + 1} h=${y1 - y0 + 1}`);
-  groups.set(group, g);
+  if (n) { g.differ++; differ++; g.px += n; }
+  if (out) g.outside.push(`${name}: ${out} of ${n} differing pixels outside the ${boxes.length} emoji boxes, box x=${x0} y=${y0} w=${x1 - x0 + 1} h=${y1 - y0 + 1}${a.w !== b.w || a.h !== b.h ? ` (size ${a.w}×${a.h} → ${b.w}×${b.h})` : ''}`);
 }
 for (const [group, g] of groups) {
-  if (g.outside.length) { bad++; console.log(`OUTSIDE  ${group}: ${g.pictures} picture(s)\n  ${g.outside.join('\n  ')}`); }
-  else console.log(`emoji only  ${group}: ${g.pictures} picture(s), ${g.red} differing pixels, all inside emoji boxes (+${pad}px)`);
+  if (g.outside.length) { bad++; console.log(`OUTSIDE  ${group}: ${g.differ} of ${g.pictures} picture(s) differ\n  ${g.outside.join('\n  ')}`); }
+  else console.log(`${g.differ ? 'emoji only' : 'same      '}  ${group}: ${g.differ} of ${g.pictures} picture(s) differ, ${g.px} pixels, all inside emoji boxes (+${pad}px)`);
 }
-console.log(`${names.length} differing pictures in ${groups.size} groups; ${bad} group(s) with a difference outside the emoji`);
+console.log(`${names.length} pictures, ${differ} differ, in ${groups.size} groups; ${bad} group(s) with a difference outside the emoji`);
 process.exit(bad ? 1 : 0);

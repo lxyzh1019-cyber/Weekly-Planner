@@ -773,7 +773,10 @@ async function plantCheck(cmp, browser, storage, settledWeek, shots) {
     fs.rmSync(NEW_DIR, { recursive: true, force: true });
     fs.rmSync(DIFF_DIR, { recursive: true, force: true });
     fs.mkdirSync(NEW_DIR, { recursive: true });
-    shots.forEach(s => fs.writeFileSync(path.join(NEW_DIR, s.name + '.png'), s.png));
+    shots.forEach(s => {
+      fs.writeFileSync(path.join(NEW_DIR, s.name + '.png'), s.png);
+      fs.writeFileSync(path.join(NEW_DIR, s.name + '.emoji.json'), JSON.stringify(s.emoji));
+    });
 
     if (UPDATE) {
       fs.mkdirSync(REF_DIR, { recursive: true });
@@ -817,7 +820,6 @@ async function plantCheck(cmp, browser, storage, settledWeek, shots) {
           differ++;
           fs.mkdirSync(DIFF_DIR, { recursive: true });
           if (r.diffUrl) fs.writeFileSync(path.join(DIFF_DIR, s.name + '.png'), fromDataUrl(r.diffUrl));
-          fs.writeFileSync(path.join(DIFF_DIR, s.name + '.emoji.json'), JSON.stringify(s.emoji));
           const sz = (r.size[0] !== r.size[2] || r.size[1] !== r.size[3]) ? ` (size ${r.size[0]}×${r.size[1]} → ${r.size[2]}×${r.size[3]})` : '';
           problems.push(`${s.name}: ${r.count} pixels differ, box x=${r.box.x} y=${r.box.y} w=${r.box.w} h=${r.box.h}${sz}; still differs after ${RETRIES} re-shots in a new context`);
         }
