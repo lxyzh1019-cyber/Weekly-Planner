@@ -23,7 +23,7 @@ const ROOT = path.join(__dirname, '..');
 const RETIRED = ['sheet', 'sheet--compact', 'sheet-close-x', 'app-dialog-sheet', 'td-more-sheet', 'sd-sheet', 'pn-told-sheet', 'rq-x'];
 // The kit's own rules: the only ones that may draw the box.
 const KIT = new Set(['.overlay', '.overlay.open', '.overlay--dialog', '.overlay.overlay--dialog', '.overlay[data-money-surface]',
-  '.ui-sheet', '.ui-dialog', '.ui-sheet-x', '.ui-sheet--docked', '.ui-sheet > h3']);
+  '.ui-sheet', '.ui-dialog', '.ui-sheet-x', '.ui-sheet--docked', '.ui-sheet-body', '.ui-sheet-body > h3']);
 const BOX = /^(?:background(?:-color|-image)?|border(?:-[a-z-]+)?|box-shadow|position|inset|top|right|bottom|left|z-index|align-items|justify-content|align-self|width|min-width|max-width|margin(?:-[a-z]+)?|animation(?:-[a-z]+)?|display|transform)$/;
 const POPUP_SUBJECT = /(?:\.overlay\b|#[A-Za-z]+Overlay$|\.ui-sheet(?![-\w])|\.ui-dialog(?![-\w])|\.rq-sheet(?![-\w])|\.gu-sheet(?![-\w]))[^\s>+~]*$/;
 

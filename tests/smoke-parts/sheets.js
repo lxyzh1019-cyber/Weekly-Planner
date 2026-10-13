@@ -1,10 +1,10 @@
-// Smoke group: one sheet and one dialog (Stage 43, Part 12; owner answers G13 and P1–P4, 2026-10-12). oneSheetAndOneDialogEverywhere opens each of the 25 pop-ups (the 23 overlays in index.html, the ⋯ More sheet tdMoreOverlay, and the app dialog appDialogOverlay), at the iPad width 1024×768 and the phone width 390×844. A sheet is the kit's .ui-sheet with the same paper, border and corner as every other sheet, at layer --z-sheet (300); it is centred on the iPad and sits on the bottom edge, full width, on the phone, except the three forms (edit, activity, training: .ui-sheet--docked), which on the iPad are the right-side panel on the bottom right edge. Each sheet has exactly one ✕ (.ui-sheet-x), at least 44×44, in its top-right corner, and tapping it closes the sheet. The app dialog (a confirm and a choice) is the kit's .ui-dialog, centred at both widths, at layer --z-dialog (500), with no ✕; its Cancel closes it. Stage 63 (owner P5, P6, 2026-10-12): the handle bar shows only on a phone sheet (390 wide), never on an iPad sheet, centred or docked; on a sheet made tall (a 1600px spacer) and scrolled to the bottom, the ✕ is still inside the visible sheet at its top right and a tap lands on it; the ✕ does not cover the title's words; a danger confirm's OK is .ui-btn--danger, a plain one's .ui-btn--primary, both .act-guard. tests/smoke.js calls it near the end of the run, on its one shared page; it puts back the profile and the size.
+// Smoke group: one sheet and one dialog (Stage 43, Part 12; owner answers G13 and P1–P4, 2026-10-12). oneSheetAndOneDialogEverywhere opens each of the 25 pop-ups (the 23 overlays in index.html, the ⋯ More sheet tdMoreOverlay, and the app dialog appDialogOverlay), at the iPad size 1194×834 and the phone size 390×844. A sheet is the kit's .ui-sheet with the same paper, border and corner as every other sheet, at layer --z-sheet (300); it is centred on the iPad and sits on the bottom edge, full width, on the phone, except the three forms (edit, activity, training: .ui-sheet--docked), which on the iPad are the right-side panel on the bottom right edge. Each sheet has exactly one ✕ (.ui-sheet-x), at least 44×44, in its top-right corner, and tapping it closes the sheet. The app dialog (a confirm and a choice) is the kit's .ui-dialog, centred at both widths, at layer --z-dialog (500), with no ✕; its Cancel closes it. Stage 63 (owner P5, P6, 2026-10-12): the handle bar shows only on a phone sheet (390 wide), never on an iPad sheet, centred or docked; on a sheet made tall (a 1600px spacer) and scrolled to the bottom, the ✕ is still inside the visible sheet at its top right and a tap lands on it; the ✕ does not cover the title's words. The ✕ fix (2026-10-13, P4/P6): on every sheet the ✕ is within 16px of the sheet's visible top and right edge at rest, after scrolling the sheet to the bottom, and on a tall sheet scrolled to the bottom; a tap at its centre lands on it; it overlaps no other button, input or link; a danger confirm's OK is .ui-btn--danger, a plain one's .ui-btn--primary, both .act-guard. tests/smoke.js calls it near the end of the run, on its one shared page; it puts back the profile and the size.
 module.exports = async ({ page, want, checks }) => {
   if (!want('oneSheetAndOneDialogEverywhere')) return;
   const before = page.viewportSize();
   const bad = [];
   try {
-    for (const [w, h, size] of [[1024, 768, 'iPad'], [390, 844, 'phone']]) {
+    for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
       await page.setViewportSize({ width: w, height: h });
       await page.waitForTimeout(150);
       const found = await page.evaluate(async (size) => {
@@ -18,6 +18,8 @@ module.exports = async ({ page, want, checks }) => {
           sundayOverlay: () => { sdSheetOpen('Test', '<p>A line</p>'); },
           pnToldOverlay: () => { pnOpenToldSheet(); },
           tdMoreOverlay: () => { goToday(); tdOpenMore(); },
+          // Its opener (openKidRoutineQuick, js/08-day-view.js) writes the title first; opened bare, the title row would be empty.
+          kidRoutineOverlay: () => { document.getElementById('kidRoutineTitle').textContent = '🌅 Morning routine'; openSheet('kidRoutineOverlay'); },
         };
         const statics = [...document.querySelectorAll('.overlay[id]')].map(o => o.id).filter(id => id !== 'appDialogOverlay' && id !== 'tdMoreOverlay');
         if (statics.length !== 23) out.push(`${statics.length} overlays in index.html, expected 23`);
@@ -62,35 +64,47 @@ module.exports = async ({ page, want, checks }) => {
           if (glyphs.length !== 1) out.push(`${where}: ${glyphs.length} ✕ buttons, want 1`);
           const x = xs[0];
           if (x) {
-            const b = x.getBoundingClientRect();
+            // P4/P6 (owner 2026-10-12; the ✕ fix of 2026-10-13): the ✕ is pinned to the sheet's top-right corner — at rest, scrolled to the bottom, and on a sheet made tall and scrolled — within 16px of the visible top and of the right edge, and a tap at its centre lands on it.
+            const scroller = sheet.querySelector(':scope > .ui-sheet-body') || sheet;
+            const pinned = (when) => {
+              const sr = sheet.getBoundingClientRect(), b = x.getBoundingClientRect(), top = Math.max(sr.top, 0);
+              if (Math.abs(b.top - top) > 16 || Math.abs(sr.right - b.right) > 16) out.push(`${where}: ${when} the ✕ is not at the sheet's top right (✕ top ${Math.round(b.top)}, right ${Math.round(b.right)}; sheet top ${Math.round(top)}, right ${Math.round(sr.right)})`);
+              const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+              if (!hit || !x.contains(hit)) out.push(`${where}: ${when} a tap on the ✕ lands on ${hit ? hit.tagName + '.' + hit.className : 'nothing'}`);
+              return b;
+            };
+            const b = pinned('at rest');
             if (b.width < 44 - 0.5 || b.height < 44 - 0.5) out.push(`${where}: the ✕ is ${Math.round(b.width)}×${Math.round(b.height)}, under 44×44`);
-            if (b.right < r.right - 24 || b.top > r.top + 24) out.push(`${where}: the ✕ is not top right (✕ ${Math.round(b.right)},${Math.round(b.top)}; sheet ${Math.round(r.right)},${Math.round(r.top)})`);
-            const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-            if (!hit || !x.contains(hit)) out.push(`${where}: a tap on the ✕ lands on ${hit ? hit.tagName + '.' + hit.className : 'nothing'}`);
-            // P6 (owner 2026-10-12): the ✕ stays in view at the top right while a tall sheet scrolls. A spacer makes this sheet tall; at the bottom of the scroll the ✕ is still inside the visible sheet box, near its top right, and a tap on it lands on it.
-            const spacer = document.createElement('div');
-            spacer.style.height = '1600px';
-            x.parentNode.insertBefore(spacer, x);
-            sheet.scrollTop = sheet.scrollHeight;
-            await tick();
-            const sr = sheet.getBoundingClientRect(), b2 = x.getBoundingClientRect();
-            if (sheet.scrollTop < 100) out.push(`${where}: the tall sheet did not scroll (scrollTop ${Math.round(sheet.scrollTop)})`);
-            else if (b2.top < sr.top - 0.5 || b2.bottom > sr.bottom + 0.5 || b2.top > sr.top + 24 || b2.right < sr.right - 24) out.push(`${where}: after scrolling to the bottom the ✕ left the visible sheet (✕ ${Math.round(b2.right)},${Math.round(b2.top)}–${Math.round(b2.bottom)}; sheet ${Math.round(sr.right)},${Math.round(sr.top)}–${Math.round(sr.bottom)})`);
-            else {
-              const hit2 = document.elementFromPoint(b2.left + b2.width / 2, b2.top + b2.height / 2);
-              if (!hit2 || !x.contains(hit2)) out.push(`${where}: after scrolling a tap on the ✕ lands on ${hit2 ? hit2.tagName + '.' + hit2.className : 'nothing'}`);
+            // The ✕ covers no other control of the sheet (bounding boxes, at rest).
+            for (const el of sheet.querySelectorAll('button, input, select, textarea, a[href], [role="switch"]')) {
+              if (el === x || x.contains(el)) continue;
+              const q = el.getBoundingClientRect();
+              if (!q.width || !q.height) continue;
+              if (q.left < b.right - 0.5 && q.right > b.left + 0.5 && q.top < b.bottom - 0.5 && q.bottom > b.top + 0.5) out.push(`${where}: the ✕ overlaps ${el.tagName.toLowerCase()} "${(el.textContent || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 24)}"`);
             }
-            sheet.scrollTop = 0;
-            spacer.remove();
-            await tick();
             // The ✕ never covers the title's words.
-            const h3 = sheet.querySelector(':scope > h3');
+            const h3 = sheet.querySelector('h3');
             if (h3) {
               const rg = document.createRange();
               rg.selectNodeContents(h3);
-              const tr = rg.getBoundingClientRect(), b3 = x.getBoundingClientRect();
-              if (tr.width && tr.right > b3.left + 0.5 && tr.bottom > b3.top && tr.top < b3.bottom) out.push(`${where}: the ✕ covers the title text (title right ${Math.round(tr.right)}, ✕ left ${Math.round(b3.left)})`);
+              const tr = rg.getBoundingClientRect();
+              if (tr.width && tr.right > b.left + 0.5 && tr.bottom > b.top && tr.top < b.bottom) out.push(`${where}: the ✕ covers the title text "${h3.textContent.trim().slice(0, 40)}" (title right ${Math.round(tr.right)}, ✕ left ${Math.round(b.left)}; title box right ${Math.round(h3.getBoundingClientRect().right)})`);
             }
+            // The sheet's own content scrolled to the bottom.
+            scroller.scrollTop = scroller.scrollHeight;
+            await tick();
+            pinned('scrolled to the bottom');
+            // A spacer makes the sheet tall; scrolled to the bottom the ✕ is still at its top right.
+            const spacer = document.createElement('div');
+            spacer.style.height = '1600px';
+            scroller.appendChild(spacer);
+            scroller.scrollTop = scroller.scrollHeight;
+            await tick();
+            if (scroller.scrollTop < 100) out.push(`${where}: the tall sheet did not scroll (scrollTop ${Math.round(scroller.scrollTop)})`);
+            else pinned('on a tall sheet scrolled to the bottom');
+            scroller.scrollTop = 0;
+            spacer.remove();
+            await tick();
             x.click();
             await tick();
             if (ov.classList.contains('open')) { out.push(`${where}: the ✕ did not close it`); closeSheet(id); }

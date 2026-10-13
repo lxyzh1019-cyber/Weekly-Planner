@@ -393,9 +393,11 @@
 <!-- The Record sheet: one door for a chore grade, a meet, a gift, a fine and a move -->
 <div class="overlay" id="recordOverlay" data-area="money" onclick="overlayClick(event,'recordOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="rcSheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="rcSheetTitle">✍️ Record something</h3>
-    <div id="recordBody"></div>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="rcSheetTitle">✍️ Record something</h3>
+      <div id="recordBody"></div>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeRecordSheet()">✕</button>
   </div>
 </div>
@@ -405,8 +407,10 @@
      Chrome here, body filled by JS, the recordOverlay pattern. -->
 <div class="overlay" id="requestOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'requestOverlay')">
   <div class="ui-sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
-    <h3 id="rqSheetTitle">✋ Ask parents</h3>
-    <div id="requestBody"></div>
+    <div class="ui-sheet-body">
+      <h3 id="rqSheetTitle">✋ Ask parents</h3>
+      <div id="requestBody"></div>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="rqClose()">✕</button>
   </div>
 </div>
@@ -415,8 +419,10 @@
      Chrome here, body filled by JS, the recordOverlay pattern. -->
 <div class="overlay" id="sundayOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'sundayOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
-    <h3 id="sdSheetTitle">🗣️ Parent's card</h3>
-    <div id="sundayBody"></div>
+    <div class="ui-sheet-body">
+      <h3 id="sdSheetTitle">🗣️ Parent's card</h3>
+      <div id="sundayBody"></div>
+    </div>
   </div>
 </div>
 
@@ -428,15 +434,19 @@
      data-pn-action controls go to pnHandleClick (js/99-main.js). -->
 <div class="overlay" id="pnToldOverlay" data-area="parent" data-money-surface onclick="overlayClick(event,'pnToldOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="pnToldTitle">
-    <h3 id="pnToldTitle">🚪 She told me… — on her behalf</h3>
-    <div id="pnToldBody"></div>
+    <div class="ui-sheet-body">
+      <h3 id="pnToldTitle">🚪 She told me… — on her behalf</h3>
+      <div id="pnToldBody"></div>
+    </div>
   </div>
 </div>
 
 <div class="overlay" id="grownupsOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'grownupsOverlay')">
   <div class="ui-sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
-    <h3 id="guSheetTitle">✏️ Fix</h3>
-    <div id="grownupsBody"></div>
+    <div class="ui-sheet-body">
+      <h3 id="guSheetTitle">✏️ Fix</h3>
+      <div id="grownupsBody"></div>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="guCloseSheet()">✕</button>
   </div>
 </div>
@@ -444,9 +454,11 @@
 <!-- Quick profile switcher (tap the profile icon) -->
 <div class="overlay" id="profileSwitchOverlay" data-area="planner" onclick="overlayClick(event,'profileSwitchOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="profileSwitchTitle">Switch profile 👤</h3>
-    <div class="profile-switch-list" id="profileSwitchBody"></div>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="profileSwitchTitle">Switch profile 👤</h3>
+      <div class="profile-switch-list" id="profileSwitchBody"></div>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('profileSwitchOverlay')">✕</button>
   </div>
 </div>
@@ -722,95 +734,97 @@
 <!-- Training Sheet -->
 <div class="overlay" id="trainingOverlay" onclick="overlayClick(event,'trainingOverlay')">
   <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="trainingSheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="trainingSheetTitle">🏋️ Competitive Sports Session</h3>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="trainingSheetTitle">🏋️ Competitive Sports Session</h3>
 
-    <!-- Competitions only. Without it every meet on every screen read "Skating
-         Comp." and the one thing that tells them apart lived nowhere. -->
-    <div id="trainingCompNameRow" style="display:none">
-      <h4>WHICH COMPETITION</h4>
-      <input type="text" id="trainingCompName" maxlength="40"
-        placeholder="e.g. Winter Invitational" aria-label="Competition name">
-    </div>
-
-    <h4>START TIME</h4>
-    <div id="trainingStartPicker"></div>
-
-    <h4>SPORT TAG</h4>
-    <div class="sheet-row" id="trainingTagBtns"></div>
-
-    <h4>DURATION</h4>
-    <div class="sheet-row" id="trainingDurBtns"></div>
-    <!-- A training session has never had a custom length: the presets were the
-         whole of it, so a 75-minute practice or a meet that runs past the longest
-         pill could not be entered. Same control the activity and edit sheets use. -->
-    <div id="trainingCustomDur"></div>
-    <div id="trainingTimeSummary"></div>
-
-    <h4>COLOUR</h4>
-    <div class="colour-picker" id="trainingColourPicker"></div>
-
-    <h4>OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
-    <div class="objectives-list" id="objectivesList"></div>
-    <button class="ui-btn ui-btn--secondary" style="margin-bottom:0.8rem" onclick="openCustomTask()">＋ Add custom task</button>
-
-    <h4>NOTE</h4>
-    <textarea class="note-input" id="trainingNote" aria-label="Note for this session" rows="2" placeholder="e.g. Terwillegar, bring skates…"></textarea>
-
-    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingWarmupToggle" onclick="toggleWarmupBuffer('training')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🔥 Needs warm-up time (default 20 min right before — adjust below)</span>
-    </div>
-    <div class="buffer-dur-row" id="trainingWarmupDurRow" style="display:none">
-      <label for="trainingWarmupBufMin">Warm-up minutes (before only)</label>
-      <input type="number" id="trainingWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onTrainingBufferMinInput()">
-    </div>
-    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">👕 Get ready before, 🧺 unpack after (15 min each — adjust below)</span>
-    </div>
-    <div class="buffer-dur-row" id="trainingReadyDurRow" style="display:none">
-      <label for="trainingReadyBufMin">Get-ready minutes (each way)</label>
-      <input type="number" id="trainingReadyBufMin" min="5" max="120" step="5" value="15" onchange="onTrainingBufferMinInput()">
-    </div>
-    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingTravelToggle" onclick="toggleTravelBuffer('training')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🚗 Needs travel time (default 15 min before & after — adjust below)</span>
-    </div>
-    <div class="buffer-dur-row" id="trainingTravelDurRow" style="display:none">
-      <label for="trainingTravelBufMin">Travel minutes (each way)</label>
-      <input type="number" id="trainingTravelBufMin" min="5" max="180" step="5" value="15" onchange="onTrainingBufferMinInput()">
-    </div>
-    <div>
-      <h4>GEAR LIST</h4>
-      <div class="checklist-wrap" id="trainingGearList"></div>
-    </div>
-
-    <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingRepeat" onclick="toggleRepeat('trainingRepeat')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🔁 Repeat on other days…</span>
-    </div>
-    <div id="trainingRepeatDays" style="display:none">
-      <div class="day-pick-presets">
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','weekdays')">Weekdays</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','weekend')">Weekend</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','all')">All</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','none')">None</button>
+      <!-- Competitions only. Without it every meet on every screen read "Skating
+           Comp." and the one thing that tells them apart lived nowhere. -->
+      <div id="trainingCompNameRow" style="display:none">
+        <h4>WHICH COMPETITION</h4>
+        <input type="text" id="trainingCompName" maxlength="40"
+          placeholder="e.g. Winter Invitational" aria-label="Competition name">
       </div>
-      <div class="day-picker" id="trainingDayPicker"></div>
-      <div id="trainingDateRange" class="date-range-wrap" style="display:none">
-        <label>Repeat from</label>
-        <input type="date" id="trainingDateStart" aria-label="Repeat start date">
-        <label>through</label>
-        <input type="date" id="trainingDateEnd" aria-label="Repeat end date">
-        <label for="trainingRepeatEvery">How often</label>
-        <select id="trainingRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
-        <p class="hint">Leave the dates empty to repeat only this week.</p>
-      </div>
-    </div>
 
-    <div class="sheet-action-row">
-      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmTraining()">Place Training ✅</button>
+      <h4>START TIME</h4>
+      <div id="trainingStartPicker"></div>
+
+      <h4>SPORT TAG</h4>
+      <div class="sheet-row" id="trainingTagBtns"></div>
+
+      <h4>DURATION</h4>
+      <div class="sheet-row" id="trainingDurBtns"></div>
+      <!-- A training session has never had a custom length: the presets were the
+           whole of it, so a 75-minute practice or a meet that runs past the longest
+           pill could not be entered. Same control the activity and edit sheets use. -->
+      <div id="trainingCustomDur"></div>
+      <div id="trainingTimeSummary"></div>
+
+      <h4>COLOUR</h4>
+      <div class="colour-picker" id="trainingColourPicker"></div>
+
+      <h4>OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
+      <div class="objectives-list" id="objectivesList"></div>
+      <button class="ui-btn ui-btn--secondary" style="margin-bottom:0.8rem" onclick="openCustomTask()">＋ Add custom task</button>
+
+      <h4>NOTE</h4>
+      <textarea class="note-input" id="trainingNote" aria-label="Note for this session" rows="2" placeholder="e.g. Terwillegar, bring skates…"></textarea>
+
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingWarmupToggle" onclick="toggleWarmupBuffer('training')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔥 Needs warm-up time (default 20 min right before — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="trainingWarmupDurRow" style="display:none">
+        <label for="trainingWarmupBufMin">Warm-up minutes (before only)</label>
+        <input type="number" id="trainingWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onTrainingBufferMinInput()">
+      </div>
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">👕 Get ready before, 🧺 unpack after (15 min each — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="trainingReadyDurRow" style="display:none">
+        <label for="trainingReadyBufMin">Get-ready minutes (each way)</label>
+        <input type="number" id="trainingReadyBufMin" min="5" max="120" step="5" value="15" onchange="onTrainingBufferMinInput()">
+      </div>
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingTravelToggle" onclick="toggleTravelBuffer('training')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🚗 Needs travel time (default 15 min before & after — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="trainingTravelDurRow" style="display:none">
+        <label for="trainingTravelBufMin">Travel minutes (each way)</label>
+        <input type="number" id="trainingTravelBufMin" min="5" max="180" step="5" value="15" onchange="onTrainingBufferMinInput()">
+      </div>
+      <div>
+        <h4>GEAR LIST</h4>
+        <div class="checklist-wrap" id="trainingGearList"></div>
+      </div>
+
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingRepeat" onclick="toggleRepeat('trainingRepeat')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔁 Repeat on other days…</span>
+      </div>
+      <div id="trainingRepeatDays" style="display:none">
+        <div class="day-pick-presets">
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','weekdays')">Weekdays</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','weekend')">Weekend</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','all')">All</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','none')">None</button>
+        </div>
+        <div class="day-picker" id="trainingDayPicker"></div>
+        <div id="trainingDateRange" class="date-range-wrap" style="display:none">
+          <label>Repeat from</label>
+          <input type="date" id="trainingDateStart" aria-label="Repeat start date">
+          <label>through</label>
+          <input type="date" id="trainingDateEnd" aria-label="Repeat end date">
+          <label for="trainingRepeatEvery">How often</label>
+          <select id="trainingRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+          <p class="hint">Leave the dates empty to repeat only this week.</p>
+        </div>
+      </div>
+
+      <div class="sheet-action-row">
+        <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmTraining()">Place Training ✅</button>
+      </div>
     </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="cancelCreatePlacement('trainingOverlay')">✕</button>
   </div>
@@ -821,86 +835,90 @@
      having selected an activity first (item 6). -->
 <div class="overlay" id="slotPickerOverlay" onclick="overlayClick(event,'slotPickerOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="slotPickerTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="slotPickerTitle">Add an activity</h3>
-    <p class="slot-picker-hint" id="slotPickerHint">Pick what goes here.</p>
-    <div class="slot-picker-filter" id="slotPickerFilter"></div>
-    <div class="slot-picker-list" id="slotPickerList"></div>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="slotPickerTitle">Add an activity</h3>
+      <p class="slot-picker-hint" id="slotPickerHint">Pick what goes here.</p>
+      <div class="slot-picker-filter" id="slotPickerFilter"></div>
+      <div class="slot-picker-list" id="slotPickerList"></div>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('slotPickerOverlay')">✕</button>
   </div>
 </div>
 
 <div class="overlay" id="activityOverlay" onclick="overlayClick(event,'activityOverlay')">
   <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="activitySheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="activitySheetTitle"></h3>
-    <div class="sheet-time-grid-row">
-      <div class="sheet-time-col">
-        <h4>START TIME</h4>
-        <div id="activityStartPicker"></div>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="activitySheetTitle"></h3>
+      <div class="sheet-time-grid-row">
+        <div class="sheet-time-col">
+          <h4>START TIME</h4>
+          <div id="activityStartPicker"></div>
+        </div>
+        <div class="sheet-time-col sheet-time-col--duration">
+          <h4>DURATION</h4>
+          <div class="duration-custom-slot" id="activityDurationTopSpacer" aria-hidden="true"></div>
+          <div class="sheet-row" id="activityDurBtns"></div>
+          <div id="activityCustomDur"></div>
+        </div>
       </div>
-      <div class="sheet-time-col sheet-time-col--duration">
-        <h4>DURATION</h4>
-        <div class="duration-custom-slot" id="activityDurationTopSpacer" aria-hidden="true"></div>
-        <div class="sheet-row" id="activityDurBtns"></div>
-        <div id="activityCustomDur"></div>
+      <div id="activityTimeSummary"></div>
+      <h4>COLOUR</h4>
+      <div class="colour-picker" id="activityColourPicker"></div>
+      <div id="choreTypeRow" style="display:none">
+        <h4>CHORE TYPE</h4>
+        <div class="sheet-row" id="choreTypePicker"></div>
       </div>
-    </div>
-    <div id="activityTimeSummary"></div>
-    <h4>COLOUR</h4>
-    <div class="colour-picker" id="activityColourPicker"></div>
-    <div id="choreTypeRow" style="display:none">
-      <h4>CHORE TYPE</h4>
-      <div class="sheet-row" id="choreTypePicker"></div>
-    </div>
-    <h4>GOAL / OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
-    <div class="objectives-list" id="activityObjectivesList"></div>
-    <button class="ui-btn ui-btn--secondary" style="margin-bottom:0.8rem" onclick="openCustomTask('activity')">＋ Add custom goal</button>
-    <h4>NOTE</h4>
-    <textarea class="note-input" id="activityNote" aria-label="Note for this activity" rows="2" placeholder="Add a note…"></textarea>
-    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🚗 Needs travel time (default 15 min each way — adjust below)</span>
-    </div>
-    <div class="buffer-dur-row" id="activityTravelDurRow" style="display:none">
-      <label for="activityTravelBufMin">Travel minutes (each way)</label>
-      <input type="number" id="activityTravelBufMin" min="5" max="180" step="5" value="15" onchange="onActivityTravelBufMinInput()">
-    </div>
-    <!-- Get-ready existed only on the training sheet, so an appointment or a
-         school day placed from here could name a journey but never the time
-         it takes to be ready for it. -->
-    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityReadyToggle" onclick="toggleGetReadyBuffer('activity')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">👕 Get ready before, 🧺 unpack after (15 min each — adjust below)</span>
-    </div>
-    <div class="buffer-dur-row" id="activityReadyDurRow" style="display:none">
-      <label for="activityReadyBufMin">Get-ready minutes (each way)</label>
-      <input type="number" id="activityReadyBufMin" min="5" max="120" step="5" value="15" onchange="onActivityReadyBufMinInput()">
-    </div>
-    <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🔁 Repeat on other days…</span>
-    </div>
-    <div id="activityRepeatDays" style="display:none">
-      <div class="day-pick-presets">
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','weekdays')">Weekdays</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','weekend')">Weekend</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','all')">All</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','none')">None</button>
+      <h4>GOAL / OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
+      <div class="objectives-list" id="activityObjectivesList"></div>
+      <button class="ui-btn ui-btn--secondary" style="margin-bottom:0.8rem" onclick="openCustomTask('activity')">＋ Add custom goal</button>
+      <h4>NOTE</h4>
+      <textarea class="note-input" id="activityNote" aria-label="Note for this activity" rows="2" placeholder="Add a note…"></textarea>
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🚗 Needs travel time (default 15 min each way — adjust below)</span>
       </div>
-      <div class="day-picker" id="activityDayPicker"></div>
-      <div id="activityDateRange" class="date-range-wrap" style="display:none">
-        <label>Repeat from</label>
-        <input type="date" id="activityDateStart" aria-label="Repeat start date">
-        <label>through</label>
-        <input type="date" id="activityDateEnd" aria-label="Repeat end date">
-        <label for="activityRepeatEvery">How often</label>
-        <select id="activityRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
-        <p class="hint">Leave the dates empty to repeat only this week.</p>
+      <div class="buffer-dur-row" id="activityTravelDurRow" style="display:none">
+        <label for="activityTravelBufMin">Travel minutes (each way)</label>
+        <input type="number" id="activityTravelBufMin" min="5" max="180" step="5" value="15" onchange="onActivityTravelBufMinInput()">
       </div>
-    </div>
-    <div class="sheet-action-row">
-      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmActivity()">Place Block ✅</button>
+      <!-- Get-ready existed only on the training sheet, so an appointment or a
+           school day placed from here could name a journey but never the time
+           it takes to be ready for it. -->
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityReadyToggle" onclick="toggleGetReadyBuffer('activity')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">👕 Get ready before, 🧺 unpack after (15 min each — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="activityReadyDurRow" style="display:none">
+        <label for="activityReadyBufMin">Get-ready minutes (each way)</label>
+        <input type="number" id="activityReadyBufMin" min="5" max="120" step="5" value="15" onchange="onActivityReadyBufMinInput()">
+      </div>
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔁 Repeat on other days…</span>
+      </div>
+      <div id="activityRepeatDays" style="display:none">
+        <div class="day-pick-presets">
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','weekdays')">Weekdays</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','weekend')">Weekend</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','all')">All</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','none')">None</button>
+        </div>
+        <div class="day-picker" id="activityDayPicker"></div>
+        <div id="activityDateRange" class="date-range-wrap" style="display:none">
+          <label>Repeat from</label>
+          <input type="date" id="activityDateStart" aria-label="Repeat start date">
+          <label>through</label>
+          <input type="date" id="activityDateEnd" aria-label="Repeat end date">
+          <label for="activityRepeatEvery">How often</label>
+          <select id="activityRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+          <p class="hint">Leave the dates empty to repeat only this week.</p>
+        </div>
+      </div>
+      <div class="sheet-action-row">
+        <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmActivity()">Place Block ✅</button>
+      </div>
     </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="cancelCreatePlacement('activityOverlay')">✕</button>
   </div>
@@ -909,175 +927,177 @@
 <!-- Edit Sheet -->
 <div class="overlay" id="editOverlay" onclick="overlayClick(event,'editOverlay')">
   <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="editSheetTitle">
-    <div class="sheet-handle"></div>
-    <div class="edit-title-row">
-      <h3 id="editSheetTitle"></h3>
-      <div class="edit-mood-inline" id="editBlockMoods"></div>
-    </div>
-
-    <div id="editChecklistWrap" style="display:none">
-      <h4>CHECKLIST</h4>
-      <div class="checklist-wrap" id="editChecklistList"></div>
-    </div>
-
-    <div class="sheet-time-grid-row">
-      <div class="sheet-time-col">
-        <h4>START TIME</h4>
-        <div id="editStartPicker"></div>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <div class="edit-title-row">
+        <h3 id="editSheetTitle"></h3>
+        <div class="edit-mood-inline" id="editBlockMoods"></div>
       </div>
-      <div class="sheet-time-col sheet-time-col--duration">
-        <h4>DURATION</h4>
-        <div class="duration-custom-slot" id="editDurationTopSpacer" aria-hidden="true"></div>
-        <div class="sheet-row" id="editDurBtns"></div>
-        <div id="editCustomDur"></div>
+
+      <div id="editChecklistWrap" style="display:none">
+        <h4>CHECKLIST</h4>
+        <div class="checklist-wrap" id="editChecklistList"></div>
       </div>
-    </div>
-    <div id="editTimeSummary"></div>
 
-    <div id="editObjectivesWrap" style="display:none">
-      <h4>OBJECTIVES</h4>
-      <div id="editObjectivesView" style="margin-bottom:0.8rem"></div>
-      <div id="editObjectivesEditWrap" style="display:none">
-        <label style="font-size:calc(0.95rem * var(--text-scale, 1));font-weight:700;color:var(--ink-muted)">Edit your goals (one per line)</label>
-        <textarea class="note-input" id="editObjectivesInput" aria-label="Objectives" rows="4" placeholder="e.g. 10 good jumps&#10;2 run-throughs"></textarea>
+      <div class="sheet-time-grid-row">
+        <div class="sheet-time-col">
+          <h4>START TIME</h4>
+          <div id="editStartPicker"></div>
+        </div>
+        <div class="sheet-time-col sheet-time-col--duration">
+          <h4>DURATION</h4>
+          <div class="duration-custom-slot" id="editDurationTopSpacer" aria-hidden="true"></div>
+          <div class="sheet-row" id="editDurBtns"></div>
+          <div id="editCustomDur"></div>
+        </div>
       </div>
-    </div>
+      <div id="editTimeSummary"></div>
 
-    <h4>NOTE</h4>
-    <textarea class="note-input" id="editNoteInput" aria-label="Note" rows="2" placeholder="Add a note…"></textarea>
+      <div id="editObjectivesWrap" style="display:none">
+        <h4>OBJECTIVES</h4>
+        <div id="editObjectivesView" style="margin-bottom:0.8rem"></div>
+        <div id="editObjectivesEditWrap" style="display:none">
+          <label style="font-size:calc(0.95rem * var(--text-scale, 1));font-weight:700;color:var(--ink-muted)">Edit your goals (one per line)</label>
+          <textarea class="note-input" id="editObjectivesInput" aria-label="Objectives" rows="4" placeholder="e.g. 10 good jumps&#10;2 run-throughs"></textarea>
+        </div>
+      </div>
 
-    <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editWarmupToggle" onclick="toggleEditWarmupBuffer()" style="display:none">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🔥 Needs warm-up time</span>
-    </div>
-    <div class="buffer-dur-row" id="editWarmupDurRow" style="display:none">
-      <label for="editWarmupBufMin">Warm-up minutes (before only)</label>
-      <input type="number" id="editWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onEditBufferMinInput()">
-    </div>
-    <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">👕 Get ready before, 🧺 unpack after</span>
-    </div>
-    <!-- TWO LEGS, NOT ONE FIGURE MIRRORED. Tuesday is school, then straight on
-         to training, then home: no drive back from school, a short hop from the
-         school gates to the pool, a longer one home afterwards. "each way"
-         could say none of it. -->
-    <div class="buffer-dur-row buffer-leg-row" id="editReadyDurRow" style="display:none">
-      <label for="editReadyBufMin">👕 Get ready, minutes</label>
-      <input type="number" id="editReadyBufMin" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
-      <label class="buffer-leg-off" for="editReadyAfterToggle">🧺 Unpack after</label>
-      <input type="checkbox" id="editReadyAfterToggle" onchange="onEditBufferMinInput()">
-      <input type="number" id="editReadyAfterMin" aria-label="Minutes unpacking afterwards" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
-    </div>
-    <div class="edit-primary-toggle-row">
-      <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
+      <h4>NOTE</h4>
+      <textarea class="note-input" id="editNoteInput" aria-label="Note" rows="2" placeholder="Add a note…"></textarea>
+
+      <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editWarmupToggle" onclick="toggleEditWarmupBuffer()" style="display:none">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label">🚗 Needs travel time</span>
+        <span class="toggle-label">🔥 Needs warm-up time</span>
       </div>
-      <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editCompleteToggle" onclick="toggleEditComplete()">
+      <div class="buffer-dur-row" id="editWarmupDurRow" style="display:none">
+        <label for="editWarmupBufMin">Warm-up minutes (before only)</label>
+        <input type="number" id="editWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onEditBufferMinInput()">
+      </div>
+      <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label">✅ Mark this activity done</span>
+        <span class="toggle-label">👕 Get ready before, 🧺 unpack after</span>
       </div>
-      <div id="editParentStampRow" class="parent-stamp-row" style="display:none">
-        <span class="toggle-label">💖 Proud stamp</span>
-        <div class="parent-stamp-picker" id="editParentStampPicker"></div>
+      <!-- TWO LEGS, NOT ONE FIGURE MIRRORED. Tuesday is school, then straight on
+           to training, then home: no drive back from school, a short hop from the
+           school gates to the pool, a longer one home afterwards. "each way"
+           could say none of it. -->
+      <div class="buffer-dur-row buffer-leg-row" id="editReadyDurRow" style="display:none">
+        <label for="editReadyBufMin">👕 Get ready, minutes</label>
+        <input type="number" id="editReadyBufMin" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
+        <label class="buffer-leg-off" for="editReadyAfterToggle">🧺 Unpack after</label>
+        <input type="checkbox" id="editReadyAfterToggle" onchange="onEditBufferMinInput()">
+        <input type="number" id="editReadyAfterMin" aria-label="Minutes unpacking afterwards" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
       </div>
-    </div>
-    <div class="buffer-dur-row buffer-leg-row" id="editTravelDurRow" style="display:none">
-      <label for="editTravelBufMin">🚗 Getting there, minutes</label>
-      <input type="number" id="editTravelBufMin" min="5" max="180" step="5" value="15" onchange="onEditBufferMinInput()">
-      <label class="buffer-leg-off" for="editTravelHomeToggle">Coming home after</label>
-      <input type="checkbox" id="editTravelHomeToggle" onchange="onEditBufferMinInput()">
-      <input type="number" id="editTravelHomeMin" aria-label="Minutes travelling home afterwards" min="5" max="180" step="5" value="15" onchange="onEditBufferMinInput()">
-    </div>
-    <div id="editTrainingGearWrap" style="display:none">
-      <h4>GEAR LIST</h4>
-      <div class="checklist-wrap" id="editTrainingGearList"></div>
-    </div>
+      <div class="edit-primary-toggle-row">
+        <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">🚗 Needs travel time</span>
+        </div>
+        <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editCompleteToggle" onclick="toggleEditComplete()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">✅ Mark this activity done</span>
+        </div>
+        <div id="editParentStampRow" class="parent-stamp-row" style="display:none">
+          <span class="toggle-label">💖 Proud stamp</span>
+          <div class="parent-stamp-picker" id="editParentStampPicker"></div>
+        </div>
+      </div>
+      <div class="buffer-dur-row buffer-leg-row" id="editTravelDurRow" style="display:none">
+        <label for="editTravelBufMin">🚗 Getting there, minutes</label>
+        <input type="number" id="editTravelBufMin" min="5" max="180" step="5" value="15" onchange="onEditBufferMinInput()">
+        <label class="buffer-leg-off" for="editTravelHomeToggle">Coming home after</label>
+        <input type="checkbox" id="editTravelHomeToggle" onchange="onEditBufferMinInput()">
+        <input type="number" id="editTravelHomeMin" aria-label="Minutes travelling home afterwards" min="5" max="180" step="5" value="15" onchange="onEditBufferMinInput()">
+      </div>
+      <div id="editTrainingGearWrap" style="display:none">
+        <h4>GEAR LIST</h4>
+        <div class="checklist-wrap" id="editTrainingGearList"></div>
+      </div>
 
-    <div class="edit-stopwatch-wrap" id="editStopwatchWrap">
-      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="editStopwatchToggle" onclick="toggleEditStopwatch()">
+      <div class="edit-stopwatch-wrap" id="editStopwatchWrap">
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="editStopwatchToggle" onclick="toggleEditStopwatch()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">⏱ Stopwatch (goal vs time used)</span>
+        </div>
+        <div class="edit-stopwatch-stats" id="editStopwatchStats"></div>
+        <div class="edit-stopwatch-btns">
+          <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchStart" onclick="editStopwatchStart()">Start</button>
+          <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchPause" onclick="editStopwatchPause()">Pause</button>
+          <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchReset" onclick="editStopwatchReset()">Reset</button>
+        </div>
+      </div>
+
+      <!-- Repeat to other days of this week -->
+      <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editRepeat" onclick="toggleRepeat('editRepeat')">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label">⏱ Stopwatch (goal vs time used)</span>
+        <span class="toggle-label">🔁 Repeat on other days…</span>
       </div>
-      <div class="edit-stopwatch-stats" id="editStopwatchStats"></div>
-      <div class="edit-stopwatch-btns">
-        <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchStart" onclick="editStopwatchStart()">Start</button>
-        <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchPause" onclick="editStopwatchPause()">Pause</button>
-        <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchReset" onclick="editStopwatchReset()">Reset</button>
+      <div id="editRepeatDays" style="display:none">
+        <div class="day-pick-presets">
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','weekdays')">Weekdays</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','weekend')">Weekend</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','all')">All</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','none')">None</button>
+        </div>
+        <div class="day-picker" id="editDayPicker"></div>
       </div>
-    </div>
 
-    <!-- Repeat to other days of this week -->
-    <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editRepeat" onclick="toggleRepeat('editRepeat')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🔁 Repeat on other days…</span>
-    </div>
-    <div id="editRepeatDays" style="display:none">
-      <div class="day-pick-presets">
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','weekdays')">Weekdays</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','weekend')">Weekend</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','all')">All</button>
-        <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','none')">None</button>
+      <!-- Series membership: only shown when this block is part of a multi-block series -->
+      <div id="seriesWrap" style="display:none">
+        <!-- What the repeat actually says, and the one thing about it you can
+             change from here. Moving the last day adds or removes real blocks:
+             the repeat is materialised, so a date nobody acts on is decoration. -->
+        <p class="series-spec" id="seriesSpec"></p>
+        <div class="series-until" id="seriesUntilRow" hidden>
+          <label for="seriesUntilInput">Last day</label>
+          <input type="date" id="seriesUntilInput" aria-label="Last day of this repeat">
+          <button type="button" class="ui-btn ui-btn--secondary" onclick="applySeriesUntil()">Update</button>
+        </div>
+        <button class="ui-btn ui-btn--secondary" style="width:100%" onclick="detachFromSeries()">✂️ Detach from series</button>
+        <p style="font-size:calc(0.75rem * var(--text-scale, 1));color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
       </div>
-      <div class="day-picker" id="editDayPicker"></div>
-    </div>
 
-    <!-- Series membership: only shown when this block is part of a multi-block series -->
-    <div id="seriesWrap" style="display:none">
-      <!-- What the repeat actually says, and the one thing about it you can
-           change from here. Moving the last day adds or removes real blocks:
-           the repeat is materialised, so a date nobody acts on is decoration. -->
-      <p class="series-spec" id="seriesSpec"></p>
-      <div class="series-until" id="seriesUntilRow" hidden>
-        <label for="seriesUntilInput">Last day</label>
-        <input type="date" id="seriesUntilInput" aria-label="Last day of this repeat">
-        <button type="button" class="ui-btn ui-btn--secondary" onclick="applySeriesUntil()">Update</button>
+      <!-- Sister Sync: public visibility — parent-only -->
+      <div id="sisterSyncWrap" style="display:none">
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="publicToggle" onclick="togglePublic()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">👯 Show details to your sister (Sister Sync)</span>
+        </div>
       </div>
-      <button class="ui-btn ui-btn--secondary" style="width:100%" onclick="detachFromSeries()">✂️ Detach from series</button>
-      <p style="font-size:calc(0.75rem * var(--text-scale, 1));color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
-    </div>
 
-    <!-- Sister Sync: public visibility — parent-only -->
-    <div id="sisterSyncWrap" style="display:none">
-      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="publicToggle" onclick="togglePublic()">
-        <div class="toggle-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label">👯 Show details to your sister (Sister Sync)</span>
+      <!-- Outside #sisterSyncWrap on purpose, like #watchSisterBtn below: that
+           block is parent-only, and inviting your sister along is a child's own
+           decision — Sister Sync was her only other way. Hidden on a watching
+           block: passing somebody else's meet on as a plain invite would clone
+           her competition block onto the competitor's own calendar. -->
+      <button class="ui-btn ui-btn--secondary" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite my sister</button>
+
+      <!-- Outside #sisterSyncWrap on purpose: that block is parent-only, and
+           asking your sister to come and watch you compete is a child's own
+           decision. Shown only on a competition block, and blockIsCompetition
+           already answers false for a watch block, so a watch block cannot be
+           re-shared as a meet. -->
+      <button class="ui-btn ui-btn--secondary" id="watchSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterToWatch()">👀 Invite my sister to watch</button>
+
+      <div id="parentPinWrap" style="display:none">
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="pinToggle" onclick="togglePin()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">📌 Parent-pinned (locked)</span>
+        </div>
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="confirmToggle" onclick="toggleConfirm()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">✅ Confirm progress (counts toward level-up)</span>
+        </div>
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="notDoneToggle" onclick="toggleNotDone()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">🚫 Didn't happen (recorded, not done)</span>
+        </div>
       </div>
-    </div>
 
-    <!-- Outside #sisterSyncWrap on purpose, like #watchSisterBtn below: that
-         block is parent-only, and inviting your sister along is a child's own
-         decision — Sister Sync was her only other way. Hidden on a watching
-         block: passing somebody else's meet on as a plain invite would clone
-         her competition block onto the competitor's own calendar. -->
-    <button class="ui-btn ui-btn--secondary" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite my sister</button>
-
-    <!-- Outside #sisterSyncWrap on purpose: that block is parent-only, and
-         asking your sister to come and watch you compete is a child's own
-         decision. Shown only on a competition block, and blockIsCompetition
-         already answers false for a watch block, so a watch block cannot be
-         re-shared as a meet. -->
-    <button class="ui-btn ui-btn--secondary" id="watchSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterToWatch()">👀 Invite my sister to watch</button>
-
-    <div id="parentPinWrap" style="display:none">
-      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="pinToggle" onclick="togglePin()">
-        <div class="toggle-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label">📌 Parent-pinned (locked)</span>
+      <div class="sheet-actions-sticky">
+        <button class="ui-btn ui-btn--danger ui-btn--block act-guard" onclick="removeBlock()">🗑 Remove this block</button>
+        <button class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.4rem" onclick="saveEditChanges()">Save Changes ✅</button>
       </div>
-      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="confirmToggle" onclick="toggleConfirm()">
-        <div class="toggle-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label">✅ Confirm progress (counts toward level-up)</span>
-      </div>
-      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="notDoneToggle" onclick="toggleNotDone()">
-        <div class="toggle-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label">🚫 Didn't happen (recorded, not done)</span>
-      </div>
-    </div>
-
-    <div class="sheet-actions-sticky">
-      <button class="ui-btn ui-btn--danger ui-btn--block act-guard" onclick="removeBlock()">🗑 Remove this block</button>
-      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.4rem" onclick="saveEditChanges()">Save Changes ✅</button>
     </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('editOverlay')">✕</button>
   </div>
@@ -1086,12 +1106,14 @@
 <!-- Kid quick view: routine checklist + auto stopwatch -->
 <div class="overlay kid-block-overlay" id="kidRoutineOverlay" onclick="overlayClick(event,'kidRoutineOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="kidRoutineTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="kidRoutineTitle"></h3>
-    <div class="checklist-wrap" id="kidRoutineChecklist"></div>
-    <div class="kid-run-stopwatch" id="kidRoutineStopwatch" style="display:none"></div>
-    <button type="button" class="ui-btn ui-btn--secondary" style="width:100%;margin-top:0.5rem" onclick="kidRoutineOpenEdit()">✏️ Edit (times, notes, stopwatch…)</button>
-    <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.45rem" onclick="closeSheet('kidRoutineOverlay')">Done ✨</button>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="kidRoutineTitle"></h3>
+      <div class="checklist-wrap" id="kidRoutineChecklist"></div>
+      <div class="kid-run-stopwatch" id="kidRoutineStopwatch" style="display:none"></div>
+      <button type="button" class="ui-btn ui-btn--secondary" style="width:100%;margin-top:0.5rem" onclick="kidRoutineOpenEdit()">✏️ Edit (times, notes, stopwatch…)</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.45rem" onclick="closeSheet('kidRoutineOverlay')">Done ✨</button>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('kidRoutineOverlay')">✕</button>
   </div>
 </div>
@@ -1099,17 +1121,19 @@
 <!-- Kid quick view: training objectives + gear -->
 <div class="overlay kid-block-overlay" id="kidTrainingOverlay" onclick="overlayClick(event,'kidTrainingOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="kidTrainingTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="kidTrainingTitle"></h3>
-    <p style="font-size:calc(0.92rem * var(--text-scale, 1));color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
-    <div id="kidTrainingObjectives"></div>
-    <div class="kid-run-stopwatch" id="kidTrainingStopwatch" style="display:none"></div>
-    <h4 style="margin-top:0.75rem">HOW IT WENT</h4>
-    <div class="checklist-wrap" id="kidTrainingChecks"></div>
-    <h4 style="margin-top:0.75rem">GEAR TO PACK</h4>
-    <div class="checklist-wrap" id="kidTrainingGear"></div>
-    <button type="button" class="ui-btn ui-btn--secondary" style="width:100%;margin-top:0.5rem" onclick="kidTrainingOpenEdit()">✏️ Edit (objectives, times, travel…)</button>
-    <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.45rem" onclick="closeSheet('kidTrainingOverlay')">Done ✨</button>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="kidTrainingTitle"></h3>
+      <p style="font-size:calc(0.92rem * var(--text-scale, 1));color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
+      <div id="kidTrainingObjectives"></div>
+      <div class="kid-run-stopwatch" id="kidTrainingStopwatch" style="display:none"></div>
+      <h4 style="margin-top:0.75rem">HOW IT WENT</h4>
+      <div class="checklist-wrap" id="kidTrainingChecks"></div>
+      <h4 style="margin-top:0.75rem">GEAR TO PACK</h4>
+      <div class="checklist-wrap" id="kidTrainingGear"></div>
+      <button type="button" class="ui-btn ui-btn--secondary" style="width:100%;margin-top:0.5rem" onclick="kidTrainingOpenEdit()">✏️ Edit (objectives, times, travel…)</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.45rem" onclick="closeSheet('kidTrainingOverlay')">Done ✨</button>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('kidTrainingOverlay')">✕</button>
   </div>
 </div>
@@ -1126,36 +1150,38 @@
      old names (templateOverlay, templateSheetTitle). -->
 <div class="overlay" id="templateOverlay" onclick="overlayClick(event,'templateOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="templateSheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="templateSheetTitle">📋 Copy a day</h3>
-    <!-- What is on this day now, drawn by renderCopyDayNow, so both days are in
-         view before a copy is chosen. -->
-    <div id="copyDayNow" class="copy-day-now"></div>
-    <!-- Copy a day you have already planned onto this one. A week rarely has
-         seven different shapes: two Tuesdays that look alike were two Tuesdays
-         built by hand. Rows are built by renderCopyDayList; each opens to list
-         its blocks, and the copy button is inside. The two toggles above them
-         choose which week to take from and — a parent only — whose day it
-         lands on. -->
-    <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Pick a day to copy onto this one. Tap it to see what's on it.</p>
-    <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
-    <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
-    <div id="copyDayList" class="copy-day-list"></div>
-    <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
-    <button class="ui-btn ui-btn--secondary" style="width:100%;font-size:calc(1rem * var(--text-scale, 1))" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
-    <!-- Looking back on a past day (R5 §7 Q3). The 🌙 left the Day view's top
-         bar; today's mood is asked on Today. A past day keeps its door here, on
-         its own menu — renderReflectDayButton shows it for past days only and
-         passes the day to openReflectSheet. -->
-    <div id="reflectDayWrap" hidden>
-      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Looking back on this day?</p>
-      <button type="button" class="ui-btn ui-btn--secondary reflect-day-btn" id="reflectDayBtn"></button>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="templateSheetTitle">📋 Copy a day</h3>
+      <!-- What is on this day now, drawn by renderCopyDayNow, so both days are in
+           view before a copy is chosen. -->
+      <div id="copyDayNow" class="copy-day-now"></div>
+      <!-- Copy a day you have already planned onto this one. A week rarely has
+           seven different shapes: two Tuesdays that look alike were two Tuesdays
+           built by hand. Rows are built by renderCopyDayList; each opens to list
+           its blocks, and the copy button is inside. The two toggles above them
+           choose which week to take from and — a parent only — whose day it
+           lands on. -->
+      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Pick a day to copy onto this one. Tap it to see what's on it.</p>
+      <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
+      <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
+      <div id="copyDayList" class="copy-day-list"></div>
+      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
+      <button class="ui-btn ui-btn--secondary" style="width:100%;font-size:calc(1rem * var(--text-scale, 1))" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
+      <!-- Looking back on a past day (R5 §7 Q3). The 🌙 left the Day view's top
+           bar; today's mood is asked on Today. A past day keeps its door here, on
+           its own menu — renderReflectDayButton shows it for past days only and
+           passes the day to openReflectSheet. -->
+      <div id="reflectDayWrap" hidden>
+        <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Looking back on this day?</p>
+        <button type="button" class="ui-btn ui-btn--secondary reflect-day-btn" id="reflectDayBtn"></button>
+      </div>
+      <!-- Start this day over (R5 §7 Q4). It was 🗑 on the Day view's top bar,
+           beside 📋 and 🌙, and it deleted done and parent-pinned blocks too.
+           Down here, last, it keeps them; clearDay's confirm lists what goes. -->
+      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
+      <button type="button" class="ui-btn ui-btn--secondary day-over-btn" onclick="clearDay()">🗑 Start this day over</button>
     </div>
-    <!-- Start this day over (R5 §7 Q4). It was 🗑 on the Day view's top bar,
-         beside 📋 and 🌙, and it deleted done and parent-pinned blocks too.
-         Down here, last, it keeps them; clearDay's confirm lists what goes. -->
-    <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
-    <button type="button" class="ui-btn ui-btn--secondary day-over-btn" onclick="clearDay()">🗑 Start this day over</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('templateOverlay')">✕</button>
   </div>
 </div>
@@ -1163,10 +1189,12 @@
 <!-- Weekly Wins recap (#6) -->
 <div class="overlay" id="weeklyWinsOverlay" onclick="overlayClick(event,'weeklyWinsOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="weeklyWinsTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="weeklyWinsTitle">🎉 This week's wins</h3>
-    <div id="weeklyWinsBody"></div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="closeSheet('weeklyWinsOverlay')">Awesome! 🙌</button>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="weeklyWinsTitle">🎉 This week's wins</h3>
+      <div id="weeklyWinsBody"></div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="closeSheet('weeklyWinsOverlay')">Awesome! 🙌</button>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('weeklyWinsOverlay')">✕</button>
   </div>
 </div>
@@ -1178,43 +1206,45 @@
 <!-- Custom Activity -->
 <div class="overlay" id="customOverlay" onclick="overlayClick(event,'customOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customSheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="customSheetTitle">✨ Create Activity</h3>
-    <div class="custom-builder">
-      <label>Activity Name</label>
-      <input type="text" id="customName" placeholder="e.g. Guitar, Swimming…" maxlength="30" aria-label="Activity name">
-      <div class="row">
-        <div>
-          <label>Icon (emoji)</label>
-          <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)" oninput="syncEmojiGrid('customEmojiGrid', this.value)">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="customSheetTitle">✨ Create Activity</h3>
+      <div class="custom-builder">
+        <label>Activity Name</label>
+        <input type="text" id="customName" placeholder="e.g. Guitar, Swimming…" maxlength="30" aria-label="Activity name">
+        <div class="row">
+          <div>
+            <label>Icon (emoji)</label>
+            <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)" oninput="syncEmojiGrid('customEmojiGrid', this.value)">
+          </div>
+          <div>
+            <label>Default Duration</label>
+            <select id="customDur" aria-label="How long">
+              <option value="15">15 min</option>
+              <option value="20">20 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60" selected>1 hour</option>
+              <option value="90">1.5 hours</option>
+              <option value="120">2 hours</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label>Default Duration</label>
-          <select id="customDur" aria-label="How long">
-            <option value="15">15 min</option>
-            <option value="20">20 min</option>
-            <option value="30">30 min</option>
-            <option value="45">45 min</option>
-            <option value="60" selected>1 hour</option>
-            <option value="90">1.5 hours</option>
-            <option value="120">2 hours</option>
-          </select>
+        <label>Or tap an icon</label>
+        <div class="emoji-grid" id="customEmojiGrid"></div>
+        <!-- Built from ACTIVITY_CATEGORIES by renderCategorySelects (js/09-sheets.js).
+             It was a hardcoded list of eight, copied byte for byte into the parent
+             editor below, so the two could drift and a category added to the app
+             reached neither. -->
+        <label for="customCat">Category</label>
+        <select id="customCat" aria-label="Category"></select>
+        <div id="customSubWrap">
+          <label for="customSub">Kind</label>
+          <select id="customSub" aria-label="Kind"></select>
         </div>
       </div>
-      <label>Or tap an icon</label>
-      <div class="emoji-grid" id="customEmojiGrid"></div>
-      <!-- Built from ACTIVITY_CATEGORIES by renderCategorySelects (js/09-sheets.js).
-           It was a hardcoded list of eight, copied byte for byte into the parent
-           editor below, so the two could drift and a category added to the app
-           reached neither. -->
-      <label for="customCat">Category</label>
-      <select id="customCat" aria-label="Category"></select>
-      <div id="customSubWrap">
-        <label for="customSub">Kind</label>
-        <select id="customSub" aria-label="Kind"></select>
-      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomActivity()">Add Activity ✅</button>
     </div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomActivity()">Add Activity ✅</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customOverlay')">✕</button>
   </div>
 </div>
@@ -1224,20 +1254,22 @@
      grown-up adds it. -->
 <div class="overlay" id="customSportOverlay" onclick="overlayClick(event,'customSportOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customSportTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="customSportTitle">🤸 Add a sport</h3>
-    <div class="custom-builder">
-      <label for="sportName">Sport name</label>
-      <input type="text" id="sportName" placeholder="e.g. Gymnastics" maxlength="24" aria-label="Sport name">
-      <label for="sportIcon">Icon (emoji)</label>
-      <input type="text" id="sportIcon" placeholder="🤸" maxlength="2" aria-label="Sport icon (emoji)" oninput="syncEmojiGrid('sportEmojiGrid', this.value)">
-      <label>Or tap an icon</label>
-      <div class="emoji-grid" id="sportEmojiGrid"></div>
-      <label>Colour</label>
-      <div class="colour-picker" id="sportColourPicker"></div>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="customSportTitle">🤸 Add a sport</h3>
+      <div class="custom-builder">
+        <label for="sportName">Sport name</label>
+        <input type="text" id="sportName" placeholder="e.g. Gymnastics" maxlength="24" aria-label="Sport name">
+        <label for="sportIcon">Icon (emoji)</label>
+        <input type="text" id="sportIcon" placeholder="🤸" maxlength="2" aria-label="Sport icon (emoji)" oninput="syncEmojiGrid('sportEmojiGrid', this.value)">
+        <label>Or tap an icon</label>
+        <div class="emoji-grid" id="sportEmojiGrid"></div>
+        <label>Colour</label>
+        <div class="colour-picker" id="sportColourPicker"></div>
+      </div>
+      <div class="sport-existing" id="sportExistingList"></div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomSport()">Add sport ✅</button>
     </div>
-    <div class="sport-existing" id="sportExistingList"></div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomSport()">Add sport ✅</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customSportOverlay')">✕</button>
   </div>
 </div>
@@ -1245,61 +1277,63 @@
 <!-- Parent Activity Editor (create + edit) -->
 <div class="overlay" id="parentActivityOverlay" onclick="overlayClick(event,'parentActivityOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="parentActivityHeading">
-    <div class="sheet-handle"></div>
-    <h3 id="parentActivityHeading">✨ Add Activity</h3>
-    <div class="custom-builder">
-      <label>Activity Name</label>
-      <input type="text" id="paName" placeholder="e.g. Tennis, Drama…" maxlength="30" aria-label="Activity name">
-      <div class="row">
-        <div>
-          <label>Icon (emoji)</label>
-          <input type="text" id="paIcon" aria-label="Icon" placeholder="🎾" maxlength="2" oninput="syncEmojiGrid('paEmojiGrid', this.value)">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="parentActivityHeading">✨ Add Activity</h3>
+      <div class="custom-builder">
+        <label>Activity Name</label>
+        <input type="text" id="paName" placeholder="e.g. Tennis, Drama…" maxlength="30" aria-label="Activity name">
+        <div class="row">
+          <div>
+            <label>Icon (emoji)</label>
+            <input type="text" id="paIcon" aria-label="Icon" placeholder="🎾" maxlength="2" oninput="syncEmojiGrid('paEmojiGrid', this.value)">
+          </div>
+          <div>
+            <label>Default Duration</label>
+            <select id="paDur" aria-label="How long">
+              <option value="15">15 min</option>
+              <option value="20">20 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60" selected>1 hour</option>
+              <option value="90">1.5 hours</option>
+              <option value="120">2 hours</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label>Default Duration</label>
-          <select id="paDur" aria-label="How long">
-            <option value="15">15 min</option>
-            <option value="20">20 min</option>
-            <option value="30">30 min</option>
-            <option value="45">45 min</option>
-            <option value="60" selected>1 hour</option>
-            <option value="90">1.5 hours</option>
-            <option value="120">2 hours</option>
-          </select>
+        <label>Or tap an icon</label>
+        <div class="emoji-grid" id="paEmojiGrid"></div>
+        <label for="paCat">Category</label>
+        <select id="paCat" aria-label="Category"></select>
+        <div id="paSubWrap">
+          <label for="paSub">Kind</label>
+          <select id="paSub" aria-label="Kind"></select>
         </div>
+        <!-- When it can be planned, and whether you go somewhere to do it. Both
+             were fields only the shipped catalog could set, so a family's own
+             activity never turned up in the picker's suggestions and never
+             arrived with its travel time. -->
+        <!-- A labelled group rather than a bare row of boxes: four checkboxes with
+             a heading above them and nothing tying the two together reads to a
+             screen reader as four unrelated questions. -->
+        <label id="paWhenLabel">When does it fit?</label>
+        <div class="pa-when-row" role="group" aria-labelledby="paWhenLabel">
+          <label class="pa-when"><input type="checkbox" id="paWhenBefore"> 🌅 Before school</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenMidday"> 🥗 Middle of the day</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenAfter" checked> 🎒 After school</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenEvening"> 🌙 Evening</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenWeekend" checked> 🎉 Weekend</label>
+        </div>
+        <label class="pa-when pa-when--solo"><input type="checkbox" id="paTravels"> 🚗 You go somewhere to do it</label>
+        <label>Visibility</label>
+        <select id="paVisibility" aria-label="Who can see it">
+          <option value="shared">🔗 Shared (both girls)</option>
+          <option value="jenn">🐥 Jenn only</option>
+          <option value="jess">🦊 Jess only</option>
+        </select>
       </div>
-      <label>Or tap an icon</label>
-      <div class="emoji-grid" id="paEmojiGrid"></div>
-      <label for="paCat">Category</label>
-      <select id="paCat" aria-label="Category"></select>
-      <div id="paSubWrap">
-        <label for="paSub">Kind</label>
-        <select id="paSub" aria-label="Kind"></select>
-      </div>
-      <!-- When it can be planned, and whether you go somewhere to do it. Both
-           were fields only the shipped catalog could set, so a family's own
-           activity never turned up in the picker's suggestions and never
-           arrived with its travel time. -->
-      <!-- A labelled group rather than a bare row of boxes: four checkboxes with
-           a heading above them and nothing tying the two together reads to a
-           screen reader as four unrelated questions. -->
-      <label id="paWhenLabel">When does it fit?</label>
-      <div class="pa-when-row" role="group" aria-labelledby="paWhenLabel">
-        <label class="pa-when"><input type="checkbox" id="paWhenBefore"> 🌅 Before school</label>
-        <label class="pa-when"><input type="checkbox" id="paWhenMidday"> 🥗 Middle of the day</label>
-        <label class="pa-when"><input type="checkbox" id="paWhenAfter" checked> 🎒 After school</label>
-        <label class="pa-when"><input type="checkbox" id="paWhenEvening"> 🌙 Evening</label>
-        <label class="pa-when"><input type="checkbox" id="paWhenWeekend" checked> 🎉 Weekend</label>
-      </div>
-      <label class="pa-when pa-when--solo"><input type="checkbox" id="paTravels"> 🚗 You go somewhere to do it</label>
-      <label>Visibility</label>
-      <select id="paVisibility" aria-label="Who can see it">
-        <option value="shared">🔗 Shared (both girls)</option>
-        <option value="jenn">🐥 Jenn only</option>
-        <option value="jess">🦊 Jess only</option>
-      </select>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="paConfirmBtn" onclick="confirmParentActivity()">Save ✅</button>
     </div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="paConfirmBtn" onclick="confirmParentActivity()">Save ✅</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('parentActivityOverlay')">✕</button>
   </div>
 </div>
@@ -1307,31 +1341,33 @@
 <!-- Custom Training Task -->
 <div class="overlay" id="customTaskOverlay" onclick="overlayClick(event,'customTaskOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customTaskSheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="customTaskSheetTitle">➕ Custom Training Task</h3>
-    <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
-    <div class="custom-builder">
-      <label>Task name (e.g. Backstroke drill)</label>
-      <input type="text" id="taskName" placeholder="e.g. 50m Freestyle" aria-label="Training task name">
-      <div class="row">
-        <div id="taskSportRow">
-          <label>Sport</label>
-          <select id="taskSport" aria-label="Sport">
-            <option value="skating">⛸ Skating</option>
-            <option value="swimming">🏊 Swimming</option>
-            <option value="dryland">💪 Dryland</option>
-            <option value="general">🏃 General</option>
-          </select>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="customTaskSheetTitle">➕ Custom Training Task</h3>
+      <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
+      <div class="custom-builder">
+        <label>Task name (e.g. Backstroke drill)</label>
+        <input type="text" id="taskName" placeholder="e.g. 50m Freestyle" aria-label="Training task name">
+        <div class="row">
+          <div id="taskSportRow">
+            <label>Sport</label>
+            <select id="taskSport" aria-label="Sport">
+              <option value="skating">⛸ Skating</option>
+              <option value="swimming">🏊 Swimming</option>
+              <option value="dryland">💪 Dryland</option>
+              <option value="general">🏃 General</option>
+            </select>
+          </div>
+          <div>
+            <label>Reps / Count</label>
+            <input type="text" id="taskReps" placeholder="e.g. x4 or 6 mins" aria-label="Reps or duration">
+          </div>
         </div>
-        <div>
-          <label>Reps / Count</label>
-          <input type="text" id="taskReps" placeholder="e.g. x4 or 6 mins" aria-label="Reps or duration">
-        </div>
+        <label>Notes (optional)</label>
+        <textarea class="note-input" id="taskNotes" aria-label="Notes for this task" rows="2" placeholder="Focus on form, breathing, etc."></textarea>
       </div>
-      <label>Notes (optional)</label>
-      <textarea class="note-input" id="taskNotes" aria-label="Notes for this task" rows="2" placeholder="Focus on form, breathing, etc."></textarea>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomTask()">Save Task ✅</button>
     </div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomTask()">Save Task ✅</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customTaskOverlay')">✕</button>
   </div>
 </div>
@@ -1341,13 +1377,15 @@
      yesterday?") and the Save button is bound to it when the sheet opens. -->
 <div class="overlay" id="reflectOverlay" onclick="overlayClick(event,'reflectOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="reflectSheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="reflectSheetTitle">🌙 How was today?</h3>
-    <h4>Overall vibe</h4>
-    <div class="vibe-moods" id="reflectOverallMoods" style="margin-bottom:1rem"></div>
-    <h4>How did each block feel? <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1))">(optional)</span></h4>
-    <div id="reflectBlockList"></div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="reflectSaveBtn">Save ✨</button>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="reflectSheetTitle">🌙 How was today?</h3>
+      <h4>Overall vibe</h4>
+      <div class="vibe-moods" id="reflectOverallMoods" style="margin-bottom:1rem"></div>
+      <h4>How did each block feel? <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1))">(optional)</span></h4>
+      <div id="reflectBlockList"></div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="reflectSaveBtn">Save ✨</button>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('reflectOverlay')">✕</button>
   </div>
 </div>
@@ -1357,10 +1395,12 @@
      Read-only: Close (or the sheet's ✕) is the one thing to do. -->
 <div class="overlay" id="tdLevelOverlay" onclick="overlayClick(event,'tdLevelOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="tdLevelTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="tdLevelTitle">⭐ My level</h3>
-    <div id="tdLevelBody"></div>
-    <button type="button" class="td-level-close" onclick="closeSheet('tdLevelOverlay')">Close</button>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="tdLevelTitle">⭐ My level</h3>
+      <div id="tdLevelBody"></div>
+      <button type="button" class="td-level-close" onclick="closeSheet('tdLevelOverlay')">Close</button>
+    </div>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('tdLevelOverlay')">✕</button>
   </div>
 </div>
@@ -1368,29 +1408,31 @@
 <!-- New Challenge -->
 <div class="overlay" id="newChallengeOverlay" onclick="overlayClick(event,'newChallengeOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="newChallengeTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="newChallengeTitle">🎯 New Weekly Challenge</h3>
-    <div class="custom-builder">
-      <label>Challenge title</label>
-      <input type="text" id="chTitle" placeholder="e.g. Practice piano 5x this week" aria-label="Challenge title">
-      <label>Activity</label>
-      <select id="chActivity" aria-label="Activity"></select>
-      <div class="row">
-        <div>
-          <label>Target count</label>
-          <input type="number" id="chTarget" min="1" value="5" aria-label="Challenge target count">
-        </div>
-        <div>
-          <label>For</label>
-          <select id="chWho" aria-label="Who it is for">
-            <option value="both">Both sisters</option>
-            <option value="jenn">Jenn only</option>
-            <option value="jess">Jess only</option>
-          </select>
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="newChallengeTitle">🎯 New Weekly Challenge</h3>
+      <div class="custom-builder">
+        <label>Challenge title</label>
+        <input type="text" id="chTitle" placeholder="e.g. Practice piano 5x this week" aria-label="Challenge title">
+        <label>Activity</label>
+        <select id="chActivity" aria-label="Activity"></select>
+        <div class="row">
+          <div>
+            <label>Target count</label>
+            <input type="number" id="chTarget" min="1" value="5" aria-label="Challenge target count">
+          </div>
+          <div>
+            <label>For</label>
+            <select id="chWho" aria-label="Who it is for">
+              <option value="both">Both sisters</option>
+              <option value="jenn">Jenn only</option>
+              <option value="jess">Jess only</option>
+            </select>
+          </div>
         </div>
       </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmNewChallenge()">Create ✨</button>
     </div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmNewChallenge()">Create ✨</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newChallengeOverlay')">✕</button>
   </div>
 </div>
@@ -1398,24 +1440,26 @@
 <!-- New Level Rule -->
 <div class="overlay" id="newRuleOverlay" onclick="overlayClick(event,'newRuleOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="newRuleTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="newRuleTitle">⚙️ New Level-Up Rule</h3>
-    <div class="custom-builder">
-      <label>Activity</label>
-      <select id="ruleActivity" aria-label="Activity"></select>
-      <label>Rule type</label>
-      <select id="ruleType" aria-label="Kind of rule">
-        <option value="count">Count (do X times)</option>
-        <option value="hours">Time (accumulate X hours)</option>
-      </select>
-      <label>Target amount</label>
-      <input type="number" id="ruleTarget" min="1" value="10" aria-label="Level-up target count">
-      <label for="ruleName">Level-up name (e.g. "Piano Master")</label>
-      <input type="text" id="ruleName" placeholder="e.g. Math Wizard" aria-label="Level-up title">
-      <label for="ruleNewIcon">New icon (optional)</label>
-      <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2" aria-label="Level-up icon (emoji)">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="newRuleTitle">⚙️ New Level-Up Rule</h3>
+      <div class="custom-builder">
+        <label>Activity</label>
+        <select id="ruleActivity" aria-label="Activity"></select>
+        <label>Rule type</label>
+        <select id="ruleType" aria-label="Kind of rule">
+          <option value="count">Count (do X times)</option>
+          <option value="hours">Time (accumulate X hours)</option>
+        </select>
+        <label>Target amount</label>
+        <input type="number" id="ruleTarget" min="1" value="10" aria-label="Level-up target count">
+        <label for="ruleName">Level-up name (e.g. "Piano Master")</label>
+        <input type="text" id="ruleName" placeholder="e.g. Math Wizard" aria-label="Level-up title">
+        <label for="ruleNewIcon">New icon (optional)</label>
+        <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2" aria-label="Level-up icon (emoji)">
+      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmNewRule()">Save Rule ✨</button>
     </div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmNewRule()">Save Rule ✨</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newRuleOverlay')">✕</button>
   </div>
 </div>
@@ -1423,25 +1467,27 @@
 <!-- New Custom Routine -->
 <div class="overlay" id="newRoutineOverlay" onclick="overlayClick(event,'newRoutineOverlay')">
   <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="rbHeading">
-    <div class="sheet-handle"></div>
-    <h3 id="rbHeading">🌅 New Custom Routine</h3>
-    <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Add a checklist routine both girls can use.</p>
-    <div class="custom-builder">
-      <div class="row">
-        <div style="flex:3">
-          <label for="rbTitle">Routine name</label>
-          <input type="text" id="rbTitle" placeholder="e.g. Saturday Clean-up" aria-label="Routine name">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="rbHeading">🌅 New Custom Routine</h3>
+      <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Add a checklist routine both girls can use.</p>
+      <div class="custom-builder">
+        <div class="row">
+          <div style="flex:3">
+            <label for="rbTitle">Routine name</label>
+            <input type="text" id="rbTitle" placeholder="e.g. Saturday Clean-up" aria-label="Routine name">
+          </div>
+          <div style="flex:1">
+            <label for="rbIcon">Icon</label>
+            <input type="text" id="rbIcon" placeholder="📋" maxlength="2" aria-label="Routine icon (emoji)">
+          </div>
         </div>
-        <div style="flex:1">
-          <label for="rbIcon">Icon</label>
-          <input type="text" id="rbIcon" placeholder="📋" maxlength="2" aria-label="Routine icon (emoji)">
-        </div>
+        <label>Checklist items (timer in minutes, optional)</label>
+        <div id="rbItems"></div>
+        <button class="ui-btn ui-btn--secondary" style="margin-top:0.4rem" onclick="addRoutineItem()">＋ Add item</button>
       </div>
-      <label>Checklist items (timer in minutes, optional)</label>
-      <div id="rbItems"></div>
-      <button class="ui-btn ui-btn--secondary" style="margin-top:0.4rem" onclick="addRoutineItem()">＋ Add item</button>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="rbConfirmBtn" style="margin-top:0.8rem" onclick="confirmRoutine()">Save Routine ✨</button>
     </div>
-    <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="rbConfirmBtn" style="margin-top:0.8rem" onclick="confirmRoutine()">Save Routine ✨</button>
     <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newRoutineOverlay')">✕</button>
   </div>
 </div>

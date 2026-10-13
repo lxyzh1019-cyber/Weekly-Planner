@@ -1651,7 +1651,11 @@ say which one they are. (checked by smoke: jobsCardIsNeverBlank)
   the iPad and comes from the bottom on a phone (≤699px), one paper, border
   and corner for all, at `--z-sheet`. Each has exactly one ✕, `.ui-sheet-x`
   on a kit icon button (44×44, top right; `sheetCloseXHtml` writes it for a
-  body built in code), beside its own Cancel / Done. The edit, activity and
+  body built in code), beside its own Cancel / Done. The sheet's box does
+  not scroll: its content sits in `.ui-sheet-body`, the one scroller, and the
+  ✕ is pinned (absolute) to the box's top-right corner, so it stays there
+  scrolled or not (P4/P6); a new sheet keeps that shape — box, body, ✕ last.
+  The edit, activity and
   training forms are `.ui-sheet--docked`: the right-side panel on the iPad
   (P2, the one exception), from the bottom on a phone. The money sheets
   (Record, request, Sunday's Parent's card, She told me, Grown-ups' fix
