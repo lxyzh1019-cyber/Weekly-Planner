@@ -219,6 +219,24 @@ pixel is caught. The footer build line (`.app-build`, on the parent App panel
 and the More sheet) is written as `Build 0000-00-00` before every shot, so a
 new `APP_BUILD` needs no new pictures.
 
+**Emoji are hidden (Stage 45, test only).** Before every shot each run of
+colour emoji text is wrapped in a `<px-emoji>` element (`display: contents`)
+whose text is transparent; a placeholder or input value that is only emoji is
+made transparent too. Nothing in `css/` or `js/` changes. The glyph keeps its
+width and place: every element's box is read before and after, and a picture
+whose layout moved by more than 0.05 px fails ("hiding the emoji moved the
+layout"; Chromium's 1/64 px rounding at the wrapper's edges is below that).
+The self-check then plants two real changes on `today-jenn-ipad-pop`, which has
+emoji hidden — a button with no emoji made 1px wider, and its text colour moved
+— and each must differ from the clean shot inside that button's box. **The
+limit:** a button or chip whose label is only an emoji (🗑, 🔁, 📌, ⛸️) becomes
+a blank box, so a change of that icon alone is invisible to the picture test;
+a `<select>`'s option text is not hidden. For every differing picture the run
+also writes `pictures-diff/<name>.emoji.json` (the hidden emoji's boxes), and
+`node tools/emoji-diff-check.js <artifact folder>` says per picture group
+whether every differing pixel lies inside those boxes — run it before a
+refresh that should only touch emoji.
+
 **Retries.** A picture that differs is shot again, alone, in a brand-new
 browser context (a new renderer process), up to 2 times. It passes only when a
 re-shot matches the reference exactly as the first shot must (2 levels per
