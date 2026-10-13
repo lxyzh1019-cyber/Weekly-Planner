@@ -2130,16 +2130,19 @@ function tdOpenMore() {
     });
     document.body.appendChild(ov);
   }
-  ov.innerHTML = `<div class="sheet td-more-sheet" role="dialog" aria-modal="true" aria-label="More places to go">
-      <div class="sheet-handle"></div>
-      <div class="td-cap">More</div>
-      <div class="td-more-grid">
-        ${items.map(i => `<button type="button" class="td-more-tile" data-td-more="${i.go}">
-            <span class="td-more-icon" aria-hidden="true">${i.icon}</span>
-            <span class="td-more-label">${escapeHtml(i.label)}</span>
-          </button>`).join('')}
+  ov.innerHTML = `<div class="ui-sheet" role="dialog" aria-modal="true" aria-label="More places to go">
+      <div class="ui-sheet-body">
+        <div class="sheet-handle"></div>
+        <div class="td-cap">More</div>
+        <div class="td-more-grid">
+          ${items.map(i => `<button type="button" class="td-more-tile" data-td-more="${i.go}">
+              <span class="td-more-icon" aria-hidden="true">${i.icon}</span>
+              <span class="td-more-label">${escapeHtml(i.label)}</span>
+            </button>`).join('')}
+        </div>
+        <p class="app-build">Build ${escapeHtml(APP_BUILD)}</p>
       </div>
-      <p class="app-build">Build ${escapeHtml(APP_BUILD)}</p>
+      ${sheetCloseXHtml(`onclick="closeSheet('tdMoreOverlay')"`)}
     </div>`;
   ov.classList.add('open');
 }

@@ -89,7 +89,7 @@
 - **D60** Dark-mode removal and its guard go into Kit 1.1.
 - **D61** D9–D14, the header exact values and the kit-gaps note are copied into the repository's handoff folder, notes only, in Kit 1.1.
 - **D62** Today's ribbon stays as it is; the seven-day row part goes on Now, She told me and Meeting.
-- **D63** Hiding colour emoji in the picture test waits for Part 13; until then a rerun caused only by emoji edges is not a failure.
+- **D63** Hiding colour emoji in the picture test waits for Part 13; until then a rerun caused only by emoji edges is not a failure. (Note 2026-10-13, Stage 45 deviation in WORKING_RECORD.md: permanent — emoji are not hidden, the retries stay, and a planted outline check proves a real change still fails through them.)
 - **D64** Nothing merged before Plan v11 was approved (done).
 - **D65** The iPad read of the live build after the Parts 7, 8, 10 merges and one Sunday per girl: done, by your answer of 11 October.
 - **D66** The app's header exact-values copy stands, with a dated note. The kit-gaps note in the app is your corrected copy (3) of 11 October (K1–K12).

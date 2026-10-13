@@ -66,6 +66,11 @@
 //    (L12), so its own sizes stay as typed and carry `/* look: <reason> */` on
 //    the same line — in css/app.css too, where that mark is read for this rule
 //    only. In js/html, (b) and EXEMPT work as in rule 2.
+//    Floor (Part 13): a css/ font-size that can come out below 13px (rem at
+//    16px, --text-scale and --fs-scale at 1) needs a floor — `max(13px, …)` in
+//    the value, or a css/floors.css rule of 13px or more for the same last
+//    class. The ones that were there at Part 13 are in FLOOR_ALLOW, each group
+//    with its reason; an entry that matches nothing fails as stale.
 //
 // 5. Money sizes (Money fit and logic PR 3; the plan called it "rule 6" — there
 //    is no other rule 5). css/app.css between the marker comments
@@ -160,6 +165,28 @@ const SIZE_EXEMPT = [
   { selector: '@keyframes sdGlow 50%', prop: 'box-shadow',
     why: 'the bonus glow animation (sdGlow) at its peak' },
 ];
+/* Rule 4, floor: the sub-13px font sizes on file at Part 13 (2026-10-12), by
+   the rule's selector, grouped by why each may stay. A new one is floored. */
+const FLOOR_ALLOW = [
+  { why: 'the parent portal\'s grids and charts (the parent month view, chore pages, trends, chore options): a grown-up\'s dense reading surface, where the kid floor does not apply (UI rules: "most are print, dark-mode or parent surfaces")',
+    selectors: ['.pm-cell-pct', '.ck-added', '.ck-warn', '.ck-pill', '.ck-item-due', '.ck-grid-dh', '.ck-grid-dh small', '.ck-risk',
+      '.cp-kid-name', '.cp-kid-badge', '.cp-daylabel', '.cp-gbtn', '.cp-plan-name', '.cp-fine', '.cp-sick', '.cp-stripe', '.cp-grid-tot',
+      '.cp-payname', '.cp-stepn', '.ctr-card-xp', '.ctr-tile-cap', '.ctr-tick, .ctr-xlab, .ctr-xlab2', '.ctr-endlab', '.ctr-legend-item',
+      '.ctr-heat-cell', '.co-name', '.co-due', '.co-lane, .co-who', '.co-goallab', '.pc-meta', '.perf-money', '.perf-facts', '.sync-debug-msg'] },
+  { why: 'the family meeting\'s captions and per-item notes, read by the grown-up running it (the meeting is not one of the four kid screens the floor sweep covers)',
+    selectors: ['.mm-cap', '.mm-legend', '.mm-item', '.mm-settle-cell', '.mny-override-note', '.mm-detail-editnote', '.mm-weekbar-last',
+      '.mm-weekbar-late', '.mm-routine-all, .mm-addchore', '.mm-detail-cap', '.mm-detail-note', '.mm-detail-empty', '.mm-item-pay',
+      '.mm-item-said', '.mm-2b-label', '.mm-2b-num'] },
+  { why: 'the old money parts\' labels on parent and meeting surfaces; the kid money pages floor theirs in css/floors.css (#screen-mymoney) and size the rest by money tokens (rule 5)',
+    selectors: ['.mny-label', '.mny-note', '.mny-chip', '.mny-ask', '.mny-buys', '.mny-tour-where'] },
+  { why: 'the Week and Day timeline\'s drawn-to-scale labels: a bigger label changes the layout the block heights budget for (wfTextPx, renderBlockPixel); the Week screen\'s own copies are floored in css/floors.css',
+    selectors: ['.tl-placement-guide::before', '.placed-block .block-train-chip', '.wf-card-conflict-badge',
+      '.wf-card-notdone-badge', '.wf-card-conflict-flag', '.block-clip-marker', '.placed-block .block-note', '.placed-block .block-objective-row',
+      '.placed-block .block-gear-head', '.placed-block .block-gear-item', '.placed-block.compact .block-name.block-name--inline .block-note-inline',
+      '.placed-block.compact .block-meta', '.wins-lbl', '.spc-dur'] },
+  { why: 'a small secondary line under a bigger main one (a badge count, a dialog choice\'s sub-line, an objective\'s meta): the main line carries the meaning at 15px+',
+    selectors: ['.badge', '.app-dialog-choice-sub', '.obj-item .obj-meta'] },
+];
 const SIZE_PROP = /^(?:border(?:-(?:top|right|bottom|left))?(?:-width)?|border-radius|border-(?:top|bottom)-(?:left|right)-radius|box-shadow)$/;
 const MONEY_START = /\/\*\s*money-tokens:start\b/g;
 const MONEY_END = /\/\*\s*money-tokens:end\b/g;
@@ -202,6 +229,7 @@ function moneySizeProblem(value) {
   return /\d/.test(v) ? 'a typed size' : '';
 }
 let unscaledKept = 0;
+const floorCandidates = [];       // rule 4 floor: every css/ font-size outside print and token blocks
 const looks = new Map();          // look name → Set of custom properties
 let cssDecls = 0, tokenBlocks = 0;
 const moneyMarks = [];           // per file: how many start / end markers, and whether they make a span
@@ -272,6 +300,10 @@ const css = cssSrc.replace(/\/\*[\s\S]*?\*\//g, blank);
       else problems.push({ where, rule: 'text scale', detail: ctx,
         fix: 'write calc(<size> * var(--text-scale, 1)); a print-sheet-only size carries /* look: <reason> */ on its line' });
     }
+    // Rule 4, floor: read after every file is in (css/floors.css comes later).
+    if (prop === 'font-size' && !inToken && !stack.some(s => /^@media\s+(?:only\s+)?print\b/i.test(s))) {
+      floorCandidates.push({ where, file: cssFile, selector: selector.replace(/\s+/g, ' '), value, ctx });
+    }
   };
   for (let i = 0; i < css.length; i++) {
     const c = css[i];
@@ -306,6 +338,39 @@ const css = cssSrc.replace(/\/\*[\s\S]*?\*\//g, blank);
   }
   MONEY_SPAN_FILES.filter(f => !moneyMarks.some(m => m.file.replace(/\\/g, '/').endsWith(f)))
     .forEach(f => problems.push({ where: f, rule: 'money markers', detail: 'the file was not read', fix: 'keep ' + f + ' in css/' }));
+}
+
+// Rule 4, floor: a font size that can come out under 13px has a floor.
+let flooredByMax = 0, flooredByFile = 0, floorAllowed = 0;
+{
+  const pxOf = (v) => {
+    const floor = v.match(/max\(\s*(\d*\.?\d+)px\s*,/);
+    if (floor) return { px: +floor[1], max: true };
+    const nums = [...v.replace(/var\([^)]*\)/g, '1').matchAll(/(\d*\.?\d+)(px|rem)\b/g)].map(m => +m[1] * (m[2] === 'rem' ? 16 : 1));
+    return nums.length ? { px: Math.min(...nums), max: false } : null;
+  };
+  const lastClass = (sel) => { const m = [...sel.split(',').pop().matchAll(/\.([\w-]+)/g)].pop(); return m ? m[1] : null; };
+  const floored = new Set();
+  floorCandidates.filter(c => c.file.replace(/\\/g, '/').endsWith('css/floors.css')).forEach(c => {
+    const p = pxOf(c.value);
+    if (p && p.px >= 13) c.selector.split(',').forEach(part => { const k = lastClass(part); if (k) floored.add(k); });
+  });
+  const allow = new Map();
+  FLOOR_ALLOW.forEach(g => g.selectors.forEach(sel => allow.set(sel, { g, hits: 0 })));
+  for (const c of floorCandidates) {
+    const p = pxOf(c.value);
+    if (!p || p.px >= 13) continue;
+    if (p.max) { flooredByMax++; continue; }
+    const parts = c.selector.split(',').map(x => lastClass(x)).filter(Boolean);
+    if (parts.length && parts.every(k => floored.has(k))) { flooredByFile++; continue; }
+    const a = allow.get(c.selector);
+    if (a) { a.hits++; floorAllowed++; continue; }
+    problems.push({ where: c.where, rule: 'text floor', detail: `${c.ctx} can be ${+p.px.toFixed(2)}px`,
+      fix: 'floor it: calc(max(13px, calc(<size> * var(--fs-scale, 1))) * var(--text-scale, 1)), or a css/floors.css rule for its class' });
+  }
+  allow.forEach((a, sel) => { if (!a.hits) problems.push({ where: 'tests/check-look-tokens.js FLOOR_ALLOW', rule: 'text floor',
+    detail: `${sel} matches no sub-13px font size any more`, fix: 'delete the entry' }); });
+  FLOOR_ALLOW.filter(g => !g.why).forEach(g => problems.push({ where: 'tests/check-look-tokens.js FLOOR_ALLOW', rule: 'text floor', detail: g.selectors.join(', '), fix: 'every group says why' }));
 }
 
 // ── The JS lexer (comments blanked; strings, templates and regexes kept) ──
@@ -533,7 +598,8 @@ if (!problems.length) {
   console.log(`OK  ${cssDecls} css declarations checked, colours and fonts only in ${tokenBlocks} token block(s); `
     + `${scannedFiles} js/html file(s) clean — ${allowedLiterals} literal(s) kept by ${marksUsed} look: mark(s) `
     + `(${tablesCovered} table(s)) and ${EXEMPT.length} exemption(s); every absolute font size multiplies --text-scale `
-    + `(${unscaledKept} print-only size(s) kept by look: marks); ${looksNote}; `
+    + `(${unscaledKept} print-only size(s) kept by look: marks); every font size under 13px has a floor (${flooredByMax} by max(), `
+    + `${flooredByFile} by css/floors.css, ${floorAllowed} on file in FLOOR_ALLOW); ${looksNote}; `
     + `${moneySizeDecls} money size value(s) between the markers are tokens (${SIZE_EXEMPT.length} named exemption(s)); `
     + `no dark scheme in ${darkChecked} file(s), color-scheme: light on :root`);
   process.exit(0);

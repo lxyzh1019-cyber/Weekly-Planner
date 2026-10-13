@@ -331,7 +331,7 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   closeSheet(id);
 });
-/* Hero Mode is gone (js/05-helpers.js). Drop its key so a switch nobody can see
+/* Hero Mode is gone (docs/archive/history-comments.md). Drop its key so a switch nobody can see
    is not still remembered on the girls' iPad. */
 try { localStorage.removeItem('wp_hero_mode'); } catch (e) {}
 

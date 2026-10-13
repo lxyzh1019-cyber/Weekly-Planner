@@ -198,12 +198,9 @@ function loanState(kid, debtId) {
   return mnyDebtById(kid, debtId) || mnyNormalizeDebt({ id: 'none' });
 }
 
-/* Sunday v15 Stage 4 retired the old monthly schedule here: `loanMonthKey`,
-   `loanDownOutstanding`, `loanDueNow` (the down payment, then the monthly
-   figure) and `mnyDueNowAll`. A Sunday takes the must-pay below
-   (`mnyDueThisWeek` / `mnyLoanSundayPayment`); a debt's `downPayment*`
-   fields stay on the record for the weeks lived under them and are read by
-   nothing that moves money (Plan v3 §D). */
+/* A Sunday takes the must-pay below (`mnyDueThisWeek` / `mnyLoanSundayPayment`);
+   a debt's `downPayment*` fields stay on the record for the weeks lived under
+   them and are read by nothing that moves money (Plan v3 §D). */
 
 /* What's still owed: principal not yet cleared, plus any interest charged. */
 function loanBalance(kid, debtId) {
@@ -257,11 +254,8 @@ function loanRecordPayment(kid, amount, kind, debtId) {
   return rec;
 }
 
-/* Retired in Sunday v15 Stage 4 (Plan v3 §D, §G): the deposit prompt
-   (`loanPayDownPaymentPrompt`), the monthly arrears charge (`loanAccrueArrears`,
-   `mnyAccrueArrearsAll`) and the monthly transfer with its three shortfall
-   choices (`loanSundayTransfer`, `mnySundayTransferAll`). A short Sunday pays
-   what there is and carries the rest, with no interest on it. */
+/* A short Sunday pays what there is and carries the rest, with no interest on
+   it (Plan v3 §D, §G). */
 
 /* ════════════════════════════════════════════════════════════════
    SUNDAY v15 LOAN TERMS (Plan v3 §D, owner decision D4)
@@ -552,32 +546,6 @@ function mnyAddSurprise(kid, fields) {
   if (!(borrow > 0)) { saveAll(); return { covered: true, paid }; }
   return mnyAddDebt(kid, { name: what, icon: '🌧️', item: what, principal: borrow,
     monthly: 0, downPayment: 0, downPaymentDue: '' });
-}
-
-/* Pay extra, any amount — this is the one that earns the 10%.
-
-   This is also the "loan-surplus choice" the honesty ladder withdraws at step
-   3, so a strike on record this week closes it. */
-async function loanPayExtraPrompt(kid, debtId) {
-  if (typeof mrLosesChoices === 'function' && mrLosesChoices(kid)) {
-    showToast('Loan choices are paused this week ⚖️ — decided together on Sunday');
-    return;
-  }
-  const w = ensureWallet(kid);
-  const d = loanState(kid, debtId);
-  const bonus = Number(d.bonusRate) || 0;
-  const v = await showPrompt(
-    `Pay extra off ${d.name} ${d.icon}\nAnything you pay early earns ${bonus}% — $100 clears $${(100 * (1 + bonus / 100)).toFixed(0)}.\nHow much? (you have ${fmtMoney(w.cash)})`,
-    { value: '', type: 'number' });
-  if (v == null || v === '') return;
-  const amt = money2(Math.min(parseFloat(v) || 0, w.cash));
-  if (!(amt > 0)) { showToast('Enter an amount like 20'); return; }
-  w.cash = money2(w.cash - amt);
-  evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: amt,
-                  ref: d.id, note: 'Extra off ' + (d.name || 'her loan') });
-  const rec = loanRecordPayment(kid, amt, 'early', d.id);
-  showToast(`${d.icon} Paid ${fmtMoney(amt)} — cleared ${fmtMoney(rec ? rec.credited : amt)} with the ${bonus}% bonus`);
-  if (typeof mnyRerenderMoney === 'function') mnyRerenderMoney();
 }
 
 /* Are they on pace? What has been paid against what the weekly must-pay

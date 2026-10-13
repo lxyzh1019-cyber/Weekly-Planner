@@ -111,10 +111,6 @@ const FMT_ALLOW = [
     why: 'owner decision pending (Stage 32): "$100 and up shown rounded" on the passbook and the forecast; below $100 it is fmtMoney' },
   { file: 'js/43-sunday-core.js', name: 'sdOff$', rule: 'formatter',
     why: 'not a format: "taken off is always negative" (Plan v18 §W), the minus put in front of fmtMoney' },
-  { file: 'js/15-meeting.js', name: '$${y.target.toFixed(0)}', rule: 'raw $${',
-    why: 'owner decision pending (Stage 32): whole-dollar display (the yearly target), same as sdBook$' },
-  { file: 'js/20-loan.js', name: '$${(100 * (1 + bonus / 100)).toFixed(0)}', rule: 'raw $${',
-    why: 'owner decision pending (Stage 32): whole-dollar display (what $100 paid early clears), same as sdBook$' },
 ];
 const FMT_NAME = /(?:Money|Dollars?|Signed|DayName|DayLabel|DayMonth|ShortDate|ShortDay|MonthYear|KidName)$/;
 const FMT_CODE = /\.toFixed\(|toLocaleDateString|MONTH_SHORT/;

@@ -15,11 +15,7 @@
    `mnyDoCommit`, rewritten in Stage 4 so every dollar moves through the
    function that owns it, In = Out asserted before anything is written.
 
-   Retired in Stage 4 (deleted with their CSS and actions): "What I earned"
-   and "What I do with it" (`mnyRenderEarned`, `mnyRenderDecide`), the
-   earnings, income-bar, pool, plan, bucket, change-plan, door, reflect,
-   commit and committed cards, the inline competition and money-from-outside
-   forms, the confirm bar, the three shortfall choices (`MNY_SHORTFALL`) and
+   A result or a gift is entered at the table
    the meeting-wide Undo button. A result or a gift is entered at the table
    through the Record sheet (Dad's ➕ on Sunday's "Dad answers first" card) or
    asked for by her (js/45) — one writer each.

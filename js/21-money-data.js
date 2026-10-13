@@ -59,10 +59,6 @@ const MNY_BUCKETS = [
   { key: 'stock', icon: '📈', label: 'Companies',  stage: 'stock', tint: 'var(--mny-pot-stock-tint)' },
 ];
 
-/* The ready-made plans (`MNY_PLANS`) are retired with the meeting's old money
-   panels (Sunday v15 Stage 4, Plan v3 §G): the three starts on Sunday's "I
-   choose" step are the core's `SD_PRESETS` (js/43). */
-
 /* Investing is a fixed menu — no typing in a ticker. A nine-year-old picking a
    company by name is the lesson; a search box is a casino. */
 const MNY_FUNDS = [
@@ -1426,14 +1422,6 @@ function mnyReopenWeek(kid, weekKey) {
   saveAll();
   return true;
 }
-function mnyConfirmStamp(weekKey, kid) {
-  const s = mnyWeekConfirm(weekKey, kid);
-  if (!s || !s.at) return '';
-  if (s.reopenedAt) return 'Changed after confirming — confirm again';
-  const d = new Date(s.at);
-  return 'Confirmed by ' + s.by + ' · ' + d.getDate() + ' ' +
-         ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
-}
 /* The parent's before-we-start checklist, stored beside the confirm. */
 function mnyChecks(weekKey, kid) {
   const c = mnyEnsureWeekMaps();
@@ -1557,10 +1545,6 @@ function mnyPool(weekKey, kid) {
     spendCap: money2(mine * (Number(mrRuleOr(mrRulesForWeek(weekKey), 'spend.capPct')) || 0) / 100),
   };
 }
-
-/* `mnySplitFor`, `mnySplitTotal`, `mnySplitToLoan`, `mnyPricePlan` and
-   `mnyDoors` priced the retired plan cards; Sunday's "I choose" step prices
-   every placement through the core (js/43). Retired in Stage 4. */
 
 /* ════════════════════════════════════════════════════════════════
    THE TWO BARS

@@ -870,12 +870,6 @@ function skipRewardPrompt() {
   maybeShowRewardPrompt();
 }
 
-/* openTutorial, chooseTutorialStarter, skipTutorial and offerTutorialIfNeeded
-   lived here. They were the first-run flow, and all four existed to hand a
-   child one Family Hero chore as an unlocked "starter". Family Hero is not a
-   prize any more, so the overlay had nothing to offer: every chore it listed is
-   now on the ordinary picker, reachable from the slot she just tapped. */
-
 
 /* ── Rest days: a kid can mark a day as "off". Rest days are celebrated (rest is
    part of the plan) and never count against a streak — the gap logic below
@@ -1251,13 +1245,6 @@ function addQuickBreak(durationMin) {
   showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
 }
 
-/* renderDayNextUpBanner lived here. It printed "Now" and "Next up" into the day
-   timeline's left rail — the same sentence Today's own card leads with, on a
-   screen you had just navigated away from Today to reach. The rail is gone and
-   this went with it; Today says it once. Its two side jobs moved rather than
-   died: the break row's visibility and the evening wind-down nudge are both in
-   tdRenderToday (js/31-today.js), which is where they are read now. */
-
 function updateStopwatchGoalToasts(blocks) {
   blocks.forEach(b => {
     const sw = b.stopwatch;
@@ -1523,13 +1510,6 @@ async function changeParentPin() {
   showToast('✅ Parent PIN updated');
 }
 let parentUnlockedThisSession = false;
-
-/* Hero Mode lived here. It began as the choice of landing screen — Quest Board
-   or week grid — and Today took that job. Its last remaining duty was gating a
-   "Quests" shortcut on Today, and Today became the quest list itself, so the
-   toggle ended up switching nothing at all. Removed, and the stored key is
-   cleared on boot (js/99-main.js) so it does not linger on the girls' devices.
-   HERO_TIERS and the XP ladder are a different feature and are untouched. */
 
 /* ════════════════════════════════════════════════════════════════
    LOOKS — Pop and Calm (docs/handoff/looks-calm-pop.md L4–L7)

@@ -256,6 +256,31 @@ function bkCloudSizeInfo() {
   return { ...payloadHealth(bytes), measured };
 }
 
+/* Stage 64 (owner P10 A, 2026-10-12): one read-only line — is a Sunday-start
+   money week saved in this device's rulebook? Every stored version is read
+   straight from state, NOT through mrVersions(): that calls mrEnsure(), which
+   seeds a starting rulebook when none is stored — a write. Nothing here writes.
+   The withdrawn shipped pair (sunday, 2026-10-11) is told apart by the one rule
+   that owns it, mrMoneyWeekRuleOn (js/18-rules.js): on its own `from` week a
+   stored sunday + from pair is on unless it is that pair. */
+function bkSundayStartLine() {
+  const mr = state.shared && state.shared.chore && state.shared.chore.moneyRules;
+  const versions = mr && Array.isArray(mr.versions) ? mr.versions : [];
+  const found = [];
+  versions.slice()
+    .sort((a, b) => String(a && a.effectiveFrom).localeCompare(String(b && b.effectiveFrom)))
+    .forEach(v => {
+      const rules = (v && v.rules) || {};
+      const from = mrGetPath(rules, 'week.from');
+      if (mrGetPath(rules, 'week.startsOn') !== 'sunday' || !from) return;
+      const text = mrMoneyWeekRuleOn(rules, String(from))
+        ? `saved, from ${fmtDay(String(from), 'dated')}`
+        : `withdrawn, ignored (from ${fmtDay(String(from), 'dated')})`;
+      if (!found.includes(text)) found.push(text);
+    });
+  return `Sunday-start money rule: ${found.length ? found.join('; ') : 'none saved'}`;
+}
+
 function bkRenderPanel() {
   const wrap = document.getElementById('bkWrap');
   if (!wrap) return;
@@ -271,10 +296,11 @@ function bkRenderPanel() {
     <h3 class="parent-h3">🗄️ Backup &amp; restore</h3>
     <p class="parent-hint">A full backup contains everything both girls have planned and earned — every week, routine, goal, chore and pocket-money record. Keep one somewhere off this device.</p>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.5rem">
-      <button class="btn-confirm bk-btn" onclick="bkExportFullBackup()">⬇️ Export full backup</button>
-      <button class="pill-btn bk-btn" onclick="bkImportPickFile()">⬆️ Restore from file…</button>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard bk-btn" onclick="bkExportFullBackup()">⬇️ Export full backup</button>
+      <button class="ui-btn ui-btn--secondary bk-btn" onclick="bkImportPickFile()">⬆️ Restore from file…</button>
     </div>
     <p class="parent-hint">On this device now: ${stats.weeks} week${stats.weeks === 1 ? '' : 's'}, ${stats.blocks} planned block${stats.blocks === 1 ? '' : 's'}, ${stats.goals} goal${stats.goals === 1 ? '' : 's'}.</p>
+    <p class="parent-hint" id="bkSundayStart">${escapeHtml(bkSundayStartLine())}</p>
 
     <h3 class="parent-h3">☁️ Cloud save size</h3>
     <p class="parent-hint">Everything syncs as one document, and the cloud caps that document at 1 MB. ${info.measured ? '' : '(Not synced yet this session — measured from the copy on this device.)'}</p>
@@ -285,7 +311,7 @@ function bkRenderPanel() {
 
     <h3 class="parent-h3">🧹 Chore-only export</h3>
     <p class="parent-hint">A smaller file with just the chore groups, prices and money snapshots — useful for checking the money setup, but <b>not</b> a backup of the planner and not restorable here.</p>
-    <button class="pill-btn bk-btn" onclick="ctExportBackup()">⬇️ Export chore-only file</button>
+    <button class="ui-btn ui-btn--secondary bk-btn" onclick="ctExportBackup()">⬇️ Export chore-only file</button>
     <div class="bk-reset" onclick="coHandleClick(event)">${typeof coDangerCard === 'function' ? coDangerCard() : ''}</div>
   `;
 }

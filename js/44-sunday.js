@@ -1391,7 +1391,7 @@ function sdOpenDad() {
       ${step === 0 && sun.asked ? `<div class="sd-note">${sun.premarked ? '✓ Sunday routine marked for her' : sun.done ? '✓ Sunday routine ticked' : '○ Sunday routine not ticked yet'}</div>` : ''}
       <div class="sd-teal">${escapeHtml(check)}</div>
       <button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>
-    </div>`;
+    </div>${sheetCloseXHtml('data-mny-action="sd-dadclose"')}`;
   openSheet('sundayOverlay');
 }
 
@@ -1411,7 +1411,7 @@ function sdSheetOpen(title, html) {
   if (!body) return;
   const t = document.getElementById('sdSheetTitle');
   if (t) t.textContent = title;
-  body.innerHTML = `${html}<button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>`;
+  body.innerHTML = `${html}<button type="button" class="ui-btn ui-btn--primary ui-btn--lg" data-mny-action="sd-dadclose">Back to her</button>${sheetCloseXHtml('data-mny-action="sd-dadclose"')}`;
   if (!document.getElementById('sundayOverlay').classList.contains('open')) openSheet('sundayOverlay');
 }
 function sdOpenLine(tile, edit) {
@@ -1653,6 +1653,8 @@ function sdCellDown(k) {
   sdPress = { k, start: Date.now(), p: 0, fired: false };
   sdPress.timer = setInterval(() => {
     if (!sdPress) return;
+    // The meeting closed under her finger: drop the hold, place nothing.
+    if (!(typeof mmIsOpen === 'function' && mmIsOpen())) { clearInterval(sdPress.timer); sdPress = null; return; }
     sdPress.p = Math.min(100, (Date.now() - sdPress.start) / SD_HOLD_MS * 100);
     const bar = document.querySelector(`[data-sd-cell="${k}"] .sd-cell-hold`);
     if (bar) bar.style.width = Math.round(sdPress.p) + '%';
@@ -1720,6 +1722,8 @@ function sdSignDown() {
   sdSignHold = { p: 0 };
   sdSignHold.timer = setInterval(() => {
     if (!sdSignHold) return;
+    // The meeting closed mid-hold: drop it, sign nothing.
+    if (!(typeof mmIsOpen === 'function' && mmIsOpen())) { clearInterval(sdSignHold.timer); sdSignHold = null; return; }
     sdSignHold.p = Math.min(100, sdSignHold.p + 60 / SD_SIGN_MS * 100);
     const fill = document.querySelector('[data-sd-sign] .sd-sign-fill');
     if (fill) fill.style.width = sdSignHold.p + '%';

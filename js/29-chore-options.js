@@ -287,7 +287,7 @@ async function coRetire(id) {
   const row = pool.find(p => p.id === id);
   if (!row) return;
   if (!(await showConfirm(`Retire "${row.label}"? Past weeks keep every grade it already earned.`,
-    { danger: true, okLabel: 'Retire' }))) return;
+    { okLabel: 'Retire' }))) return;
   coApply(pool.filter(p => p.id !== id), `retired ${row.label}`);
   coRenderOptions();
   cpRenderChoreTab();

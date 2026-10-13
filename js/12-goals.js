@@ -276,13 +276,13 @@ function buildAchievementRow(a) {
   controls.className = 'gt-achievement-controls';
 
   const modeBtn = document.createElement('button');
-  modeBtn.className='pill-btn';
+  modeBtn.className='ui-btn ui-btn--secondary';
   modeBtn.textContent = a.mode==='duration' ? 'Mode: Duration' : 'Mode: Count';
   modeBtn.onclick = ()=>setAchievementMode(a.id, a.mode==='duration'?'count':'duration');
   controls.appendChild(modeBtn);
 
   const pick = document.createElement('button');
-  pick.className='pill-btn';
+  pick.className='ui-btn ui-btn--secondary';
   pick.textContent='Link activity';
   pick.onclick = async ()=>{
     const names = acts.map((x,i)=>`${i+1}. ${x.icon} ${x.name}`).join('\n');
@@ -293,7 +293,7 @@ function buildAchievementRow(a) {
   controls.appendChild(pick);
 
   const targetBtn = document.createElement('button');
-  targetBtn.className = 'pill-btn';
+  targetBtn.className = 'ui-btn ui-btn--secondary';
   targetBtn.textContent = `Target: ${escapeHtml(targetLabel)}`;
   targetBtn.onclick = async ()=>{
     const next = parseInt((await showPrompt(`Set target (${a.mode==='duration'?'minutes':'count'})`, { value:String(targetVal), type:'number' }))||'', 10);

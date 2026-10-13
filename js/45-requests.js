@@ -145,20 +145,6 @@ function mnyAddRequest(kid, fields) {
   return r;
 }
 
-/* Take back a question nobody has answered. Tombstoned, so the other device
-   does not hand it back. */
-function mnyWithdrawRequest(kid, id) {
-  if (!mnyRequestMayAsk(kid)) return false;
-  const list = mnyEnsureRequests(kid);
-  const i = list.findIndex(r => r && r.id === id);
-  if (i < 0) return false;
-  if (list[i].status === 'yes') { showToast('Already answered — ask a grown-up to change it.'); return false; }
-  list.splice(i, 1);
-  tombstoneIds('req:', [id]);
-  saveAll();
-  return true;
-}
-
 /* ── One reader: every question she has asked, in one shape ──
    {id, store, kind, status, text, icon, amount, open, applied, askedAt,
     answeredAt, weekKey, record}. `open` is "still waiting on a grown-up" —
@@ -1069,7 +1055,7 @@ function rqPreviewAndFoot(o) {
   const opt = o || {};
   return `${opt.preview === false ? '' : `<div class="rq-preview" data-rq-preview>${escapeHtml(st.preview || '')}</div>`}
     <div class="rq-foot">
-      ${opt.notNow === false ? '' : '<button type="button" class="rq-notnow" data-mny-action="rq-close">Not now</button>'}
+      ${opt.notNow === false ? '' : '<button type="button" class="ui-btn ui-btn--secondary" data-mny-action="rq-close">Not now</button>'}
       <button type="button" class="rq-send${st.ready ? ' ready' : ''}" data-mny-action="rq-send">Send to parents →</button>
     </div>`;
 }
@@ -1082,7 +1068,7 @@ function rqRender() {
   // The result sheet's line sits beside its title, on one line (M8-2).
   if (title) title.innerHTML = escapeHtml(MNY_INFO_KINDS.indexOf(d.kind) >= 0 ? mnyInfoSheetTitle(d) : RQ_TITLES[d.kind])
     + (d.kind === 'result' ? ' <span class="rq-titlesub">The official results sheet decides. A parent checks it before anything pays.</span>' : '');
-  const sheet = host.closest('.sheet');
+  const sheet = host.closest('.ui-sheet');
   if (sheet) sheet.setAttribute('data-rq-kind', d.kind);
   if (sheet) sheet.setAttribute('data-rq-mode', d.kind === 'move' ? d.mode : '');
   let body;
@@ -1095,7 +1081,7 @@ function rqRender() {
   else if (d.kind === 'prices') body = rqPricesBody(d);
   else if (MNY_INFO_KINDS.indexOf(d.kind) >= 0) body = mnyInfoSheetBody(d);
   else body = rqListBody(kid);
-  host.innerHTML = `<button type="button" class="ui-btn ui-btn--secondary ui-btn--icon rq-x" data-mny-action="rq-close" aria-label="Close">✕</button>${body}`;
+  host.innerHTML = body;
 }
 
 /* Typing changed something the button and the preview say: update those two,

@@ -35,8 +35,6 @@ let selectedActivity = null;
    control is a column count, not a mode: nothing about how a day is read or
    edited changes with it, and it is a localStorage preference, not state. */
 let timelinePlacementGuideEl = null;
-/* dayLandscapeChromeRaf lived here, throttling the day screen's chrome
-   measurement. The measurement is gone — one scroller needs no arithmetic. */
 let pendingStartMin = null;
 let editingBlockId = null;
 let syncDayIdx = 0;
@@ -45,10 +43,6 @@ let syncDayIdx = 0;
    is retired; setWeekView folds any other value into 'full' rather than leaving
    the screen on a container that no longer exists. */
 let weekView = 'full';
-/* currentZone lived here, for the morning/afternoon/evening day filters.
-   Those are gone and the day is always shown whole — see js/08-day-view.js. */
-/* currentTrayFilter lived here, for the activity rail's category chips. The
-   rail is gone; the placement picker keeps its own filter (slotPickerFilter). */
 let activeTimers = {}; // itemKey -> {remaining, interval}
 let pendingFocusBlockId = null;
 let pendingFocusAttempts = 0;
@@ -56,8 +50,6 @@ let activeStopwatchTick = null;
 let kidQuickBlockId = null;
 let kidRoutineStopwatchTick = null;
 let kidTrainingStopwatchTick = null;
-/* dayLandscapeFocusPane lived here, dimming one pane of the day screen while
-   the other was in use. There is one pane now — the schedule. */
 let currentTimelineGuideY = null;
 const MORNING_UNLOCK_ITEM = { id:'m_unlock_warm_water', text:'Warm water before breakfast' };
 const AFTERSCHOOL_REWARD_ITEMS = [

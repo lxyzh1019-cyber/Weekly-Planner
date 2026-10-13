@@ -125,7 +125,7 @@ spot), `tests/check-money-words.js`, `tests/check-steady-share.js` (no division
 by steady money outside `js/43-sunday-core.js`), `tests/check-money-surface.js`
 (the money text size and font are set through `[data-money-surface]` only),
 `tests/check-dead-css.js`,
-`tests/check-dead-ids.js`, `tests/check-dead-actions.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
+`tests/check-dead-ids.js`, `tests/check-dead-actions.js`, `tests/check-sw-shell.js` and `tests/check-ui-guards.js` (the Part 13 guards, UI rules) (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
 
@@ -443,6 +443,7 @@ Kid-facing copy is a product surface, not filler. The rules:
 ## UI rules
 
 - **Where styles live (Stage 33).** Each screen's own rules go in its file — `css/today.css`, `css/week-day.css`, `css/money.css`, `css/parent.css`, `css/social.css`, linked after `css/app.css` in that order; shared parts (kit, header, tokens) and the sheets stay in `css/app.css`; `css/floors.css` (the minimum-size floors) is linked last so the minimum sizes win, and every file in `css/` must be linked in `index.html` and listed in `sw.js` SHELL. (checked by tests/check-sw-shell.js, tests/check-dead-css.js, tests/check-look-tokens.js)
+- **The Part 13 guards (Stage 45, `tests/check-ui-guards.js`, in `npm run check`).** One page header per screen (index.html's static `<header class="hdr">`, `hdrMount`, and the listed `pageHeader(` builders); header buttons at least 44px and named (`aria:` on every step, title and action button); header text at least 15px; no new `*-btn`, `*-tab`, `*-card` or `*-sheet` class outside the kit (the 50 private parts on file are listed with their reasons) and none of the retired `.pill-btn`, `.btn-icon`, `.btn-confirm`, `.btn-danger`, `.pn-card`; a z-index is a `--z-*` token or a number under `--z-nav` (60, local stacking), and an `@media` width is one of the breakpoints (699/700, 767/768, 819, 820-979, 980 landscape, 899, 1099/1100); no selector lists 4 or more screens by hand; every `setInterval` in js/08, js/09, js/44 is stopped on screen change or sheet close (TIMERS). `tests/check-look-tokens.js` rule 4 also floors text: a font size that can come out under 13px has `max(13px, …)` or a `css/floors.css` rule (the ones on file are in FLOOR_ALLOW). Every allowlist entry says why; a stale one fails. The red (danger) OK is only for a confirm that cannot be undone (owner P7–P9; smoke: theRedOkIsOnlyForWhatCannotBeUndone). (checked by tests/check-ui-guards.js, tests/check-look-tokens.js)
 - **Touch targets ≥ 44×44px** on every interactive element, including week
   arrows and small chips. Enforced on the four kid screens by
   `kidScreensMeetTheHouseRules` in `tests/smoke.js`, which probes the real hit
@@ -1471,7 +1472,7 @@ function the Chores screen called, so the two could not disagree
 owner ticked all 19 rows of `docs/chore-relocation-map.md`, and the Chores
 screen went — `#screen-chore`, `openChoreTab` / `renderChoreTab`, the kid-tab
 renderers, its money card and matrix, the chore-group editor
-(`#choreGroupOverlay`) and the More 🧹 tile; its smoke checks were ported to
+(`#choreGroupOverlay`, gone; the overlays left are the kit's `.ui-sheet`, under UI rules) and the More 🧹 tile; its smoke checks were ported to
 the new homes or dropped. What its render did for the week (goal bonuses, group
 payouts) is `ctSelfHealWeek`, run by Today's render; the portal keeps
 `ctHandleWrapClick`. To make "the same function" literal, the chore writers are
@@ -1643,7 +1644,29 @@ say which one they are. (checked by smoke: jobsCardIsNeverBlank)
   Parent › Now keeps today (white, navy frame) apart from the selected day
   (navy fill) — `todayAndSelectedDifferInBothLooks`. (checked by smoke: todayAndSelectedDifferInBothLooks)
 - Never white text on the pastel category colors (all fail contrast). (text only)
-- Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`. (text only)
+- **One sheet, one dialog (Stage 43; owner G13, P1–P4, 2026-10-12).** Every
+  pop-up is an `.overlay` (opened and closed only by `openSheet` /
+  `closeSheet`) holding the kit's `.ui-sheet` — the 23 overlays in
+  `index.html` and the ⋯ More sheet (`#tdMoreOverlay`). A sheet is centred on
+  the iPad and comes from the bottom on a phone (≤699px), one paper, border
+  and corner for all, at `--z-sheet`. Each has exactly one ✕, `.ui-sheet-x`
+  on a kit icon button (44×44, top right; `sheetCloseXHtml` writes it for a
+  body built in code), beside its own Cancel / Done. The sheet's box does
+  not scroll: its content sits in `.ui-sheet-body`, the one scroller, and the
+  ✕ is pinned (absolute) to the box's top-right corner, so it stays there
+  scrolled or not (P4/P6); a new sheet keeps that shape — box, body, ✕ last.
+  The edit, activity and
+  training forms are `.ui-sheet--docked`: the right-side panel on the iPad
+  (P2, the one exception), from the bottom on a phone. The money sheets
+  (Record, request, Sunday's Parent's card, She told me, Grown-ups' fix
+  sheets) take the same box (P3); their words and buttons keep the area's
+  colours through `[data-area]`, a money surface keeps the 0.62 money scrim
+  (`.overlay[data-money-surface]`), and a sheet that needs another width sets
+  `--sheet-w` and nothing else. The one dialog is `appDialog` (`showConfirm`,
+  `showAlert`, `showCheckConfirm`, `showPrompt`, `showChoice`):
+  `.overlay--dialog` holding a `.ui-dialog`, centred everywhere, at
+  `--z-dialog`, with no ✕ — Cancel is its way out. Never native
+  `confirm()` / `prompt()`, and no rule outside the kit draws a sheet's box. (checked by tests/check-sheet-family.js and smoke: oneSheetAndOneDialogEverywhere)
 
 **IF IT LOOKS LIKE A CONTROL AND IS ANNOUNCED AS ONE, IT HAS TO BE ONE.** Three
 of the five `.profile-badge`s — Today, the chore tab, Sister Sync — were bare
@@ -3515,8 +3538,9 @@ Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
   is a real answer, and a child should see her request was answered rather than
   find it simply gone. (text only)
 
-`moneyCanTransact` is called by two functions and **none of the primitives check
-`isParent()` themselves**, so `mnyMoveMoney` carries that gate explicitly.
+**None of the money primitives check `isParent()` themselves**, so
+`mnyMoveMoney` carries that gate explicitly (`moneyCanTransact`, called by
+nothing, was deleted in Consistency Part 13).
 
 ## The Flow — the screen the stream was stored for
 
@@ -4086,7 +4110,7 @@ white text on a pastel** by the looks walks (`thePopLookReadsEverywhere`,
 
 **Withdrawn 2026-10-06 by decision 15 (Money fit and logic, Plan v2):** the money week is Monday–Sunday everywhere; the Sunday routine is counted as kept at the meeting; the Sun–Sat mapping code stays for the record and is tested with explicit rules only. `MR_DEFAULT_RULES.week` is `{ startsOn: 'monday' }` (no `from`); `mrMoneyWeekRuleOn` reads the STORED rules only (no default fallback), so only a stored `week.startsOn: 'sunday'` with a stored `week.from` could turn the mapping on. The pending-rule card (`mrMoneyWeekRulePending` / `mrApplyMoneyWeekRule`, `MR_MONEY_WEEK_NOTE`, Grown-ups `guMoneyWeekCard`) is removed, and so are the smoke checks `theMoneyWeekRunsSundayToSaturday` and `aDayIsNeverPaidTwiceAcrossTheSwitch`. The pre-mark (replacing owner decision #93) is one pure rule, `mrStreakRunPure` (js/18, read by `mrStreakWeek`): in a week not yet settled, its meeting Sunday (day 6) counts as kept once it has come; a settled week is read whole as before. The record of the withdrawn rule is in `docs/archive/architecture-history.md`. (checked by tests/sunday.test.js)
 
-The exact withdrawn pair (`startsOn: 'sunday'`, `from: '2026-10-11'`), copied into rulebooks seeded on builds 2026-10-04a–05f, is ignored by `mrMoneyWeekRuleOn`; any other stored sunday + `from` pair still counts.
+The exact withdrawn pair (`startsOn: 'sunday'`, `from: '2026-10-11'`), copied into rulebooks seeded on builds 2026-10-04a–05f, is ignored by `mrMoneyWeekRuleOn`; any other stored sunday + `from` pair still counts. The parent backup screen (`bkSundayStartLine` in js/30-backup.js) reads the stored Sunday-start pair straight from `state.shared.chore.moneyRules.versions` and writes nothing (not through `mrVersions()`, which seeds a rulebook).
 
 *Moved to `docs/archive/architecture-history.md`: the record of the withdrawn Sunday-to-Saturday rule (Deviation 34).*
 
@@ -4214,8 +4238,8 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   `sdSegHitsBox`, js/43): in the shaded gap of the newest past segment that
   fits, else beside or above/below the signed point, box-checked against
   every line. **The own line is the reference green**, `--sd-own` (#2f7f62). (checked by tests/sunday.test.js)
-- **The request sheet closes with its ×** (`.rq-x`, drawn by `rqRender`
-  inside `#requestBody` so the delegated listener hears it); the doors'
+- **The request sheet closes with its ✕** (the sheet's `.ui-sheet-x`, drawn by `rqRender`
+  through `sheetCloseXHtml` inside `#requestBody` so the delegated listener hears it); the doors'
   sheets have no "Done", the Move · Cash sheet has no "Not now" and one title
   for its four modes. ⏪ Draw early is the reference's compact body
   (`rqAdvBody`: one plain line, How much −/+, three reasons). (text only)
@@ -4382,7 +4406,8 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   and steppers use `--bw-chip`. The two selected meanings are under PR 3
   above. (text only)
 - **The sheet scrim** `--mny-v15-scrim` is 0.62 in both looks, so the page's
-  numbers do not read beside a sheet. (text only)
+  numbers do not read beside a sheet; every `[data-money-surface]` overlay
+  reads it as its `--scrim` (Stage 43). (text only)
 - **Held by** smoke `aSundayRowOpensItsSheet` and the unit case in
   `tests/sunday.test.js`. (checked by tests/sunday.test.js and smoke: aSundayRowOpensItsSheet)
 - **The money fit check (PR 5 part 2, build 2026-10-06e)** is smoke
@@ -4442,7 +4467,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   is one number with a check rather than two that drift: **bump both
   together.** `theBuildNumberIsOnThePage` in `tests/smoke.js` holds both
   surfaces.
-- Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 19 overlays carry their
+- Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 23 overlays carry their
   ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
   (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and
   Escape for sheets live in `openSheet`/`closeSheet` (`js/17-ui-misc.js`) — do

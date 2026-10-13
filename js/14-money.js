@@ -302,12 +302,4 @@ function moneyAdvanceMonth(kid) {
    made could not be LABELLED — the stream got "Sold a company" and never which
    sheet asked for it or why. Structural fields (from, to, amount) are still
    applied last, so a caller can name a movement and never redirect one; that
-   rule cost two silent defects in Stage 1 and is not relaxed here.
-
-   Kids may look at what they own on 💰 My money; every function that moves it
-   is parent-only. This is the guard the old bank screen enforced, kept because
-   the commit path and the rules page both still lean on it. */
-function moneyCanTransact() {
-  if (!isParent()) { showToast('A grown-up moves the money 🔒'); return false; }
-  return true;
-}
+   rule cost two silent defects in Stage 1 and is not relaxed here. */

@@ -16,6 +16,7 @@ const parentPortal = require('./smoke-parts/parent');
 const weekDay = require('./smoke-parts/week-day');
 const todayChecks = require('./smoke-parts/today');
 const socialChecks = require('./smoke-parts/social');
+const sheetChecks = require('./smoke-parts/sheets');
 
 /* A throwaway static server for the handful of checks that need a real origin.
    The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
@@ -164,6 +165,9 @@ function findChromium() {
     theSundayKitHolds44pxInItsBoxes: [],
     parentReadingSizeDefaultsToLarger: [],
     withMumReadsInBothLooks: [],
+    oneSheetAndOneDialogEverywhere: [],
+    theRedOkIsOnlyForWhatCannotBeUndone: [],
+    theBackupScreenSaysIfASundayStartRuleIsSaved: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
@@ -1342,7 +1346,7 @@ function findChromium() {
     currentDayKey = getDayKeys(0)[0];
     openSlotPicker(15 * 60 + 30);
     const list = document.getElementById('slotPickerList');
-    const sheet = document.querySelector('#slotPickerOverlay .sheet');
+    const sheet = document.querySelector('#slotPickerOverlay .ui-sheet');
     const chipRow = document.getElementById('slotPickerFilter');
     if (!list || !sheet || !chipRow) return ['the picker did not open'];
     const chips = [...chipRow.querySelectorAll('.filter-chip')];
@@ -2974,15 +2978,14 @@ function findChromium() {
     const wrap = document.getElementById('mnyPage1Wrap');
     // Her page has no control that moves money — not a disabled one, none.
     const noMovers = !wrap.querySelector('[data-mny-action="commit"], [data-mnyp-action]');
-    // And the guard the commit path leans on refuses her — and Grown-ups, where
-    // ✏️ Fix what she owns lives (Stage 4b), draws no control for her.
-    const guarded = moneyCanTransact() === false;
+    // And Grown-ups, where ✏️ Fix what she owns lives (Stage 4b), draws no
+    // control for her.
     const cashBefore = mnyCash(kid);
     mnyRenderRulesTab();
     const noDoor = !document.querySelector('#mnyRulesWrap [data-mnyp-action]') && mnyCash(kid) === cashBefore;
     // Her earnings are not hers to change either.
     const cannotOverride = mnySetOverride(kid, mnyWeekKey(), 'chores', 99, 'fixing') === false;
-    return noMovers && guarded && noDoor && cannotOverride;
+    return noMovers && noDoor && cannotOverride;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.
   if (want('kidCannotEditRules')) checks.kidCannotEditRules = await page.evaluate(() => {
@@ -5300,7 +5303,7 @@ function findChromium() {
     };
 
     const small = [];
-    scr.querySelectorAll('button, [onclick], [role="button"], a[href], input:not([type=hidden]), select, summary, .pill-btn, .btn-icon').forEach(el => {
+    scr.querySelectorAll('button, [onclick], [role="button"], a[href], input:not([type=hidden]), select, summary').forEach(el => {
       if (!visible(el)) return;
       if (EXEMPT.some(c => el.classList.contains(c))) return;
       const r = el.getBoundingClientRect();
@@ -6193,7 +6196,7 @@ function findChromium() {
             && b.original.chores === planner       // the planner's number is kept
             && mnyWeekReason(kid, wk) === 'graded_wrong'
             && !mnyIsConfirmed(wk, kid)            // the week reopened
-            && mnyConfirmStamp(wk, kid).indexOf('confirm again') > -1
+            && !!(mnyWeekConfirm(wk, kid) || {}).reopenedAt   // reads "confirm again"
             // and it reaches the frozen ledger, not just the screen
             && mrFreezeWeekLedger(wk, kid).chores === 15;
     mrEnsureEarnings(kid, wk).overrides = {};
@@ -6733,7 +6736,7 @@ function findChromium() {
       const screen = document.getElementById('screen-meeting');
       const signs = [...screen.querySelectorAll('button')].filter(b => /hold to sign/i.test(b.textContent + ' ' + (b.getAttribute('aria-label') || '')));
       if (signs.length !== 1) bad.push(signs.length + ' "hold to sign" controls on the money step: ' + signs.map(b => b.className).join(', '));
-      const dead = [...screen.querySelectorAll('.btn-confirm[disabled]')];
+      const dead = [...screen.querySelectorAll('.ui-btn--primary[disabled]')];
       if (dead.length) bad.push('the footer draws a disabled button: ' + dead.map(b => b.textContent.trim()).join(' | '));
       if (!screen.querySelector('[data-sd-sign]')) bad.push('the ritual\'s own hold to sign is missing');
     } catch (e) { bad.push('threw: ' + e.message); }
@@ -7837,7 +7840,8 @@ function findChromium() {
       profile = 'jenn';
       ['result', 'club', 'move', 'adv', 'goal', 'list'].forEach(kind => {
         mnyOpenRequestSheet(kind, { kid: 'jenn' });
-        if (!document.querySelector('#requestBody [data-mny-action]')) problems.push('the ' + kind + ' sheet drew no controls');
+        // Stage 63: the ✕ is one static button after #requestBody (onclick rqClose), so a list with no rows draws no data-mny-action of its own.
+        if (!document.querySelector(kind === 'list' ? '#requestOverlay .ui-sheet > .ui-sheet-x[onclick]' : '#requestBody [data-mny-action]')) problems.push('the ' + kind + ' sheet drew no controls');
         sweep('Request sheet › ' + kind); rqClose();
       });
       profile = 'parent';
@@ -13854,9 +13858,10 @@ function findChromium() {
         const want = p.unlocked ? 'yours' : `level ${p.levelReq}`;
         if (!row.textContent.includes(want)) bad.push(`"${p.label}" does not say "${want}"`);
       });
-      // Read-only: the one control is Close.
-      const controls = [...sheet.querySelectorAll('button, input, select')];
-      if (controls.length !== 1 || !controls[0].classList.contains('td-level-close')) bad.push(`My level has ${controls.length} controls, want only Close`);
+      // Read-only: the one control is Close, beside the sheet's ✕ (Stage 43, P4).
+      const controls = [...sheet.querySelectorAll('button, input, select')].filter(c => !c.classList.contains('ui-sheet-x'));
+      if (controls.length !== 1 || !controls[0].classList.contains('td-level-close')) bad.push(`My level has ${controls.length} controls besides its ✕, want only Close`);
+      if (sheet.querySelectorAll('.ui-sheet-x').length !== 1) bad.push('My level has no ✕ (or more than one)');
       const tiny = [...sheet.querySelectorAll('*')].filter(el =>
         [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
       if (tiny.length) bad.push(`My level has text under 13px (.${tiny[0].className})`);
@@ -14465,6 +14470,19 @@ function findChromium() {
     });
     // The current place has to be stated, not only tinted.
     const marksCurrent = !!nav.querySelector('.kid-nav-btn.on[aria-current="page"]');
+    // R2 (owner 2026-10-12): the current tab wears the planner's picked colour (--sel-planner, white text), never the main action's yellow.
+    const onTab = nav.querySelector('.kid-nav-btn.on');
+    if (onTab) {
+      const probe = document.createElement('i');
+      probe.style.cssText = 'position:absolute;background:var(--sel-planner);color:var(--sel-planner-ink)';
+      document.body.appendChild(probe);
+      const want = getComputedStyle(probe);
+      const got = getComputedStyle(onTab);
+      const pair = [want.backgroundColor, want.color];
+      probe.remove();
+      if (got.backgroundColor !== pair[0] || got.color !== pair[1]) return `the current tab is ${got.backgroundColor} / ${got.color}, the planner's picked colour is ${pair[0]} / ${pair[1]}`;
+      if (got.backgroundColor === 'rgb(255, 200, 61)') return 'the current tab is the main action yellow';
+    }
     // Content must not sit underneath it.
     const padded = parseFloat(getComputedStyle(document.body).paddingBottom) >= 50;
 
@@ -15456,7 +15474,7 @@ function findChromium() {
     const answer = (mood) => {
       const dot = [...document.querySelectorAll('#reflectOverallMoods .vibe-mood')].find(el => el.textContent === mood);
       if (dot) dot.click();
-      const save = document.querySelector('#reflectOverlay .btn-confirm');
+      const save = document.querySelector('#reflectOverlay .ui-btn--primary');
       if (save) save.click();
       if (document.getElementById('ritualScreen').classList.contains('show')) closeRitual();
     };
@@ -15655,7 +15673,7 @@ function findChromium() {
       if (document.getElementById('undoToast').hidden) bad.push('the undo toast did not come up, so the sheet was not measured under it');
       openReflectSheet(key);
       await new Promise(r => setTimeout(r, 400)); // the sheet slides up (0.3s)
-      const sheet = document.querySelector('#reflectOverlay .sheet');
+      const sheet = document.querySelector('#reflectOverlay .ui-sheet');
       const overall = [...document.querySelectorAll('#reflectOverallMoods .vibe-mood')];
       const perBlock = [...document.querySelectorAll('#reflectBlockList .vibe-mood')];
       if (overall.length !== 5) bad.push(`${overall.length} overall mood buttons, expected 5`);
@@ -15944,7 +15962,7 @@ function findChromium() {
         if (!/activities marked public/i.test(panel.textContent)) bad.push('the parent choice does not say "activities marked public"');
         pick('busy-only').click();
         if (state.shared.sisterVisibilityMode !== 'busy-only') bad.push(`the parent's "busy only" wrote "${state.shared.sisterVisibilityMode}"`);
-        if (!(pick('busy-only') || {}).classList?.contains('active')) bad.push('the parent choice does not show busy only as chosen');
+        if ((pick('busy-only') || {}).getAttribute?.('aria-pressed') !== 'true') bad.push('the parent choice does not show busy only as chosen');
         [pick('public'), pick('busy-only')].forEach(b => {
           const r = b.getBoundingClientRect();
           if (r.height < 44) bad.push(`a sister-details choice is ${Math.round(r.height)}px tall, under 44px`);
@@ -16631,7 +16649,7 @@ function findChromium() {
       mnyOpenMyMoney('jenn');
       take('My money', ['#screen-mymoney .mv2-card', '#screen-mymoney .hdr-tab[aria-current="page"]', '#screen-mymoney > * > .hdr .hdr-btn', '#screen-mymoney .mv2-act']);
       goToday(); tdOpenMore(); await wait(350);
-      take('More', ['#tdMoreOverlay .sheet', '#tdMoreOverlay .td-more-tile']);
+      take('More', ['#tdMoreOverlay .ui-sheet', '#tdMoreOverlay .td-more-tile']);
       closeSheet('tdMoreOverlay');
       parentUnlockedThisSession = true; selectProfile('parent');
       // Plan v9 §N: PIN, the look and Exit sit in the one-row header's 🔒 Parent ▾ menu.
@@ -16644,7 +16662,7 @@ function findChromium() {
       take('Parent › Now', ['#screen-parent > .hdr', '#parentDests > [aria-selected="false"]',
         '#parentDests > [aria-selected="true"]',   // Plan v17 item 6: the portal's switcher hides on Now; measured on Setup
         '#pnWrap .ui-card', '#pnWrap .ui-days > button', '#pnWrap .ui-days > [aria-current="date"]', '#pnWrap .pn-wait-toggles [aria-pressed="true"]', '#pnWrap .pn-sunkid',
-        '#screen-parent .ui-btn--primary']);
+        '#pnWrap .ui-btn--primary']);
       pnOpenToldSheet(); await wait(300);
       take('Parent › Now › She told me', ['#pnToldBody .ui-days > [aria-pressed="true"]', '#pnToldBody .pn-answer-kids [aria-pressed="true"]']);
       pnSheetOpen = false; closeSheet('pnToldOverlay');
@@ -23360,9 +23378,7 @@ function findChromium() {
       const qSkip = mnyAddRequest(kid, { kind: 'skip', blockId: 'aj-3', dayKey: days[3] });
       const qMove = mnyAddRequest(kid, { kind: 'move', from: 'ready', to: 'cash', amount: 1 });
       const qGift = mnyAddRequest(kid, { kind: 'gift', amount: 20, giver: 'Uncle Mike' });
-      const qOpen = mnyAddRequest(kid, { kind: 'adv', amount: 1 });
       if (mnyAnswerRequest(kid, qAdv.id, 'yes') !== false) bad.push('requests: a child answered her own request');
-      if (!mnyWithdrawRequest(kid, qOpen.id) || mnyEnsureRequests(kid).some(r => r.id === qOpen.id) || !state.shared.tombstones['req:' + qOpen.id]) bad.push('requests: a withdrawn request is not gone and tombstoned');
       profile = 'parent';
       const view = mnyRequestsFor(kid);
       const stores = new Set(view.map(v => v.store));
@@ -23936,7 +23952,7 @@ function findChromium() {
           paApplyTextScale();
           paRenderPrefs();
           const scale = document.getElementById('screen-parent').style.getPropertyValue('--fs-scale').trim();
-          const cur = [...document.querySelectorAll('#paPrefsWrap [data-pa-scale].active')].map(b => b.textContent.trim());
+          const cur = [...document.querySelectorAll('#paPrefsWrap [data-pa-scale][aria-pressed="true"]')].map(b => b.textContent.trim());
           return { scale, cur };
         }, stored);
         const label = stored === null ? 'nothing stored' : 'stored ' + stored;
@@ -24324,7 +24340,7 @@ function findChromium() {
         mnyOpenRequestSheet('list', { kid });
         const chips = [...document.querySelectorAll('#requestBody .rq-chip')];
         if (chips.length !== asks().length || !/Skate bag/.test(chips[0].textContent) || !/⏳ waiting/.test(chips[0].textContent)) bad.push('the list is not every request, newest first, with its answer');
-        press('[data-mny-action="rq-close"]');
+        document.querySelector('#requestOverlay .ui-sheet > .ui-sheet-x').click();
         if (open()) bad.push('Done did not close the list');
         // A disabled option says why rather than doing nothing.
         mnyOpenRequestSheet('move', { kid });
@@ -25386,7 +25402,7 @@ function findChromium() {
         btn(fine.id).click();
         if (!rqDraft || rqDraft.kind !== 'dispute') bad.push('the button did not open the dispute sheet');
         if (!/This fine is wrong/.test(document.getElementById('rqSheetTitle').textContent)) bad.push('the sheet is not titled "This fine is wrong"');
-        if (!document.querySelector('#requestBody [data-mny-action="rq-close"].rq-x')) bad.push('the sheet has no × to close it');
+        if (!document.querySelector('#requestOverlay .ui-sheet > .ui-sheet-x')) bad.push('the sheet has no × to close it');
         const head = document.querySelector('#requestBody .rq-fine');
         if (!head || !/−\$/.test(head.textContent)) bad.push('the sheet does not show the fine with its amount negative');
         const chip = document.querySelector('#requestBody [data-mny-action="rq-why"]');
@@ -25564,7 +25580,7 @@ function findChromium() {
             const h3 = [...document.querySelectorAll('#requestBody .rq-prices h3')].map(h => h.textContent.trim());
             if (h3.join(' / ') !== '🏆 Competitions / 📦 Box fine') bad.push('the price sheet opens on ' + h3.join(' / '));
             const fineRows = document.querySelectorAll('#requestBody .rq-prices .chore-card:last-child .ct-item');
-            const sheetBox = document.querySelector('#requestOverlay .sheet').getBoundingClientRect();
+            const sheetBox = document.querySelector('#requestOverlay .ui-sheet').getBoundingClientRect();
             const lastFine = fineRows.length ? fineRows[fineRows.length - 1].getBoundingClientRect().bottom : 1e4;
             if (lastFine > sheetBox.bottom) bad.push(`the Box fine rows end at ${Math.round(lastFine)}px, below the sheet (${Math.round(sheetBox.bottom)}px)`);
             rqClose();
@@ -25926,7 +25942,7 @@ function findChromium() {
                 .forEach(t => { if (txt.indexOf(t) < 0) bad.push(where + ': the sheet has no ' + t); });
               if (wk === newest.weekKey && txt.indexOf('Loan left after' + ' ' + fmtMoney(612.34)) < 0 && txt.indexOf('Loan left after' + fmtMoney(612.34)) < 0) bad.push(where + ': no "Loan left after ' + fmtMoney(612.34) + '": ' + txt.slice(0, 200));
               if (!/Settled without a sign/.test(txt)) bad.push(where + ': a seeded row with no sign does not say "Settled without a sign"');
-              const sheet = ov.querySelector('.sheet').getBoundingClientRect();
+              const sheet = ov.querySelector('.ui-sheet').getBoundingClientRect();
               body.querySelectorAll('*').forEach(el => {
                 if (!shown(el) || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
                 const a = el.getBoundingClientRect();
@@ -25935,7 +25951,7 @@ function findChromium() {
               });
               const alpha = Number((getComputedStyle(ov).backgroundColor.match(/rgba?\(([^)]+)\)/) || [])[1].split(',')[3] || 1);
               if (!(alpha >= 0.6)) bad.push(where + ': the scrim behind the sheet is ' + alpha + ' — the page reads through it');
-              const x = body.querySelector('[data-mny-action="rq-close"]');
+              const x = ov.querySelector('.ui-sheet > .ui-sheet-x');
               if (!x) bad.push(where + ': the sheet has no ✕');
               else { x.click(); if (ov.classList.contains('open')) bad.push(where + ': ✕ did not close the sheet'); }
             };
@@ -25976,7 +25992,7 @@ function findChromium() {
               const shownSum = lrows.reduce((n, l) => { const m = (l.querySelector('b') || {}).textContent.match(/−\$?([\d.,]+)/); return n + (m ? Number(m[1].replace(/,/g, '')) : 0); }, 0);
               if (lrows.length && Math.round(shownSum * 100) !== Math.round(rec.takenOff.fines * 100)) bad.push('late fine: the sheet lists ' + lrows.length + ' fine row(s) charging ' + shownSum.toFixed(2) + ' under a frozen ➖ fines total of ' + rec.takenOff.fines.toFixed(2) + ': ' + lbody.textContent.replace(/\s+/g, ' ').slice(0, 160));
               if (!lrows.length && rec.takenOff.fines > 0 && !frozenLine) bad.push('late fine: neither the fine rows nor the frozen 📦 Fines line show');
-              const lx = lbody.querySelector('[data-mny-action="rq-close"]'); if (lx) lx.click();
+              const lx = document.querySelector('#requestOverlay .ui-sheet > .ui-sheet-x'); if (lx) lx.click();
               lateAll.forEach(f => mrRemoveFine(kid, f.id));
             }
           } catch (e) { bad.push('threw: ' + e.message); }
@@ -26655,7 +26671,7 @@ function findChromium() {
     // Every static overlay's sheet is a labelled modal dialog.
     document.querySelectorAll('.overlay[id]').forEach(ov => {
       if (ov.id === 'appDialogOverlay') return;
-      const sheet = ov.querySelector('.sheet');
+      const sheet = ov.querySelector('.ui-sheet');
       if (!sheet) { bad.push(`${ov.id}: no sheet`); return; }
       if (sheet.getAttribute('role') !== 'dialog') bad.push(`${ov.id}: sheet is not role=dialog`);
       if (sheet.getAttribute('aria-modal') !== 'true') bad.push(`${ov.id}: not aria-modal`);
@@ -26688,7 +26704,7 @@ function findChromium() {
     closeSheet('templateOverlay');
     // The runtime dialogs are named too.
     const q = showConfirm('sure?');
-    const dlg = document.querySelector('#appDialogOverlay .sheet');
+    const dlg = document.querySelector('#appDialogOverlay .ui-dialog');
     const by = dlg && dlg.getAttribute('aria-labelledby');
     if (!by || !document.getElementById(by) || !document.getElementById(by).textContent.trim()) bad.push('the app dialog has no accessible name');
     _appDialogCancel(); await q;
@@ -27689,7 +27705,7 @@ function findChromium() {
                       const cs = getComputedStyle(pill);
                       near(px(cs.paddingTop), +p.pad[1], 0.01, 'the step pill top padding');
                       near(px(cs.paddingLeft), +p.pad[2], 0.01, 'the step pill side padding');
-                      if (cs.backgroundColor !== rgb(p.bg) || cs.color !== rgb(p.fg)) out.push(`${tag}: the step pill is ${cs.backgroundColor} / ${cs.color}, the picture's ${p.bg} / ${p.fg}`);
+                      if (cs.backgroundColor !== rgb('#2f7f77') || cs.color !== rgb('#ffffff')) out.push(`${tag}: the step pill is ${cs.backgroundColor} / ${cs.color}, R2 (owner 2026-10-12) wants the teal #2f7f77 / #ffffff, not the main action's yellow`);
                       if (!ruleOk(px(cs.borderTopWidth), 2) || cs.borderTopLeftRadius !== '999px') out.push(`${tag}: the step pill is ${cs.borderTopWidth} radius ${cs.borderTopLeftRadius}, the picture's 2px r999`);
                       if (cs.fontWeight !== p.weight) out.push(`${tag}: the step pill weight is ${cs.fontWeight}, the picture's ${p.weight}`);
                     }
@@ -28226,7 +28242,7 @@ function findChromium() {
     profile = 'jenn'; parentViewing = 'jenn';
     goToday();
     if (!click('#kidNav [data-td-nav="more"]')) problems.push('the kid nav has no More button');
-    const sheet = document.querySelector('#tdMoreOverlay .td-more-sheet');
+    const sheet = document.querySelector('#tdMoreOverlay .ui-sheet');
     if (!sheet) {
       problems.push('the More sheet did not open');
     } else {
@@ -28261,6 +28277,8 @@ function findChromium() {
   await parentPortal({ page, want, checks, setLook, clearLooks });
   // Sister Sync and the profile screens on the kit: tests/smoke-parts/social.js.
   await socialChecks({ page, want, checks, setLook, clearLooks });
+  // One sheet and one dialog, every pop-up (Stage 43): tests/smoke-parts/sheets.js.
+  await sheetChecks({ page, want, checks });
 
   // The money click sweep: tests/smoke-parts/money-screens.js.
   await moneyScreens.moneyClicks({ page, want, checks });

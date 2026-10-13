@@ -5,8 +5,8 @@
 ════════════════════════════════════════════════════════════════ */
 /* ── Styled dialogs — promise-based replacements for native confirm()/prompt()
    so destructive confirms and PIN/text entry stay inside the app's sheet
-   aesthetic instead of the browser's gray boxes. Reuses the .overlay/.sheet
-   styling. showConfirm → Promise<boolean>; showPrompt → Promise<string|null>
+   aesthetic instead of the browser's gray boxes. The kit's one dialog: an
+   .overlay--dialog holding a .ui-dialog (no ✕ — Cancel closes it). showConfirm → Promise<boolean>; showPrompt → Promise<string|null>
    (null on cancel, matching native prompt). ── */
 let _appDialogResolve = null;
 function _closeAppDialog(result) {
@@ -49,7 +49,7 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
   let ov = document.getElementById('appDialogOverlay');
   if (!ov) {
     ov = document.createElement('div');
-    ov.className = 'overlay';
+    ov.className = 'overlay overlay--dialog';
     ov.id = 'appDialogOverlay';
     ov.addEventListener('click', e => { if (e.target === ov) _appDialogCancel(); });
     document.body.appendChild(ov);
@@ -64,13 +64,12 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
     ? `<label class="app-dialog-check"><input type="checkbox" id="appDialogCheck" onchange="_appDialogCheckToggle()"> <span>${escapeHtml(checkLabel)}</span></label>`
     : '';
   ov.innerHTML =
-    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
-      <div class="sheet-handle"></div>
+    `<div class="ui-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
       <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       ${inputHtml}${checkHtml}
       <div class="app-dialog-btns">
-        ${hideCancel ? '' : `<button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>`}
-        <button type="button" id="appDialogOkBtn" class="btn-confirm${danger ? ' danger' : ''}" style="width:auto;flex:1"${checkLabel ? ' disabled' : ''} onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
+        ${hideCancel ? '' : `<button type="button" class="ui-btn ui-btn--secondary app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>`}
+        <button type="button" id="appDialogOkBtn" class="ui-btn ${danger ? 'ui-btn--danger' : 'ui-btn--primary'} ui-btn--block act-guard" style="width:auto;flex:1"${checkLabel ? ' disabled' : ''} onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
       </div>
     </div>`;
   return new Promise(resolve => {
@@ -107,7 +106,7 @@ function showChoice(message, options, opts = {}) {
   let ov = document.getElementById('appDialogOverlay');
   if (!ov) {
     ov = document.createElement('div');
-    ov.className = 'overlay';
+    ov.className = 'overlay overlay--dialog';
     ov.id = 'appDialogOverlay';
     ov.addEventListener('click', e => { if (e.target === ov) _appDialogCancel(); });
     document.body.appendChild(ov);
@@ -118,12 +117,11 @@ function showChoice(message, options, opts = {}) {
        ${o.sub ? `<span class="app-dialog-choice-sub">${escapeHtml(o.sub)}</span>` : ''}
      </button>`).join('');
   ov.innerHTML =
-    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
-      <div class="sheet-handle"></div>
+    `<div class="ui-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
       <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       <div class="app-dialog-choices">${btns}</div>
       <div class="app-dialog-btns">
-        <button type="button" class="pill-btn app-dialog-cancel" onclick="_closeAppDialog(null)">${escapeHtml(opts.cancelLabel || 'Not yet')}</button>
+        <button type="button" class="ui-btn ui-btn--secondary app-dialog-cancel" onclick="_closeAppDialog(null)">${escapeHtml(opts.cancelLabel || 'Not yet')}</button>
       </div>
     </div>`;
   ov.querySelectorAll('[data-choice]').forEach(btn => {
@@ -153,7 +151,9 @@ function _appChoiceKey(e) {
 // handler twice — placing a duplicate block, sending a duplicate invite, etc.
 // We swallow a repeat activation of the SAME action button inside a short
 // window. Opening any sheet resets the guard so legitimately re-using the same
-// static button on a fresh sheet is never blocked.
+// static button on a fresh sheet is never blocked. `act-guard` marks the kit
+// buttons that were .btn-confirm or .btn-danger before Stage 63 and Part 13, so the guard covers the same
+// buttons as before, not every .ui-btn--primary.
 let _actGuardBtn = null, _actGuardAt = 0;
 function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
 (function installActionDoubleTapGuard() {
@@ -164,7 +164,7 @@ function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
     if (!btn) return;
     const cls = typeof btn.className === 'string' ? btn.className : '';
     const oc = (btn.getAttribute && btn.getAttribute('onclick')) || '';
-    const isAction = /\bbtn-confirm\b/.test(cls) || /\bbtn-danger\b/.test(cls) || MUTATING.test(oc);
+    const isAction = /\bact-guard\b/.test(cls) || MUTATING.test(oc);
     if (!isAction) return;
     const now = Date.now();
     if (btn === _actGuardBtn && (now - _actGuardAt) < WINDOW_MS) {
@@ -188,7 +188,7 @@ function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
    safe first stops; failing those, the sheet itself. */
 const SHEET_FOCUSABLE = 'button:not([disabled]), select:not([disabled]), [href], [role="switch"], [tabindex]:not([tabindex="-1"])';
 function sheetFocusIn(ov) {
-  const sheet = ov.querySelector('.sheet') || ov;
+  const sheet = ov.querySelector('.ui-sheet') || ov;
   const first = sheet.querySelector('[autofocus]') || sheet.querySelector(SHEET_FOCUSABLE) || sheet;
   if (first === sheet && !sheet.hasAttribute('tabindex')) sheet.setAttribute('tabindex', '-1');
   try { first.focus({ preventScroll: true }); } catch (e) {}
@@ -198,6 +198,13 @@ function sheetFocusBack(ov) {
   if (back && document.contains(back) && typeof back.focus === 'function') {
     try { back.focus({ preventScroll: true }); } catch (e) {}
   }
+}
+/* The one ✕ of a sheet whose body is built in code (the request, Sunday,
+   She told me and More sheets): the kit icon button .ui-sheet-x, 44×44, top
+   right. `attrs` is a constant written in the caller — its close action. The
+   sheets in index.html write the same button by hand. */
+function sheetCloseXHtml(attrs) {
+  return `<button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" ${attrs}>✕</button>`;
 }
 function topOpenSheetId() {
   const open = document.querySelectorAll('.overlay.open');
@@ -309,7 +316,7 @@ function showMascotWithSuggestions(msg, suggestions, autoHide=true) {
   sugWrap.innerHTML = '';
   (suggestions || []).forEach(s => {
     const b = document.createElement('button');
-    b.className = 'pill-btn';
+    b.className = 'ui-btn ui-btn--secondary';
     b.textContent = `${s.icon} ${s.name}`;
     b.onclick = () => {
       hideMascot();

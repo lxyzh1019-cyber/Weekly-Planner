@@ -523,7 +523,7 @@ async function ctPromptBoxItem() {
   if (hit) {
     const go = await showConfirm(
       `"${label.trim()}" looks like ${hit} — the rulebook says that's never boxed.\nIt goes on Mom's shelf and she asks for it.\n\nBox it anyway?`,
-      { okLabel: 'Box it anyway', cancelLabel: 'Put it on the shelf', danger: true });
+      { okLabel: 'Box it anyway', cancelLabel: 'Put it on the shelf', danger: false });
     if (!go) return;
   }
   const e = mrBoxItem(ctActiveKid(), label, ctWeekKey);
@@ -641,7 +641,7 @@ function ctPreSystemBoard(kid, weekKey) {
     }
     body += `<div class="pre-row"><span class="pre-label">${row.icon || ''} ${escapeHtml(row.label)}</span>${cells}<span class="pre-total">${n}</span></div>`;
   });
-  return `<div class="pn-card pre-board" data-kid="${kid === 'jenn' ? 'jenn' : 'jess'}">
+  return `<div class="ui-card pre-board" data-kid="${kid === 'jenn' ? 'jenn' : 'jess'}">
     <div class="pre-title">${CT_PROFILE_ICON[kid] || ''} ${escapeHtml(kidLabel(kid).name)} · ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}</div>
     <div class="pre-money">${fmtMoney(money)} <span class="pre-meta">/ ${fmtMoney(CT_MONEY_CAP)} max · earned before the new money system</span></div>
     <div class="pre-meta">${paid ? '✅ Paid out at the family meeting' : 'Not paid out at a family meeting'}</div>

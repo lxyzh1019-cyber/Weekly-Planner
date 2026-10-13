@@ -256,11 +256,6 @@ function navDay(delta) {
    The Before School / School / After School / Evening bands are a different
    thing entirely and are very much alive — see buildSideband. */
 
-/* Today's Vibe (renderVibe / setDayMood) lived here: a mood picker folded away
-   on Today that wrote dayMoods[currentDayKey]. It is folded into Today's 🌙 How
-   was today? row (tdReflectRow, js/31-today.js), which opens the reflect sheet
-   with its day passed in (R5 §7 Q3) — one door for the day's mood. */
-
 /* Quest mode lived here — setDayViewMode, buildDayQuest, and before them
    Checklist mode. Three renderings of one day, each with its own completion
    handlers, retired one at a time for the same reason: a tick that can happen in
@@ -2269,13 +2264,6 @@ function clearPlacementGuide() {
    them, leftPaneManualCollapsed / applyLeftPaneState / toggleLeftPane hid the
    left "Today" rail. Both existed to manage a multi-pane screen. There is one
    pane now — the schedule — so there is nothing to focus and nothing to dim. */
-
-/* updateDayLandscapeChromeHeight lived here, with its two window listeners. It
-   measured the day screen's chrome into --day-landscape-chrome, which the three
-   rails each subtracted from the viewport to work out their own max-height —
-   the arithmetic that let three panes scroll independently. There is one
-   scroller now and it simply fills what is left, so there is nothing to
-   measure. */
 
 
 function placementFeedback() {
