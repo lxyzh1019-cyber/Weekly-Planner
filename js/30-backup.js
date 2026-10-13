@@ -278,7 +278,7 @@ function bkSundayStartLine() {
         : `withdrawn, ignored (from ${fmtDay(String(from), 'dated')})`;
       if (!found.includes(text)) found.push(text);
     });
-  return `Sunday-start money week: ${found.length ? found.join('; ') : 'none saved'}`;
+  return `Sunday-start money rule: ${found.length ? found.join('; ') : 'none saved'}`;
 }
 
 function bkRenderPanel() {

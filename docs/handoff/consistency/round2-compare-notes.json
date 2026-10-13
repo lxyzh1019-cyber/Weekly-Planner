@@ -39,7 +39,7 @@
     },
     {
       "title": "Stage 64 — read-only Sunday-start line on the backup screen (P10)",
-      "line": "The parent backup screen has one new line under \"On this device now\": Sunday-start money week: none saved — or \"saved, from <date>\" when this iPad's rulebook holds a Sunday-start rule, or \"withdrawn, ignored\" for the old shipped pair. It only reads; nothing is saved. The 4 backup pictures below are that line.",
+      "line": "The parent backup screen has one new line under \"On this device now\": Sunday-start money rule: none saved — or \"saved, from <date>\" when this iPad's rulebook holds a Sunday-start rule, or \"withdrawn, ignored\" for the old shipped pair. It only reads; nothing is saved. The 4 backup pictures below are that line.",
       "commits": "^Stage 64"
     },
     {
