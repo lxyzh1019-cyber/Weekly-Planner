@@ -1,5 +1,60 @@
 // Smoke group: the parent portal on the component kit (Consistency PR 10). thePortalKitHolds44px: every kit tab, button, chip and kid switch the portal draws (js/11-parent.js, js/32-parent-now.js) is at least 44×44 at 390×844 and 1194×834, in Pop and in Calm — the day squares, her rating's chips and the learning steppers included (She told me… is opened on every day it offers until each has been drawn). tests/smoke.js calls it near the end of the run, on its one shared page; it gives Jenn's today a training block while She told me… is open (her rating shows only on a training day) and takes it off again, and puts back the look, the size, the profile and the portal's place (unlocked, scope, viewing, tab, History's view), as everyHeaderMeasuresToTheExactValues does.
 module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
+  /* Stage 64 (owner P10 A): the parent backup screen says whether a
+     Sunday-start money week is saved in this device's rulebook, and opening it
+     writes nothing. Each rulebook is put in memory only; localStorage and
+     state.shared are compared before and after the screen opens, and the real
+     rulebook goes back at the end. With no rulebook stored at all only the
+     panel itself is redrawn: the portal around it already seeds the starting
+     rulebook on open (setParentTab → … mrPoolRow → mrEnsure, js/18-rules.js),
+     which is older than this line and not its business. */
+  if (want('theBackupScreenSaysIfASundayStartRuleIsSaved')) {
+    checks.theBackupScreenSaysIfASundayStartRuleIsSaved = await page.evaluate(() => {
+      const out = [];
+      const was = { profile, unlocked: parentUnlockedThisSession, tab: parentTab };
+      ctEnsureShared();
+      const c = state.shared.chore, had = Object.prototype.hasOwnProperty.call(c, 'moneyRules'), real = c.moneyRules;
+      const book = (...weeks) => ({ log: {}, versions: weeks.map((week, i) => ({
+        id: 'mrv-s64-' + i, effectiveFrom: '2026-0' + (i + 1) + '-05', createdAt: i, updatedAt: i, createdBy: 'parent',
+        reason: 'family_meeting', note: '', rules: { ...JSON.parse(JSON.stringify(MR_DEFAULT_RULES)), week } })) });
+      const day = k => fmtDay(k, 'dated');
+      const cases = [
+        ['no rulebook stored (the panel redrawn)', null, 'Sunday-start money week: none saved'],
+        ['the starting rulebook (Monday, no from)', book({ startsOn: 'monday' }), 'Sunday-start money week: none saved'],
+        ['Sunday with no from', book({ startsOn: 'sunday' }), 'Sunday-start money week: none saved'],
+        ['Sunday from 1 Nov 2026', book({ startsOn: 'monday' }, { startsOn: 'sunday', from: '2026-11-01' }), `Sunday-start money week: saved, from ${day('2026-11-01')}`],
+        ['the withdrawn pair', book({ startsOn: 'sunday', from: '2026-10-11' }, { startsOn: 'sunday', from: '2026-10-11' }), `Sunday-start money week: withdrawn, ignored (from ${day('2026-10-11')})`],
+      ];
+      const snap = () => {
+        const ls = {};
+        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
+        return JSON.stringify(ls) + '\n' + JSON.stringify(state.shared);
+      };
+      try {
+        profile = 'parent'; parentUnlockedThisSession = true;
+        showScreen('parent'); renderParentHome();
+        for (const [name, rb, expected] of cases) {
+          if (!rb) setParentTab('backup');
+          if (rb) c.moneyRules = rb; else delete c.moneyRules;
+          const before = snap();
+          if (rb) setParentTab('backup'); else bkRenderPanel();
+          const el = document.getElementById('bkSundayStart');
+          const panel = document.getElementById('ptab-backup');
+          const text = el ? el.textContent.trim() : null;
+          if (!el || !panel || panel.hidden || !el.getClientRects().length) out.push(`${name}: the Sunday-start line is not on the backup screen`);
+          else if (text !== expected) out.push(`${name}: reads "${text}", expected "${expected}"`);
+          if (snap() !== before) out.push(`${name}: opening the backup screen changed stored data (localStorage or state.shared)`);
+          if (!rb && Object.prototype.hasOwnProperty.call(c, 'moneyRules')) out.push(`${name}: a rulebook was created`);
+        }
+      } finally {
+        if (had) c.moneyRules = real; else delete c.moneyRules;
+        profile = was.profile; parentUnlockedThisSession = was.unlocked; parentTab = was.tab;
+        goToday();
+      }
+      return out.length ? out : true;
+    });
+  }
+
   /* Stage 62 (owner 2026-10-12): Monthly on a phone is 7 equal columns that
      shrink to fit; Sunday's right edge stays on screen at 360px. Every cell and
      weekday heading is measured, in both looks, at 360 and 390px, this month

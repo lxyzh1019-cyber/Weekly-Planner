@@ -167,6 +167,7 @@ function findChromium() {
     withMumReadsInBothLooks: [],
     oneSheetAndOneDialogEverywhere: [],
     theRedOkIsOnlyForWhatCannotBeUndone: [],
+    theBackupScreenSaysIfASundayStartRuleIsSaved: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))

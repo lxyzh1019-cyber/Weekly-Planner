@@ -40,6 +40,7 @@ const PARTS = {
     'theBuildNumberIsOnThePage',
     'thePortalKitHolds44px',
     'monthlyFitsAPhone',
+    'theBackupScreenSaysIfASundayStartRuleIsSaved',
     'sisterSyncIsOnTheKit',
     'theProfileScreensAreOnTheKit',
     'oneSheetAndOneDialogEverywhere',
