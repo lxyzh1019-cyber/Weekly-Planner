@@ -176,11 +176,6 @@ function renderStickerCollection(kid) {
     <div class="sticker-grid">${cells}</div>`;
 }
 
-/* showPocketMoney / togglePocketMoney / renderQuestMoneyStrip lived here. They
-   rendered into #questMoneyWrap on the Quest Board, which is gone; Today's own
-   money card (tdMoneyChart) is the kid-facing summary now, and 💰 My money is
-   still the page that owns the detail. */
-
 /* Week-topbar money button. Both roles land on 💰 My money — a parent looking
    at a kid's money should see exactly what the kid sees, and everything a
    parent can CHANGE lives on the Money rules tab of the portal instead. */
@@ -223,12 +218,6 @@ function goPlanToday() {
   const dayIdx = (d.getDay() + 6) % 7; // Monday = 0, matching the week grid
   openDayFromWeekCard(key, dayIdx);
 }
-
-/* openQuestDetail lived here: it opened the edit sheet when a kid tapped a
-   quest card's body on the Quest Board. The board no longer renders that list —
-   the day view's Quest mode does, and its cards already route a body tap
-   through onTimelineBlockTap, which knows about routines and training blocks
-   as well. */
 
 /* Arcade "blast to complete": tapping the 🎯 fires a shot at the quest card,
    which bursts before the quest is marked done — completion feels like a

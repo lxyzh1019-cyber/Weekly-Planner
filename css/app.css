@@ -52,8 +52,6 @@
        pill and the XP bar. */
     --today-mark: var(--ink);
     --today-mark-ink: #fff;
-    /* --day-landscape-chrome lived here: the day screen's chrome height, which
-       its three rails each subtracted from the viewport. One scroller now. */
 
     /* ── Reading size ──
        Every font-size under 1rem in this file is written as
@@ -851,10 +849,6 @@
     font-weight: 700;
   }
 
-  /* The .day-next-up-banner rules lived here — Today says "now" and "next up"
-     once, on its own card. */
-  /* The .day-kid-quick-row / .btn-break-quick rules lived here, styling the two
-     break buttons that sat permanently on Today. Both are gone. */
   .day-mini-panel {
     margin: 0 0 0.5rem;
     border: 2px solid var(--ink);
@@ -1005,8 +999,6 @@
 
   /* Brick colors — shared between weekly overview and MY TIME panel */
 
-
-  /* .week-grid lived here, for the retired compact week view. */
 
   /* ═══════════ PARENT MONTHLY HEATMAP ═══════════ */
   .pm-grid-wrap { padding: 0.5rem 0.8rem; }
@@ -1266,8 +1258,6 @@
      displayed for a channel a grown-up overrode at the meeting. */
   /* The Quest Board's door into the day view's quest list — the board no longer
      renders its own copy of that list. */
-  /* .quest-today-card and its parts lived here — the Quest Board's summary of
-     today, and its door through to the real list. Today IS the list. */
 
 
   /* Marks a chore that reached the day without being planned. */
@@ -1866,17 +1856,8 @@
     0%, 100% { box-shadow: 0 0 0 var(--status-clash-glow-none); }
     50% { box-shadow: 0 0 0 3px var(--status-clash-glow-strong); }
   }
-  /* W2 was here: an icon-only tier for a block too short even for a name, plus
-     the --xslim type ramp that went with it (11.84px card text, 12.8px icon —
-     both under the 13px floor). Nothing sets either class now. The week's card
-     floor is the `name` tier, so the shortest block the app allows says what it
-     is instead of rendering as a bare emoji with the name only in a title
-     tooltip, which a child on an iPad can never reach. */
   /* W1: continuation segment of a block that crosses a zone boundary. Dashed
      top edge + ⤵ marker, no time/check (those live on the first segment). */
-  /* The .week-legend rules lived here. That legend was parent-only markup inside
-     the permanently hidden compact view, so it never rendered; the Day Blocks
-     view's .tg-legend-* is the live one. */
 
   /* ═══════════ DAY EDITOR ═══════════ */
   /* Event-zone chips — secondary jump-to filter, kept small so the schedule
@@ -1905,9 +1886,6 @@
   .obj-item.refl-block-row { flex-wrap: wrap; justify-content: space-between; font-size: calc(max(15px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1)); }
 
 
-  /* .timeline-wrap lived here — the inner scroll box between .day-workspace and
-     .timeline. Its overflow was the middle of three nested scrollers; the day
-     scrolls as one surface now, and .day-workspace is it. */
   /* Today's rules here (Day "Checklist" mode / Today hero strip) moved to css/today.css (Consistency PR 7). */
   /* Pixel-canvas timeline: one hour gutter, then one column per day on show. */
   /* THE DAY STOPS WHERE THE DAY STOPS. This carried min-height: 1344px — the
@@ -2118,13 +2096,7 @@
   .tl-canvas.placing .tl-placement-guide {
     opacity: 1;
   }
-  /* .tl-hour-line and .tl-halfhour-line lived here. Three surfaces each drew
-     their own rules — or, in the Day Blocks week, a decorative stripe that named
-     no time — and all of them drew them UNDER the blocks, so the grid said
-     nothing the moment a day was actually planned. One owner now: buildHourGrid
-     in js/05-helpers.js.
-
-     ── The :00 / :30 grid ──
+  /*
      Over the blocks, and no text: a label on every hour on three surfaces at
      three scales is a lot of words on screens held to 200 of them, so the hour
      reads as a heavier rule with a tick at the column's left edge and the half
@@ -2254,10 +2226,7 @@
     border-radius: 5px; padding: 0 3px; font-weight: 800; white-space: nowrap;
   }
 
-  /* The ACTIVITY TRAY section lived here: the fixed bottom/side rail of
-     activity chips, its filters, its header and its level/lock badges. The
-     rail is gone — placement goes through the picker that opens where you
-     tap. .filter-chip survives because that picker uses it. */
+  /* .filter-chip: the chips of the placement picker that opens where you tap. */
   .filter-chip {
     flex-shrink: 0; background: var(--bg); border: 2px solid var(--ink);
     border-radius: 16px; padding: 0.3rem 0.9rem;
@@ -3397,11 +3366,8 @@
     }
   }
 
-  /* The QUEST BOARD block lived here — #screen-quest's gradient, its topbar,
-     the hero card with its own Lv/XP bar, the board header and the quest list.
-     The screen is retired (index.html says why); Today carries the hero strip
-     it duplicated, as .dq-hero. The sticker collection below moved to Today
-     with its ids intact, so its rules stay exactly as they were. */
+  /* The sticker collection below moved to Today from the Quest Board with its
+     ids intact, so its rules stay exactly as they were. */
 
   /* Sticker collection (#8) */
   .sticker-collection { margin-top: 1rem; }
@@ -3467,10 +3433,6 @@
   }
   .mission-clear-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
 
-  /* The Quest Board's pocket-money disclosure lived here, and its rules went
-     with the retired "how I earn" card for weeks under the old $6-cap group
-     model. Today's own money card is the kid-facing summary now, and 💰 My
-     money owns the detail. */
   /* The 3a "How I earn" card drew its own earnings bar, rule chips and wallet
      tiles here. It was the LEGACY half of that card — the one for weeks priced
      under the retired $6-cap group model — and it went when the two money
@@ -3716,9 +3678,6 @@
     60% { transform: translateX(3px) scale(0.99) rotate(1deg); }
     100% { transform: none; }
   }
-
-  /* Hero Mode toggle on profile screen */
-  /* .hero-mode-toggle lived here, for a switch that no longer exists. */
 
   /* ══════════════════════════════════════════════════════════════
      POCKET MONEY — the five money pages (.mny-*)

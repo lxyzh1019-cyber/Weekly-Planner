@@ -3,14 +3,8 @@
 /* ════════════════════════════════════════════════════════════════
    PLACING AN ACTIVITY
 
-   buildTray lived here — the Activities rail down the right of the day screen,
-   a scrolling grid of every activity in the library. It is gone, and with it the
-   pick-then-tap model it existed for: you chose a chip, the rail dimmed, and the
-   schedule waited for a second tap. Tapping a time opens the picker right there
-   instead, which is the interaction that was already doing the work, and the day
-   screen gets the rail's width back.
-
-   What is left is the other half of that model: a caller that already knows
+   Tapping a time opens the picker right there. What is left here is for a
+   caller that already knows which activity, and needs somewhere to put it.
    which activity, and needs somewhere to put it.
 ════════════════════════════════════════════════════════════════ */
 
@@ -1779,14 +1773,6 @@ function togglePin() {
   document.getElementById('pinToggle').classList.toggle('on', blk.parentPinned);
   buildTimeline();
 }
-
-/* ctAutoCheckOptionalFromBlock lived here: it synced a completed chore block
-   into `optionalByWeek`, the retired chore-GROUP store. Nothing downstream
-   reads that store any more — not the kid tab, not the parent portal, not
-   mrWeekBreakdown — so its only remaining effect was to make a chore look
-   handled while it never reached anyone. Completions now route through
-   claimChoresFromBlock / gradeChoresFromBlock (js/06-quests.js), which write
-   claims and grades against the chore pool. */
 
 function toggleConfirm() {
   if (!isParent()) { showToast('Only parents can confirm 🔒'); return; }

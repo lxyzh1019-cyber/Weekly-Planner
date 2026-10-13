@@ -535,10 +535,7 @@ function computeWeekTotals(keys) {
    — which is two problems at once. A week total is not a number a nine-year-old
    can act on without dividing it by seven in her head, and a row of pills has no
    column to read down, so comparing two categories means hunting. Per day leads
-   now, the week total sits behind it, and the whole thing is a two-column table.
-
-   onWeekAgeChange was here, behind a 🎂 Age field. Both are gone: the child is
-   not asked her age (currentAge answers it), and the parent portal corrects it. */
+   now, the week total sits behind it, and the whole thing is a two-column table. */
 function renderWeekGlance(keys) {
   const body = document.getElementById('weekGlanceBody');
   if (!body) return;
@@ -1114,8 +1111,7 @@ function attachMiddleDragPan(el) {
 }
 /* Every scroll surface a plan is read on. .wpp-wrap is in the list even though
    it does not scroll itself: it is where the cursor is when a parent pans the
-   print preview, and its leftover — which is all of it — carries the page.
-   (.tg2-wrap was here for the same reason, for the retired Day Blocks week.) */
+   print preview, and its leftover — which is all of it — carries the page. */
 function bindMiddleDragPan() {
   ['.weekly-full-wrap', '.wpp-wrap', '#screen-day .day-workspace']
     .forEach(sel => document.querySelectorAll(sel).forEach(attachMiddleDragPan));

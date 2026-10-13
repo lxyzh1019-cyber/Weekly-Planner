@@ -1499,13 +1499,6 @@ function mmToggleAllRoutines(kid, d) {
    completion every screen uses, chores from real parent grades, hours from
    getWeeklyHours, money from the FROZEN ledger once it exists, XP from the XP
    ledger. Nothing here is computed a second way. */
-/* mmRenderCelebrate lived here. Its per-child "wins" list re-derived what the
-   week showed — routines, chores, hours, XP — beside the accessors that already
-   owned each one. Step 2 asks the child first and offers the same facts as
-   evidence underneath, through reflEvidence (js/37-reflection.js), so the list
-   became a second answer to a question that now has an owner. The planned-vs-
-   completed chart it carried was the celebration half and survives on step 2;
-   mm2b and mm2bScale still draw it. */
 
 /* The third copy of this chart, and the third bucketing of the same blocks.
    It read b.completed directly, so a routine finished by its checklist counted
@@ -1532,9 +1525,6 @@ function mm2bScale(wk) {
     Object.values(getWeeklyHours(k, wk).byGroup).map(v => v.planned)));
 }
 
-/* `mmRenderConfirm` (the old "Confirm & record" step, unreachable since the
-   meeting became three steps) and `mmConfirmAndRecord` are retired (Sunday
-   v15 Stage 4). */
 /* ── ↺ Redo: ONE GIRL'S snapshot, taken at her sign ─────────────────
    Sunday v15 signs one girl at a time, and ↺ Redo my plan returns her and
    only her (Plan v3 §A, Rev 2). The meeting-wide picture that used to sit
@@ -1979,13 +1969,6 @@ function mmFinishButtons(wk) {
       <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
     </span>`;
 }
-/* mmPlanNextWeek lived here. It copied whatever week the meeting was pointed
-   at into the following one and then did `weekOffset += 1` — which is correct
-   only on the current week and silently wrong on every other, writing a
-   historical week's plan over the top of another week that had already
-   happened. The last step no longer offers it: copying a schedule belongs in
-   the planner, beside the week it would land on, where pcwPlan (Setup › Copy a
-   plan) and fillWeekFromNearest already do it and show their work first. */
 
 // Core money commit for the weekly meeting (no UI): credit each kid's prelim
 // pocket money to cash, advance the money world one month (interest + GIC

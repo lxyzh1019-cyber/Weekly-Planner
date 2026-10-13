@@ -54,11 +54,6 @@ function pcwPairs() {
   return [[scoped, dst]];
 }
 
-/* pcwPlaceableIds lived here. The day copy needs the same answer now, so it is
-   placeableActivityIds in js/05-helpers.js — one owner, since two screens
-   deciding for themselves what the other child can resolve is exactly how they
-   would come to disagree. */
-
 function pcwWeekBlockCount(mondayKey, kid) {
   return mrWeekDayKeys(mondayKey)
     .reduce((n, k) => n + (getDayBlocksForProfile(k, kid) || []).length, 0);

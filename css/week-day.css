@@ -38,8 +38,7 @@
     gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.4rem;
   }
   .week-glance-header h3 { font-size: calc(1.25rem * var(--text-scale, 1)); margin: 0; }
-  /* .week-glance-age and its number input were here, and the 🎂 Age question
-     with them. A row per category instead of a wrap of pills: pills have no
+  /* A row per category instead of a wrap of pills: pills have no
      column to read down, so comparing two of them meant hunting across a
      paragraph. Nothing here is under the 13px floor, and the figure a child
      actually reads — the per-day average — is at 15px. */

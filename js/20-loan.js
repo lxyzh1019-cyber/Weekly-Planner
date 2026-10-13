@@ -198,12 +198,9 @@ function loanState(kid, debtId) {
   return mnyDebtById(kid, debtId) || mnyNormalizeDebt({ id: 'none' });
 }
 
-/* Sunday v15 Stage 4 retired the old monthly schedule here: `loanMonthKey`,
-   `loanDownOutstanding`, `loanDueNow` (the down payment, then the monthly
-   figure) and `mnyDueNowAll`. A Sunday takes the must-pay below
-   (`mnyDueThisWeek` / `mnyLoanSundayPayment`); a debt's `downPayment*`
-   fields stay on the record for the weeks lived under them and are read by
-   nothing that moves money (Plan v3 §D). */
+/* A Sunday takes the must-pay below (`mnyDueThisWeek` / `mnyLoanSundayPayment`);
+   a debt's `downPayment*` fields stay on the record for the weeks lived under
+   them and are read by nothing that moves money (Plan v3 §D). */
 
 /* What's still owed: principal not yet cleared, plus any interest charged. */
 function loanBalance(kid, debtId) {
@@ -257,11 +254,8 @@ function loanRecordPayment(kid, amount, kind, debtId) {
   return rec;
 }
 
-/* Retired in Sunday v15 Stage 4 (Plan v3 §D, §G): the deposit prompt
-   (`loanPayDownPaymentPrompt`), the monthly arrears charge (`loanAccrueArrears`,
-   `mnyAccrueArrearsAll`) and the monthly transfer with its three shortfall
-   choices (`loanSundayTransfer`, `mnySundayTransferAll`). A short Sunday pays
-   what there is and carries the rest, with no interest on it. */
+/* A short Sunday pays what there is and carries the rest, with no interest on
+   it (Plan v3 §D, §G). */
 
 /* ════════════════════════════════════════════════════════════════
    SUNDAY v15 LOAN TERMS (Plan v3 §D, owner decision D4)

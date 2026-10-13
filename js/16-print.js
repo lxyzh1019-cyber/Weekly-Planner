@@ -53,11 +53,6 @@ function onPrintWindowChange() {
   renderPrintSheet();
 }
 
-/* onPrintAgeChange was here. It read document.getElementById('printAge').value
-   with no null guard, and there has been no #printAge element in index.html for
-   a long time — so the one thing it could have done was throw. Age is not asked
-   for anywhere now; currentAge() answers it. */
-
 /* Print's standard header, never printed: ◀ back through the one back stack
    (the week it was opened from), Print week, and 🖨 Print, which prints. */
 function openPrint() {
@@ -328,8 +323,5 @@ function renderPrintSheet(host, opts) {
 
 // Weekly time-per-category totals over the chosen window, plus unscheduled
 // (free) time and an age-based sleep recommendation.
-/* buildPrintSummary lived here — the week's totals as a footer under the print
-   grid. It had no caller: the summary was dropped from the sheet deliberately
-   (see the note above the render) and the function outlived it. */
 
 

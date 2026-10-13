@@ -42,11 +42,6 @@ const QUIET_HOURS = { startMin: 21 * 60, endMin: 7 * 60 };
 const DEFAULT_KID_AGE = 10;
 const AGE_ROLLOVER_MONTH = 7;   // 0-based: August
 
-/* CAT_COLOUR lived here: the same nine categories again, as `var(--cat-*)`
-   strings. It had ZERO consumers — a third copy of a colour table that nothing
-   ever read, which is worse than a duplicate that drifts, because a duplicate
-   that drifts at least shows up on a screen. CAT_HEX below is what the app
-   asks, and ACTIVITY_CATEGORIES is what owns the hues. */
 /* Brighter, same hue (Looks stage 2, 2026-09-27): each value sits on its
    category's main subgroup below where one exists, and every value it replaced
    is in RETIRED_SEEDED_HEXES. css/app.css's `--cat-*` copy these for the few
@@ -781,10 +776,6 @@ function getObjectivePresets(act, tag, isCompetition) {
    AFTERSCHOOL_CHECKLIST_REWARDS) are a DIFFERENT feature that happens to share
    the same prompt widget, and they stay: those earn an extra checklist item off
    a real streak rather than gating an activity. */
-/* TUTORIAL_STARTER_CHOICES lived here — the three Family Hero chores the
-   first-run overlay offered as a "starter" to unlock. Onboarding went with the
-   unlock subsystem: its whole content was picking a locked chore, so with
-   nothing locked there was nothing left for it to say. */
 const AFTERSCHOOL_CHECKLIST_REWARDS = [
   { id:'ar1', text:'Champion Prep: 10-minute reading star mission' },
   { id:'ar3', text:'Calm Finish Bonus: 5-minute stretch reset' },
