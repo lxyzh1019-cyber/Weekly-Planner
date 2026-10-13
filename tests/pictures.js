@@ -62,7 +62,7 @@ const RETRIES = 2;
    box. One state, one size, one look, to keep the cost small. */
 const PLANT = { state: 'confirm-dialog', user: 'jenn', size: 'ipad', look: 'pop',
   selector: '#appDialogOverlay .app-dialog-cancel',
-  css: '' }; // TEMPORARY: plant disabled to prove the check goes red
+  css: 'outline: 1px solid #f00 !important; outline-offset: -1px !important;' };
 
 const SIZES = { ipad: { width: 1194, height: 834 }, phone: { width: 390, height: 844 } };
 const LOOKS = ['pop', 'calm'];
