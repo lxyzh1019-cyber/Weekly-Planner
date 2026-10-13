@@ -226,7 +226,19 @@ channel, 0 pixels); each such pass is printed as "matched on retry N: <name>"
 and counted in the summary. A picture that never matches fails with its diff.
 Why: on the CI Linux runner colour emoji are scaled from a bitmap font, and
 their edges came out a few levels apart between two runs of the same code. The
-self-check does not retry. `PICTURES_UPDATE=1` takes no retries.
+self-check does not retry. `PICTURES_UPDATE=1` takes no retries. The retries
+are permanent (D63, 2026-10-13): colour emoji are not hidden, because hiding
+them moved the text after each emoji.
+
+**Plant check.** After the compare, one picture (`confirm-dialog-jenn-ipad-pop`)
+is shot again with a paint-only change planted: a 1px red outline drawn inside
+the dialog's Cancel button (`outline-offset: -1px`, so nothing moves; the
+button's text must have no emoji). It goes through the same retries as every
+picture and must still differ after both re-shots, with the difference box
+inside the button's box (scaled by the device pixel ratio, ±1px); the run
+prints "plant check: … caught". Not caught fails the run, locally too, like the
+self-check; caught outside the button fails on CI. It proves the retries cannot
+pass a real change.
 
 **Local vs CI.** References are made and compared only on the CI Linux runner;
 fonts and the browser build differ elsewhere. Without `CI` set the test reports

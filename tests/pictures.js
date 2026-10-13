@@ -50,8 +50,19 @@ const ALLOWED_PIXELS = 0;
    colour emoji are scaled from a bitmap font, and their edges came out a few
    levels apart between two runs of the same code (parent-money, phone, Pop:
    14 pixels on the ⛸️ of one button), while a real change differs every time.
-   The self-check does not retry. */
+   The self-check does not retry. Permanent since 2026-10-13 (D63): colour
+   emoji are not hidden (hiding them moved the text after each emoji), so the
+   retries stay, and the plant check below proves a real change still fails
+   through them. */
 const RETRIES = 2;
+/* The plant check: one picture is shot with a paint-only change planted (a 1px
+   red outline drawn inside one button whose text has no emoji, so no layout
+   moves) and compared through the same retries as every picture. It must still
+   differ after all RETRIES re-shots, with the difference inside the button's
+   box. One state, one size, one look, to keep the cost small. */
+const PLANT = { state: 'confirm-dialog', user: 'jenn', size: 'ipad', look: 'pop',
+  selector: '#appDialogOverlay .app-dialog-cancel',
+  css: 'outline: 1px solid #f00 !important; outline-offset: -1px !important;' };
 
 const SIZES = { ipad: { width: 1194, height: 834 }, phone: { width: 390, height: 844 } };
 const LOOKS = ['pop', 'calm'];
@@ -446,7 +457,9 @@ async function buildStorage(browser) {
 
 // One size in one look: every state, each from a fresh load of the fixture.
 // With `only` (a picture name), just that one picture, in a context of its own.
-async function shootAll(browser, size, look, storage, settledWeek, only) {
+// With `plant` (PLANT), its outline is added just before the picture is taken;
+// the shot then carries the button's text and box (`planted`).
+async function shootAll(browser, size, look, storage, settledWeek, only, plant) {
   const ctx = await newContext(browser, size, FIXTURE.now);
   await ctx.addInitScript(({ storage, look }) => {
     localStorage.clear();
@@ -497,9 +510,21 @@ async function shootAll(browser, size, look, storage, settledWeek, only) {
         if (s.shows && !(await page.evaluate((sel) => !!document.querySelector(sel), s.shows))) {
           throw new Error(`${s.shows} is not on show after open`);
         }
+        const planted = plant ? await page.evaluate(({ selector, css }) => {
+          const el = document.querySelector(selector);
+          if (!el) throw new Error(`plant: ${selector} is not on show`);
+          const text = el.textContent.trim();
+          if (/\p{Extended_Pictographic}/u.test(text)) throw new Error(`plant: the button text "${text}" has an emoji`);
+          el.setAttribute('data-px-plant', '1');
+          const st = document.createElement('style');
+          st.textContent = `[data-px-plant] { ${css} }`;
+          document.head.appendChild(st);
+          const r = el.getBoundingClientRect(), d = window.devicePixelRatio;
+          return { text, box: { x: (r.left + window.scrollX) * d, y: (r.top + window.scrollY) * d, w: r.width * d, h: r.height * d } };
+        }, plant) : null;
         const png = await stillShot(page, !!s.sheet);
         if (!png) problems.push(`${name}: never held still for two pictures in a row`);
-        else shots.push({ name, png, size, look });
+        else shots.push({ name, png, size, look, planted });
         if (errors.length) problems.push(`${name}: the app reported an error — ${errors.join(' | ')}`);
       } catch (e) {
         if (/^ABORTING/.test(e.message)) throw e;
@@ -635,6 +660,22 @@ async function selfCheck(cmp, png) {
       return;
     }
 
+    // A shot compared with its reference; while it differs it is shot again
+    // (with the same plant, if any), up to RETRIES times. `again` is the re-shot
+    // that matched; `reshots` counts the re-shots taken.
+    async function compareWithRetries(shot, ref, plant) {
+      const r = await cmp.evaluate(compareInPage, { a: ref, b: dataUrl(shot.png), tol: CHANNEL_TOLERANCE, wantDiff: true });
+      let again = null, reshots = 0;
+      for (let n = 1; r.count > ALLOWED_PIXELS && !again && n <= RETRIES; n++) {
+        reshots = n;
+        const re = (await shootAll(browser, shot.size, shot.look, storage, settledWeek, shot.name, plant)).shots[0];
+        if (!re) continue;
+        const rr = await cmp.evaluate(compareInPage, { a: ref, b: dataUrl(re.png), tol: CHANNEL_TOLERANCE, wantDiff: false });
+        if (rr.count <= ALLOWED_PIXELS) again = Object.assign(re, { retry: n });
+      }
+      return { r, again, reshots };
+    }
+
     const refs = fs.existsSync(REF_DIR) ? fs.readdirSync(REF_DIR).filter(f => f.endsWith('.png')) : [];
     const problems = openProblems.slice();
     if (!refs.length) {
@@ -647,21 +688,13 @@ async function selfCheck(cmp, png) {
       for (const s of shots) {
         const refPath = path.join(REF_DIR, s.name + '.png');
         if (!fs.existsSync(refPath)) { problems.push(`${s.name}: missing reference`); continue; }
-        const ref = dataUrl(fs.readFileSync(refPath));
-        const r = await cmp.evaluate(compareInPage, { a: ref, b: dataUrl(s.png), tol: CHANNEL_TOLERANCE, wantDiff: true });
-        let matched = false;
-        for (let n = 1; r.count > ALLOWED_PIXELS && !matched && n <= RETRIES; n++) {
-          const again = (await shootAll(browser, s.size, s.look, storage, settledWeek, s.name)).shots[0];
-          if (!again) continue;
-          const rr = await cmp.evaluate(compareInPage, { a: ref, b: dataUrl(again.png), tol: CHANNEL_TOLERANCE, wantDiff: false });
-          if (rr.count <= ALLOWED_PIXELS) {
-            matched = true;
-            retried.push(s.name);
-            console.log(`matched on retry ${n}: ${s.name} (first shot: ${r.count} pixels differed, box x=${r.box.x} y=${r.box.y} w=${r.box.w} h=${r.box.h})`);
-            fs.writeFileSync(path.join(NEW_DIR, s.name + '.png'), again.png);
-          }
+        const { r, again } = await compareWithRetries(s, dataUrl(fs.readFileSync(refPath)));
+        if (again) {
+          retried.push(s.name);
+          console.log(`matched on retry ${again.retry}: ${s.name} (first shot: ${r.count} pixels differed, box x=${r.box.x} y=${r.box.y} w=${r.box.w} h=${r.box.h})`);
+          fs.writeFileSync(path.join(NEW_DIR, s.name + '.png'), again.png);
         }
-        if (r.count > ALLOWED_PIXELS && !matched) {
+        if (r.count > ALLOWED_PIXELS && !again) {
           differ++;
           fs.mkdirSync(DIFF_DIR, { recursive: true });
           if (r.diffUrl) fs.writeFileSync(path.join(DIFF_DIR, s.name + '.png'), fromDataUrl(r.diffUrl));
@@ -671,12 +704,41 @@ async function selfCheck(cmp, png) {
       }
       console.log(`compared ${shots.length} pictures with tests/reference/: ${differ} differ` +
         `, ${retried.length} matched only on a retry (up to ${RETRIES} re-shots each in a new context)`);
+
+      // 2. The plant check: a planted paint-only change must still fail
+      //    through the retries. Not caught is a broken test, so like the
+      //    self-check it exits 1 locally too.
+      const plantName = `${PLANT.state}-${PLANT.user}-${PLANT.size}-${PLANT.look}`;
+      const plantRef = path.join(REF_DIR, plantName + '.png');
+      if (!fs.existsSync(plantRef)) problems.push(`plant check: ${plantName} has no reference`);
+      else {
+        const shot = (await shootAll(browser, PLANT.size, PLANT.look, storage, settledWeek, plantName, PLANT)).shots[0];
+        if (!shot) {
+          console.error(`FAIL  plant check: the planted picture ${plantName} could not be taken`);
+          exitCode = 1;
+        } else {
+          const { r, again, reshots } = await compareWithRetries(shot, dataUrl(fs.readFileSync(plantRef)), PLANT);
+          const b = shot.planted.box;
+          const what = `1px red outline on "${shot.planted.text}" (box x=${b.x} y=${b.y} w=${b.w} h=${b.h}) in ${plantName}`;
+          if (r.count <= ALLOWED_PIXELS || again || reshots !== RETRIES) {
+            console.error(`FAIL  plant check: the ${what} was not caught (first shot ${r.count} pixels differed` +
+              (again ? `, matched on retry ${again.retry}` : '') + `, ${reshots} of ${RETRIES} re-shots taken)`);
+            exitCode = 1;
+          } else {
+            const inside = r.box.x >= b.x - 1 && r.box.y >= b.y - 1 &&
+              r.box.x + r.box.w <= b.x + b.w + 1 && r.box.y + r.box.h <= b.y + b.h + 1;
+            const found = `${r.count} pixels differ, box x=${r.box.x} y=${r.box.y} w=${r.box.w} h=${r.box.h}`;
+            if (inside) console.log(`plant check: the ${what} still differs after ${RETRIES} re-shots (${found}, inside the button) — caught`);
+            else problems.push(`plant check: the ${what} differs outside the button (${found})`);
+          }
+        }
+      }
     }
     if (problems.length) {
       console.error(`\n${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
       if (GATING) { console.error('\nFAIL  picture test (diffs in tests/out/pictures-diff/, fresh set in tests/out/pictures-new/)'); exitCode = 1; }
       else console.log('\nlocal run — not gating (references are made and compared on the CI Linux runner only)');
-    } else {
+    } else if (!exitCode) {
       console.log(refs.length ? 'ALL PICTURES MATCH' : 'pictures taken; nothing to compare yet');
     }
   } catch (e) {

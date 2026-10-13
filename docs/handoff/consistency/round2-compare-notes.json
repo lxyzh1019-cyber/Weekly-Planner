@@ -1,0 +1,45 @@
+{
+  "intro": "Round 2 of the consistency pass: every picture that changed between main and the Round 2 branch, old on the left, new on the right. Made by node tools/picture-diff-page.js --git origin/main HEAD docs/handoff/consistency/round2-compare.html \"Round 2 — before and after\" --notes docs/handoff/consistency/round2-compare-notes.json",
+  "sections": [
+    {
+      "title": "Part 12 — sheets and dialogs (Stage 43, P1–P6)",
+      "line": "Every pop-up has one look: centred on the iPad, from the bottom on the phone, one ✕ of at least 44px top right; the edit, activity and training forms keep their right-side panel on the iPad; yes/no dialogs keep only Cancel; money pop-ups keep their area colours (P1–P4). The handle bar shows only on phone sheets and the ✕ stays in view while a tall sheet scrolls (P5, P6, built in Stage 63).",
+      "commits": "^Stage 43"
+    },
+    {
+      "title": "Stage 62 — parent kit, Monthly on a phone",
+      "line": "The parent pages (Monthly, Copy a week, Access, Profiles, Preferences, School calendar) use the kit buttons and cards; Monthly on a phone has 7 equal columns that shrink, and Sunday's right edge stays on screen at 360px.",
+      "commits": "^Stage 62"
+    },
+    {
+      "title": "Stage 63 — kit buttons, nav colour, teal step, Not now",
+      "line": "The other files' old buttons are kit buttons; the current nav tab takes the planner's picked colour; the meeting's current step is teal (yellow is only the main action); \"Not now\" on the Record and request sheets is a kit secondary button.",
+      "commits": "^Stage 63"
+    },
+    {
+      "title": "Part 13 — clean-up and guards (Stage 45)",
+      "line": "The old buttons are gone: the 32 pictures below are the three form sheets' picks, now kit chips, and the Week's + buttons, now kit icon buttons. The red OK is kept only for what cannot be undone — 8 red, 4 normal, 2 red only when blocks are lost. Copy a day says \"N blocks will be replaced\" (not \"planned\": the count includes ticked blocks), which differs from P9's example.",
+      "items": [
+        "Red: Reset week — \"Reset all chore data (and pocket money) for week of <Mon date>?\" (Reset)",
+        "Red: Start a day over — \"Start <day> over? This takes off: … There is no undo.\" (Start over)",
+        "Red: Remove a goal — \"Remove this goal?\" (Remove)",
+        "Red: take an activity off the list — \"Take \"<activity>\" off the list? It is on N days from today onward — those will be removed.\" (Take it off)",
+        "Red: Reset a routine — \"Reset this routine to the built-in default? Your edits will be lost.\" (Reset)",
+        "Red: Delete a routine — \"Delete this routine?\" (Delete)",
+        "Red: replace from a backup — \"This replaces the N weeks on this device with the M in the backup. It can't be undone.\" (Replace everything)",
+        "Red: Copy a week over planned blocks — \"Replace N blocks already planned in <week>? … Nothing in <week> is touched.\" (Replace them)",
+        "Normal: Box it anyway — \"\"<item>\" looks like <rule> — the rulebook says that's never boxed. … Box it anyway?\"",
+        "Normal: an exercise off the list — \"Take this exercise off the girls' list?\" (Take it off)",
+        "Normal: a child-added activity off the list — \"Take this activity the child added off the list?\" (Take it off)",
+        "Normal: Retire a chore — \"Retire \"<chore>\"? Past weeks keep every grade it already earned.\" (Retire)",
+        "Red only when blocks are lost: a repeat cut short — \"Run this repeat until <day>? … N planned blocks will be removed. Days already ticked or confirmed are kept either way.\" (Update it)",
+        "Red only when blocks are lost: Copy a day — \"Copy <day>'s plan? … N blocks will be replaced: …\" (Copy it)"
+      ],
+      "commits": "^Stage 45"
+    },
+    {
+      "title": "Test note — emoji not hidden (deviation)",
+      "line": "Colour emoji are not hidden in the picture test: hiding them moved the text after each emoji. The retry loop stays (a differing picture is shot again up to 2 times), and a planted check proves a real change still fails through it: a 1px red outline on the confirm dialog's Cancel button must still differ after both re-shots, inside the button's box."
+    }
+  ]
+}
