@@ -1,0 +1,1638 @@
+diff --git a/ARCHITECTURE.md b/ARCHITECTURE.md
+index 8e7b732..93f174b 100644
+--- a/ARCHITECTURE.md
++++ b/ARCHITECTURE.md
+@@ -3195,6 +3195,43 @@ four segments, which counted to four on Christmas week as readily as on a term
+ Tuesday and is exactly why the 9am band stood for so long. They assert the axis
+ matches the day it claims to describe.
+ 
++## Follow a calendar — a club's practices, kept in step (build 2026-10-16a)
++
++`js/48-cal-follow.js`, App › Follow a calendar. The school import
++(`js/35-school-calendar.js`) takes days off and term dates only; timed events
++belong here, placed for one child as one activity and read again later.
++
++- **Storage.** `state.shared.calFeeds`, id-keyed records merged with
++  `mergeArrayById(…, 'feed:')`; stopping one tombstones `feed:<id>`. A placed
++  block carries `calFeed`, `calKey` (`<event id>|<day first set for>`) and what
++  the club last said: `calDay`, `calStart`, `calLen`. The file and Google's
++  service name an event the same way (`icsSeriesId`), so either read
++  recognises the other's blocks. (checked by tests/merge.test.js calFeeds; smoke: aFollowedCalendarStaysInStep)
++- **Reading.** A Google calendar is read through the Calendar API
++  (`singleEvents=true`, the device's time zone) with a key the family makes,
++  restricted to the app's address: browsers may not read Google's calendar
++  file from another site. Any other link is fetched as .ics and fails where the
++  server sends no CORS header. The .ics parser now applies `EXDATE`,
++  `RECURRENCE-ID` and `STATUS:CANCELLED`, which the school import also gets.
++- **Nothing changes until a parent applies.** A check builds rows (add, move,
++  remove, conflict, skip); Apply writes only the ticked ones. A finished block
++  is never moved and never placed twice. A block whose day or time no longer
++  matches `calDay`/`calStart`/`calLen` was changed by hand: a club change to it
++  is a conflict, keep-yours first; keeping it re-stamps the club's values so it
++  is not asked again. A practice unticked or removed by hand (`removeBlock`
++  calls `fcalForget`) goes in the feed's `skipKeys` and is not offered again.
++- **Days with no practice.** A club all-day event (meet, break, long weekend)
++  and Alberta's 9 general holidays (`fcalStatHolidays`, computed per year)
++  hold practices back as unticked rows: the real club calendar left a Victoria
++  Day Monday and a Good Friday in.
++- **Rhythm and size.** Placed 12 weeks ahead (`FCAL_HORIZON_DAYS`), checked
++  again every 14 days (`FCAL_CHECK_DAYS`) when a parent opens the portal
++  (`renderParentHome` → `fcalAutoCheck`, once per app load). Rolling, not the
++  whole season: the profile document uploads whole on every change (the same
++  reason school days are offered near the front only).
++- **Privacy.** The place keeps its name only (`fcalPlaceName`); street
++  addresses are not saved, because the data syncs to every family device.
++
+ ## One clock — the system did not begin today
+ 
+ **There is one date, `state.shared.chore.programStartDate`, it is DERIVED when
+diff --git a/FEATURES.md b/FEATURES.md
+index 8e9d720..4866e00 100644
+--- a/FEATURES.md
++++ b/FEATURES.md
+@@ -44,7 +44,7 @@ Each line says what you see or what the app does, then the test that proves it.
+ - Week opens on the layout you can plan in, scrolls as one surface and keeps its column floor — Proof: weekOpensOnTheLayoutYouCanPlanIn, weekScrollsAsOneSurface, theWeekGridKeepsItsColumnFloor
+ - Dragging a block moves it to the time it was dropped at; resizing changes only its duration — Proof: draggingABlockMovesItToTheTimeItWasDroppedAt, resizingABlockChangesOnlyItsDuration
+ - Narrow screens get one day at a time — Proof: narrowScreensGetOneDay
+-- School calendar: every week view follows it, and an ICS file becomes days off only after review — Proof: schoolCalendarIsRight, everyWeekViewFollowsTheSchoolCalendar, anIcsFileBecomesDaysOffOnlyAfterReview
++- School calendar: every week view follows it, and an ICS file becomes days off only after review; its timed events are not placed there but pointed to App › Follow a calendar — Proof: schoolCalendarIsRight, everyWeekViewFollowsTheSchoolCalendar, anIcsFileBecomesDaysOffOnlyAfterReview
+ - Week's buttons and chips are the component kit's (PR 8): ✏️ Start planning, 📋 Copy <week>, Add all N and 🎉 See wins are .ui-btn--primary, Sign this week ✍️ is .ui-btn--primary and Unsign .ui-btn--secondary, the Sunday review's ✕ is a 44px .ui-btn--icon in the banner's corner, each offered school day is a .ui-chip, and a parent's Switch on the Week's sub-bar is `pv-btn pb-action` (D81); the private .wins-btn, .tip-dismiss, .wk-sig-btn and .wsb-day are gone; every kit button and chip on the Week is at least 44 x 44 with its tap landing on it, iPad and phone — Proof: kitButtonsHold44pxOnWeekAndDay, oneSchoolDayCanBeAddedOnItsOwn, tests/check-dead-css.js
+ - Week and Day styles live in css/week-day.css: the wf-, wcr-, glance-, week-glance-, tg-legend-, wins-, block-, spc- and wk-sig- rules moved out of css/app.css with their values and order unchanged, then (reviewer, Stage 36) each component whole: .placed-block with its variants, .week-glance with .week-chores, .week-signature, .slot-pick-chip with .slot-pick-add, and .tl-overrun right after .wf-overrun so the day-view overrun hatch stays above its block (it had flipped to z4 under the block's z10) (the .wf-band and .wf-travel rules stay in css/app.css, Sister Sync draws them too) — Proof: tests/check-dead-css.js, kitButtonsHold44pxOnWeekAndDay (the overrun's stack); Stage 36 record: the 36 Week and Day pictures (week-full, week-print-preview, day, weekly-wins) taken locally before and after the move, 0 differ
+ - This week at a glance: each category is the kit's list row .ui-row (Stage 55, owner answer G10): the swatch in the icon slot, the per-day and week figures in the right-hand slot; 52px, 2px ink, 11px corners; the private .glance-row rules are gone — Proof: kitButtonsHold44pxOnWeekAndDay (iPad and phone, a planted 18px corner caught), glanceSeparatesSleepFromUnscheduled
+@@ -289,7 +289,8 @@ Each line says what you see or what the app does, then the test that proves it.
+ - The parent portal is one purple header (64 iPad, 60 phone, 44 controls): Parent menu (PIN, look, Exit), six destinations Now, Meeting, History, Money, Setup (App) with the icon only on the current one, and the girl switch (hidden on Now); on a phone the destination's name is the title; the day is no longer in the bar; the meeting and My money headers are page headers too — Proof: parentScreensMeetTheHouseRules, everyHeaderMeasuresToTheExactValues
+ - A parent viewing a girl's Week or Day keeps her header row with her own avatar (🐥 Jenn / 🦊 Jess, 52px pink circle, read as "Viewing Jenn, switch profile") and a 44px purple sub-bar: ◀ Hub, Reviewing <name>'s week/day, and Switch (Week, a .pv-btn.pb-action like the Day's actions and measured with them) or Confirm all, Mark the rest not done, Mark reviewed (Day); on Day row 1 also has ◀ Week, her own way back — Proof: everyHeaderMeasuresToTheExactValues, everyProfileBadgeSaysTheSameThing, parentDayTopBarStaysCompact, confirmingIsNotReviewing, aDayIsNotReviewableUntilItHasHappened, theMeetingOffersAWayOutOfAnUnconfirmedDay
+ - Parent Monthly has the parent header: back to Parent, Monthly, ◀ month ▶ in the centre, Jenn/Jess switch; no separate top bar or month stepper — Proof: everyHeaderMeasuresToTheExactValues, theMarkupSaysWhatThingsAre
+-- Parent App (Profiles, Preferences, School), Copy a week, the school calendar import and Before the new system use the kit: cards are .ui-card, a picked-one choice (reading size, sister details, week, who, span, clash, day, tab, girl) a .ui-chip with aria-pressed, an action a .ui-btn (Save, Add the ticked ones, Copy: primary; Use the shipped dates, Discard, Read link: secondary; Copy is full width); no .pill-btn, .btn-confirm or .pn-card is left in js/13, 33, 34, 35 — Proof: grep of those files, sisterDetailsAreTheParentsToChange, parentReadingSizeDefaultsToLarger, copyingAWeekIsAPlanNotAClaim, schoolCalendarIsRight
++- Parent App (Profiles, Preferences, School), Copy a week, the school calendar import and Before the new system use the kit: cards are .ui-card, a picked-one choice (reading size, sister details, week, who, span, clash, day, tab, girl) a .ui-chip with aria-pressed, an action a .ui-btn (Save, Add the ticked days, Copy: primary; Use the shipped dates, Discard, Read link: secondary; Copy is full width); no .pill-btn, .btn-confirm or .pn-card is left in js/13, 33, 34, 35 — Proof: grep of those files, sisterDetailsAreTheParentsToChange, parentReadingSizeDefaultsToLarger, copyingAWeekIsAPlanNotAClaim, schoolCalendarIsRight
++- App › Follow a calendar (js/48-cal-follow.js): a parent follows a club's calendar for one girl, as one activity (Training with its sport by default); the calendar list syncs between devices (calFeeds, id-merged, a stopped one stays gone); practices are placed 12 weeks ahead as parent-pinned blocks with the sport, travel and get-ready time, the place's name only (no street address); every 14 days, when a parent opens the portal, the app reads the calendar again (Check for changes at any time) and shows new, moved and removed practices grouped by month, each ticked; nothing changes until Apply the ticked changes; a finished practice never changes and is never placed twice; a practice changed by hand asks Keep yours / Take the club's (keep yours first); a practice removed by hand or unticked is not offered again; skipped and moved practices in the calendar are read (EXDATE, RECURRENCE-ID, cancelled); a club all-day event and Alberta's 9 statutory holidays hold practices back, unticked; a Google calendar is read through the Calendar API with a Google key (a card without a key asks for one); a failed check says Could not check with the last check date and leaves the plan as it is; a downloaded .ics can be read once, not followed — Proof: aFollowedCalendarStaysInStep, test:merge calFeeds (3 checks)
+ - Parent Monthly on a phone is seven equal columns that shrink to fit; Sunday's right edge is on screen at 360px and 390px in Pop and Calm — Proof: monthlyFitsAPhone (failed first: Sunday ended at 437px)
+ - Parent Reading size starts at 1.2 (Larger) when nothing is stored; a stored 1.15 reads as Larger — Proof: parentReadingSizeDefaultsToLarger
+ - Parent Now lists Waiting for you as full question cards grouped by girl or by kind and filtered Jenn, Jess or Both, with side panes This Sunday, Her answer last week, What they own, Record and She told me — Proof: nowIsWhereQuestionsAreAnswered
+@@ -503,7 +504,7 @@ The test map: for a change in the area or files named, the tests it needs before
+ - Tests: profile and navigation (`js/17-ui-misc.js`, `js/99-main.js`, the profile switcher in `js/06-quests.js`, the picker in `css/social.css`) → `SMOKE_ONLY=everyProfileBadgeSwitchesProfile,everyProfileBadgeSaysTheSameThing,kidNavIsUsableAndScoped,navReachesEverythingAndOldRoutesStillWork,theProfileScreensAreOnTheKit`
+ - Tests: looks and layout (`css/*.css`, look tokens) → `SMOKE_ONLY=thePopLookReadsEverywhere,theCalmLookReadsEverywhere,everyTextUsesTheLooksFonts,theLooksKeepTheSameBoxes,kidScreensMeetTheHouseRules,parentScreensMeetTheHouseRules,printIgnoresTheLook`
+ - Tests: print (`js/16-print.js`) → `SMOKE_ONLY=printIsOnTheWeek,printBuffers,printSideband,printIgnoresTheLook,portalPrintsNoBrokenNumbers`
+-- Tests: school calendar (`js/35-school-calendar.js`) → `SMOKE_ONLY=schoolCalendarIsRight,everyWeekViewFollowsTheSchoolCalendar,anIcsFileBecomesDaysOffOnlyAfterReview,aBlankWeekOffersItsSchoolDays`
++- Tests: school calendar and Follow a calendar (`js/35-school-calendar.js`, `js/48-cal-follow.js`) → `npm run test:merge`; `SMOKE_ONLY=schoolCalendarIsRight,everyWeekViewFollowsTheSchoolCalendar,anIcsFileBecomesDaysOffOnlyAfterReview,aFollowedCalendarStaysInStep,aBlankWeekOffersItsSchoolDays`
+ - Tests: sheets and dialogs (`.overlay`, `.ui-sheet`, `.ui-dialog` in `css/app.css`, the overlays in `index.html`, `openSheet` / `closeSheet` / `appDialog` in `js/17-ui-misc.js`, `tests/smoke-parts/sheets.js`) → `npm run test:fast` (`tests/check-sheet-family.js`); `SMOKE_ONLY=oneSheetAndOneDialogEverywhere,sheetsAreDialogsYouCanLeave,theMarkupSaysWhatThingsAre,streakAndPrivilegesOnToday,reflectMoodsAre44pxTargets,requestSheetsSendEveryKind,aGirlCanDisputeAFine,moneySchoolWearsTheNewLook,thePortalKitHolds44px,kidScreensMeetTheHouseRules,parentScreensMeetTheHouseRules`
+ - Tests: markup, escaping and the shell (`index.html`, `js/05-helpers.js`, `sw.js`, `manifest.json`) → `SMOKE_ONLY=theMarkupSaysWhatThingsAre,sheetsAreDialogsYouCanLeave,everyControlHasAName,escapingHoldsOnEverySurface,installsToTheHomeScreen,theBuildNumberIsOnThePage`
+ - Tests: `tools/cleanup-ci-artifacts.html` → `npm run test:cleanup` (needs a browser, about 1 minute)
+diff --git a/WORKING_RECORD.md b/WORKING_RECORD.md
+index a744c49..1a9a2cf 100644
+--- a/WORKING_RECORD.md
++++ b/WORKING_RECORD.md
+@@ -15,6 +15,7 @@ Single working record for this repository. Updated by the main session at the en
+ - Must know: no cash account (Plan v9 Deviation 37); "Dad" → "parents" on screen (38); smoke on this PC needs `SMOKE_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"`; workers do not commit, the main session does; main session cannot Write script files (use Edit on the plan, short python -c for records).
+ 
+ ## Design decisions
++- [agreed] Owner 2026-10-16 (claude.ai chat): App › Follow a calendar — its own App row, separate from Copy a plan; a saved list of calendar links; a Google calendar read through the Calendar API every 14 days when a parent opens the portal, with Check for changes at any time; nothing changes until a parent applies; finished practices never change; a practice changed by hand asks keep yours / take the club's; club all-day events and Alberta statutory holidays hold practices back; the place's name only; the school link stays in School (owner yes); one pull request — search: Follow a calendar
+ - [agreed] Owner 2026-10-12: Round 1 corrections C1–C7 and colours C8 in docs/handoff/kit-gaps-pr7-10.md (copy 5) override K4, K5, K10, K11; C7 first as its own commit; colours exactly C8, darken a fill below 4.5:1 and note it in the pull request — search: Owner corrections C1–C7
+ - [agreed] Owner 2026-10-12 R1: the Meeting screen and the Record sheet are in the money area (C8 table "Where" column and kit-1-1-values.md updated) — search: Meeting and Record sheet money area
+ - [agreed] Owner 2026-10-12 R2: in Round 2 the nav current tab takes the planner picked colour; the meeting current step (.sd-stepchip.on) is teal; yellow only for the main action — search: nav current tab planner colour
+diff --git a/css/app.css b/css/app.css
+index 8571399..ef598a9 100644
+--- a/css/app.css
++++ b/css/app.css
+@@ -3489,7 +3489,7 @@
+     font-size: calc(max(13px, calc(0.9rem * var(--fs-scale, 1))) * var(--text-scale, 1));
+     font-weight: 700; color: var(--ink);
+   }
+-  .pa-time-row input { flex: 1 1 8rem; min-width: 0; min-height: 44px; }
++  .pa-time-row input, .pa-time-row select { flex: 1 1 8rem; min-width: 0; min-height: 44px; }
+   .pa-time-hint { flex: 1 1 100%; margin: 0; }
+   .pa-x {
+     min-width: 32px; min-height: 32px; margin-left: 0.4rem;
+diff --git a/index.html b/index.html
+index c127087..3cb7464 100644
+--- a/index.html
++++ b/index.html
+@@ -561,6 +561,7 @@
+   <div class="parent-panel" id="ptab-profiles" role="region" aria-label="Profiles" hidden><div id="paProfilesWrap"></div></div>
+   <div class="parent-panel" id="ptab-prefs" role="region" aria-label="Preferences" hidden><div id="paPrefsWrap"></div></div>
+   <div class="parent-panel" id="ptab-school" role="region" aria-label="School calendar" hidden><div id="paSchoolWrap"></div></div>
++  <div class="parent-panel" id="ptab-calendars" role="region" aria-label="Follow a calendar" hidden><div id="paCalWrap"></div></div>
+   <div class="parent-panel" id="ptab-app" role="tabpanel" aria-labelledby="pdestbtn-app" hidden>
+     <div id="ptab-app-wrap"></div>
+   </div>
+@@ -1548,6 +1549,7 @@
+ <script src="js/45-requests.js"></script>
+ <script src="js/46-grownups.js"></script>
+ <script src="js/47-header.js"></script>
++<script src="js/48-cal-follow.js"></script>
+ <script src="js/99-main.js"></script>
+ </body>
+ </html>
+diff --git a/js/01-config.js b/js/01-config.js
+index 93cc521..9b8c98a 100644
+--- a/js/01-config.js
++++ b/js/01-config.js
+@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
+    the Today More sheet (js/31-today.js) and under the list on the parent
+    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
+    an iPad with no console. */
+-const APP_BUILD = '2026-10-13c';
++const APP_BUILD = '2026-10-16a';
+ const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
+ const START_HOUR  = 6;
+ const END_HOUR    = 22;
+diff --git a/js/04-merge.js b/js/04-merge.js
+index bb7fe43..cb2a60b 100644
+--- a/js/04-merge.js
++++ b/js/04-merge.js
+@@ -673,6 +673,9 @@ function mergeSharedState(localShared, remoteShared) {
+     // archives rather than removals, so no tombstone scope is needed — an
+     // archived sport must keep resolving for the blocks that still name it.
+     customSports: mergeArrayById(ls.customSports, rs.customSports),
++    // The calendars a family follows (js/48-cal-follow.js). Id-keyed records
++    // with a stamp; stopping one records a 'feed:' tombstone so it stays gone.
++    calFeeds: mergeArrayById(ls.calFeeds, rs.calFeeds, 'feed:'),
+     // Which days a grown-up has reviewed. A union per kid per day — see
+     // mergeParentDayConfirm. Unarbitrated until now, which meant two adults
+     // working through one Sunday meeting on two devices lost one set of
+diff --git a/js/08-day-view.js b/js/08-day-view.js
+index 66293c4..76c4c60 100644
+--- a/js/08-day-view.js
++++ b/js/08-day-view.js
+@@ -2415,6 +2415,8 @@ async function removeBlock() {
+     }
+   }
+   tombstoneBlockIds([editingBlockId]);
++  // A practice from a followed calendar, removed by hand, is not offered again.
++  fcalForget(blk);
+   setDayBlocks(currentDayKey, blocks.filter(b=>b.id!==editingBlockId));
+   closeSheet('editOverlay');
+   buildTimeline();
+diff --git a/js/11-parent.js b/js/11-parent.js
+index 76b21a7..011c2f0 100644
+--- a/js/11-parent.js
++++ b/js/11-parent.js
+@@ -38,7 +38,7 @@ const PARENT_PANEL_DEST = {
+   money: 'money',
+   setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', rules: 'setup',
+   copyweek: 'setup',
+-  app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', backup: 'app',
++  app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', calendars: 'app', backup: 'app',
+   conflicts: 'app',
+ };
+ /* The landing lists. The boundary test decides which side a row falls on:
+@@ -61,6 +61,7 @@ const PARENT_LANDINGS = {
+     { panel: 'profiles', icon: '👤', title: 'Profiles',        sub: 'Who the girls are, their age, and what each sees of her sister' },
+     { panel: 'prefs',    icon: '🎛️', title: 'Preferences',     sub: 'Reading size on grown-up screens' },
+     { panel: 'school',   icon: '📅', title: 'School calendar', sub: 'Term dates and days off — replaced each August' },
++    { panel: 'calendars', icon: '🔄', title: 'Follow a calendar', sub: 'A club’s practices in one girl’s plan, kept in step' },
+     { panel: 'backup',   icon: '🗄️', title: 'Backup and data', sub: 'Export, restore, cloud size, and resetting a week' },
+     { panel: 'conflicts', icon: '🔀', title: 'Two versions',      sub: 'When two devices saved different versions of one record' },
+   ],
+@@ -308,6 +309,7 @@ const PARENT_PANEL_RENDERERS = {
+   profiles: () => paRenderProfiles(),
+   prefs:    () => paRenderPrefs(),
+   school:   () => paRenderSchool(),
++  calendars: () => fcalRender(),
+   backup:   () => bkRenderPanel(),
+   conflicts: () => cfRenderPanel(),
+ };
+@@ -316,6 +318,9 @@ function renderParentHome() {
+   // Shared chrome first, then only the panel actually on screen.
+   parentRenderScope();
+   setParentTab(parentTab);
++  // A followed calendar due for its every-14-days check is read now, once per
++  // app load; it only speaks when something changed (js/48-cal-follow.js).
++  fcalAutoCheck();
+ }
+ 
+ /* The review panel's own header — kid name, age field, kid pills. It moved in
+diff --git a/js/35-school-calendar.js b/js/35-school-calendar.js
+index 20fdff6..ec24dbc 100644
+--- a/js/35-school-calendar.js
++++ b/js/35-school-calendar.js
+@@ -1,5 +1,7 @@
+-// Weekly-Planner — importing a calendar (.ics), for the school year and for
+-// standing appointments.
++// Weekly-Planner — importing a calendar (.ics) for the school year: days off and
++// term dates. Timed events (a club's practices, standing appointments) are placed
++// and kept in step by App › Follow a calendar (js/48-cal-follow.js), which reads
++// them with this parser.
+ //
+ // Why a hand-written parser. The suite boots the app over file:// and the CSP
+ // this app deploys under allows no third-party script, so a CDN library is not
+@@ -15,7 +17,9 @@
+ //     which is where a parent would notice.
+ //   - Anything past FREQ=WEEKLY / FREQ=DAILY with UNTIL, COUNT and BYDAY.
+ //     Everything else in RRULE is skipped rather than half-applied, and the
+-//     preview says how many were skipped.
++//     preview says how many were skipped. Skipped dates (EXDATE), one moved or
++//     cancelled copy of a repeat (RECURRENCE-ID) and cancelled events ARE read:
++//     a club calendar cancels a holiday practice and moves another that way.
+ //
+ // NOTHING IS WRITTEN UNTIL IT IS CONFIRMED. Every date this file produces goes
+ // into a preview with a tick beside it. That is the same discipline pcwPlan
+@@ -54,9 +58,6 @@ const SC_MAX_REPEATS = 200;     // per recurring event
+ 
+ let scDraft = null;             // the parsed proposal awaiting a decision
+ let scBusy = false;             // a fetch in flight
+-let scTab = 'school';           // 'school' | 'blocks'
+-let scBlockKid = 'jenn';
+-let scBlockActId = '';
+ 
+ /* ── The parser ── */
+ 
+@@ -119,17 +120,43 @@ function icsDateValue(value, params) {
+ function icsParse(text) {
+   const lines = icsUnfold(text).split('\n');
+   const events = [];
++  /* A changed copy of one repeat (RECURRENCE-ID) and the dates a repeat skips
++     (EXDATE) are how a club calendar moves one practice and cancels another.
++     Both are applied after the walk, because the changed copy may come before
++     or after the repeat it changes. Without them a skipped holiday came back as
++     a practice and a moved one landed twice. */
++  const overrides = [];
++  const cancelledCopies = new Set();
+   let cur = null;
+   let skipped = 0;
+   for (const raw of lines) {
+     const line = raw.trim();
+     if (!line) continue;
+-    if (line.toUpperCase() === 'BEGIN:VEVENT') { cur = { summary: '', rrule: null }; continue; }
++    if (line.toUpperCase() === 'BEGIN:VEVENT') { cur = { summary: '', rrule: null, uid: '', place: '', exdates: [], status: '' }; continue; }
+     if (line.toUpperCase() === 'END:VEVENT') {
+       if (cur && cur.start) {
+-        const expanded = icsExpand(cur);
+-        if (expanded === null) skipped++;
+-        else events.push(...expanded);
++        const series = icsSeriesId(cur.uid);
++        if (cur.recurrenceId) {
++          // A changed (or cancelled) copy of one repeat.
++          const orig = cur.recurrenceId.dayKey;
++          if (cur.status === 'CANCELLED') cancelledCopies.add(series + '|' + orig);
++          else {
++            const one = icsExpand(Object.assign({}, cur, { rrule: null }));
++            if (one && one.length) overrides.push(Object.assign(one[0], { series, origDay: orig }));
++            cancelledCopies.add(series + '|' + orig);
++          }
++        } else if (cur.status !== 'CANCELLED') {
++          const expanded = icsExpand(cur);
++          if (expanded === null) skipped++;
++          else {
++            const skip = new Set(cur.exdates);
++            expanded.forEach(e => {
++              e.series = series;
++              e.origDay = e.dayKey;
++              if (!skip.has(e.dayKey)) events.push(e);
++            });
++          }
++        }
+       }
+       cur = null;
+       if (events.length > SC_MAX_EVENTS) break;
+@@ -142,15 +169,37 @@ function icsParse(text) {
+     else if (p.name === 'DTEND') cur.end = icsDateValue(p.value, p.params);
+     else if (p.name === 'SUMMARY') cur.summary = icsUnescape(p.value);
+     else if (p.name === 'RRULE') cur.rrule = p.value;
++    else if (p.name === 'UID') cur.uid = p.value.trim();
++    else if (p.name === 'LOCATION') cur.place = icsUnescape(p.value);
++    else if (p.name === 'STATUS') cur.status = p.value.trim().toUpperCase();
++    else if (p.name === 'RECURRENCE-ID') cur.recurrenceId = icsDateValue(p.value, p.params);
++    else if (p.name === 'EXDATE') {
++      p.value.split(',').forEach(v => {
++        const d = icsDateValue(v, p.params);
++        if (d) cur.exdates.push(d.dayKey);
++      });
++    }
+   }
+-  return { events, skipped };
++  // A copy replaces the date it was cut from; the repeat's own copy goes.
++  const kept = events.filter(e => !(e.series && cancelledCopies.has(e.series + '|' + e.origDay)));
++  kept.push(...overrides);
++  kept.forEach(e => { if (e.place == null) e.place = ''; });
++  return { events: kept, skipped };
++}
++
++/* The id a calendar gives one event or one repeat, the same way Google's own
++   calendar service names it: the UID without its "@google.com" ending. A
++   practice read from the file and the same practice read through the service
++   then carry one key, so a later check recognises what an earlier import placed. */
++function icsSeriesId(uid) {
++  return String(uid || '').trim().replace(/@google\.com$/i, '');
+ }
+ 
+ /* One VEVENT → the occurrences it actually covers. null means "this has a rule
+    I do not understand", which is reported rather than guessed at. */
+ function icsExpand(ev) {
+   const one = (start) => {
+-    const out = { dayKey: start.dayKey, allDay: start.allDay, summary: ev.summary };
++    const out = { dayKey: start.dayKey, allDay: start.allDay, summary: ev.summary, place: ev.place || '' };
+     if (!start.allDay) {
+       out.startMin = start.minutes;
+       // DTEND on a timed event is exclusive of nothing — it is the end.
+@@ -168,7 +217,7 @@ function icsExpand(ev) {
+       const d = formatDayKey(ev.start.dayKey);
+       const stop = formatDayKey(ev.end.dayKey);
+       while (d < stop && out.length < SC_MAX_REPEATS) {
+-        out.push({ dayKey: dateToLocalKey(d), allDay: true, summary: ev.summary });
++        out.push({ dayKey: dateToLocalKey(d), allDay: true, summary: ev.summary, place: ev.place || '' });
+         d.setDate(d.getDate() + 1);
+       }
+       return out;
+@@ -359,42 +408,9 @@ function scCommitSchool() {
+   showToast(`📅 Added ${added.length} day${added.length === 1 ? '' : 's'} off`);
+ }
+ 
+-/* Timed events as blocks. Every one goes through the same shape a placed block
+-   has, on one chosen activity, for one chosen child — parent-only, because it
+-   writes into a child's plan. */
+-function scCommitBlocks() {
+-  if (!scDraft || !isParent()) return;
+-  const act = findActivity(scBlockActId, scBlockKid);
+-  if (!act) { showToast('Pick which activity these are'); return; }
+-  const take = scDraft.timed.filter(e => e.on);
+-  if (!take.length) { showToast('Nothing ticked to add'); return; }
+-  let placed = 0;
+-  const byDay = {};
+-  take.forEach(e => { (byDay[e.dayKey] = byDay[e.dayKey] || []).push(e); });
+-  Object.keys(byDay).forEach(dayKey => {
+-    const arr = (getDayBlocksForProfile(dayKey, scBlockKid) || []).slice();
+-    byDay[dayKey].forEach(e => {
+-      // Never twice: a second import of the same calendar must not double it up.
+-      if (arr.some(b => b.actId === act.id && b.startMin === e.startMin)) return;
+-      arr.push({
+-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+-        actId: act.id,
+-        startMin: e.startMin,
+-        durationMin: e.durationMin || act.durationMin || 60,
+-        objectives: [], note: (e.summary || '').slice(0, 60), checklistState: {},
+-        completed: false, confirmed: false,
+-        createdAt: syncNow(), updatedAt: syncNow(),
+-      });
+-      placed++;
+-    });
+-    setDayBlocks(dayKey, arr, scBlockKid);
+-  });
+-  saveAll();
+-  scDraft = null;
+-  paRenderSchool();
+-  refreshCurrentScreen && refreshCurrentScreen();
+-  showToast(placed ? `📅 Added ${placed} to ${kidLabel(scBlockKid).name}'s plan` : 'Those were already there');
+-}
++/* Timed events (a club's practices, a standing appointment) are not this
++   screen's: App › Follow a calendar (js/48-cal-follow.js) places them for one
++   child and keeps them in step. This screen takes days off and term dates. */
+ 
+ /* ── The panel ── */
+ 
+@@ -424,61 +440,29 @@ function scRenderImport() {
+ 
+   if (!d) { wrap.innerHTML = intro; return; }
+ 
+-  const tabs = `<div class="pn-toggle" style="margin-top:0.8rem">
+-      <button type="button" class="ui-chip" aria-pressed="${scTab === 'school'}" data-sc="tab" data-tab="school">🏫 Days off (${d.offDays.length})</button>
+-      <button type="button" class="ui-chip" aria-pressed="${scTab === 'blocks'}" data-sc="tab" data-tab="blocks">📌 Appointments (${d.timed.length})</button>
++  const rows = d.offDays.map((o, i) => {
++    const dt = formatDayKey(o.date);
++    return `<label class="sc-row"><input type="checkbox" data-sc="off" data-i="${i}"${o.on ? ' checked' : ''}>
++      <span class="sc-when">${DAY_SHORT[(dt.getDay() + 6) % 7]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]}</span>
++      <span class="sc-what">${escapeHtml(o.label)}</span></label>`;
++  }).join('') || `<p class="pn-note">No all-day entries in that file — only timed ones.</p>`;
++  const term = (d.termStart && d.termEnd)
++    ? `<label class="sc-row sc-row--term"><input type="checkbox" data-sc="term"${d.takeTerm ? ' checked' : ''}>
++        <span class="sc-when">Term</span>
++        <span class="sc-what">${escapeHtml(d.termStart)} → ${escapeHtml(d.termEnd)}</span></label>
++       <p class="pn-note">Off by default: which day a term starts decides which days count as
++         school for a whole year, so this is a guess worth checking before you take it.</p>`
++    : '';
++  const ticked = d.offDays.filter(o => o.on).length;
++  const body = `<p class="pn-note">Every all-day entry in the file. ${ticked} of ${d.offDays.length}
++      ${ticked === 1 ? 'is' : 'are'} ticked because ${ticked === 1 ? 'it reads' : 'they read'} like
++      a day off — check the rest yourself, since a picture day is not a day at home.</p>
++    <div class="ui-card">${rows}</div>${term ? `<div class="ui-card" style="margin-top:0.4rem">${term}</div>` : ''}
++    <div class="pn-toggle" style="margin-top:0.5rem">
++      <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-school">Add the ticked days</button>
++      <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
+     </div>`;
+ 
+-  let body;
+-  if (scTab === 'school') {
+-    const rows = d.offDays.map((o, i) => {
+-      const dt = formatDayKey(o.date);
+-      return `<label class="sc-row"><input type="checkbox" data-sc="off" data-i="${i}"${o.on ? ' checked' : ''}>
+-        <span class="sc-when">${DAY_SHORT[(dt.getDay() + 6) % 7]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]}</span>
+-        <span class="sc-what">${escapeHtml(o.label)}</span></label>`;
+-    }).join('') || `<p class="pn-note">No all-day entries in that file — only timed ones.</p>`;
+-    const term = (d.termStart && d.termEnd)
+-      ? `<label class="sc-row sc-row--term"><input type="checkbox" data-sc="term"${d.takeTerm ? ' checked' : ''}>
+-          <span class="sc-when">Term</span>
+-          <span class="sc-what">${escapeHtml(d.termStart)} → ${escapeHtml(d.termEnd)}</span></label>
+-         <p class="pn-note">Off by default: which day a term starts decides which days count as
+-           school for a whole year, so this is a guess worth checking before you take it.</p>`
+-      : '';
+-    const ticked = d.offDays.filter(o => o.on).length;
+-    body = `<p class="pn-note">Every all-day entry in the file. ${ticked} of ${d.offDays.length}
+-        ${ticked === 1 ? 'is' : 'are'} ticked because ${ticked === 1 ? 'it reads' : 'they read'} like
+-        a day off — check the rest yourself, since a picture day is not a day at home.</p>
+-      <div class="ui-card">${rows}</div>${term ? `<div class="ui-card" style="margin-top:0.4rem">${term}</div>` : ''}
+-      <div class="pn-toggle" style="margin-top:0.5rem">
+-        <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-school">Add the ticked days</button>
+-        <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
+-      </div>`;
+-  } else {
+-    const acts = getAllActivities(scBlockKid).filter(a => !a._locked);
+-    if (!scBlockActId && acts.length) scBlockActId = (acts.find(a => a.id === 'appointment') || acts[0]).id;
+-    const rows = d.timed.slice(0, 60).map((e, i) => {
+-      const dt = formatDayKey(e.dayKey);
+-      return `<label class="sc-row"><input type="checkbox" data-sc="ev" data-i="${i}"${e.on ? ' checked' : ''}>
+-        <span class="sc-when">${DAY_SHORT[(dt.getDay() + 6) % 7]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]} · ${escapeHtml(formatTimeFromMin(e.startMin))}</span>
+-        <span class="sc-what">${escapeHtml(e.summary || 'Appointment')}</span></label>`;
+-    }).join('') || `<p class="pn-note">No timed events in that file — only all-day entries.</p>`;
+-    body = `<div class="ui-card">
+-        <div class="pn-toggle">${['jenn', 'jess'].map(k =>
+-          `<button type="button" class="ui-chip" aria-pressed="${k === scBlockKid}" data-sc="kid" data-kid="${k}">${escapeHtml(kidLabel(k).icon + ' ' + kidLabel(k).name)}</button>`).join('')}</div>
+-        <div class="pa-time-row" style="margin-top:0.5rem">
+-          <label for="scActSelect">As</label>
+-          <select id="scActSelect" data-sc="act">${acts.map(a =>
+-            `<option value="${escapeAttr(a.id)}"${a.id === scBlockActId ? ' selected' : ''}>${escapeHtml(a.icon + ' ' + a.name)}</option>`).join('')}</select>
+-        </div>
+-      </div>
+-      <div class="ui-card" style="margin-top:0.4rem">${rows}</div>
+-      ${d.timed.length > 60 ? `<p class="pn-note">Showing the first 60 of ${d.timed.length}.</p>` : ''}
+-      <div class="pn-toggle" style="margin-top:0.5rem">
+-        <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-blocks">Add the ticked ones</button>
+-        <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
+-      </div>`;
+-  }
+-
+   const skipped = d.skipped
+     ? `<p class="pn-note">⚠️ ${d.skipped} repeating event${d.skipped === 1 ? '' : 's'} skipped — this reads
+         weekly and daily repeats with an end, and leaves anything more complicated alone rather than
+@@ -488,7 +472,10 @@ function scRenderImport() {
+   wrap.innerHTML = intro
+     + `<p class="pn-cap" style="margin-top:0.8rem">What is in it</p>
+        <div class="ui-card pn-clear">${d.total} event${d.total === 1 ? '' : 's'} read${d.source ? ` · ${escapeHtml(d.source)}` : ''}.</div>`
+-    + skipped + tabs + body;
++    + skipped
++    + (d.timed.length ? `<p class="pn-note">${d.timed.length} timed event${d.timed.length === 1 ? '' : 's'} in this file
++        ${d.timed.length === 1 ? 'is' : 'are'} not days off. To place them in a plan, use App › Follow a calendar.</p>` : '')
++    + body;
+ }
+ 
+ /* One delegated listener for the whole import section — reached from
+@@ -499,19 +486,13 @@ function scHandleClick(e) {
+   const act = btn.getAttribute('data-sc');
+   if (act === 'pick') { scPickFile(); return; }
+   if (act === 'fetch') { scFetchUrl(); return; }
+-  if (act === 'tab') { scTab = btn.getAttribute('data-tab'); scRenderImport(); return; }
+-  if (act === 'kid') { scBlockKid = btn.getAttribute('data-kid'); scBlockActId = ''; scRenderImport(); return; }
+   if (act === 'discard') { scDraft = null; scRenderImport(); return; }
+   if (act === 'commit-school') { scCommitSchool(); return; }
+-  if (act === 'commit-blocks') { scCommitBlocks(); return; }
+   if (act === 'off' && scDraft) { scDraft.offDays[+btn.getAttribute('data-i')].on = btn.checked; return; }
+-  if (act === 'ev' && scDraft) { scDraft.timed[+btn.getAttribute('data-i')].on = btn.checked; return; }
+   if (act === 'term' && scDraft) { scDraft.takeTerm = btn.checked; }
+ }
+ 
+ function scHandleChange(e) {
+-  const sel = e.target.closest('[data-sc="act"]');
+-  if (sel) { scBlockActId = sel.value; return; }
+-  const box = e.target.closest('[data-sc="off"], [data-sc="ev"], [data-sc="term"]');
++  const box = e.target.closest('[data-sc="off"], [data-sc="term"]');
+   if (box) scHandleClick(e);
+ }
+diff --git a/js/48-cal-follow.js b/js/48-cal-follow.js
+new file mode 100644
+index 0000000..9cee82b
+--- /dev/null
++++ b/js/48-cal-follow.js
+@@ -0,0 +1,788 @@
++// Weekly-Planner — App › Follow a calendar.
++//
++// A club publishes its practices in a calendar. This places them in ONE girl's
++// plan as blocks of one activity (Training, with its sport, by default) and
++// keeps them in step: every FCAL_CHECK_DAYS days, when a parent opens the parent
++// portal, it reads the calendar again and shows what changed — new, moved and
++// removed practices — before anything moves.
++//
++// The rules that keep a plan safe:
++//   - NOTHING CHANGES UNTIL A PARENT CONFIRMS. Every change is a ticked row in a
++//     preview, the same discipline as the school import (js/35-school-calendar.js)
++//     and Copy a plan (js/34-parent-copyweek.js).
++//   - A FINISHED PRACTICE NEVER CHANGES. Only blocks from today on that are not
++//     completed are offered for a move or a removal.
++//   - A PRACTICE CHANGED BY HAND IS ASKED ABOUT. Each block remembers the day and
++//     time the club gave it (calDay / calStart / calLen). When the block no
++//     longer matches, a grown-up moved it, and a club change to it is a choice:
++//     keep yours, or take the club's.
++//   - NO PRACTICE ON A DAY THE CLUB MARKS. An all-day club event (a meet, a
++//     break, a long weekend) clears practices that day, and so does an Alberta
++//     statutory holiday — the club's own calendar left a Victoria Day Monday and
++//     a Good Friday in. Those rows arrive unticked, so a club that does train
++//     that day is one tick away.
++//
++// How the calendar is read. A Google calendar is read through Google's calendar
++// service (the Calendar API) with a key the family makes once: browsers are not
++// allowed to read Google's calendar FILE from another site, and the service
++// also lists moved and cancelled practices one by one. Any other link is read
++// as an .ics file, which works only where that server lets a browser read it.
++// A downloaded .ics can also be read once, with no sync.
++//
++// Each practice carries one key: the event's id and the day it was first set
++// for (`series|YYYY-MM-DD`). The file and the service name an event the same
++// way (js/35-school-calendar.js, icsSeriesId), so a check recognises what an
++// earlier read placed.
++//
++// Storage: state.shared.calFeeds, merged by id with tombstones 'feed:'
++// (js/04-merge.js). Street addresses are not kept — only the place's name,
++// because saved data syncs to the family's devices.
++//
++// Declarations only; the delegated listener is bound in js/99-main.js.
++
++const FCAL_CHECK_DAYS = 14;        // a calendar is read again after this many days
++const FCAL_HORIZON_DAYS = 84;      // practices are placed up to 12 weeks ahead
++const FCAL_GOOGLE_API = 'https://www.googleapis.com/calendar/v3/calendars/';
++
++let fcalDraft = null;              // the proposal on screen: { feedId, rows, … }
++let fcalBusy = '';                 // the id of the calendar being read
++const fcalAutoTried = new Set();   // calendars the automatic check read this app load
++let fcalForm = { kid: 'jess', actId: 'training', tag: 'swimming' };
++
++/* ── Alberta's nine general (statutory) holidays ──
++   Alberta Employment Standards: New Year's Day, Alberta Family Day, Good Friday,
++   Victoria Day, Canada Day, Labour Day, Thanksgiving Day, Remembrance Day and
++   Christmas Day. The optional ones (Easter Monday, Heritage Day, Boxing Day,
++   Truth and Reconciliation) are not here. Computed, not listed, so a season
++   that crosses into a new year needs no update. */
++function fcalEaster(year) {
++  // Anonymous Gregorian algorithm.
++  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
++  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
++  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
++  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
++  const m = Math.floor((a + 11 * h + 22 * l) / 451);
++  const month = Math.floor((h + l - 7 * m + 114) / 31);
++  const day = ((h + l - 7 * m + 114) % 31) + 1;
++  return new Date(year, month - 1, day);
++}
++function fcalNthMonday(year, month, n) {
++  const d = new Date(year, month, 1);
++  while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
++  d.setDate(d.getDate() + 7 * (n - 1));
++  return d;
++}
++function fcalStatHolidays(year) {
++  const out = {};
++  const put = (d, name) => { out[dateToLocalKey(d)] = name; };
++  put(new Date(year, 0, 1), "New Year's Day");
++  put(fcalNthMonday(year, 1, 3), 'Family Day');
++  const gf = fcalEaster(year); gf.setDate(gf.getDate() - 2);
++  put(gf, 'Good Friday');
++  const vd = new Date(year, 4, 24);                     // the Monday before 25 May
++  while (vd.getDay() !== 1) vd.setDate(vd.getDate() - 1);
++  put(vd, 'Victoria Day');
++  put(new Date(year, 6, 1), 'Canada Day');
++  put(fcalNthMonday(year, 8, 1), 'Labour Day');
++  put(fcalNthMonday(year, 9, 2), 'Thanksgiving');
++  put(new Date(year, 10, 11), 'Remembrance Day');
++  put(new Date(year, 11, 25), 'Christmas Day');
++  return out;
++}
++function fcalStatHolidayName(dayKey) {
++  const y = Number(String(dayKey).slice(0, 4));
++  return y ? (fcalStatHolidays(y)[dayKey] || '') : '';
++}
++
++/* ── The calendar list ── */
++
++function fcalFeeds() {
++  if (!state.shared.calFeeds) state.shared.calFeeds = [];
++  return state.shared.calFeeds;
++}
++function fcalFeed(id) { return fcalFeeds().find(f => f && f.id === id) || null; }
++function fcalTouch(feed) { feed.updatedAt = syncNow(); }
++/* The Google key a family made once, from any calendar that has one. */
++function fcalKnownKey() {
++  const f = fcalFeeds().find(x => x && x.key);
++  return f ? f.key : '';
++}
++
++/* What a pasted link points at. Google shows a calendar as a web page
++   (…/embed?src=ID), as a file (…/ical/ID/public/basic.ics) or as an add link
++   (…?cid=BASE64); all three are one calendar id. Any other https link is read
++   as an .ics file. null means it is not a link this can read. */
++function fcalReadLink(raw) {
++  let link = String(raw || '').trim().replace(/^webcal:\/\//i, 'https://');
++  if (!link) return null;
++  if (!/^https?:\/\//i.test(link) && /^[^\s/]+@[^\s/]+$/.test(link)) {
++    return fcalGoogleTarget(link);
++  }
++  if (!/^https?:\/\//i.test(link)) return null;
++  let url;
++  try { url = new URL(link); } catch (e) { return null; }
++  if (/(^|\.)calendar\.google\.com$/i.test(url.hostname)) {
++    const src = url.searchParams.get('src');
++    if (src) return fcalGoogleTarget(src);
++    const ical = /\/calendar\/ical\/([^/]+)\//.exec(url.pathname);
++    if (ical) return fcalGoogleTarget(decodeURIComponent(ical[1]));
++    const cid = url.searchParams.get('cid');
++    if (cid) {
++      let id = cid;
++      try { if (!cid.includes('@')) id = atob(cid.replace(/-/g, '+').replace(/_/g, '/')); } catch (e) { id = cid; }
++      return fcalGoogleTarget(id);
++    }
++    return null;
++  }
++  return { calId: '', icsUrl: url.href };
++}
++function fcalGoogleTarget(calId) {
++  const id = String(calId || '').trim();
++  if (!id) return null;
++  return { calId: id, icsUrl: `https://calendar.google.com/calendar/ical/${encodeURIComponent(id)}/public/basic.ics` };
++}
++
++/* ── Reading a calendar into practices ── */
++
++/* The place's name only: "Michener Aquatic Centre, 51a St, Red Deer…" keeps
++   "Michener Aquatic Centre". */
++function fcalPlaceName(location) {
++  return String(location || '').split(',')[0].trim().slice(0, 40);
++}
++
++/* .ics text → occurrences. Timed ones become practices; all-day ones clear a day. */
++function fcalOccurrencesFromIcs(text) {
++  const { events } = icsParse(text);
++  return events.map(e => ({
++    key: (e.series || 'nouid') + '|' + (e.origDay || e.dayKey) + (e.series ? '' : '|' + (e.startMin == null ? 'day' : e.startMin)),
++    dayKey: e.dayKey,
++    allDay: !!e.allDay,
++    startMin: e.allDay ? null : e.startMin,
++    durationMin: e.allDay ? null : e.durationMin,
++    summary: e.summary || '',
++    place: fcalPlaceName(e.place),
++  }));
++}
++
++/* Google's calendar service → the same occurrences. singleEvents=true gives
++   every practice on its own, with moved ones at their new time and cancelled
++   ones left out; timeZone gives times in the family's zone, so the day and the
++   minutes are read straight off the string. */
++function fcalOccurrencesFromGoogle(items) {
++  const out = [];
++  (items || []).forEach(it => {
++    if (!it || it.status === 'cancelled' || !it.start) return;
++    const series = it.recurringEventId || it.id || 'nouid';
++    const orig = it.originalStartTime
++      ? String(it.originalStartTime.dateTime || it.originalStartTime.date || '').slice(0, 10)
++      : String(it.start.dateTime || it.start.date || '').slice(0, 10);
++    const summary = it.summary || '';
++    const place = fcalPlaceName(it.location);
++    if (it.start.date) {
++      const d = formatDayKey(it.start.date);
++      const stop = it.end && it.end.date ? it.end.date : it.start.date;
++      let guard = 0;
++      do {
++        const k = dateToLocalKey(d);
++        out.push({ key: series + '|' + k, dayKey: k, allDay: true, startMin: null, durationMin: null, summary, place });
++        d.setDate(d.getDate() + 1);
++      } while (dateToLocalKey(d) < stop && ++guard < 60);
++      return;
++    }
++    const s = String(it.start.dateTime || '');
++    const e = String((it.end && it.end.dateTime) || '');
++    const toMin = (t) => Number(t.slice(11, 13)) * 60 + Number(t.slice(14, 16));
++    const startMin = toMin(s);
++    const dayKey = s.slice(0, 10);
++    const durationMin = (e && e.slice(0, 10) === dayKey) ? Math.max(15, toMin(e) - startMin) : 60;
++    out.push({ key: series + '|' + orig, dayKey, allDay: false, startMin, durationMin, summary, place });
++  });
++  return out;
++}
++
++function fcalZone() {
++  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Edmonton'; }
++  catch (e) { return 'America/Edmonton'; }
++}
++
++/* Reads one feed. Resolves to { occs } or rejects with a reason a parent can read. */
++async function fcalRead(feed) {
++  const from = formatDayKey(todayKey());
++  const to = formatDayKey(todayKey());
++  to.setDate(to.getDate() + FCAL_HORIZON_DAYS + 1);
++  if (feed.calId && feed.key) {
++    const items = [];
++    let page = '';
++    for (let n = 0; n < 10; n++) {
++      const q = `key=${encodeURIComponent(feed.key)}&singleEvents=true&orderBy=startTime&maxResults=2500`
++        + `&timeMin=${encodeURIComponent(from.toISOString())}&timeMax=${encodeURIComponent(to.toISOString())}`
++        + `&timeZone=${encodeURIComponent(fcalZone())}` + (page ? `&pageToken=${encodeURIComponent(page)}` : '');
++      let res;
++      try { res = await fetch(`${FCAL_GOOGLE_API}${encodeURIComponent(feed.calId)}/events?${q}`, { credentials: 'omit' }); }
++      catch (e) { throw new Error('no connection to Google'); }
++      if (res.status === 400 || res.status === 403) throw new Error('Google refused the key — check the key and that the Calendar API is turned on');
++      if (res.status === 404) throw new Error('Google cannot find this calendar — it may be private now');
++      if (!res.ok) throw new Error(`Google answered ${res.status}`);
++      const body = await res.json();
++      items.push(...(body.items || []));
++      page = body.nextPageToken || '';
++      if (!page) break;
++    }
++    return { occs: fcalOccurrencesFromGoogle(items) };
++  }
++  if (feed.icsUrl) {
++    let res;
++    try { res = await fetch(feed.icsUrl, { credentials: 'omit' }); }
++    catch (e) {
++      throw new Error(feed.calId ? 'a Google calendar needs a Google key' : 'this server does not let a browser read its calendar');
++    }
++    if (!res.ok) throw new Error(`the calendar server answered ${res.status}`);
++    return { occs: fcalOccurrencesFromIcs(await res.text()) };
++  }
++  throw new Error('this calendar has no link');
++}
++
++/* ── Comparing the calendar with the plan ── */
++
++function fcalDayList(fromKey, days) {
++  const out = [];
++  const d = formatDayKey(fromKey);
++  for (let i = 0; i <= days; i++) { out.push(dateToLocalKey(d)); d.setDate(d.getDate() + 1); }
++  return out;
++}
++
++/* Everything that differs between the calendar and the plan, as rows a parent
++   ticks. `feed` is a saved calendar, or a one-time file read ({ id:'file', … }). */
++function fcalBuildRows(feed, occs, today) {
++  const t = today || todayKey();
++  const days = fcalDayList(t, FCAL_HORIZON_DAYS);
++  const last = days[days.length - 1];
++  const inRange = (k) => k >= t && k <= last;
++
++  // Days the club marks with an all-day event, and statutory holidays.
++  const marked = {};
++  occs.filter(o => o.allDay && inRange(o.dayKey)).forEach(o => {
++    if (!marked[o.dayKey]) marked[o.dayKey] = o.summary || 'club event';
++  });
++  const clearedBy = (k) => marked[k] || (fcalStatHolidayName(k) ? `${fcalStatHolidayName(k)} (statutory holiday)` : '');
++
++  const want = new Map();
++  occs.filter(o => !o.allDay && inRange(o.dayKey)).forEach(o => { if (!want.has(o.key)) want.set(o.key, o); });
++
++  // What this calendar placed earlier, from today on.
++  // A finished one is held apart: never changed, and never placed a second time.
++  const have = new Map();
++  const finished = new Set();
++  const extra = [];   // a second copy of one practice (two devices applied at once)
++  if (feed.id !== 'file') {
++    days.concat(fcalDayList(last, 14).slice(1)).forEach(k => {
++      (getDayBlocksForProfile(k, feed.kid) || []).forEach(b => {
++        if (!b || b.calFeed !== feed.id || !b.calKey) return;
++        if (b.completed) finished.add(b.calKey);
++        else if (have.has(b.calKey)) extra.push({ b, dayKey: k });
++        else have.set(b.calKey, { b, dayKey: k });
++      });
++    });
++  }
++  const skipped = new Set(feed.skipKeys || []);
++  const rows = [];
++  let leftOut = 0;
++
++  want.forEach((o, key) => {
++    if (finished.has(key)) return;
++    const why = clearedBy(o.dayKey);
++    const cur = have.get(key);
++    if (!cur) {
++      if (skipped.has(key)) { leftOut++; return; }
++      // A one-time file read places beside what is there, never twice.
++      if (feed.id === 'file' && (getDayBlocksForProfile(o.dayKey, feed.kid) || [])
++        .some(b => b && b.actId === feed.actId && b.startMin === o.startMin)) return;
++      rows.push({ type: why ? 'skip' : 'add', on: !why, key, why, occ: o, dayKey: o.dayKey });
++      return;
++    }
++    const b = cur.b;
++    const club = { day: o.dayKey, start: o.startMin, len: o.durationMin };
++    const said = { day: b.calDay, start: b.calStart, len: b.calLen };
++    const plan = { day: cur.dayKey, start: b.startMin, len: b.durationMin };
++    const same = (x, y) => x.day === y.day && x.start === y.start && x.len === y.len;
++    if (why) {
++      rows.push({ type: 'remove', on: true, key, why, block: b, blockDay: cur.dayKey, dayKey: cur.dayKey, occ: o });
++    } else if (!same(club, said)) {
++      if (same(plan, said)) rows.push({ type: 'move', on: true, key, occ: o, block: b, blockDay: cur.dayKey, dayKey: o.dayKey });
++      else rows.push({ type: 'conflict', on: true, choice: 'mine', key, occ: o, block: b, blockDay: cur.dayKey, dayKey: o.dayKey });
++    }
++  });
++  have.forEach((cur, key) => {
++    if (want.has(key)) return;
++    const edited = !(cur.dayKey === cur.b.calDay && cur.b.startMin === cur.b.calStart && cur.b.durationMin === cur.b.calLen);
++    rows.push({ type: 'remove', on: true, key, why: 'no longer in the calendar', edited, block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
++  });
++  extra.forEach(cur => {
++    if (finished.has(cur.b.calKey)) return;
++    rows.push({ type: 'remove', on: true, key: cur.b.calKey, why: 'a second copy of the same practice', block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
++  });
++  rows.sort((a, b) => (a.dayKey < b.dayKey ? -1 : a.dayKey > b.dayKey ? 1
++    : ((a.occ ? a.occ.startMin : a.block.startMin) - (b.occ ? b.occ.startMin : b.block.startMin))));
++  return { rows, leftOut };
++}
++
++/* ── Checking ── */
++
++function fcalIsDue(feed, now) {
++  const at = Number(feed.lastChecked) || 0;
++  return !at || ((now || syncNow()) - at) >= FCAL_CHECK_DAYS * 24 * 3600 * 1000;
++}
++
++/* Reads one calendar and opens its changes. `auto` is the every-14-days check:
++   it says nothing when nothing changed. */
++async function fcalCheck(feedId, auto) {
++  if (!isParent()) return;
++  const feed = fcalFeed(feedId);
++  if (!feed || fcalBusy) return;
++  fcalBusy = feedId;
++  fcalRender();
++  let result = null;
++  try {
++    result = await fcalRead(feed);
++  } catch (err) {
++    feed.lastError = String((err && err.message) || err).slice(0, 120);
++    feed.lastTried = syncNow();
++    fcalTouch(feed);
++    saveAll();
++    fcalBusy = '';
++    fcalRender();
++    showToast(`🔄 Could not check ${feed.name} — ${feed.lastError}`);
++    return;
++  }
++  fcalBusy = '';
++  feed.lastError = '';
++  const { rows, leftOut } = fcalBuildRows(feed, result.occs);
++  const changes = rows.filter(r => r.type !== 'skip');
++  if (!changes.length) {
++    feed.lastChecked = syncNow();
++    fcalTouch(feed);
++    saveAll();
++    if (fcalDraft && fcalDraft.feedId === feedId) fcalDraft = null;
++    fcalRender();
++    if (!auto) showToast(`🔄 ${feed.name}: no changes`);
++    return;
++  }
++  fcalDraft = { feedId, rows, leftOut };
++  fcalTouch(feed);
++  saveAll();
++  fcalRender();
++  showToast(`🔄 ${feed.name}: ${changes.length} change${changes.length === 1 ? '' : 's'} to review — App › Follow a calendar`);
++}
++
++/* The every-14-days check, from renderParentHome. Once per app load, one
++   calendar at a time, and never over a review a parent has open. */
++async function fcalAutoCheck() {
++  if (!isParent() || fcalBusy) return;
++  /* Per calendar, not one flag: the portal can draw before the family's synced
++     document arrives, when the list is still empty, and a calendar that
++     arrives a moment later must still get its check. */
++  for (const feed of fcalFeeds().slice()) {
++    if (fcalDraft) return;
++    if (!feed || fcalAutoTried.has(feed.id) || !fcalIsDue(feed)) continue;
++    fcalAutoTried.add(feed.id);
++    await fcalCheck(feed.id, true);
++  }
++}
++
++/* ── Applying ── */
++
++function fcalNewBlock(feed, o) {
++  const act = findActivity(feed.actId, feed.kid) || {};
++  const sport = act.isTraining ? getTrainingTopic(feed.tag) : null;
++  const note = [o.summary, o.place].filter(Boolean).join(' · ').slice(0, 60);
++  const block = {
++    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
++    actId: feed.actId,
++    startMin: o.startMin,
++    durationMin: Math.max(5, Math.min(o.durationMin || act.durationMin || 60, END_MIN - o.startMin)),
++    // The category's own hex: a training block then takes its sport's colour
++    // (trainingBlockColour), as one placed from the Training sheet does.
++    colour: CAT_HEX[act.cat] || CAT_HEX.training,
++    objectives: [], note, checklistState: {},
++    tag: sport ? sport.id : null,
++    parentPinned: true,
++    travelBuffer: !!act.travels,
++    getReadyBuffer: !!act.travels,
++    warmupBuffer: false,
++    gearState: {},
++    completed: false, confirmed: false,
++    createdAt: syncNow(), updatedAt: syncNow(),
++  };
++  if (block.travelBuffer) block.travelBufMin = DEFAULT_BUFFER_MIN;
++  if (block.getReadyBuffer) block.getReadyBufMin = DEFAULT_BUFFER_MIN;
++  if (feed.id !== 'file') Object.assign(block, fcalStamp(feed, o));
++  return block;
++}
++function fcalStamp(feed, o) {
++  return { calFeed: feed.id, calKey: o.key, calDay: o.dayKey, calStart: o.startMin, calLen: o.durationMin };
++}
++
++function fcalApply() {
++  if (!fcalDraft || !isParent()) return;
++  const feed = fcalDraft.feedId === 'file' ? fcalDraft.fileFeed : fcalFeed(fcalDraft.feedId);
++  if (!feed) { fcalDraft = null; fcalRender(); return; }
++  const kid = feed.kid;
++  const touched = {};
++  const day = (k) => (touched[k] = touched[k] || (getDayBlocksForProfile(k, kid) || []).slice());
++  const drop = (k, id) => { touched[k] = day(k).filter(b => b.id !== id); tombstoneBlockIds([id]); };
++  let added = 0, moved = 0, removed = 0, kept = 0;
++  const skips = new Set(feed.skipKeys || []);
++
++  fcalDraft.rows.forEach(r => {
++    if (r.type === 'add' || r.type === 'skip') {
++      if (r.on) { day(r.dayKey).push(fcalNewBlock(feed, r.occ)); added++; }
++      else if (r.type === 'add') skips.add(r.key);
++      return;
++    }
++    if (r.type === 'remove') {
++      if (r.on) { drop(r.blockDay, r.block.id); removed++; }
++      return;
++    }
++    // A move, or a club change to a practice changed by hand.
++    const take = r.type === 'move' ? r.on : (r.on && r.choice === 'club');
++    if (!take) {
++      // Keep the plan as it is, but remember what the club now says, so the
++      // same change is not asked again.
++      const b = day(r.blockDay).find(x => x.id === r.block.id);
++      if (b) { Object.assign(b, fcalStamp(feed, r.occ)); b.updatedAt = syncNow(); kept++; }
++      return;
++    }
++    if (r.blockDay === r.dayKey) {
++      const b = day(r.blockDay).find(x => x.id === r.block.id);
++      if (b) {
++        b.startMin = r.occ.startMin;
++        b.durationMin = r.occ.durationMin;
++        Object.assign(b, fcalStamp(feed, r.occ));
++        b.updatedAt = syncNow();
++      }
++    } else {
++      // Another day: the old copy is deleted (with its tombstone, so another
++      // device cannot bring it back) and a new one is placed.
++      const old = day(r.blockDay).find(x => x.id === r.block.id) || r.block;
++      drop(r.blockDay, r.block.id);
++      const nb = fcalNewBlock(feed, r.occ);
++      ['objectives', 'note', 'gearState', 'travelBuffer', 'travelBufMin', 'getReadyBuffer', 'getReadyBufMin',
++        'warmupBuffer', 'warmupBufMin', 'travelTo', 'travelHome', 'readyBefore', 'readyAfter', 'colour', 'tag']
++        .forEach(f => { if (old[f] !== undefined) nb[f] = old[f]; });
++      day(r.dayKey).push(nb);
++    }
++    moved++;
++  });
++
++  Object.keys(touched).forEach(k => setDayBlocks(k, touched[k], kid));
++  if (feed.id !== 'file') {
++    feed.skipKeys = [...skips].slice(-400);
++    feed.lastChecked = syncNow();
++    feed.lastError = '';
++    fcalTouch(feed);
++  }
++  saveAll();
++  fcalDraft = null;
++  fcalRender();
++  if (typeof refreshCurrentScreen === 'function') refreshCurrentScreen();
++  const bits = [];
++  if (added) bits.push(`${added} added`);
++  if (moved) bits.push(`${moved} moved`);
++  if (removed) bits.push(`${removed} removed`);
++  if (kept) bits.push(`${kept} kept as you had ${kept === 1 ? 'it' : 'them'}`);
++  showToast(`🔄 ${bits.join(' · ') || 'Nothing ticked'} — ${kidLabel(kid).name}'s plan`);
++}
++
++function fcalDiscard() {
++  if (!fcalDraft) return;
++  const feed = fcalFeed(fcalDraft.feedId);
++  // A parent who looked and said no has been asked; the next check is in 14 days.
++  if (feed) { feed.lastChecked = syncNow(); fcalTouch(feed); saveAll(); }
++  fcalDraft = null;
++  fcalRender();
++}
++
++/* A practice a grown-up removes by hand is not offered again (js/08-day-view.js
++   removeBlock). */
++function fcalForget(block) {
++  if (!block || !block.calFeed || !block.calKey) return;
++  const feed = fcalFeed(block.calFeed);
++  if (!feed) return;
++  const skips = new Set(feed.skipKeys || []);
++  skips.add(block.calKey);
++  feed.skipKeys = [...skips].slice(-400);
++  fcalTouch(feed);
++}
++
++/* ── Adding and removing a calendar ── */
++
++function fcalFormValues() {
++  const val = (id) => ((document.getElementById(id) || {}).value || '').trim();
++  return { name: val('fcalName'), link: val('fcalLink'), key: val('fcalKey') };
++}
++
++async function fcalAdd() {
++  if (!isParent()) { showToast('Ask a grown-up — calendars are parent-only'); return; }
++  const v = fcalFormValues();
++  const target = fcalReadLink(v.link);
++  if (!target) { showToast('Paste the calendar link first'); return; }
++  const act = findActivity(fcalForm.actId, fcalForm.kid);
++  if (!act) { showToast('Pick what these are'); return; }
++  const feed = {
++    id: 'cal' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
++    name: (v.name || 'Club calendar').slice(0, 30),
++    link: v.link.slice(0, 300),
++    calId: target.calId, icsUrl: target.icsUrl,
++    key: (v.key || fcalKnownKey()).slice(0, 80),
++    kid: fcalForm.kid, actId: act.id, tag: act.isTraining ? fcalForm.tag : null,
++    lastChecked: 0, lastError: '', skipKeys: [],
++    createdAt: syncNow(), updatedAt: syncNow(),
++  };
++  fcalFeeds().push(feed);
++  saveAll();
++  await fcalCheck(feed.id, false);
++}
++
++async function fcalRemoveFeed(id) {
++  const feed = fcalFeed(id);
++  if (!feed) return;
++  const ok = await showConfirm(`Stop following ${feed.name}?\n\nThe practices already in ${kidLabel(feed.kid).name}'s plan stay.`,
++    { okLabel: 'Stop following', cancelLabel: 'Keep' });
++  if (!ok) return;
++  state.shared.calFeeds = fcalFeeds().filter(f => f.id !== id);
++  tombstoneIds('feed:', [id]);
++  if (fcalDraft && fcalDraft.feedId === id) fcalDraft = null;
++  saveAll();
++  fcalRender();
++}
++
++/* A Google calendar followed before its key was made: the key is added on
++   its card, and the calendar is read straight away. */
++function fcalSaveKey(id) {
++  const feed = fcalFeed(id);
++  const input = [...document.querySelectorAll('[data-fcal-key]')].find(x => x.getAttribute('data-fcal-key') === id);
++  const key = ((input && input.value) || '').trim();
++  if (!feed || !key) { showToast('Paste the Google key first'); return; }
++  feed.key = key.slice(0, 80);
++  feed.lastError = '';
++  fcalTouch(feed);
++  saveAll();
++  fcalCheck(id, false);
++}
++
++/* A downloaded .ics, read once into the plan with the same preview and the
++   same holiday rules. It is not followed: nothing checks it again. */
++function fcalPickFile() {
++  if (!isParent()) { showToast('Ask a grown-up — importing is parent-only'); return; }
++  let input = document.getElementById('fcalFileInput');
++  if (!input) {
++    input = document.createElement('input');
++    input.type = 'file';
++    input.id = 'fcalFileInput';
++    input.accept = 'text/calendar,.ics';
++    input.hidden = true;
++    input.addEventListener('change', async () => {
++      const f = input.files && input.files[0];
++      input.value = '';
++      if (!f) return;
++      let text;
++      try { text = await f.text(); } catch (err) { showToast('That file could not be read'); return; }
++      fcalOpenFile(text, f.name);
++    });
++    document.body.appendChild(input);
++  }
++  input.value = '';
++  input.click();
++}
++function fcalOpenFile(text, name) {
++  const act = findActivity(fcalForm.actId, fcalForm.kid);
++  if (!act) { showToast('Pick what these are'); return; }
++  const fileFeed = { id: 'file', name: name || 'file', kid: fcalForm.kid, actId: act.id,
++    tag: act.isTraining ? fcalForm.tag : null, skipKeys: [] };
++  const { rows } = fcalBuildRows(fileFeed, fcalOccurrencesFromIcs(text));
++  if (!rows.length) { showToast('Nothing new to add from that file'); return; }
++  fcalDraft = { feedId: 'file', fileFeed, rows, leftOut: 0 };
++  fcalRender();
++}
++
++/* ── The screen ── */
++
++function fcalWhen(dayKey, startMin) {
++  return fmtDay(dayKey, 'long') + (startMin == null ? '' : ` · ${formatTimeFromMin(startMin)}`);
++}
++/* A stamp (ms) as the day it fell on. */
++function fcalStampDay(stamp) {
++  return stamp ? fmtDay(dateToLocalKey(new Date(Number(stamp)))) : '';
++}
++
++function fcalRowHtml(r, i) {
++  const o = r.occ;
++  // A row names the place, not the event: every practice is called the same.
++  const where = escapeHtml((o && (o.place || o.summary)) || 'Practice');
++  const box = `<input type="checkbox" data-fcal-action="tick" data-i="${i}"${r.on ? ' checked' : ''}>`;
++  const row = (when, what) => `<label class="sc-row">${box}<span class="sc-when">${when}</span><span class="sc-what">${what}</span></label>`;
++  if (r.type === 'add') return row(escapeHtml(fcalWhen(o.dayKey, o.startMin)), `➕ ${where}`);
++  if (r.type === 'skip') return row(escapeHtml(fcalWhen(o.dayKey, o.startMin)), `⏸ ${escapeHtml(r.why)} — tick to add`);
++  if (r.type === 'remove') {
++    return row(escapeHtml(fcalWhen(r.blockDay, r.block.startMin)),
++      `➖ ${escapeHtml(r.why)}${r.edited ? ' (you had changed it)' : ''}`);
++  }
++  const from = escapeHtml(fcalWhen(r.blockDay, r.block.startMin));
++  const to = escapeHtml(fcalWhen(o.dayKey, o.startMin));
++  if (r.type === 'move') return row(to, `↔️ was ${from}`);
++  return `<div class="sc-row"><span class="sc-when">${to}</span>
++      <span class="sc-what">✋ The club moved it; you had it at ${from}</span></div>
++    <div class="pn-toggle">
++      <button type="button" class="ui-chip" aria-pressed="${r.choice === 'mine'}" data-fcal-action="choose" data-i="${i}" data-choice="mine">Keep yours</button>
++      <button type="button" class="ui-chip" aria-pressed="${r.choice === 'club'}" data-fcal-action="choose" data-i="${i}" data-choice="club">Take the club's</button>
++    </div>`;
++}
++
++function fcalDraftHtml() {
++  const d = fcalDraft;
++  if (!d) return '';
++  const feed = d.feedId === 'file' ? d.fileFeed : fcalFeed(d.feedId);
++  if (!feed) return '';
++  const count = (t) => d.rows.filter(r => r.type === t).length;
++  const parts = [['add', 'new'], ['move', 'moved'], ['conflict', 'changed by you'], ['remove', 'removed'], ['skip', 'not added (club day off or holiday)']]
++    .map(([t, w]) => count(t) ? `${count(t)} ${w}` : '').filter(Boolean).join(' · ');
++  let month = '';
++  const body = d.rows.map((r, i) => {
++    const m = fmtDay(r.dayKey, 'month');
++    const head = m !== month ? `${month ? '</div>' : ''}<p class="pn-cap" style="margin-top:0.6rem">${escapeHtml(m)}</p><div class="ui-card">` : '';
++    month = m;
++    return head + fcalRowHtml(r, i);
++  }).join('') + (d.rows.length ? '</div>' : '');
++  return `<p class="pn-cap" style="margin-top:0.8rem">${d.feedId === 'file' ? 'From the file' : 'Changes'} — ${escapeHtml(feed.name)}
++      → ${escapeHtml(kidLabel(feed.kid).name)}</p>
++    <div class="ui-card pn-clear">${parts || 'Nothing to change'}.${d.leftOut ? ` ${d.leftOut} practice${d.leftOut === 1 ? '' : 's'} you said no to earlier ${d.leftOut === 1 ? 'is' : 'are'} left out.` : ''}
++      Finished practices are never changed.</div>
++    ${body}
++    <div class="pn-toggle" style="margin-top:0.5rem">
++      <button type="button" class="ui-btn ui-btn--primary" data-fcal-action="apply">Apply the ticked changes</button>
++      <button type="button" class="ui-btn ui-btn--secondary" data-fcal-action="discard">Discard</button>
++    </div>`;
++}
++
++function fcalFeedHtml(f) {
++  const act = findActivity(f.actId, f.kid);
++  const sport = f.tag ? getTrainingTopic(f.tag) : null;
++  const what = sport ? sport.label : (act ? `${act.icon} ${act.name}` : 'Activity');
++  const next = f.lastChecked ? fcalStampDay(Number(f.lastChecked) + FCAL_CHECK_DAYS * 24 * 3600 * 1000) : '';
++  const status = f.lastChecked
++    ? `Last checked ${escapeHtml(fcalStampDay(f.lastChecked))} · next check ${escapeHtml(next)}`
++    : 'Not checked yet';
++  const err = f.lastError
++    ? `<br><span class="pn-note">⚠️ Could not check: ${escapeHtml(f.lastError)}.${f.lastChecked ? ` Last check ${escapeHtml(fcalStampDay(f.lastChecked))}.` : ''} The practices in the plan stay as they are.</span>`
++    : '';
++  const busy = fcalBusy === f.id;
++  return `<div class="ui-card" style="margin-top:0.4rem">
++      <b>${escapeHtml(f.name)}</b> → ${escapeHtml(kidLabel(f.kid).icon + ' ' + kidLabel(f.kid).name)} · ${escapeHtml(what)}
++      <br><span class="pn-note">${status}${f.calId && !f.key && !f.lastError ? ' · needs a Google key' : ''}</span>${err}
++      ${f.calId && !f.key ? `<div class="pa-time-row" style="margin-top:0.4rem">
++        <input type="text" data-fcal-key="${escapeAttr(f.id)}" maxlength="80" placeholder="Paste the Google key" aria-label="Google key for ${escapeAttr(f.name)}" autocomplete="off">
++        <button type="button" class="ui-btn ui-btn--secondary" data-fcal-action="save-key" data-feed="${escapeAttr(f.id)}">Save key</button>
++      </div>` : ''}
++      <div class="pn-toggle" style="margin-top:0.4rem">
++        <button type="button" class="ui-btn ui-btn--primary" data-fcal-action="check" data-feed="${escapeAttr(f.id)}"${fcalBusy ? ' disabled' : ''}>${busy ? 'Checking…' : 'Check for changes'}</button>
++        <button type="button" class="ui-btn ui-btn--secondary" data-fcal-action="remove-feed" data-feed="${escapeAttr(f.id)}">Stop following</button>
++      </div>
++    </div>`;
++}
++
++function fcalFormHtml() {
++  const kid = fcalForm.kid;
++  const acts = getAllActivities(kid).filter(a => !a._locked);
++  if (!acts.some(a => a.id === fcalForm.actId) && acts.length) fcalForm.actId = (acts.find(a => a.id === 'training') || acts[0]).id;
++  const act = findActivity(fcalForm.actId, kid);
++  const sports = act && act.isTraining ? getTrainingTags() : [];
++  if (sports.length && !sports.some(t => t.id === fcalForm.tag)) fcalForm.tag = sports[0].id;
++  const known = fcalKnownKey();
++  return `<p class="pn-cap" style="margin-top:0.8rem">Follow a new calendar</p>
++    <div class="ui-card">
++      <div class="pa-time-row"><label for="fcalName">Name</label>
++        <input type="text" id="fcalName" maxlength="30" placeholder="e.g. Swim club"></div>
++      <div class="pa-time-row"><label for="fcalLink">Link</label>
++        <input type="url" id="fcalLink" placeholder="The club's calendar or Subscribe link"></div>
++      <div class="pn-toggle" style="margin-top:0.5rem">${['jenn', 'jess'].map(k =>
++        `<button type="button" class="ui-chip" aria-pressed="${k === kid}" data-fcal-action="kid" data-kid="${k}">${escapeHtml(kidLabel(k).icon + ' ' + kidLabel(k).name)}</button>`).join('')}</div>
++      <div class="pa-time-row" style="margin-top:0.5rem">
++        <label for="fcalActSelect">As</label>
++        <select id="fcalActSelect" data-fcal-action="act">${acts.map(a =>
++          `<option value="${escapeAttr(a.id)}"${a.id === fcalForm.actId ? ' selected' : ''}>${escapeHtml(a.icon + ' ' + a.name)}</option>`).join('')}</select>
++      </div>
++      ${sports.length ? `<div class="pn-toggle" style="margin-top:0.5rem">${sports.map(t =>
++        `<button type="button" class="ui-chip" aria-pressed="${t.id === fcalForm.tag}" data-fcal-action="sport" data-sport="${escapeAttr(t.id)}">${escapeHtml(t.label)}</button>`).join('')}</div>` : ''}
++      <div class="pa-time-row" style="margin-top:0.5rem"><label for="fcalKey">Google key</label>
++        <input type="text" id="fcalKey" maxlength="80" value="${escapeAttr(known)}" placeholder="Needed for a Google calendar" autocomplete="off"></div>
++      <div class="pn-toggle" style="margin-top:0.5rem">
++        <button type="button" class="ui-btn ui-btn--primary" data-fcal-action="add"${fcalBusy ? ' disabled' : ''}>${fcalBusy ? 'Reading…' : 'Follow and read'}</button>
++        <button type="button" class="ui-btn ui-btn--secondary" data-fcal-action="file">📂 Read a .ics file once</button>
++      </div>
++      <p class="pn-note">A Google calendar is read with a Google key: browsers are not allowed to
++        read Google's calendar file from another site. A file is read once and not followed.</p>
++    </div>`;
++}
++
++function fcalRender() {
++  const wrap = document.getElementById('paCalWrap');
++  if (!wrap) return;
++  if (!isParent()) { wrap.innerHTML = ''; return; }
++  const feeds = fcalFeeds();
++  wrap.innerHTML = `<p class="pn-cap">Follow a calendar</p>
++    <div class="ui-card pn-clear">A club's calendar, placed in one girl's plan and kept in step. Every
++      ${FCAL_CHECK_DAYS} days, when you open the parent portal, the app reads it again and shows what
++      changed. Nothing changes until you apply.</div>`
++    + fcalDraftHtml()
++    + (feeds.length ? `<p class="pn-cap" style="margin-top:0.8rem">Calendars you follow</p>${feeds.map(fcalFeedHtml).join('')}` : '')
++    + fcalFormHtml();
++}
++
++/* One delegated listener for the screen, bound in js/99-main.js. */
++function fcalHandleClick(e) {
++  const el = e.target.closest('[data-fcal-action]');
++  if (!el) return;
++  const a = el.getAttribute('data-fcal-action');
++  if (a === 'act') return;                       // a select: handled on change
++  if (a === 'tick') {
++    const r = fcalDraft && fcalDraft.rows[+el.getAttribute('data-i')];
++    if (r) r.on = el.checked;
++    return;
++  }
++  if (a === 'choose') {
++    const r = fcalDraft && fcalDraft.rows[+el.getAttribute('data-i')];
++    if (r) { r.choice = el.getAttribute('data-choice'); r.on = true; fcalRender(); }
++    return;
++  }
++  if (a === 'apply') { fcalApply(); return; }
++  if (a === 'discard') { fcalDiscard(); return; }
++  if (a === 'check') { fcalCheck(el.getAttribute('data-feed'), false); return; }
++  if (a === 'remove-feed') { fcalRemoveFeed(el.getAttribute('data-feed')); return; }
++  if (a === 'save-key') { fcalSaveKey(el.getAttribute('data-feed')); return; }
++  if (a === 'file') { fcalPickFile(); return; }
++  if (a === 'add') { fcalAdd(); return; }
++  // The form's choices redraw the form; keep what was typed.
++  const typed = fcalFormValues();
++  if (a === 'kid') fcalForm.kid = el.getAttribute('data-kid');
++  else if (a === 'sport') fcalForm.tag = el.getAttribute('data-sport');
++  else return;
++  fcalRender();
++  fcalRestoreTyped(typed);
++}
++function fcalHandleChange(e) {
++  const sel = e.target.closest('[data-fcal-action="act"]');
++  if (sel) {
++    const typed = fcalFormValues();
++    fcalForm.actId = sel.value;
++    fcalRender();
++    fcalRestoreTyped(typed);
++    return;
++  }
++  if (e.target.closest('[data-fcal-action="tick"]')) fcalHandleClick(e);
++}
++function fcalRestoreTyped(v) {
++  [['fcalName', v.name], ['fcalLink', v.link], ['fcalKey', v.key]].forEach(([id, val]) => {
++    const el = document.getElementById(id);
++    if (el && val) el.value = val;
++  });
++}
+diff --git a/js/99-main.js b/js/99-main.js
+index d5ecccb..df5b47a 100644
+--- a/js/99-main.js
++++ b/js/99-main.js
+@@ -188,6 +188,12 @@ if (document.fonts) {
+     el.addEventListener('click', paHandleClick);
+     el.addEventListener('change', paHandleChange);
+   });
++  // App › Follow a calendar: its rows and form are rebuilt on every change.
++  const calWrap = document.getElementById('paCalWrap');
++  if (calWrap) {
++    calWrap.addEventListener('click', fcalHandleClick);
++    calWrap.addEventListener('change', fcalHandleChange);
++  }
+   if (typeof paApplyTextScale === 'function') paApplyTextScale();
+ })();
+ 
+diff --git a/sw.js b/sw.js
+index c809a58..7ff94ef 100644
+--- a/sw.js
++++ b/sw.js
+@@ -26,7 +26,7 @@
+    touched: Firestore keeps its own offline story (js/03-sync.js) and a worker
+    in the middle of it would be a second cache disagreeing with the first. */
+ 
+-const SW_VERSION = '2026-10-13c';
++const SW_VERSION = '2026-10-16a';
+ const CACHE = 'wp-shell-' + SW_VERSION;
+ 
+ const SHELL = [
+@@ -87,6 +87,7 @@ const SHELL = [
+   './js/45-requests.js',
+   './js/46-grownups.js',
+   './js/47-header.js',
++  './js/48-cal-follow.js',
+   './js/99-main.js',
+   './assets/icons/apple-touch-icon.png',
+   './assets/icons/favicon-16.png',
+diff --git a/tests/merge.test.js b/tests/merge.test.js
+index 0790d04..f723fc0 100644
+--- a/tests/merge.test.js
++++ b/tests/merge.test.js
+@@ -840,6 +840,35 @@ function sync(a, b) {
+     (phone.state.shared.conflicts || []).length === 1);
+ }
+ 
++/* ── The calendars a family follows (App › Follow a calendar) ──
++   state.shared.calFeeds is a list of records, each with an id and a stamp, and
++   a parent can stop following one. Without a decision the spread in
++   mergeSharedState replaced the whole list with the remote copy on every
++   snapshot: a calendar added on the iPad vanished when the phone's document
++   arrived, and a removed one came back. */
++{
++  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
++  on(ipad, st => { st.shared.calFeeds = [{ id: 'calA', name: 'Swim club', lastChecked: 0, updatedAt: 100 }]; });
++  on(phone, st => { st.shared.calFeeds = [{ id: 'calB', name: 'Skating', updatedAt: 110 }]; });
++  sync(ipad, phone);
++  const ids = (dev) => (dev.state.shared.calFeeds || []).map(f => f.id).sort().join(',');
++  check('calFeeds: a calendar added on each device is on both after a sync',
++    ids(ipad) === 'calA,calB' && ids(phone) === 'calA,calB');
++  // The iPad checks the swim club (a newer stamp); the phone's older copy does not undo it.
++  on(ipad, st => { const f = st.shared.calFeeds.find(x => x.id === 'calA'); f.lastChecked = 500; f.updatedAt = 500; });
++  sync(ipad, phone);
++  const checked = (dev) => (dev.state.shared.calFeeds.find(x => x.id === 'calA') || {}).lastChecked;
++  check('calFeeds: the newer copy of one calendar wins on both devices', checked(ipad) === 500 && checked(phone) === 500);
++  // The phone stops following Skating; the iPad still holds it, and it stays gone.
++  on(phone, st => {
++    st.shared.calFeeds = st.shared.calFeeds.filter(f => f.id !== 'calB');
++    st.shared.tombstones['feed:calB'] = 600;
++  });
++  sync(ipad, phone);
++  check('calFeeds: a calendar removed on one device does not come back from the other',
++    ids(ipad) === 'calA' && ids(phone) === 'calA');
++}
++
+ // A restore from backup is the one write that is not a merge. Replace bumps
+ // dataEpoch, and a higher epoch is taken whole — otherwise the other device's
+ // newer-stamped records win arbitration and go straight back up, which is
+diff --git a/tests/smoke-parts/parts.js b/tests/smoke-parts/parts.js
+index cabdbfa..72610ed 100644
+--- a/tests/smoke-parts/parts.js
++++ b/tests/smoke-parts/parts.js
+@@ -56,6 +56,7 @@ const PARTS = {
+     'everyWeekViewFollowsTheSchoolCalendar',
+     'schoolHoursAreTheParentsToSet',
+     'anIcsFileBecomesDaysOffOnlyAfterReview',
++    'aFollowedCalendarStaysInStep',
+     'aBlankWeekOffersItsSchoolDays',
+     'theSchoolOfferIsAboveTheWeekGrid',
+     'oneSchoolDayCanBeAddedOnItsOwn',
+diff --git a/tests/smoke.js b/tests/smoke.js
+index 9e2df15..5ae83f0 100644
+--- a/tests/smoke.js
++++ b/tests/smoke.js
+@@ -168,6 +168,7 @@ function findChromium() {
+     oneSheetAndOneDialogEverywhere: [],
+     theRedOkIsOnlyForWhatCannotBeUndone: [],
+     theBackupScreenSaysIfASundayStartRuleIsSaved: [],
++    aFollowedCalendarStaysInStep: [],
+   };
+   const setupNeeded = (step) => {
+     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
+@@ -764,36 +765,220 @@ function findChromium() {
+     if (state.shared.schoolCal.termStart) bad.push('an unticked term was written anyway');
+     if (!isSchoolDay('2026-10-15')) bad.push('an unticked day off took effect');
+ 
+-    // Timed events land as blocks on the chosen child, once.
+-    const restore = [];
+-    ['2026-09-08', '2026-09-22', '2026-10-06'].forEach(k => {
+-      restore.push([k, getDayBlocksForProfile(k, 'jenn')]);
+-      setDayBlocks(k, [], 'jenn');
+-    });
+-    scDraft = scBuildDraft(ics, 'test');
+-    scBlockKid = 'jenn'; scBlockActId = 'piano';
+-    scCommitBlocks();
+-    const landed = getDayBlocksForProfile('2026-09-08', 'jenn') || [];
+-    if (landed.length !== 1) bad.push(`${landed.length} blocks landed on the first physio day`);
+-    else {
+-      if (landed[0].actId !== 'piano') bad.push('the block is not the chosen activity');
+-      if (landed[0].startMin !== 16 * 60) bad.push('the block did not take the event time');
+-      if (!/Physio/.test(landed[0].note || '')) bad.push('the block lost what the event was called');
+-    }
+-    // Importing the same file twice must not double it up.
++    /* Timed events are not this screen's any more: App › Follow a calendar
++       places them (aFollowedCalendarStaysInStep). The school import still
++       reads them, so it can say where they go. */
++    if (d.timed.length !== 3) bad.push(`${d.timed.length} timed events read, expected the 3 physio visits`);
+     scDraft = scBuildDraft(ics, 'test');
+-    scCommitBlocks();
+-    if ((getDayBlocksForProfile('2026-09-08', 'jenn') || []).length !== 1) {
+-      bad.push('a second import of the same calendar doubled the appointment');
+-    }
+-
+-    restore.forEach(([k, b]) => setDayBlocks(k, b, 'jenn'));
++    paRenderSchool();
++    const wrapText = (document.getElementById('scWrap') || {}).textContent || '';
++    if (!/Follow a calendar/.test(wrapText)) bad.push('the school import does not say where timed events go');
++    if (document.querySelector('#scWrap [data-sc="commit-blocks"]')) bad.push('the school import still places appointments');
+     scDraft = null;
+     state.shared.schoolCal = wasCal;
+     profile = wasProfile; parentViewing = wasViewing;
+     return bad.length === 0 || bad;
+   });
+ 
++  /* A FOLLOWED CALENDAR STAYS IN STEP (App › Follow a calendar,
++     js/48-cal-follow.js). A club calendar shaped like the real one: weekly
++     practices with skipped dates (Thanksgiving), one moved practice, a meet
++     weekend as an all-day event, and a statutory holiday the club did not
++     skip. Then the club changes things, and nothing moves until a parent
++     confirms; a finished practice and one changed by hand are protected. */
++  if (want('aFollowedCalendarStaysInStep')) checks.aFollowedCalendarStaysInStep = await page.evaluate(async () => {
++    const bad = [];
++    const wasProfile = profile, wasViewing = parentViewing, wasFeeds = state.shared.calFeeds, wasDraft = fcalDraft;
++    const wasFetch = window.fetch;
++    profile = 'parent'; parentViewing = 'jess';
++    const T = '2026-10-05';
++    const days = fcalDayList(T, FCAL_HORIZON_DAYS + 14);
++    const keep = days.map(k => [k, getDayBlocksForProfile(k, 'jess')]);
++    days.forEach(k => setDayBlocks(k, [], 'jess'));
++    state.shared.calFeeds = [];
++    const ics = [
++      'BEGIN:VCALENDAR', 'VERSION:2.0',
++      'BEGIN:VEVENT', 'UID:mon@google.com', 'DTSTART;TZID=America/Edmonton:20260928T154500',
++        'DTEND;TZID=America/Edmonton:20260928T170000', 'RRULE:FREQ=WEEKLY;UNTIL=20270614T055959Z;BYDAY=MO',
++        'EXDATE;TZID=America/Edmonton:20261012T154500', 'SUMMARY:Development Practice',
++        'LOCATION:Pool One\\, 1 Main St\\, Town', 'END:VEVENT',
++      'BEGIN:VEVENT', 'UID:fri@google.com', 'DTSTART;TZID=America/Edmonton:20261002T160000',
++        'DTEND;TZID=America/Edmonton:20261002T173000', 'RRULE:FREQ=WEEKLY;UNTIL=20270618T055959Z;BYDAY=FR',
++        'SUMMARY:Development Practice', 'END:VEVENT',
++      'BEGIN:VEVENT', 'UID:fri@google.com', 'RECURRENCE-ID;TZID=America/Edmonton:20261023T160000',
++        'DTSTART;TZID=America/Edmonton:20261023T154500', 'DTEND;TZID=America/Edmonton:20261023T171500',
++        'SUMMARY:Development Practice', 'END:VEVENT',
++      'BEGIN:VEVENT', 'UID:sat@google.com', 'DTSTART;TZID=America/Edmonton:20261003T063000',
++        'DTEND;TZID=America/Edmonton:20261003T080000', 'RRULE:FREQ=WEEKLY;UNTIL=20270619T055959Z;BYDAY=SA',
++        'SUMMARY:Development Practice', 'END:VEVENT',
++      'BEGIN:VEVENT', 'UID:wed@google.com', 'DTSTART;TZID=America/Edmonton:20261007T170000',
++        'DTEND;TZID=America/Edmonton:20261007T180000', 'RRULE:FREQ=WEEKLY;UNTIL=20270619T055959Z;BYDAY=WE',
++        'SUMMARY:Development Practice', 'END:VEVENT',
++      'BEGIN:VEVENT', 'UID:meet@google.com', 'DTSTART;VALUE=DATE:20261024', 'DTEND;VALUE=DATE:20261026',
++        'SUMMARY:Poppy Swim Meet', 'END:VEVENT',
++      'END:VCALENDAR',
++    ].join('\r\n');
++
++    // 1 · Reading: a skipped date stays empty, a moved practice lands once.
++    const occs = fcalOccurrencesFromIcs(ics);
++    if (occs.some(o => o.key === 'mon|2026-10-12')) bad.push('a skipped date (Thanksgiving) came back as a practice');
++    const oct23 = occs.filter(o => o.dayKey === '2026-10-23' && !o.allDay);
++    if (oct23.length !== 1 || oct23[0].startMin !== 15 * 60 + 45 || oct23[0].key !== 'fri|2026-10-23') {
++      bad.push(`the moved Friday read as ${JSON.stringify(oct23.map(o => [o.key, o.startMin]))}`);
++    }
++    if ((occs.find(o => o.key === 'mon|2026-10-19') || {}).place !== 'Pool One') bad.push('the place kept more than its name');
++
++    // 2 · The rows: adds, and the meet day and the statutory holiday not added.
++    const feed = { id: 'calT', name: 'Swim club', kid: 'jess', actId: 'training', tag: 'swimming',
++      skipKeys: [], lastChecked: 0, createdAt: 1, updatedAt: 1 };
++    state.shared.calFeeds.push(feed);
++    let built = fcalBuildRows(feed, occs, T);
++    const row = (key) => built.rows.find(r => r.key === key);
++    if (!row('mon|2026-10-19') || row('mon|2026-10-19').type !== 'add' || !row('mon|2026-10-19').on) bad.push('a practice was not offered, ticked');
++    if (!row('sat|2026-10-24') || row('sat|2026-10-24').type !== 'skip' || row('sat|2026-10-24').on || !/Poppy/.test(row('sat|2026-10-24').why)) {
++      bad.push('a practice on a club meet day was not held back, unticked, with the meet named');
++    }
++    if (!row('wed|2026-11-11') || row('wed|2026-11-11').type !== 'skip' || !/statutory/.test(row('wed|2026-11-11').why)) {
++      bad.push('Remembrance Day was not held back as a statutory holiday');
++    }
++    if (built.rows.some(r => r.dayKey < T || r.dayKey > fcalDayList(T, FCAL_HORIZON_DAYS).pop())) bad.push('a row fell outside today … 12 weeks');
++
++    // 3 · Applying: Training, the sport, the buffers, the key; held-back rows stay out.
++    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
++    fcalApply();
++    const on = (k) => (getDayBlocksForProfile(k, 'jess') || []).filter(b => b.calFeed === feed.id);
++    const b19 = on('2026-10-19')[0];
++    if (!b19) bad.push('an applied practice is not in the plan');
++    else {
++      if (b19.actId !== 'training' || b19.tag !== 'swimming') bad.push(`the practice is ${b19.actId}/${b19.tag}, expected training/swimming`);
++      if (!b19.travelBuffer || !b19.getReadyBuffer) bad.push('the practice has no travel or get-ready time');
++      if (b19.calKey !== 'mon|2026-10-19' || b19.startMin !== 945) bad.push('the practice lost its key or time');
++      if (/Main St/.test(b19.note || '')) bad.push('a street address was saved');
++      if (!b19.parentPinned) bad.push('the practice is not pinned by a grown-up');
++    }
++    if (on('2026-10-24').length || on('2026-11-11').length) bad.push('a held-back practice was added');
++    if (!fcalFeed(feed.id).lastChecked) bad.push('applying did not record the check');
++
++    // 4 · The same calendar again: nothing to change.
++    built = fcalBuildRows(feed, occs, T);
++    if (built.rows.some(r => r.type !== 'skip')) bad.push(`an unchanged calendar offered ${built.rows.filter(r => r.type !== 'skip').length} changes`);
++
++    // 5 · The club moves a practice: offered, and moved only once applied.
++    const moved = occs.map(o => o.key === 'mon|2026-10-19' ? { ...o, startMin: 16 * 60 } : o);
++    built = fcalBuildRows(feed, moved, T);
++    if (!row('mon|2026-10-19') || row('mon|2026-10-19').type !== 'move') bad.push('a moved practice was not offered as a move');
++    if (on('2026-10-19')[0].startMin !== 945) bad.push('a move took effect before it was applied');
++    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
++    fcalApply();
++    if (on('2026-10-19')[0].startMin !== 960) bad.push('an applied move did not move the practice');
++
++    // 6 · Changed by hand, then the club moves it: asked, and "keep yours" keeps it.
++    const d26 = getDayBlocksForProfile('2026-10-26', 'jess').map(b => b.calFeed === feed.id ? { ...b, startMin: 17 * 60, updatedAt: syncNow() } : b);
++    setDayBlocks('2026-10-26', d26, 'jess');
++    const club26 = moved.map(o => o.key === 'mon|2026-10-26' ? { ...o, startMin: 16 * 60 + 15 } : o);
++    built = fcalBuildRows(feed, club26, T);
++    const c = row('mon|2026-10-26');
++    if (!c || c.type !== 'conflict' || c.choice !== 'mine') bad.push('a practice changed by hand was not asked about, keep-yours first');
++    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
++    fcalApply();
++    if (on('2026-10-26')[0].startMin !== 17 * 60) bad.push('"keep yours" did not keep the hand-changed time');
++    built = fcalBuildRows(feed, club26, T);
++    if (row('mon|2026-10-26')) bad.push('a kept change was asked again');
++
++    // 7 · A finished practice never changes; a cancelled one is offered for removal.
++    const d9 = getDayBlocksForProfile('2026-11-09', 'jess').map(b => b.calFeed === feed.id ? { ...b, completed: true } : b);
++    setDayBlocks('2026-11-09', d9, 'jess');
++    const club2 = club26.filter(o => o.key !== 'mon|2026-11-02').map(o => o.key === 'mon|2026-11-09' ? { ...o, startMin: 18 * 60 } : o);
++    built = fcalBuildRows(feed, club2, T);
++    if (row('mon|2026-11-09')) bad.push('a finished practice was offered for a change');
++    if (!row('mon|2026-11-02') || row('mon|2026-11-02').type !== 'remove') bad.push('a cancelled practice was not offered for removal');
++    const gone = on('2026-11-02')[0];
++    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
++    fcalApply();
++    if (on('2026-11-02').length) bad.push('an applied removal left the practice in the plan');
++    if (gone && !(state.shared.tombstones || {})[gone.id]) bad.push('a removed practice has no tombstone, so another device brings it back');
++
++    // 8 · Removed by hand: not offered again.
++    const b16 = on('2026-11-16')[0];
++    fcalForget(b16);
++    setDayBlocks('2026-11-16', getDayBlocksForProfile('2026-11-16', 'jess').filter(b => b.id !== b16.id), 'jess');
++    built = fcalBuildRows(feed, club2, T);
++    if (row('mon|2026-11-16') || built.leftOut < 1) bad.push('a practice removed by hand was offered again');
++
++    // 8b · Two devices applied the same check: the second copy is offered for removal.
++    const b23 = on('2026-11-23')[0];
++    setDayBlocks('2026-11-23', getDayBlocksForProfile('2026-11-23', 'jess').concat([{ ...b23, id: b23.id + 'x' }]), 'jess');
++    built = fcalBuildRows(feed, club2, T);
++    if (built.rows.filter(r => r.key === 'mon|2026-11-23' && r.type === 'remove').length !== 1) bad.push('a second copy of one practice was not offered for removal');
++    setDayBlocks('2026-11-23', getDayBlocksForProfile('2026-11-23', 'jess').filter(b => b.id !== b23.id + 'x'), 'jess');
++
++    // 9 · Links, holidays, the 14-day rhythm.
++    const L = (x) => JSON.stringify(fcalReadLink(x));
++    const id = 'abc123@group.calendar.google.com';
++    if (fcalReadLink('https://calendar.google.com/calendar/embed?src=abc123%40group.calendar.google.com&ctz=America%2FEdmonton').calId !== id) bad.push('an embed link was not read: ' + L('embed'));
++    if (fcalReadLink('https://calendar.google.com/calendar/ical/abc123%40group.calendar.google.com/public/basic.ics').calId !== id) bad.push('a file link was not read');
++    if (fcalReadLink('webcal://example.org/club.ics').icsUrl !== 'https://example.org/club.ics') bad.push('a webcal link was not read as a file');
++    if (fcalReadLink('not a link') !== null) bad.push('text that is no link was accepted');
++    const sh = { ...fcalStatHolidays(2026), ...fcalStatHolidays(2027) };
++    [['2026-10-12', 'Thanksgiving'], ['2027-02-15', 'Family Day'], ['2027-03-26', 'Good Friday'], ['2027-05-24', 'Victoria Day'], ['2026-12-25', 'Christmas Day']]
++      .forEach(([k, n]) => { if (sh[k] !== n) bad.push(`${n} is not on ${k}`); });
++    if (sh['2026-12-26'] || sh['2027-03-29'] || sh['2026-09-30']) bad.push('an optional holiday is in the statutory list');
++    if (!fcalIsDue({ lastChecked: 1000 }, 1000 + 14 * 86400000) || fcalIsDue({ lastChecked: 1000 }, 1000 + 13 * 86400000)) bad.push('the check is not every 14 days');
++
++    // 10 · Google's service gives the same keys, and a refused key is said plainly.
++    const g = fcalOccurrencesFromGoogle([
++      { id: 'fri_20261023T220000Z', recurringEventId: 'fri', originalStartTime: { dateTime: '2026-10-23T16:00:00-06:00' },
++        start: { dateTime: '2026-10-23T15:45:00-06:00' }, end: { dateTime: '2026-10-23T17:15:00-06:00' }, summary: 'Development Practice' },
++      { id: 'mon_x', recurringEventId: 'mon', status: 'cancelled', start: { dateTime: '2026-11-02T15:45:00-07:00' } },
++      { id: 'meet', start: { date: '2026-10-24' }, end: { date: '2026-10-26' }, summary: 'Poppy Swim Meet' },
++    ]);
++    if (!g.some(o => o.key === 'fri|2026-10-23' && o.startMin === 945 && o.durationMin === 90)) bad.push("Google's moved practice did not match the file's key");
++    if (g.some(o => /mon/.test(o.key))) bad.push("Google's cancelled practice was read");
++    if (g.filter(o => o.allDay).length !== 2) bad.push("Google's meet weekend did not cover both days");
++    const gFeed = { id: 'calG', name: 'Google club', kid: 'jess', actId: 'training', tag: 'swimming', calId: id, key: 'KEY1',
++      skipKeys: [], lastChecked: 0, createdAt: 1, updatedAt: 1 };
++    state.shared.calFeeds.push(gFeed);
++    let asked = '';
++    window.fetch = async (url) => { asked = String(url); return { ok: false, status: 403, json: async () => ({}) }; };
++    await fcalCheck('calG', false);
++    if (!/googleapis\.com\/calendar\/v3\/calendars\/abc123%40group/.test(asked) || !/key=KEY1/.test(asked) || !/singleEvents=true/.test(asked)) {
++      bad.push('the Google request is not the calendar service with the key: ' + asked.slice(0, 120));
++    }
++    if (!/refused the key/.test(fcalFeed('calG').lastError || '')) bad.push('a refused key was not said plainly');
++    if (fcalFeed('calG').lastChecked) bad.push('a failed check was recorded as a check');
++    window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ items: [] }) });
++    await fcalCheck('calG', true);
++    if (fcalFeed('calG').lastError || !fcalFeed('calG').lastChecked) bad.push('a good check did not clear the error and record the check');
++    // A calendar that arrives after the portal first drew still gets its automatic check.
++    let calls = 0;
++    window.fetch = async () => { calls++; return { ok: true, status: 200, json: async () => ({ items: [] }) }; };
++    const late = { ...gFeed, id: 'calLate', lastChecked: 0, lastError: '' };
++    fcalDraft = null;
++    await fcalAutoCheck();
++    state.shared.calFeeds.push(late);
++    await fcalAutoCheck();
++    if (!fcalFeed('calLate').lastChecked) bad.push('a calendar that arrived later was not checked');
++    const before = calls;
++    await fcalAutoCheck();
++    if (calls !== before) bad.push('the automatic check read the same calendar twice in one app load');
++
++    // 11 · The screen: the row, the list, the review grouped by month.
++    setParentTab('calendars');
++    const wrap = document.getElementById('paCalWrap');
++    if (!(PARENT_LANDINGS.app || []).some(r => r.panel === 'calendars' && /Follow a calendar/.test(r.title))) bad.push('App has no Follow a calendar row');
++    if (!/Swim club/.test(wrap.textContent) || !wrap.querySelector('[data-fcal-action="check"]')) bad.push('the screen does not list the followed calendar with its check');
++    fcalDraft = { feedId: feed.id, rows: fcalBuildRows(feed, occs.map(o => o.key === 'mon|2026-10-19' ? { ...o, startMin: 17 * 60 } : o), T).rows, leftOut: 0 };
++    fcalRender();
++    if (!/Oct 2026/.test(wrap.textContent) || !wrap.querySelector('[data-fcal-action="apply"]')) bad.push('the review is not grouped by month with an apply button');
++
++    window.fetch = wasFetch;
++    keep.forEach(([k, b]) => setDayBlocks(k, b, 'jess'));
++    state.shared.calFeeds = wasFeeds;
++    fcalDraft = wasDraft;
++    profile = wasProfile; parentViewing = wasViewing;
++    return bad.length === 0 || bad;
++  });
++
+   /* SCHOOL DAYS ARE OFFERED, NOT ASSUMED. The calendar knows which days of a
+      week are school days; what it must not do is quietly fill them in, because
+      a week that arrived pre-planned is a week nobody decided. And only near the
