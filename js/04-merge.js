@@ -673,6 +673,9 @@ function mergeSharedState(localShared, remoteShared) {
     // archives rather than removals, so no tombstone scope is needed — an
     // archived sport must keep resolving for the blocks that still name it.
     customSports: mergeArrayById(ls.customSports, rs.customSports),
+    // The calendars a family follows (js/48-cal-follow.js). Id-keyed records
+    // with a stamp; stopping one records a 'feed:' tombstone so it stays gone.
+    calFeeds: mergeArrayById(ls.calFeeds, rs.calFeeds, 'feed:'),
     // Which days a grown-up has reviewed. A union per kid per day — see
     // mergeParentDayConfirm. Unarbitrated until now, which meant two adults
     // working through one Sunday meeting on two devices lost one set of

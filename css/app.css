@@ -3489,7 +3489,7 @@
     font-size: calc(max(13px, calc(0.9rem * var(--fs-scale, 1))) * var(--text-scale, 1));
     font-weight: 700; color: var(--ink);
   }
-  .pa-time-row input { flex: 1 1 8rem; min-width: 0; min-height: 44px; }
+  .pa-time-row input, .pa-time-row select { flex: 1 1 8rem; min-width: 0; min-height: 44px; }
   .pa-time-hint { flex: 1 1 100%; margin: 0; }
   .pa-x {
     min-width: 32px; min-height: 32px; margin-left: 0.4rem;

@@ -168,6 +168,7 @@ function findChromium() {
     oneSheetAndOneDialogEverywhere: [],
     theRedOkIsOnlyForWhatCannotBeUndone: [],
     theBackupScreenSaysIfASundayStartRuleIsSaved: [],
+    aFollowedCalendarStaysInStep: [],
   };
   const setupNeeded = (step) => {
     const yes = PART ? PARTS[PART].some(n => (SETUP_NEEDS[n] || []).includes(step))
@@ -764,32 +765,216 @@ function findChromium() {
     if (state.shared.schoolCal.termStart) bad.push('an unticked term was written anyway');
     if (!isSchoolDay('2026-10-15')) bad.push('an unticked day off took effect');
 
-    // Timed events land as blocks on the chosen child, once.
-    const restore = [];
-    ['2026-09-08', '2026-09-22', '2026-10-06'].forEach(k => {
-      restore.push([k, getDayBlocksForProfile(k, 'jenn')]);
-      setDayBlocks(k, [], 'jenn');
-    });
+    /* Timed events are not this screen's any more: App › Follow a calendar
+       places them (aFollowedCalendarStaysInStep). The school import still
+       reads them, so it can say where they go. */
+    if (d.timed.length !== 3) bad.push(`${d.timed.length} timed events read, expected the 3 physio visits`);
     scDraft = scBuildDraft(ics, 'test');
-    scBlockKid = 'jenn'; scBlockActId = 'piano';
-    scCommitBlocks();
-    const landed = getDayBlocksForProfile('2026-09-08', 'jenn') || [];
-    if (landed.length !== 1) bad.push(`${landed.length} blocks landed on the first physio day`);
-    else {
-      if (landed[0].actId !== 'piano') bad.push('the block is not the chosen activity');
-      if (landed[0].startMin !== 16 * 60) bad.push('the block did not take the event time');
-      if (!/Physio/.test(landed[0].note || '')) bad.push('the block lost what the event was called');
-    }
-    // Importing the same file twice must not double it up.
-    scDraft = scBuildDraft(ics, 'test');
-    scCommitBlocks();
-    if ((getDayBlocksForProfile('2026-09-08', 'jenn') || []).length !== 1) {
-      bad.push('a second import of the same calendar doubled the appointment');
-    }
-
-    restore.forEach(([k, b]) => setDayBlocks(k, b, 'jenn'));
+    paRenderSchool();
+    const wrapText = (document.getElementById('scWrap') || {}).textContent || '';
+    if (!/Follow a calendar/.test(wrapText)) bad.push('the school import does not say where timed events go');
+    if (document.querySelector('#scWrap [data-sc="commit-blocks"]')) bad.push('the school import still places appointments');
     scDraft = null;
     state.shared.schoolCal = wasCal;
+    profile = wasProfile; parentViewing = wasViewing;
+    return bad.length === 0 || bad;
+  });
+
+  /* A FOLLOWED CALENDAR STAYS IN STEP (App › Follow a calendar,
+     js/48-cal-follow.js). A club calendar shaped like the real one: weekly
+     practices with skipped dates (Thanksgiving), one moved practice, a meet
+     weekend as an all-day event, and a statutory holiday the club did not
+     skip. Then the club changes things, and nothing moves until a parent
+     confirms; a finished practice and one changed by hand are protected. */
+  if (want('aFollowedCalendarStaysInStep')) checks.aFollowedCalendarStaysInStep = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasFeeds = state.shared.calFeeds, wasDraft = fcalDraft;
+    const wasFetch = window.fetch;
+    profile = 'parent'; parentViewing = 'jess';
+    const T = '2026-10-05';
+    const days = fcalDayList(T, FCAL_HORIZON_DAYS + 14);
+    const keep = days.map(k => [k, getDayBlocksForProfile(k, 'jess')]);
+    days.forEach(k => setDayBlocks(k, [], 'jess'));
+    state.shared.calFeeds = [];
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0',
+      'BEGIN:VEVENT', 'UID:mon@google.com', 'DTSTART;TZID=America/Edmonton:20260928T154500',
+        'DTEND;TZID=America/Edmonton:20260928T170000', 'RRULE:FREQ=WEEKLY;UNTIL=20270614T055959Z;BYDAY=MO',
+        'EXDATE;TZID=America/Edmonton:20261012T154500', 'SUMMARY:Development Practice',
+        'LOCATION:Pool One\\, 1 Main St\\, Town', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:fri@google.com', 'DTSTART;TZID=America/Edmonton:20261002T160000',
+        'DTEND;TZID=America/Edmonton:20261002T173000', 'RRULE:FREQ=WEEKLY;UNTIL=20270618T055959Z;BYDAY=FR',
+        'SUMMARY:Development Practice', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:fri@google.com', 'RECURRENCE-ID;TZID=America/Edmonton:20261023T160000',
+        'DTSTART;TZID=America/Edmonton:20261023T154500', 'DTEND;TZID=America/Edmonton:20261023T171500',
+        'SUMMARY:Development Practice', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:sat@google.com', 'DTSTART;TZID=America/Edmonton:20261003T063000',
+        'DTEND;TZID=America/Edmonton:20261003T080000', 'RRULE:FREQ=WEEKLY;UNTIL=20270619T055959Z;BYDAY=SA',
+        'SUMMARY:Development Practice', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:wed@google.com', 'DTSTART;TZID=America/Edmonton:20261007T170000',
+        'DTEND;TZID=America/Edmonton:20261007T180000', 'RRULE:FREQ=WEEKLY;UNTIL=20270619T055959Z;BYDAY=WE',
+        'SUMMARY:Development Practice', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:meet@google.com', 'DTSTART;VALUE=DATE:20261024', 'DTEND;VALUE=DATE:20261026',
+        'SUMMARY:Poppy Swim Meet', 'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    // 1 · Reading: a skipped date stays empty, a moved practice lands once.
+    const occs = fcalOccurrencesFromIcs(ics);
+    if (occs.some(o => o.key === 'mon|2026-10-12')) bad.push('a skipped date (Thanksgiving) came back as a practice');
+    const oct23 = occs.filter(o => o.dayKey === '2026-10-23' && !o.allDay);
+    if (oct23.length !== 1 || oct23[0].startMin !== 15 * 60 + 45 || oct23[0].key !== 'fri|2026-10-23') {
+      bad.push(`the moved Friday read as ${JSON.stringify(oct23.map(o => [o.key, o.startMin]))}`);
+    }
+    if ((occs.find(o => o.key === 'mon|2026-10-19') || {}).place !== 'Pool One') bad.push('the place kept more than its name');
+
+    // 2 · The rows: adds, and the meet day and the statutory holiday not added.
+    const feed = { id: 'calT', name: 'Swim club', kid: 'jess', actId: 'training', tag: 'swimming',
+      skipKeys: [], lastChecked: 0, createdAt: 1, updatedAt: 1 };
+    state.shared.calFeeds.push(feed);
+    let built = fcalBuildRows(feed, occs, T);
+    const row = (key) => built.rows.find(r => r.key === key);
+    if (!row('mon|2026-10-19') || row('mon|2026-10-19').type !== 'add' || !row('mon|2026-10-19').on) bad.push('a practice was not offered, ticked');
+    if (!row('sat|2026-10-24') || row('sat|2026-10-24').type !== 'skip' || row('sat|2026-10-24').on || !/Poppy/.test(row('sat|2026-10-24').why)) {
+      bad.push('a practice on a club meet day was not held back, unticked, with the meet named');
+    }
+    if (!row('wed|2026-11-11') || row('wed|2026-11-11').type !== 'skip' || !/statutory/.test(row('wed|2026-11-11').why)) {
+      bad.push('Remembrance Day was not held back as a statutory holiday');
+    }
+    if (built.rows.some(r => r.dayKey < T || r.dayKey > fcalDayList(T, FCAL_HORIZON_DAYS).pop())) bad.push('a row fell outside today … 12 weeks');
+
+    // 3 · Applying: Training, the sport, the buffers, the key; held-back rows stay out.
+    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
+    fcalApply();
+    const on = (k) => (getDayBlocksForProfile(k, 'jess') || []).filter(b => b.calFeed === feed.id);
+    const b19 = on('2026-10-19')[0];
+    if (!b19) bad.push('an applied practice is not in the plan');
+    else {
+      if (b19.actId !== 'training' || b19.tag !== 'swimming') bad.push(`the practice is ${b19.actId}/${b19.tag}, expected training/swimming`);
+      if (!b19.travelBuffer || !b19.getReadyBuffer) bad.push('the practice has no travel or get-ready time');
+      if (b19.calKey !== 'mon|2026-10-19' || b19.startMin !== 945) bad.push('the practice lost its key or time');
+      if (/Main St/.test(b19.note || '')) bad.push('a street address was saved');
+      if (!b19.parentPinned) bad.push('the practice is not pinned by a grown-up');
+    }
+    if (on('2026-10-24').length || on('2026-11-11').length) bad.push('a held-back practice was added');
+    if (!fcalFeed(feed.id).lastChecked) bad.push('applying did not record the check');
+
+    // 4 · The same calendar again: nothing to change.
+    built = fcalBuildRows(feed, occs, T);
+    if (built.rows.some(r => r.type !== 'skip')) bad.push(`an unchanged calendar offered ${built.rows.filter(r => r.type !== 'skip').length} changes`);
+
+    // 5 · The club moves a practice: offered, and moved only once applied.
+    const moved = occs.map(o => o.key === 'mon|2026-10-19' ? { ...o, startMin: 16 * 60 } : o);
+    built = fcalBuildRows(feed, moved, T);
+    if (!row('mon|2026-10-19') || row('mon|2026-10-19').type !== 'move') bad.push('a moved practice was not offered as a move');
+    if (on('2026-10-19')[0].startMin !== 945) bad.push('a move took effect before it was applied');
+    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
+    fcalApply();
+    if (on('2026-10-19')[0].startMin !== 960) bad.push('an applied move did not move the practice');
+
+    // 6 · Changed by hand, then the club moves it: asked, and "keep yours" keeps it.
+    const d26 = getDayBlocksForProfile('2026-10-26', 'jess').map(b => b.calFeed === feed.id ? { ...b, startMin: 17 * 60, updatedAt: syncNow() } : b);
+    setDayBlocks('2026-10-26', d26, 'jess');
+    const club26 = moved.map(o => o.key === 'mon|2026-10-26' ? { ...o, startMin: 16 * 60 + 15 } : o);
+    built = fcalBuildRows(feed, club26, T);
+    const c = row('mon|2026-10-26');
+    if (!c || c.type !== 'conflict' || c.choice !== 'mine') bad.push('a practice changed by hand was not asked about, keep-yours first');
+    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
+    fcalApply();
+    if (on('2026-10-26')[0].startMin !== 17 * 60) bad.push('"keep yours" did not keep the hand-changed time');
+    built = fcalBuildRows(feed, club26, T);
+    if (row('mon|2026-10-26')) bad.push('a kept change was asked again');
+
+    // 7 · A finished practice never changes; a cancelled one is offered for removal.
+    const d9 = getDayBlocksForProfile('2026-11-09', 'jess').map(b => b.calFeed === feed.id ? { ...b, completed: true } : b);
+    setDayBlocks('2026-11-09', d9, 'jess');
+    const club2 = club26.filter(o => o.key !== 'mon|2026-11-02').map(o => o.key === 'mon|2026-11-09' ? { ...o, startMin: 18 * 60 } : o);
+    built = fcalBuildRows(feed, club2, T);
+    if (row('mon|2026-11-09')) bad.push('a finished practice was offered for a change');
+    if (!row('mon|2026-11-02') || row('mon|2026-11-02').type !== 'remove') bad.push('a cancelled practice was not offered for removal');
+    const gone = on('2026-11-02')[0];
+    fcalDraft = { feedId: feed.id, rows: built.rows, leftOut: 0 };
+    fcalApply();
+    if (on('2026-11-02').length) bad.push('an applied removal left the practice in the plan');
+    if (gone && !(state.shared.tombstones || {})[gone.id]) bad.push('a removed practice has no tombstone, so another device brings it back');
+
+    // 8 · Removed by hand: not offered again.
+    const b16 = on('2026-11-16')[0];
+    fcalForget(b16);
+    setDayBlocks('2026-11-16', getDayBlocksForProfile('2026-11-16', 'jess').filter(b => b.id !== b16.id), 'jess');
+    built = fcalBuildRows(feed, club2, T);
+    if (row('mon|2026-11-16') || built.leftOut < 1) bad.push('a practice removed by hand was offered again');
+
+    // 8b · Two devices applied the same check: the second copy is offered for removal.
+    const b23 = on('2026-11-23')[0];
+    setDayBlocks('2026-11-23', getDayBlocksForProfile('2026-11-23', 'jess').concat([{ ...b23, id: b23.id + 'x' }]), 'jess');
+    built = fcalBuildRows(feed, club2, T);
+    if (built.rows.filter(r => r.key === 'mon|2026-11-23' && r.type === 'remove').length !== 1) bad.push('a second copy of one practice was not offered for removal');
+    setDayBlocks('2026-11-23', getDayBlocksForProfile('2026-11-23', 'jess').filter(b => b.id !== b23.id + 'x'), 'jess');
+
+    // 9 · Links, holidays, the 14-day rhythm.
+    const L = (x) => JSON.stringify(fcalReadLink(x));
+    const id = 'abc123@group.calendar.google.com';
+    if (fcalReadLink('https://calendar.google.com/calendar/embed?src=abc123%40group.calendar.google.com&ctz=America%2FEdmonton').calId !== id) bad.push('an embed link was not read: ' + L('embed'));
+    if (fcalReadLink('https://calendar.google.com/calendar/ical/abc123%40group.calendar.google.com/public/basic.ics').calId !== id) bad.push('a file link was not read');
+    if (fcalReadLink('webcal://example.org/club.ics').icsUrl !== 'https://example.org/club.ics') bad.push('a webcal link was not read as a file');
+    if (fcalReadLink('not a link') !== null) bad.push('text that is no link was accepted');
+    const sh = { ...fcalStatHolidays(2026), ...fcalStatHolidays(2027) };
+    [['2026-10-12', 'Thanksgiving'], ['2027-02-15', 'Family Day'], ['2027-03-26', 'Good Friday'], ['2027-05-24', 'Victoria Day'], ['2026-12-25', 'Christmas Day']]
+      .forEach(([k, n]) => { if (sh[k] !== n) bad.push(`${n} is not on ${k}`); });
+    if (sh['2026-12-26'] || sh['2027-03-29'] || sh['2026-09-30']) bad.push('an optional holiday is in the statutory list');
+    if (!fcalIsDue({ lastChecked: 1000 }, 1000 + 14 * 86400000) || fcalIsDue({ lastChecked: 1000 }, 1000 + 13 * 86400000)) bad.push('the check is not every 14 days');
+
+    // 10 · Google's service gives the same keys, and a refused key is said plainly.
+    const g = fcalOccurrencesFromGoogle([
+      { id: 'fri_20261023T220000Z', recurringEventId: 'fri', originalStartTime: { dateTime: '2026-10-23T16:00:00-06:00' },
+        start: { dateTime: '2026-10-23T15:45:00-06:00' }, end: { dateTime: '2026-10-23T17:15:00-06:00' }, summary: 'Development Practice' },
+      { id: 'mon_x', recurringEventId: 'mon', status: 'cancelled', start: { dateTime: '2026-11-02T15:45:00-07:00' } },
+      { id: 'meet', start: { date: '2026-10-24' }, end: { date: '2026-10-26' }, summary: 'Poppy Swim Meet' },
+    ]);
+    if (!g.some(o => o.key === 'fri|2026-10-23' && o.startMin === 945 && o.durationMin === 90)) bad.push("Google's moved practice did not match the file's key");
+    if (g.some(o => /mon/.test(o.key))) bad.push("Google's cancelled practice was read");
+    if (g.filter(o => o.allDay).length !== 2) bad.push("Google's meet weekend did not cover both days");
+    const gFeed = { id: 'calG', name: 'Google club', kid: 'jess', actId: 'training', tag: 'swimming', calId: id, key: 'KEY1',
+      skipKeys: [], lastChecked: 0, createdAt: 1, updatedAt: 1 };
+    state.shared.calFeeds.push(gFeed);
+    let asked = '';
+    window.fetch = async (url) => { asked = String(url); return { ok: false, status: 403, json: async () => ({}) }; };
+    await fcalCheck('calG', false);
+    if (!/googleapis\.com\/calendar\/v3\/calendars\/abc123%40group/.test(asked) || !/key=KEY1/.test(asked) || !/singleEvents=true/.test(asked)) {
+      bad.push('the Google request is not the calendar service with the key: ' + asked.slice(0, 120));
+    }
+    if (!/refused the key/.test(fcalFeed('calG').lastError || '')) bad.push('a refused key was not said plainly');
+    if (fcalFeed('calG').lastChecked) bad.push('a failed check was recorded as a check');
+    window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ items: [] }) });
+    await fcalCheck('calG', true);
+    if (fcalFeed('calG').lastError || !fcalFeed('calG').lastChecked) bad.push('a good check did not clear the error and record the check');
+    // A calendar that arrives after the portal first drew still gets its automatic check.
+    let calls = 0;
+    window.fetch = async () => { calls++; return { ok: true, status: 200, json: async () => ({ items: [] }) }; };
+    const late = { ...gFeed, id: 'calLate', lastChecked: 0, lastError: '' };
+    fcalDraft = null;
+    await fcalAutoCheck();
+    state.shared.calFeeds.push(late);
+    await fcalAutoCheck();
+    if (!fcalFeed('calLate').lastChecked) bad.push('a calendar that arrived later was not checked');
+    const before = calls;
+    await fcalAutoCheck();
+    if (calls !== before) bad.push('the automatic check read the same calendar twice in one app load');
+
+    // 11 · The screen: the row, the list, the review grouped by month.
+    setParentTab('calendars');
+    const wrap = document.getElementById('paCalWrap');
+    if (!(PARENT_LANDINGS.app || []).some(r => r.panel === 'calendars' && /Follow a calendar/.test(r.title))) bad.push('App has no Follow a calendar row');
+    if (!/Swim club/.test(wrap.textContent) || !wrap.querySelector('[data-fcal-action="check"]')) bad.push('the screen does not list the followed calendar with its check');
+    fcalDraft = { feedId: feed.id, rows: fcalBuildRows(feed, occs.map(o => o.key === 'mon|2026-10-19' ? { ...o, startMin: 17 * 60 } : o), T).rows, leftOut: 0 };
+    fcalRender();
+    if (!/Oct 2026/.test(wrap.textContent) || !wrap.querySelector('[data-fcal-action="apply"]')) bad.push('the review is not grouped by month with an apply button');
+
+    window.fetch = wasFetch;
+    keep.forEach(([k, b]) => setDayBlocks(k, b, 'jess'));
+    state.shared.calFeeds = wasFeeds;
+    fcalDraft = wasDraft;
     profile = wasProfile; parentViewing = wasViewing;
     return bad.length === 0 || bad;
   });

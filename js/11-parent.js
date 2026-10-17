@@ -38,7 +38,7 @@ const PARENT_PANEL_DEST = {
   money: 'money',
   setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', rules: 'setup',
   copyweek: 'setup',
-  app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', backup: 'app',
+  app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', calendars: 'app', backup: 'app',
   conflicts: 'app',
 };
 /* The landing lists. The boundary test decides which side a row falls on:
@@ -61,6 +61,7 @@ const PARENT_LANDINGS = {
     { panel: 'profiles', icon: '👤', title: 'Profiles',        sub: 'Who the girls are, their age, and what each sees of her sister' },
     { panel: 'prefs',    icon: '🎛️', title: 'Preferences',     sub: 'Reading size on grown-up screens' },
     { panel: 'school',   icon: '📅', title: 'School calendar', sub: 'Term dates and days off — replaced each August' },
+    { panel: 'calendars', icon: '🔄', title: 'Follow a calendar', sub: 'A club’s practices in one girl’s plan, kept in step' },
     { panel: 'backup',   icon: '🗄️', title: 'Backup and data', sub: 'Export, restore, cloud size, and resetting a week' },
     { panel: 'conflicts', icon: '🔀', title: 'Two versions',      sub: 'When two devices saved different versions of one record' },
   ],
@@ -308,6 +309,7 @@ const PARENT_PANEL_RENDERERS = {
   profiles: () => paRenderProfiles(),
   prefs:    () => paRenderPrefs(),
   school:   () => paRenderSchool(),
+  calendars: () => fcalRender(),
   backup:   () => bkRenderPanel(),
   conflicts: () => cfRenderPanel(),
 };
@@ -316,6 +318,9 @@ function renderParentHome() {
   // Shared chrome first, then only the panel actually on screen.
   parentRenderScope();
   setParentTab(parentTab);
+  // A followed calendar due for its every-14-days check is read now, once per
+  // app load; it only speaks when something changed (js/48-cal-follow.js).
+  fcalAutoCheck();
 }
 
 /* The review panel's own header — kid name, age field, kid pills. It moved in

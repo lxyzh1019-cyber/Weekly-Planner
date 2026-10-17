@@ -1,5 +1,7 @@
-// Weekly-Planner — importing a calendar (.ics), for the school year and for
-// standing appointments.
+// Weekly-Planner — importing a calendar (.ics) for the school year: days off and
+// term dates. Timed events (a club's practices, standing appointments) are placed
+// and kept in step by App › Follow a calendar (js/48-cal-follow.js), which reads
+// them with this parser.
 //
 // Why a hand-written parser. The suite boots the app over file:// and the CSP
 // this app deploys under allows no third-party script, so a CDN library is not
@@ -15,7 +17,9 @@
 //     which is where a parent would notice.
 //   - Anything past FREQ=WEEKLY / FREQ=DAILY with UNTIL, COUNT and BYDAY.
 //     Everything else in RRULE is skipped rather than half-applied, and the
-//     preview says how many were skipped.
+//     preview says how many were skipped. Skipped dates (EXDATE), one moved or
+//     cancelled copy of a repeat (RECURRENCE-ID) and cancelled events ARE read:
+//     a club calendar cancels a holiday practice and moves another that way.
 //
 // NOTHING IS WRITTEN UNTIL IT IS CONFIRMED. Every date this file produces goes
 // into a preview with a tick beside it. That is the same discipline pcwPlan
@@ -54,9 +58,6 @@ const SC_MAX_REPEATS = 200;     // per recurring event
 
 let scDraft = null;             // the parsed proposal awaiting a decision
 let scBusy = false;             // a fetch in flight
-let scTab = 'school';           // 'school' | 'blocks'
-let scBlockKid = 'jenn';
-let scBlockActId = '';
 
 /* ── The parser ── */
 
@@ -119,17 +120,43 @@ function icsDateValue(value, params) {
 function icsParse(text) {
   const lines = icsUnfold(text).split('\n');
   const events = [];
+  /* A changed copy of one repeat (RECURRENCE-ID) and the dates a repeat skips
+     (EXDATE) are how a club calendar moves one practice and cancels another.
+     Both are applied after the walk, because the changed copy may come before
+     or after the repeat it changes. Without them a skipped holiday came back as
+     a practice and a moved one landed twice. */
+  const overrides = [];
+  const cancelledCopies = new Set();
   let cur = null;
   let skipped = 0;
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-    if (line.toUpperCase() === 'BEGIN:VEVENT') { cur = { summary: '', rrule: null }; continue; }
+    if (line.toUpperCase() === 'BEGIN:VEVENT') { cur = { summary: '', rrule: null, uid: '', place: '', exdates: [], status: '' }; continue; }
     if (line.toUpperCase() === 'END:VEVENT') {
       if (cur && cur.start) {
-        const expanded = icsExpand(cur);
-        if (expanded === null) skipped++;
-        else events.push(...expanded);
+        const series = icsSeriesId(cur.uid);
+        if (cur.recurrenceId) {
+          // A changed (or cancelled) copy of one repeat.
+          const orig = cur.recurrenceId.dayKey;
+          if (cur.status === 'CANCELLED') cancelledCopies.add(series + '|' + orig);
+          else {
+            const one = icsExpand(Object.assign({}, cur, { rrule: null }));
+            if (one && one.length) overrides.push(Object.assign(one[0], { series, origDay: orig }));
+            cancelledCopies.add(series + '|' + orig);
+          }
+        } else if (cur.status !== 'CANCELLED') {
+          const expanded = icsExpand(cur);
+          if (expanded === null) skipped++;
+          else {
+            const skip = new Set(cur.exdates);
+            expanded.forEach(e => {
+              e.series = series;
+              e.origDay = e.dayKey;
+              if (!skip.has(e.dayKey)) events.push(e);
+            });
+          }
+        }
       }
       cur = null;
       if (events.length > SC_MAX_EVENTS) break;
@@ -142,15 +169,37 @@ function icsParse(text) {
     else if (p.name === 'DTEND') cur.end = icsDateValue(p.value, p.params);
     else if (p.name === 'SUMMARY') cur.summary = icsUnescape(p.value);
     else if (p.name === 'RRULE') cur.rrule = p.value;
+    else if (p.name === 'UID') cur.uid = p.value.trim();
+    else if (p.name === 'LOCATION') cur.place = icsUnescape(p.value);
+    else if (p.name === 'STATUS') cur.status = p.value.trim().toUpperCase();
+    else if (p.name === 'RECURRENCE-ID') cur.recurrenceId = icsDateValue(p.value, p.params);
+    else if (p.name === 'EXDATE') {
+      p.value.split(',').forEach(v => {
+        const d = icsDateValue(v, p.params);
+        if (d) cur.exdates.push(d.dayKey);
+      });
+    }
   }
-  return { events, skipped };
+  // A copy replaces the date it was cut from; the repeat's own copy goes.
+  const kept = events.filter(e => !(e.series && cancelledCopies.has(e.series + '|' + e.origDay)));
+  kept.push(...overrides);
+  kept.forEach(e => { if (e.place == null) e.place = ''; });
+  return { events: kept, skipped };
+}
+
+/* The id a calendar gives one event or one repeat, the same way Google's own
+   calendar service names it: the UID without its "@google.com" ending. A
+   practice read from the file and the same practice read through the service
+   then carry one key, so a later check recognises what an earlier import placed. */
+function icsSeriesId(uid) {
+  return String(uid || '').trim().replace(/@google\.com$/i, '');
 }
 
 /* One VEVENT → the occurrences it actually covers. null means "this has a rule
    I do not understand", which is reported rather than guessed at. */
 function icsExpand(ev) {
   const one = (start) => {
-    const out = { dayKey: start.dayKey, allDay: start.allDay, summary: ev.summary };
+    const out = { dayKey: start.dayKey, allDay: start.allDay, summary: ev.summary, place: ev.place || '' };
     if (!start.allDay) {
       out.startMin = start.minutes;
       // DTEND on a timed event is exclusive of nothing — it is the end.
@@ -168,7 +217,7 @@ function icsExpand(ev) {
       const d = formatDayKey(ev.start.dayKey);
       const stop = formatDayKey(ev.end.dayKey);
       while (d < stop && out.length < SC_MAX_REPEATS) {
-        out.push({ dayKey: dateToLocalKey(d), allDay: true, summary: ev.summary });
+        out.push({ dayKey: dateToLocalKey(d), allDay: true, summary: ev.summary, place: ev.place || '' });
         d.setDate(d.getDate() + 1);
       }
       return out;
@@ -359,42 +408,9 @@ function scCommitSchool() {
   showToast(`📅 Added ${added.length} day${added.length === 1 ? '' : 's'} off`);
 }
 
-/* Timed events as blocks. Every one goes through the same shape a placed block
-   has, on one chosen activity, for one chosen child — parent-only, because it
-   writes into a child's plan. */
-function scCommitBlocks() {
-  if (!scDraft || !isParent()) return;
-  const act = findActivity(scBlockActId, scBlockKid);
-  if (!act) { showToast('Pick which activity these are'); return; }
-  const take = scDraft.timed.filter(e => e.on);
-  if (!take.length) { showToast('Nothing ticked to add'); return; }
-  let placed = 0;
-  const byDay = {};
-  take.forEach(e => { (byDay[e.dayKey] = byDay[e.dayKey] || []).push(e); });
-  Object.keys(byDay).forEach(dayKey => {
-    const arr = (getDayBlocksForProfile(dayKey, scBlockKid) || []).slice();
-    byDay[dayKey].forEach(e => {
-      // Never twice: a second import of the same calendar must not double it up.
-      if (arr.some(b => b.actId === act.id && b.startMin === e.startMin)) return;
-      arr.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        actId: act.id,
-        startMin: e.startMin,
-        durationMin: e.durationMin || act.durationMin || 60,
-        objectives: [], note: (e.summary || '').slice(0, 60), checklistState: {},
-        completed: false, confirmed: false,
-        createdAt: syncNow(), updatedAt: syncNow(),
-      });
-      placed++;
-    });
-    setDayBlocks(dayKey, arr, scBlockKid);
-  });
-  saveAll();
-  scDraft = null;
-  paRenderSchool();
-  refreshCurrentScreen && refreshCurrentScreen();
-  showToast(placed ? `📅 Added ${placed} to ${kidLabel(scBlockKid).name}'s plan` : 'Those were already there');
-}
+/* Timed events (a club's practices, a standing appointment) are not this
+   screen's: App › Follow a calendar (js/48-cal-follow.js) places them for one
+   child and keeps them in step. This screen takes days off and term dates. */
 
 /* ── The panel ── */
 
@@ -424,60 +440,28 @@ function scRenderImport() {
 
   if (!d) { wrap.innerHTML = intro; return; }
 
-  const tabs = `<div class="pn-toggle" style="margin-top:0.8rem">
-      <button type="button" class="ui-chip" aria-pressed="${scTab === 'school'}" data-sc="tab" data-tab="school">🏫 Days off (${d.offDays.length})</button>
-      <button type="button" class="ui-chip" aria-pressed="${scTab === 'blocks'}" data-sc="tab" data-tab="blocks">📌 Appointments (${d.timed.length})</button>
+  const rows = d.offDays.map((o, i) => {
+    const dt = formatDayKey(o.date);
+    return `<label class="sc-row"><input type="checkbox" data-sc="off" data-i="${i}"${o.on ? ' checked' : ''}>
+      <span class="sc-when">${DAY_SHORT[(dt.getDay() + 6) % 7]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]}</span>
+      <span class="sc-what">${escapeHtml(o.label)}</span></label>`;
+  }).join('') || `<p class="pn-note">No all-day entries in that file — only timed ones.</p>`;
+  const term = (d.termStart && d.termEnd)
+    ? `<label class="sc-row sc-row--term"><input type="checkbox" data-sc="term"${d.takeTerm ? ' checked' : ''}>
+        <span class="sc-when">Term</span>
+        <span class="sc-what">${escapeHtml(d.termStart)} → ${escapeHtml(d.termEnd)}</span></label>
+       <p class="pn-note">Off by default: which day a term starts decides which days count as
+         school for a whole year, so this is a guess worth checking before you take it.</p>`
+    : '';
+  const ticked = d.offDays.filter(o => o.on).length;
+  const body = `<p class="pn-note">Every all-day entry in the file. ${ticked} of ${d.offDays.length}
+      ${ticked === 1 ? 'is' : 'are'} ticked because ${ticked === 1 ? 'it reads' : 'they read'} like
+      a day off — check the rest yourself, since a picture day is not a day at home.</p>
+    <div class="ui-card">${rows}</div>${term ? `<div class="ui-card" style="margin-top:0.4rem">${term}</div>` : ''}
+    <div class="pn-toggle" style="margin-top:0.5rem">
+      <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-school">Add the ticked days</button>
+      <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
     </div>`;
-
-  let body;
-  if (scTab === 'school') {
-    const rows = d.offDays.map((o, i) => {
-      const dt = formatDayKey(o.date);
-      return `<label class="sc-row"><input type="checkbox" data-sc="off" data-i="${i}"${o.on ? ' checked' : ''}>
-        <span class="sc-when">${DAY_SHORT[(dt.getDay() + 6) % 7]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]}</span>
-        <span class="sc-what">${escapeHtml(o.label)}</span></label>`;
-    }).join('') || `<p class="pn-note">No all-day entries in that file — only timed ones.</p>`;
-    const term = (d.termStart && d.termEnd)
-      ? `<label class="sc-row sc-row--term"><input type="checkbox" data-sc="term"${d.takeTerm ? ' checked' : ''}>
-          <span class="sc-when">Term</span>
-          <span class="sc-what">${escapeHtml(d.termStart)} → ${escapeHtml(d.termEnd)}</span></label>
-         <p class="pn-note">Off by default: which day a term starts decides which days count as
-           school for a whole year, so this is a guess worth checking before you take it.</p>`
-      : '';
-    const ticked = d.offDays.filter(o => o.on).length;
-    body = `<p class="pn-note">Every all-day entry in the file. ${ticked} of ${d.offDays.length}
-        ${ticked === 1 ? 'is' : 'are'} ticked because ${ticked === 1 ? 'it reads' : 'they read'} like
-        a day off — check the rest yourself, since a picture day is not a day at home.</p>
-      <div class="ui-card">${rows}</div>${term ? `<div class="ui-card" style="margin-top:0.4rem">${term}</div>` : ''}
-      <div class="pn-toggle" style="margin-top:0.5rem">
-        <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-school">Add the ticked days</button>
-        <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
-      </div>`;
-  } else {
-    const acts = getAllActivities(scBlockKid).filter(a => !a._locked);
-    if (!scBlockActId && acts.length) scBlockActId = (acts.find(a => a.id === 'appointment') || acts[0]).id;
-    const rows = d.timed.slice(0, 60).map((e, i) => {
-      const dt = formatDayKey(e.dayKey);
-      return `<label class="sc-row"><input type="checkbox" data-sc="ev" data-i="${i}"${e.on ? ' checked' : ''}>
-        <span class="sc-when">${DAY_SHORT[(dt.getDay() + 6) % 7]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]} · ${escapeHtml(formatTimeFromMin(e.startMin))}</span>
-        <span class="sc-what">${escapeHtml(e.summary || 'Appointment')}</span></label>`;
-    }).join('') || `<p class="pn-note">No timed events in that file — only all-day entries.</p>`;
-    body = `<div class="ui-card">
-        <div class="pn-toggle">${['jenn', 'jess'].map(k =>
-          `<button type="button" class="ui-chip" aria-pressed="${k === scBlockKid}" data-sc="kid" data-kid="${k}">${escapeHtml(kidLabel(k).icon + ' ' + kidLabel(k).name)}</button>`).join('')}</div>
-        <div class="pa-time-row" style="margin-top:0.5rem">
-          <label for="scActSelect">As</label>
-          <select id="scActSelect" data-sc="act">${acts.map(a =>
-            `<option value="${escapeAttr(a.id)}"${a.id === scBlockActId ? ' selected' : ''}>${escapeHtml(a.icon + ' ' + a.name)}</option>`).join('')}</select>
-        </div>
-      </div>
-      <div class="ui-card" style="margin-top:0.4rem">${rows}</div>
-      ${d.timed.length > 60 ? `<p class="pn-note">Showing the first 60 of ${d.timed.length}.</p>` : ''}
-      <div class="pn-toggle" style="margin-top:0.5rem">
-        <button type="button" class="ui-btn ui-btn--primary" data-sc="commit-blocks">Add the ticked ones</button>
-        <button type="button" class="ui-btn ui-btn--secondary" data-sc="discard">Discard</button>
-      </div>`;
-  }
 
   const skipped = d.skipped
     ? `<p class="pn-note">⚠️ ${d.skipped} repeating event${d.skipped === 1 ? '' : 's'} skipped — this reads
@@ -488,7 +472,10 @@ function scRenderImport() {
   wrap.innerHTML = intro
     + `<p class="pn-cap" style="margin-top:0.8rem">What is in it</p>
        <div class="ui-card pn-clear">${d.total} event${d.total === 1 ? '' : 's'} read${d.source ? ` · ${escapeHtml(d.source)}` : ''}.</div>`
-    + skipped + tabs + body;
+    + skipped
+    + (d.timed.length ? `<p class="pn-note">${d.timed.length} timed event${d.timed.length === 1 ? '' : 's'} in this file
+        ${d.timed.length === 1 ? 'is' : 'are'} not days off. To place them in a plan, use App › Follow a calendar.</p>` : '')
+    + body;
 }
 
 /* One delegated listener for the whole import section — reached from
@@ -499,19 +486,13 @@ function scHandleClick(e) {
   const act = btn.getAttribute('data-sc');
   if (act === 'pick') { scPickFile(); return; }
   if (act === 'fetch') { scFetchUrl(); return; }
-  if (act === 'tab') { scTab = btn.getAttribute('data-tab'); scRenderImport(); return; }
-  if (act === 'kid') { scBlockKid = btn.getAttribute('data-kid'); scBlockActId = ''; scRenderImport(); return; }
   if (act === 'discard') { scDraft = null; scRenderImport(); return; }
   if (act === 'commit-school') { scCommitSchool(); return; }
-  if (act === 'commit-blocks') { scCommitBlocks(); return; }
   if (act === 'off' && scDraft) { scDraft.offDays[+btn.getAttribute('data-i')].on = btn.checked; return; }
-  if (act === 'ev' && scDraft) { scDraft.timed[+btn.getAttribute('data-i')].on = btn.checked; return; }
   if (act === 'term' && scDraft) { scDraft.takeTerm = btn.checked; }
 }
 
 function scHandleChange(e) {
-  const sel = e.target.closest('[data-sc="act"]');
-  if (sel) { scBlockActId = sel.value; return; }
-  const box = e.target.closest('[data-sc="off"], [data-sc="ev"], [data-sc="term"]');
+  const box = e.target.closest('[data-sc="off"], [data-sc="term"]');
   if (box) scHandleClick(e);
 }

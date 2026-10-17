@@ -188,6 +188,12 @@ if (document.fonts) {
     el.addEventListener('click', paHandleClick);
     el.addEventListener('change', paHandleChange);
   });
+  // App › Follow a calendar: its rows and form are rebuilt on every change.
+  const calWrap = document.getElementById('paCalWrap');
+  if (calWrap) {
+    calWrap.addEventListener('click', fcalHandleClick);
+    calWrap.addEventListener('change', fcalHandleChange);
+  }
   if (typeof paApplyTextScale === 'function') paApplyTextScale();
 })();
 

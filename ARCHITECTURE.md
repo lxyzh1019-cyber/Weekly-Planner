@@ -3195,6 +3195,43 @@ four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis
 matches the day it claims to describe.
 
+## Follow a calendar — a club's practices, kept in step (build 2026-10-16a)
+
+`js/48-cal-follow.js`, App › Follow a calendar. The school import
+(`js/35-school-calendar.js`) takes days off and term dates only; timed events
+belong here, placed for one child as one activity and read again later.
+
+- **Storage.** `state.shared.calFeeds`, id-keyed records merged with
+  `mergeArrayById(…, 'feed:')`; stopping one tombstones `feed:<id>`. A placed
+  block carries `calFeed`, `calKey` (`<event id>|<day first set for>`) and what
+  the club last said: `calDay`, `calStart`, `calLen`. The file and Google's
+  service name an event the same way (`icsSeriesId`), so either read
+  recognises the other's blocks. (checked by tests/merge.test.js calFeeds; smoke: aFollowedCalendarStaysInStep)
+- **Reading.** A Google calendar is read through the Calendar API
+  (`singleEvents=true`, the device's time zone) with a key the family makes,
+  restricted to the app's address: browsers may not read Google's calendar
+  file from another site. Any other link is fetched as .ics and fails where the
+  server sends no CORS header. The .ics parser now applies `EXDATE`,
+  `RECURRENCE-ID` and `STATUS:CANCELLED`, which the school import also gets.
+- **Nothing changes until a parent applies.** A check builds rows (add, move,
+  remove, conflict, skip); Apply writes only the ticked ones. A finished block
+  is never moved and never placed twice. A block whose day or time no longer
+  matches `calDay`/`calStart`/`calLen` was changed by hand: a club change to it
+  is a conflict, keep-yours first; keeping it re-stamps the club's values so it
+  is not asked again. A practice unticked or removed by hand (`removeBlock`
+  calls `fcalForget`) goes in the feed's `skipKeys` and is not offered again.
+- **Days with no practice.** A club all-day event (meet, break, long weekend)
+  and Alberta's 9 general holidays (`fcalStatHolidays`, computed per year)
+  hold practices back as unticked rows: the real club calendar left a Victoria
+  Day Monday and a Good Friday in.
+- **Rhythm and size.** Placed 12 weeks ahead (`FCAL_HORIZON_DAYS`), checked
+  again every 14 days (`FCAL_CHECK_DAYS`) when a parent opens the portal
+  (`renderParentHome` → `fcalAutoCheck`, once per app load). Rolling, not the
+  whole season: the profile document uploads whole on every change (the same
+  reason school days are offered near the front only).
+- **Privacy.** The place keeps its name only (`fcalPlaceName`); street
+  addresses are not saved, because the data syncs to every family device.
+
 ## One clock — the system did not begin today
 
 **There is one date, `state.shared.chore.programStartDate`, it is DERIVED when
