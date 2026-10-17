@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en" data-look="pop">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Weekly Planner — Pop and Calm example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gochi+Hand&family=Patrick+Hand&family=Nunito:wght@400;700&family=Baloo+2:wght@600;700;800&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Example for docs/handoff/looks-calm-pop.md (Plan v6).
+   The rule it demonstrates (L2): the two looks differ ONLY in the values below.
+   Every component rule further down is written once and reads these values.
+   Money colours are today's (L10); the money redesign picks the one set later. */
+
+/* ── Shared by both looks ─────────────────────────────────────── */
+:root {
+  --ink: #1c2240;
+  /* Border widths: today's, identical in both looks, so switching never moves a box (L3). */
+  --bw-card: 2.5px; --bw-small: 2px; --bw-now: 3.5px; --bw-block: 1.5px;
+  --r-card: 20px; --r-row: 18px; --r-tile: 14px; --r-btn: 14px;
+  /* Kid colours: fill / strong (white text only here) / wash */
+  --jenn: #ff5c8a; --jenn-strong: #c81d5a; --jenn-wash: #ffe4ec;
+  --jess: #3d8bfd; --jess-strong: #1a5fd0; --jess-wash: #e2edff;
+  /* Categories: same hues as today, brighter (map every --cat-* in the app) */
+  --cat-school: #4aa3ff;   --cat-school-wash: #e3f0ff;
+  --cat-training: #f2597d; --cat-training-wash: #ffe3ea;
+  --cat-daily: #ffc83d;    --cat-daily-wash: #fff4d6;
+  --cat-routine: #3cc9b9;  --cat-routine-wash: #dcf7f3;
+  --cat-free: #4cc46a;     --cat-free-wash: #e0f6e5;
+  --cat-active: #fb8a2e;   --cat-active-wash: #ffead8;
+  --cat-sleep: #a78bfa;    --cat-sleep-wash: #efe9ff;
+  /* Money: today's two sets, unchanged */
+  --mny-chart-ready: #ffd166; --mny-chart-locked: #6fb1fc; --mny-chart-spent: #ff9eb5; --mny-chart-loanpaid: #95d5b2;
+  --mny-flow-ready: #6fb1fc;  --mny-flow-locked: #8ad8d0;  --mny-flow-invest: #b0a0ea; --mny-flow-spent: #ffd166; --mny-flow-loan: #f2b880;
+}
+
+/* ── Pop: style B with today's handwriting fonts, text 10% larger ─ */
+[data-look="pop"] {
+  --text-scale: 1.1;
+  --font-head: 'Gochi Hand', 'Caveat', cursive; --head-weight: 400;
+  --font-body: 'Patrick Hand', 'Nunito', sans-serif;
+  --page: #fff6e3; --grid: #f1e5c8; --muted: #4d5575;
+  --shadow-card: 4px 4px 0 var(--ink); --shadow-row: 3px 3px 0 var(--ink);
+  --shadow-now: 7px 8px 0 var(--ink); --shadow-small: 2px 2px 0 var(--ink);
+  --now-fill: 100%;   /* Now card filled with its category colour */
+  --row-fill: 100%;   /* list rows filled with the category wash */
+  --tile-fill: 0%;    /* icon tiles white */
+  --block-fill: 100%; /* week blocks in full category colour */
+  --bar-cat: 0%;      /* progress bar in ink */
+  --btn-bg: #ffc83d; --btn-ink: var(--ink);
+  --tick-bg: var(--ink); --tick-ink: #ffffff;
+  --nav-on: #ffc83d;
+}
+
+/* ── Calm: new fonts, cool grid, white cards, navy 3D borders ───── */
+[data-look="calm"] {
+  --text-scale: 1;
+  --font-head: 'Baloo 2', system-ui, sans-serif; --head-weight: 800;
+  --font-body: 'Lexend', system-ui, sans-serif;
+  --page: #eef2f9; --grid: #dde3ee; --muted: #5a6380;
+  --shadow-card: 3px 3px 0 var(--ink); --shadow-row: 3px 3px 0 var(--ink);
+  --shadow-now: 7px 8px 0 var(--ink); --shadow-small: 2px 2px 0 var(--ink);
+  --now-fill: 0%;
+  --row-fill: 0%;
+  --tile-fill: 100%;
+  --block-fill: 22%;
+  --bar-cat: 100%;
+  --btn-bg: #5b4fd6; --btn-ink: #ffffff;
+  --tick-bg: #5b4fd6; --tick-ink: #ffffff;
+  --nav-on: #eef2f9;
+}
+
+/* ── Components: written once ─────────────────────────────────── */
+* { box-sizing: border-box; }
+html { background: var(--page); }
+body {
+  margin: 0; color: var(--ink);
+  font-family: var(--font-body); font-size: calc(19.5px * var(--text-scale)); line-height: 1.3;
+  background-color: var(--page);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 26px 26px;
+  padding: env(safe-area-inset-top, 0px) 0 calc(96px + env(safe-area-inset-bottom, 0px));
+}
+h1, h2, h3 { font-family: var(--font-head); font-weight: var(--head-weight); margin: 0; line-height: 1.1; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--jess-strong); outline-offset: 3px; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+.top { display: flex; align-items: center; gap: 12px; padding: 18px 4px 10px; }
+.top h1 { font-size: 1.75em; flex: 1; }
+.top .sub { font-size: 0.75em; }
+.kid {
+  min-width: 48px; min-height: 48px; padding: 0 14px; border-radius: 999px;
+  border: var(--bw-small) solid var(--ink); box-shadow: var(--shadow-small);
+  background: #fff; font-weight: 700;
+}
+.kid[aria-pressed="true"] { background: var(--kid-strong); color: #fff; }
+
+.card { background: #fff; border: var(--bw-card) solid var(--ink); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: 14px 16px; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+.now {
+  background: color-mix(in srgb, var(--c) var(--now-fill), #fff);
+  border: var(--bw-now) solid var(--ink); border-radius: 22px; box-shadow: var(--shadow-now);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
+}
+.now-head { display: flex; align-items: center; gap: 14px; }
+.now-name { font-family: var(--font-head); font-weight: var(--head-weight); font-size: 1.4em; line-height: 1.08; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: var(--bw-small) solid var(--ink); border-radius: 999px; padding: 2px 10px; font-size: 0.75em; }
+.tick {
+  flex: 0 0 auto; width: 56px; height: 56px; border-radius: 12px;
+  background: var(--tick-bg); color: var(--tick-ink);
+  border: var(--bw-card) solid var(--ink); box-shadow: var(--shadow-small); font-size: 1.4em;
+}
+.bar { height: 12px; border-radius: 999px; background: #fff; border: var(--bw-small) solid var(--ink); overflow: hidden; }
+.bar > span { display: block; height: 100%; width: var(--p); background: color-mix(in srgb, var(--c) var(--bar-cat), var(--ink)); }
+
+.ribbon { position: relative; height: 18px; border-radius: 6px; background: #fff; border: var(--bw-block) solid var(--ink); overflow: hidden; }
+.ribbon > span { position: absolute; top: 0; bottom: 0; background: var(--c); }
+.ribbon > .mark { background: var(--ink); width: 3px; }   /* "today" markers: ink, not kid colour (L9) */
+.ribbon-scale { display: flex; justify-content: space-between; font-size: 0.7em; }
+
+.row {
+  display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; width: 100%; text-align: left;
+  background: color-mix(in srgb, var(--cw) var(--row-fill), #fff);
+  border: var(--bw-card) solid var(--ink); border-radius: var(--r-row); box-shadow: var(--shadow-row);
+}
+.tile {
+  flex: 0 0 auto; width: 46px; height: 46px; border-radius: var(--r-tile); font-size: 1.2em;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--cw) var(--tile-fill), #fff);
+  border: var(--bw-small) solid var(--ink); box-shadow: var(--shadow-small);
+}
+.row-main { flex: 1; display: flex; flex-direction: column; }
+.row-name { font-weight: 700; }
+.row-tag { font-size: 0.75em; }
+
+.btn {
+  min-height: 52px; width: 100%; border-radius: var(--r-btn); font-weight: 700;
+  background: var(--btn-bg); color: var(--btn-ink);
+  border: var(--bw-card) solid var(--ink); box-shadow: var(--shadow-row);
+}
+.xp { display: flex; align-items: center; gap: 14px; }
+.avatar { width: 52px; height: 52px; border-radius: 999px; background: var(--kid-wash); border: 3px solid var(--kid); display: flex; align-items: center; justify-content: center; font-size: 1.4em; }
+.xpbar { height: 12px; border-radius: 999px; background: #fff; border: var(--bw-small) solid var(--ink); overflow: hidden; }
+.xpbar > span { display: block; height: 100%; width: 60%; background: var(--kid); }
+
+/* Week grid */
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.day-h { text-align: center; border-radius: 10px; padding: 4px 0; font-size: 0.7em; }
+.day-h b { display: block; font-family: var(--font-head); font-weight: var(--head-weight); font-size: 1.35em; }
+.day-h.today { background: var(--ink); color: #fff; }
+.lane { position: relative; height: 420px; background: rgba(255,255,255,.6); border-radius: 8px; }
+.blk {
+  position: absolute; left: 2px; right: 2px; overflow: hidden; padding: 2px 3px; font-size: 0.6em; line-height: 1.15;
+  background: color-mix(in srgb, var(--c) var(--block-fill), #fff);
+  border: var(--bw-block) solid var(--ink); border-radius: 7px;
+}
+
+/* Money strip: today's two sets */
+.swatches { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 0.8em; }
+.sw { display: inline-flex; align-items: center; gap: 6px; }
+.sw i { width: 16px; height: 16px; border-radius: 5px; background: var(--s); border: 1.5px solid var(--ink); }
+
+/* Bottom nav and More sheet */
+.nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; display: flex; justify-content: space-around;
+  background: #fff; border-top: var(--bw-card) solid var(--ink);
+  padding: 6px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+}
+.nav button {
+  min-width: 44px; min-height: 52px; flex: 1 1 0; border: var(--bw-small) solid transparent; border-radius: 14px; background: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 0.66em; white-space: nowrap;
+}
+.nav button span { font-size: 1.5em; }
+.nav button[aria-current="page"] { background: var(--nav-on); border-color: var(--ink); }
+.scrim { position: fixed; inset: 0; z-index: 300; background: rgba(28,34,64,.35); display: flex; align-items: flex-end; justify-content: center; }
+.scrim[hidden] { display: none; }
+.sheet { width: min(560px, 100%); margin: 0 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.tiles button { min-height: 88px; }
+.build { font-size: 0.7em; }
+.panel[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div style="flex: 1">
+      <h1 id="title">Today</h1>
+      <span class="sub muted">Friday, Sep 25</span>
+    </div>
+    <button class="kid" data-kid="jenn" aria-pressed="true">Jenn</button>
+    <button class="kid" data-kid="jess" aria-pressed="false">Jess</button>
+  </header>
+
+  <!-- Today -->
+  <main class="panel stack" id="p-today">
+    <section class="now" style="--c: var(--cat-school)" aria-label="Now">
+      <div><span class="chip">Now</span> <span style="font-size: 0.75em">🧠 Brain Construction</span></div>
+      <div class="now-head">
+        <span style="font-size: 2em" aria-hidden="true">🦘</span>
+        <div style="flex: 1">
+          <div class="now-name">Math Kangaroo practice</div>
+          <span class="num" style="font-size: 0.8em">4:00 – 4:45, 35 min left</span>
+        </div>
+        <button class="tick" aria-label="Mark Math Kangaroo practice done">✓</button>
+      </div>
+      <div class="bar" style="--p: 22%"><span></span></div>
+      <span style="font-size: 0.8em">Next: ☕ 15 min break, then ⛸️ Figure skating at 5:15</span>
+    </section>
+
+    <div class="card stack" style="gap: 6px; padding: 12px 14px">
+      <div class="ribbon" aria-hidden="true">
+        <span style="--c: var(--cat-routine); left: 0; width: 6%"></span>
+        <span style="--c: var(--cat-school); left: 8%; width: 32%"></span>
+        <span style="--c: var(--cat-daily); left: 40%; width: 2%"></span>
+        <span style="--c: var(--cat-school); left: 44%; width: 8%"></span>
+        <span style="--c: var(--cat-training); left: 58%; width: 10%"></span>
+        <span style="--c: var(--cat-daily); left: 71%; width: 5%"></span>
+        <span style="--c: var(--cat-free); left: 80%; width: 6%"></span>
+        <span style="--c: var(--cat-routine); left: 88%; width: 5%"></span>
+        <span class="mark" style="left: 33%"></span>
+      </div>
+      <div class="ribbon-scale muted num"><span>7am</span><span>2pm</span><span>9pm</span></div>
+    </div>
+
+    <h2 style="font-size: 1.25em; padding: 2px 4px 0">Up next</h2>
+    <button class="row" style="--cw: var(--cat-training-wash)"><span class="tile" aria-hidden="true">⛸️</span><span class="row-main"><span class="row-name">Figure skating</span><span class="row-tag muted">💪 Body Construction</span></span><span class="num">5:15</span></button>
+    <button class="row" style="--cw: var(--cat-daily-wash)"><span class="tile" aria-hidden="true">🍝</span><span class="row-main"><span class="row-name">Dinner</span><span class="row-tag muted">🍎 Fuel &amp; Care</span></span><span class="num">6:45</span></button>
+    <button class="row" style="--cw: var(--cat-routine-wash)"><span class="tile" aria-hidden="true">🌙</span><span class="row-main"><span class="row-name">Evening routine</span><span class="row-tag muted">🌅 Daily Rhythm</span></span><span class="num">8:00</span></button>
+
+    <section class="card xp">
+      <span class="avatar" aria-hidden="true">🦁</span>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+        <h3 style="font-size: 1.05em">Lv 4, Mighty Hero</h3>
+        <div class="xpbar"><span></span></div>
+        <span class="muted num" style="font-size: 0.75em">60 / 100 XP to Lv 5</span>
+      </div>
+    </section>
+    <button class="btn">✏️ Modify my plan</button>
+  </main>
+
+  <!-- Week -->
+  <main class="panel stack" id="p-week" hidden>
+    <div class="card" style="padding: 10px 8px">
+      <div class="week" id="weekGrid"></div>
+    </div>
+  </main>
+
+  <!-- Money: colours only; layout belongs to the money redesign -->
+  <main class="panel stack" id="p-money" hidden>
+    <section class="card stack" style="gap: 10px">
+      <h2 style="font-size: 1.2em">Money colours today</h2>
+      <p class="muted" style="margin: 0; font-size: 0.8em">Two sets that disagree. Both looks use them unchanged until the money redesign picks one.</p>
+      <strong style="font-size: 0.85em">My money charts</strong>
+      <div class="swatches">
+        <span class="sw"><i style="--s: var(--mny-chart-ready)"></i>Kept ready</span>
+        <span class="sw"><i style="--s: var(--mny-chart-locked)"></i>Locked away</span>
+        <span class="sw"><i style="--s: var(--mny-chart-spent)"></i>Spent</span>
+        <span class="sw"><i style="--s: var(--mny-chart-loanpaid)"></i>Loan paid off</span>
+      </div>
+      <strong style="font-size: 0.85em">Flow</strong>
+      <div class="swatches">
+        <span class="sw"><i style="--s: var(--mny-flow-ready)"></i>Kept ready</span>
+        <span class="sw"><i style="--s: var(--mny-flow-locked)"></i>Locked away</span>
+        <span class="sw"><i style="--s: var(--mny-flow-invest)"></i>In companies</span>
+        <span class="sw"><i style="--s: var(--mny-flow-spent)"></i>Spent</span>
+        <span class="sw"><i style="--s: var(--mny-flow-loan)"></i>Loan</span>
+      </div>
+    </section>
+  </main>
+
+  <!-- Sister Sync -->
+  <main class="panel stack" id="p-sync" hidden>
+    <section class="card">
+      <div class="week" style="grid-template-columns: repeat(2, minmax(0, 1fr))" id="syncGrid"></div>
+    </section>
+  </main>
+</div>
+
+<nav class="nav" aria-label="Where to go">
+  <button data-go="today" aria-current="page"><span aria-hidden="true">☀️</span>Today</button>
+  <button data-go="week"><span aria-hidden="true">📋</span>Week</button>
+  <button data-go="money"><span aria-hidden="true">💰</span>Money</button>
+  <button data-go="sync"><span aria-hidden="true">👯</span>Sister Sync</button>
+  <button data-more><span aria-hidden="true">⋯</span>More</button>
+</nav>
+
+<div class="scrim" id="more" hidden>
+  <div class="sheet card" role="dialog" aria-modal="true" aria-labelledby="moreTitle">
+    <h2 id="moreTitle" style="font-size: 1.3em">More</h2>
+    <div class="tiles">
+      <button class="row" style="--cw: var(--cat-daily-wash); flex-direction: column; justify-content: center"><span aria-hidden="true">🧹</span>Chores</button>
+      <button class="row" style="--cw: var(--cat-sleep-wash); flex-direction: column; justify-content: center"><span aria-hidden="true">◀</span>Switch</button>
+      <button class="row" id="lookTile" style="--cw: var(--cat-routine-wash); flex-direction: column; justify-content: center"><span aria-hidden="true">🎨</span><span id="lookLabel">Calm look</span></button>
+    </div>
+    <p class="build muted" style="margin: 0 0 10px">Build example</p>
+    <button class="btn" id="moreClose" style="--btn-bg: #fff; --btn-ink: var(--ink)">Close</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KIDS = {
+    jenn: { kid: 'var(--jenn)', strong: 'var(--jenn-strong)', wash: 'var(--jenn-wash)' },
+    jess: { kid: 'var(--jess)', strong: 'var(--jess-strong)', wash: 'var(--jess-wash)' }
+  };
+  var LOOKS = ['pop', 'calm'];
+  var DEFAULT_LOOK = 'pop';              /* L6 */
+  var kid = 'jenn';
+
+  /* Per kid, per device, never synced (L4). Storage can fail; the page still works. */
+  function readLook(k) {
+    try { var v = localStorage.getItem('wp.look.' + k); return LOOKS.indexOf(v) >= 0 ? v : DEFAULT_LOOK; }
+    catch (e) { return DEFAULT_LOOK; }
+  }
+  function writeLook(k, v) { try { localStorage.setItem('wp.look.' + k, v); } catch (e) {} }
+
+  function apply() {
+    var look = readLook(kid);
+    var root = document.documentElement;
+    root.dataset.look = look;
+    root.style.setProperty('--kid', KIDS[kid].kid);
+    root.style.setProperty('--kid-strong', KIDS[kid].strong);
+    root.style.setProperty('--kid-wash', KIDS[kid].wash);
+    document.getElementById('lookLabel').textContent = (look === 'pop' ? 'Calm' : 'Pop') + ' look';
+    document.querySelectorAll('.kid').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.kid === kid));
+    });
+  }
+
+  document.querySelectorAll('.kid').forEach(function (b) {
+    b.addEventListener('click', function () { kid = b.dataset.kid; apply(); });
+  });
+
+  var titles = { today: 'Today', week: 'Week', money: 'Money', sync: 'Sister Sync' };
+  document.querySelectorAll('[data-go]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var go = b.dataset.go;
+      document.querySelectorAll('.panel').forEach(function (p) { p.hidden = p.id !== 'p-' + go; });
+      document.querySelectorAll('[data-go]').forEach(function (n) {
+        if (n === b) n.setAttribute('aria-current', 'page'); else n.removeAttribute('aria-current');
+      });
+      document.getElementById('title').textContent = titles[go];
+    });
+  });
+
+  var more = document.getElementById('more');
+  var opener = null;
+  function closeMore() { more.hidden = true; if (opener) opener.focus(); }
+  document.querySelector('[data-more]').addEventListener('click', function (e) {
+    opener = e.currentTarget; more.hidden = false; document.getElementById('lookTile').focus();
+  });
+  document.getElementById('moreClose').addEventListener('click', closeMore);
+  more.addEventListener('click', function (e) { if (e.target === more) closeMore(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !more.hidden) closeMore(); });
+
+  /* The sheet stays open after a flip so the child sees the change at once. */
+  document.getElementById('lookTile').addEventListener('click', function () {
+    writeLook(kid, readLook(kid) === 'pop' ? 'calm' : 'pop');
+    apply();
+  });
+
+  /* Week and Sister Sync sample blocks: [start hour, end hour, category, label] */
+  var H = 420, FROM = 7, SPAN = 14;
+  function y(h) { return (h - FROM) / SPAN * H; }
+  function lane(blocks) {
+    return '<div class="lane">' + blocks.map(function (b) {
+      return '<div class="blk" style="--c: var(--cat-' + b[2] + '); top: ' + y(b[0]).toFixed(1) +
+        'px; height: ' + Math.max(y(b[1]) - y(b[0]) - 2, 14).toFixed(1) + 'px">' + b[3] + '</div>';
+    }).join('') + '</div>';
+  }
+  var morning = [7, 7.75, 'routine', '🌅'], day = [8.5, 15.25, 'school', '🏫 School'], dinner = [18, 18.75, 'daily', '🍝'];
+  var week = [
+    ['Mon', 21, [morning, day, [16, 17, 'school', '🦘'], dinner]],
+    ['Tue', 22, [morning, day, [16.5, 18.5, 'training', '⛸️ Skate'], [18.75, 19.5, 'daily', '🍝']]],
+    ['Wed', 23, [morning, day, [16, 16.75, 'school', '🎹'], dinner, [19, 20, 'training', '🏊']]],
+    ['Thu', 24, [morning, day, [16.5, 18.5, 'training', '⛸️ Skate']]],
+    ['Fri', 25, [morning, day, [16, 16.75, 'school', '🦘'], [17.25, 18.5, 'training', '⛸️']], true],
+    ['Sat', 26, [[9, 12, 'training', '🏆 Meet'], [13, 16, 'active', '🧭 Air show'], [18.5, 20.5, 'free', '🎮']]],
+    ['Sun', 27, [[10, 11, 'daily', '🧹'], [14, 15, 'daily', '👨‍👩‍👧 Meeting'], [15.5, 17.5, 'free', '🎮 Free']]]
+  ];
+  document.getElementById('weekGrid').innerHTML = week.map(function (d) {
+    return '<div><div class="day-h' + (d[3] ? ' today' : '') + '">' + d[0] + '<b class="num">' + d[1] + '</b></div>' + lane(d[2]) + '</div>';
+  }).join('');
+  document.getElementById('syncGrid').innerHTML =
+    '<div><div class="day-h">Jenn</div>' + lane([morning, day, [16.5, 18.5, 'training', '⛸️ Skate']]) + '</div>' +
+    '<div><div class="day-h">Jess</div>' + lane([morning, day, [16, 17, 'training', '🏊 Swim']]) + '</div>';
+
+  apply();
+})();
+</script>
+</body>
+</html>

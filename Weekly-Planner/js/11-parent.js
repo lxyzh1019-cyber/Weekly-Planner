@@ -1,0 +1,1698 @@
+// Weekly-Planner — parent mode: review, approvals, activity management, performance,
+// routines, monthly heatmap, level rules. Extracted verbatim from index.html.
+/* ════════════════════════════════════════════════════════════════
+   PARENT MODE
+════════════════════════════════════════════════════════════════ */
+let parentTab = 'now';   // the panel on screen
+let parentDest = 'now';  // which of the five destinations owns it
+
+/* ── Scope, and why it is not parentViewing ──
+   The switcher gains a "Both" state, but parentViewing cannot hold it: 27
+   places read that global, and most of them are outside the portal entirely —
+   activeProfile, the week view, block grading, the quest strip — and every one
+   assumes a real child. A third value would have them silently fall back to
+   Jenn or to Jess.
+
+   So scope is its own flag, read only by the portal's own screens.
+   parentViewing keeps holding the last real kid, so "open her full week" and
+   everything downstream still has someone to open. */
+let parentScope = 'both';   // 'both' | 'jenn' | 'jess'
+function parentScopeKid() { return parentScope === 'both' ? null : parentScope; }
+
+/* Six destinations (Plan v9 §N: 💰 Money became its own top tab instead of
+   Setup › Money rules). Each has a home panel; anything else it owns is a
+   detail reached from that home, with a back link rather than a second nav
+   row. */
+const PARENT_DESTS = [
+  { id: 'now',     icon: '📥', label: 'Now',     home: 'now' },
+  { id: 'meeting', icon: '🧑‍🧑‍🧒', label: 'Meeting', home: 'review' },
+  { id: 'history', icon: '📊', label: 'History', home: 'history' },
+  { id: 'money',   icon: '💰', label: 'Money',   home: 'money' },
+  { id: 'setup',   icon: '📋', label: 'Setup',   home: 'setup' },
+  { id: 'app',     icon: '⚙️', label: 'App',     home: 'app' },
+];
+const PARENT_PANEL_DEST = {
+  now: 'now', chores: 'now',
+  review: 'meeting',
+  history: 'history', trends: 'history', analysis: 'history',   // trends/analysis are the toggle's two halves
+  money: 'money',
+  setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', rules: 'setup',
+  copyweek: 'setup',
+  app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', calendars: 'app', backup: 'app',
+  conflicts: 'app',
+};
+/* The landing lists. The boundary test decides which side a row falls on:
+   does changing this alter what the girls are asked to do, or what it is
+   worth? Yes → Setup. No → App. */
+const PARENT_LANDINGS = {
+  setup: [
+    { panel: 'options',  icon: '🧹', title: 'Chores and pay',      sub: 'The pool, due times, lanes and who does what' },
+    { panel: 'routines', icon: '🌅', title: 'Routines',            sub: 'Morning, after school, evening, and your own' },
+    { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
+    { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
+    { panel: 'copyweek', icon: '📋', title: 'Copy a plan',         sub: 'Put a week — or one day — onto another, or onto her sister’s' },
+    { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
+      section: 'rules', group: 'log' },
+    { panel: 'money',    icon: '👴', title: 'Grandfather rule',        sub: 'A flat amount for each empty week before we started counting',
+      section: 'rules', group: 'gf' },
+  ],
+  app: [
+    { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },
+    { panel: 'profiles', icon: '👤', title: 'Profiles',        sub: 'Who the girls are, their age, and what each sees of her sister' },
+    { panel: 'prefs',    icon: '🎛️', title: 'Preferences',     sub: 'Reading size on grown-up screens' },
+    { panel: 'school',   icon: '📅', title: 'School calendar', sub: 'Term dates and days off — replaced each August' },
+    { panel: 'calendars', icon: '🔄', title: 'Follow a calendar', sub: 'A club’s practices in one girl’s plan, kept in step' },
+    { panel: 'backup',   icon: '🗄️', title: 'Backup and data', sub: 'Export, restore, cloud size, and resetting a week' },
+    { panel: 'conflicts', icon: '🔀', title: 'Two versions',      sub: 'When two devices saved different versions of one record' },
+  ],
+};
+
+/* ── History ──
+   Trends and Performance both answered "how did the last eight weeks go", so
+   they are one screen with a toggle rather than two tabs. Nothing inside either
+   is rebuilt: the toggle shows one of the two panels that already exist, which
+   is why every part of both — the pager, the CSV, the cumulative line, the
+   heatmap, the written read, the nine categories, the month view — comes across
+   untouched. */
+/* A third view, 'before' (R5 §5 C2, row 15): the weeks from before the chore
+   pool (frozen in moneySnapshots), read-only — the board the chore tab draws
+   for them, without its clear-week, export and goal controls, which stay in
+   App › Backup and data. It has no panel of its own; it draws into this wrap,
+   and it is offered only when such a week exists for a child in scope. */
+let parentHistoryView = 'money';   // 'money' | 'time' | 'before'
+let parentPreWeek = null;          // the week open in the 'before' view
+const PARENT_HISTORY_VIEWS = [
+  { id: 'money', label: '💰 Money', panel: 'trends',
+    note: 'What each week actually paid. Weeks with no meeting held paid nothing — the gap is the finding, not missing data.' },
+  { id: 'time',  label: '⏱️ Time and routines', panel: 'analysis',
+    note: 'How much of what was planned actually got done, and the month at a glance.' },
+  { id: 'before', label: '🗂️ Before the new system', panel: null,
+    note: 'Weeks from before the chore list, as they were recorded: the goal, the routine and chore ticks, and what the week paid. Read only — to reset or save a copy of a week, use App › Backup and data.' },
+];
+function setParentHistoryView(id) {
+  parentHistoryView = id;
+  setParentTab('history');
+}
+function parentHistoryKids() {
+  const k = parentScopeKid();
+  return k ? [k] : ['jenn', 'jess'];
+}
+/* Every week frozen at the original migration for a child in scope, newest
+   first. ctWeekIsPreSystem is the one owner of the question. */
+function parentPreSystemWeeks(kids) {
+  ctEnsureShared();
+  return Object.keys(state.shared.chore.moneySnapshots || {})
+    .filter(wk => /^\d{4}-\d{2}-\d{2}$/.test(wk) && kids.some(k => ctWeekIsPreSystem(wk, k)))
+    .sort().reverse();
+}
+function parentRenderPreSystem(kids) {
+  const weeks = parentPreSystemWeeks(kids);
+  if (!weeks.length) return '';
+  if (!weeks.includes(parentPreWeek)) parentPreWeek = weeks[0];
+  const thisYear = formatDayKey(todayKey()).getFullYear();
+  const chips = weeks.map(wk => {
+    const mon = formatDayKey(wk);
+    const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()}${mon.getFullYear() === thisYear ? '' : ', ' + mon.getFullYear()}`;
+    const on = wk === parentPreWeek;
+    return `<button type="button" class="ui-chip" data-parent-preweek="${escapeAttr(wk)}" aria-pressed="${on}">${escapeHtml(label)}</button>`;
+  }).join('');
+  const boards = kids.filter(k => ctWeekIsPreSystem(parentPreWeek, k))
+    .map(k => ctPreSystemBoard(k, parentPreWeek)).join('');
+  return `<div class="pre-weeks">${chips}</div>${boards}`;
+}
+function parentRenderHistory() {
+  const wrap = document.getElementById('ptab-history-wrap');
+  if (!wrap) return;
+  const kids = parentHistoryKids();
+  const views = PARENT_HISTORY_VIEWS.filter(v => v.id !== 'before' || parentPreSystemWeeks(kids).length);
+  const view = views.find(v => v.id === parentHistoryView) || views[0];
+  wrap.innerHTML = `<div class="ph-views" role="group" aria-label="Which reading">${views.map(v =>
+      `<button type="button" class="ui-chip" aria-pressed="${v.id === view.id}" data-parent-history="${v.id}">${escapeHtml(v.label)}</button>`).join('')}</div>
+    <p class="pn-note">${escapeHtml(view.note)}</p>
+    ${view.id === 'before' ? parentRenderPreSystem(kids) : ''}`;
+  // The two halves live in their own panels; show the one this view names.
+  PARENT_HISTORY_VIEWS.forEach(v => {
+    const el = document.getElementById('ptab-' + v.panel);
+    if (el) el.hidden = (v.id !== view.id);
+  });
+  const render = PARENT_PANEL_RENDERERS[view.panel];
+  if (render) { try { render(); } catch (e) { console.error('history view failed:', view.id, e); } }
+}
+
+/* A landing is rows, not a second row of tabs. */
+function parentRenderLanding(destId) {
+  const wrap = document.getElementById('ptab-' + destId + '-wrap');
+  if (!wrap) return;
+  const dest = PARENT_DESTS.find(d => d.id === destId) || {};
+  const rows = (PARENT_LANDINGS[destId] || []).map(r => `
+    <button type="button" class="pn-row" data-parent-panel="${escapeAttr(r.panel)}"${r.section ? ` data-parent-section="${escapeAttr(r.section)}"` : ''}${r.group ? ` data-parent-group="${escapeAttr(r.group)}"` : ''}>
+      <span class="pn-ico" aria-hidden="true">${r.icon}</span>
+      <span class="pn-text"><span class="pn-title">${escapeHtml(r.title)}</span>
+        <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
+      <span class="pn-chev" aria-hidden="true">›</span>
+    </button>`).join('');
+  /* The build this device is running, on the App landing only (the Today More
+     sheet shows the same line). GitHub Pages and the service worker both cache,
+     so "is the iPad on the new code?" has to be answerable by reading the page.
+     APP_BUILD (js/01-config.js) and sw.js's SW_VERSION are held equal by
+     tests/check-sw-shell.js. */
+  const build = destId === 'app' ? `<p class="app-build">Build ${escapeHtml(APP_BUILD)}</p>` : '';
+  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="ui-card pl-list">${rows}</div>${build}`;
+}
+
+/* ── The parent header (PR 5, D35) ──
+   pageHeader({variant:'parent'}) on the portal: 🔒 Parent ▾ (PIN, the look,
+   Exit), the six destinations and the girl switch, one purple row
+   (docs/handoff/header-exact-values.md, the Parent portal rows). Drawn once:
+   the tabs keep their focus and the menu its state, and setParentTab only
+   moves the selection and the phone's title (the destination's name). */
+function parentRenderHeader() {
+  const screen = document.getElementById('screen-parent');
+  if (!screen || document.getElementById('parentMenuBtn')) return;
+  const dest = PARENT_DESTS.find(d => d.id === parentDest) || PARENT_DESTS[0];
+  const lookTo = LOOK_NAMES[lookOther(document.documentElement.getAttribute('data-look') || LOOK_DEFAULT)];
+  const menu = `<div class="parent-menu">
+      <button type="button" class="parent-menu-btn" id="parentMenuBtn" aria-expanded="false" aria-controls="parentMenu" onclick="parentMenuToggle()">🔒<span class="pm-word"> Parent</span> ▾</button>
+      <div class="parent-menu-pop" id="parentMenu" hidden>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="parentMenuToggle(false);changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+        <button type="button" class="ui-btn ui-btn--secondary" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the ${escapeAttr(lookTo)} look" aria-label="Switch to the ${escapeAttr(lookTo)} look">🎨 ${escapeHtml(lookTo)}</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="parentMenuToggle(false);goProfile()">Exit to the girls</button>
+      </div>
+    </div>`;
+  const panelOf = { now: 'now', meeting: 'review', history: 'history', money: 'money', setup: 'setup', app: 'app' };
+  const tabs = PARENT_DESTS.map(d => {
+    const on = d.id === dest.id;
+    const isApp = d.id === 'app';
+    const badge = d.id === 'now' ? '<span class="pn-badge" id="pnTabBadge" hidden></span>' : '';
+    const inner = isApp ? escapeHtml(d.icon)
+      : `<span class="pdest-icon">${escapeHtml(d.icon)} </span>${escapeHtml(d.label)}${badge}`;
+    return `<button type="button" role="tab" id="pdestbtn-${d.id}" data-pdest="${d.id}"
+        aria-selected="${on}" aria-controls="ptab-${panelOf[d.id]}" tabindex="${on ? 0 : -1}"
+        data-parent-dest="${d.id}"${isApp ? ' aria-label="App"' : ''}>${inner}</button>`;
+  }).join('');
+  hdrMount('screen-parent', {
+    variant: 'parent',
+    lead: `${menu}<div class="ui-tabs parent-dests" id="parentDests" role="tablist" aria-label="Parent sections">${tabs}</div>`,
+    title: dest.label,
+    tools: '<div class="parent-scope ui-kids" id="parentScopePills" role="group" aria-label="Which child"></div>',
+  });
+}
+
+/* One switcher, in the top bar, replacing the three that each drew their own:
+   one joined switch, Both · 🐥 Jenn · 🦊 Jess (All · 🐥 · 🦊 on a phone,
+   the names in the labels). */
+function parentRenderScope() {
+  const wrap = document.getElementById('parentScopePills');
+  if (!wrap) return;
+  /* Parent › Now has its own Jenn · Jess · Both (`wp_now_scope`, js/32), so
+     the portal's switcher hides there — one girl switch per screen (Plan v17
+     item 6). History and Copy a plan, which read `parentScope`, still show it. */
+  wrap.hidden = parentTab === 'now';
+  const opts = [['both', 'Both', '<span class="ps-word">Both</span><span class="ps-short">All</span>'],
+    ['jenn', 'Jenn', '🐥<span class="ps-word"> Jenn</span>'], ['jess', 'Jess', '🦊<span class="ps-word"> Jess</span>']];
+  wrap.innerHTML = opts.map(([id, name, inner]) =>
+    `<button type="button" aria-pressed="${parentScope === id}"
+       aria-label="${name}" data-parent-scope="${id}">${inner}</button>`).join('');
+}
+
+function setParentScope(scope) {
+  parentScope = scope;
+  // Keep parentViewing on a real child, always: everything outside this portal
+  // reads it and none of it can do anything with "both".
+  if (scope === 'jenn' || scope === 'jess') parentViewing = scope;
+  parentRenderScope();
+  setParentTab(parentTab);
+}
+
+/* The phone's bottom bar. Same idea as the kid nav (js/31-today.js) and the
+   same 44px floor, but it drives setParentDest rather than showScreen —
+   the portal is one screen with panels, not five screens. */
+function parentRenderNav() {
+  const nav = document.getElementById('parentNav');
+  if (!nav) return;
+  const show = isParent() && document.getElementById('screen-parent')?.classList.contains('active');
+  nav.hidden = !show;
+  document.body.classList.toggle('has-parent-nav', !!show);
+  if (!show) return;
+  const waiting = (typeof pnWaitingCount === 'function') ? pnWaitingCount() : 0;
+  nav.innerHTML = PARENT_DESTS.map(d => {
+    const on = d.id === parentDest;
+    const badge = (d.id === 'now' && waiting) ? `<span class="pn-navdot">${waiting}</span>` : '';
+    return `<button type="button" class="ui-btn"
+        data-parent-dest="${d.id}"${on ? ' aria-current="page"' : ''}>
+        <span class="parent-nav-icon" aria-hidden="true">${d.icon}${badge}</span>
+        <span class="parent-nav-label">${escapeHtml(d.label)}</span>
+      </button>`;
+  }).join('');
+}
+
+function setParentDest(id) {
+  const dest = PARENT_DESTS.find(d => d.id === id);
+  if (!dest) return;
+  setParentTab(dest.home);
+}
+
+/* One delegated listener for the destination nav, the landings and the scope
+   pills, bound in js/99-main.js. */
+function parentHandleNavClick(e) {
+  const dest = e.target.closest('[data-parent-dest]');
+  if (dest) { setParentDest(dest.getAttribute('data-parent-dest')); return; }
+  const panel = e.target.closest('[data-parent-panel]');
+  if (panel) {
+    /* Change history and the 👴 Grandfather rule are parts of Grown-ups, not
+       panels of their own — the log only makes sense next to the things it
+       logs. The row names the Grown-ups tab they live on (⚙️ Rules since
+       Stage 4b), so it opens where it means to. */
+    const sec = panel.getAttribute('data-parent-section');
+    if (sec) mnyParentSection = sec;
+    // ⚙️ Rules is one screen with groups (Plan v9 §N): open the row's own group.
+    const grp = panel.getAttribute('data-parent-group');
+    if (grp) guRuleOpenGroup(grp);
+    setParentTab(panel.getAttribute('data-parent-panel'));
+    return;
+  }
+  const scope = e.target.closest('[data-parent-scope]');
+  if (scope) { setParentScope(scope.getAttribute('data-parent-scope')); return; }
+  const hist = e.target.closest('[data-parent-history]');
+  if (hist) { setParentHistoryView(hist.getAttribute('data-parent-history')); return; }
+  const preWeek = e.target.closest('[data-parent-preweek]');
+  if (preWeek) { parentPreWeek = preWeek.getAttribute('data-parent-preweek'); parentRenderHistory(); return; }
+  const back = e.target.closest('[data-parent-back]');
+  if (back) { setParentDest(parentDest); return; }
+}
+
+/* One panel, one renderer. Tabs are pure show/hide, so rendering all ten on
+   every call threw nine of them away — including both charts and the whole
+   money rules page, on every kid switch, in an app where a render can trigger a
+   full-document write.
+
+   Every entry is an arrow rather than a bare reference: this file loads at 11
+   and most of these are declared at 24–30, so naming them directly here would
+   read them before their script has run. The arrow defers the lookup to the
+   call, which is the point at which they exist. */
+const PARENT_PANEL_RENDERERS = {
+  now:      () => pnRenderNow(),
+  history:  () => parentRenderHistory(),
+  setup:    () => parentRenderLanding('setup'),
+  app:      () => parentRenderLanding('app'),
+  review:   () => { renderParentReviewHeader(); renderMeetingHub(); renderReviewFeedback(); },
+  chores:   () => cpRenderChoreTab(),
+  options:  () => coRenderOptions(),
+  trends:   () => ctrRenderTrends(),
+  analysis: () => renderPerformance(),
+  routines: () => renderRoutinesList(),
+  tasks:    () => { renderPendingApproval(); renderPendingTaskApproval(); renderParentActivities(); },
+  money:    () => mnyRenderRulesTab(),
+  rules:    () => renderLevelRules(),
+  copyweek: () => pcwRender(),
+  access:   () => paRenderAccess(),
+  profiles: () => paRenderProfiles(),
+  prefs:    () => paRenderPrefs(),
+  school:   () => paRenderSchool(),
+  calendars: () => fcalRender(),
+  backup:   () => bkRenderPanel(),
+  conflicts: () => cfRenderPanel(),
+};
+
+function renderParentHome() {
+  // Shared chrome first, then only the panel actually on screen.
+  parentRenderScope();
+  setParentTab(parentTab);
+  // A followed calendar due for its every-14-days check is read now, once per
+  // app load; it only speaks when something changed (js/48-cal-follow.js).
+  fcalAutoCheck();
+}
+
+/* The review panel's own header — kid name, age field, kid pills. It moved in
+   here with the rest of that panel's rendering rather than staying in
+   renderParentHome, where it would have run for every tab. */
+function renderParentReviewHeader() {
+  const name = document.getElementById('reviewKidName');
+  if (name) name.textContent = `${kidLabel(parentViewing).icon} ${kidLabel(parentViewing).name}`;
+}
+
+/* Age moved to App › Profiles, which draws a field per kid and writes through
+   setKidAge. renderParentAge and onParentAgeChange targeted one input on the
+   Weekly Review screen and had nothing left to point at. */
+
+/* 🔒 Parent ▾ — PIN, the look and Exit, in one small menu (§N "Header
+   space"). `open` forces it; no argument flips it. */
+function parentMenuToggle(open) {
+  const pop = document.getElementById('parentMenu');
+  const btn = document.getElementById('parentMenuBtn');
+  if (!pop || !btn) return;
+  const next = open == null ? pop.hidden : !!open;
+  pop.hidden = !next;
+  btn.setAttribute('aria-expanded', String(next));
+}
+function setParentTab(tab) {
+  parentTab = tab;
+  parentRenderHeader();
+  // The one-row header's switcher, drawn with every panel (it was drawn only by renderParentHome).
+  parentRenderScope();
+  parentDest = PARENT_PANEL_DEST[tab] || parentDest;
+  const dest = PARENT_DESTS.find(d => d.id === parentDest);
+  // A phone's row names the destination (its tabs are the bottom bar).
+  const title = document.querySelector('#screen-parent > .hdr .hdr-title');
+  if (title && dest) title.textContent = dest.label;
+  document.querySelectorAll('#parentDests > [role="tab"]').forEach(t => {
+    const on = t.dataset.pdest === parentDest;
+    // A strip that says role="tab" has to answer which one is selected and what
+    // it controls, and has to be one stop in the tab order rather than five.
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    t.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll('#screen-parent .parent-panel').forEach(p =>
+    p.hidden = (p.id !== 'ptab-' + tab));
+  /* A detail is reached from its destination's home, so it gets one back link
+     rather than the destination growing a second row of tabs. */
+  const back = document.getElementById('parentBack');
+  if (back) {
+    const isDetail = !!dest && dest.home !== tab;
+    back.hidden = !isDetail;
+    if (isDetail) {
+      const row = (PARENT_LANDINGS[parentDest] || []).find(r => r.panel === tab);
+      back.innerHTML = `<button type="button" class="ui-btn ui-btn--secondary" data-parent-back="1">◀ ${escapeHtml(dest.label)}</button>
+        <span class="parent-crumb">${escapeHtml(row ? row.title : '')}</span>`;
+    }
+  }
+  const render = PARENT_PANEL_RENDERERS[tab];
+  // Isolated the way showScreen isolates its hooks: one panel that throws must
+  // not be able to leave the portal on a blank screen with no way back.
+  if (render) { try { render(); } catch (e) { console.error('parent panel render failed:', tab, e); } }
+  // On every panel, not just App: a disagreement between two devices has to
+  // find a grown-up rather than wait to be looked for. It draws nothing at all
+  // when there is nothing to decide.
+  if (typeof cfRenderBanner === 'function') { try { cfRenderBanner(); } catch (e) { console.error('cfRenderBanner failed', e); } }
+  parentRenderNav();
+}
+
+/* Arrow keys move between destinations; Home/End jump to the ends. Bound once
+   in js/99-main.js. Roving tabindex is set in setParentTab above, so focus
+   follows selection and the strip stays a single stop in the tab order. */
+function parentTabsKeydown(e) {
+  const tabs = [...document.querySelectorAll('#parentDests > [role="tab"]')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0 || !tabs.length) return;
+  let next = null;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % tabs.length;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + tabs.length) % tabs.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = tabs.length - 1;
+  if (next === null) return;
+  e.preventDefault();
+  setParentDest(tabs[next].dataset.pdest);
+  tabs[next].focus();
+}
+
+/* The Meeting destination's home. Review & confirm lives in ONE place —
+   the meeting itself. This is read-only status for the meeting's week:
+   the 7-day strip mirrors the meeting's day-confirms (both kids), and every
+   tap opens the meeting itself rather than confirming in a second surface. */
+function renderMeetingHub() {
+  const wrap = document.getElementById('meetingHub');
+  if (!wrap) return;
+  ctPrepareRead();
+  const wk = ctWeekKey || ctThisWeekKey();
+  const info = ctWeekInfo();
+  const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
+  const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
+  let days = '';
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
+    days += meetingDayTile(d, date, `onclick="openFamilyMeetingAt(1,${d})"`);
+  }
+  const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
+  /* pool.cameIn, not ctWeekMoney. This line says "pocket money so far" and it is
+     the parent's front door to the meeting, but it used to read the earnings
+     net — so a $50 birthday cheque already sitting in the week was invisible
+     here and then appeared out of nowhere at the table. Anything labelled as
+     the week's money is the pool's number; "earned for her work" is a
+     different figure and keeps its own label elsewhere. */
+  const money = ['jenn', 'jess'].map(kid =>
+    `${CT_PROFILE_ICON[kid]} ${fmtMoney(mnyPool(wk, kid).cameIn)}`).join(' · ');
+  const status = held
+    ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
+    : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
+  const cta = held
+    ? `<button type="button" class="ui-btn ui-btn--secondary ui-btn--block" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="ui-btn ui-btn--primary ui-btn--block" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+  wrap.innerHTML = `<div class="hub-week">Week of ${escapeHtml(weekLabel)}</div>
+    <div class="ui-days ui-days--tiles">${days}</div>${status}
+    <div class="hub-cta">${cta}</div>${mmCatchUpBanner()}`;
+}
+/* C5 (owner 2026-10-12): one day tile of the meeting's week, on the Meeting
+   hub and Now's Sunday card — weekday, date, each girl's % and "Review ›"
+   ("Confirmed" once both girls' day is); the kit draws the ✓ / • marks and
+   today's double frame. Its spoken name says the day, date, state and both
+   %. `act` is the tile's own handler attribute. */
+function meetingDayTile(d, date, act) {
+  const k = ctDateToKey(date), confirmed = mmIsDayConfirmed(d);
+  const isToday = k === todayKey(), isFuture = k > todayKey();
+  const jenn = mmDayPct('jenn', d), jess = mmDayPct('jess', d);
+  const cls = [confirmed ? 'ui-day--ok' : '', isFuture ? 'ui-day--future' : ''].filter(Boolean).join(' ');
+  const label = `${DAY_SHORT[d]} ${date.getDate()}, ${confirmed ? 'confirmed' : 'not confirmed yet'}${isToday ? ', today' : ''}, ${kidLabel('jenn').name} ${jenn}%, ${kidLabel('jess').name} ${jess}%`;
+  return `<button type="button"${cls ? ` class="${cls}"` : ''}${isToday ? ' aria-current="date"' : ''} ${act}
+      aria-label="${escapeAttr(label)}"><span class="ui-day-dow">${DAY_SHORT[d]}</span><span class="ui-day-date">${date.getDate()}</span>
+      <span class="ui-day-pct">🐥${jenn}%</span><span class="ui-day-pct">🦊${jess}%</span>
+      <span class="ui-day-state">${confirmed ? 'Confirmed' : 'Review ›'}</span></button>`;
+}
+// Deep-link into the meeting: used by the hub's day strip to open the exact
+// day a parent wants to review, inside the one-and-only confirm surface.
+function openFamilyMeetingAt(step, day) {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  openFamilyMeeting();
+  mmStep = step;
+  mmSelectedDay = day == null ? null : day;
+  renderMeetingMode();
+}
+
+/* Feedback from the kid: the moods/vibes they logged each day this week,
+   plus their free-text weekly note (written from the Quest Board). */
+function renderReviewFeedback() {
+  const wrap = document.getElementById('reviewFeedback');
+  if (!wrap) return;
+  const kid = parentViewing;
+  const pd = getProfData(kid);
+  const keys = getDayKeys(weekOffset);
+  const wkKey = keys[0];
+  let html = '';
+  const note = pd && pd.weekFeedback && pd.weekFeedback[wkKey];
+  if (note && note.trim()) {
+    html += `<div class="feedback-week-note">💬 <b>Their note this week:</b><br>${escapeHtml(note.trim())}</div>`;
+  }
+  const moods = keys.map((k, i) => {
+    const m = pd && pd.dayMoods && pd.dayMoods[k];
+    return m ? `<span title="${DAY_SHORT[i]}">${DAY_SHORT[i]} ${m}</span>` : null;
+  }).filter(Boolean);
+  if (moods.length) {
+    html += `<div class="feedback-item">🌈 <b>Daily vibes:</b> ${moods.join(' · ')}</div>`;
+  }
+  if (!html) html = '<p class="feedback-empty">No feedback yet — vibes and notes your kid logs this week will show here.</p>';
+  wrap.innerHTML = html;
+}
+
+/* Task approval: activities a kid added themselves wait for a parent's OK. */
+function pendingApprovalActs() {
+  const out = [];
+  ['jenn','jess'].forEach(p => {
+    ((state.profiles[p] && state.profiles[p].customActivities) || []).forEach(a => {
+      if (a.pendingApproval) out.push({ act: a, owner: p });
+    });
+  });
+  return out;
+}
+function renderPendingApproval() {
+  const wrap = document.getElementById('pendingApprovalList');
+  if (!wrap) return;
+  const pending = pendingApprovalActs();
+  if (!pending.length) { wrap.innerHTML = '<p class="feedback-empty">Nothing waiting — new activities the girls add will appear here.</p>'; return; }
+  wrap.innerHTML = '';
+  pending.forEach(({ act, owner }) => {
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span class="pc-meta">· ${kidLabel(owner).icon} ${escapeHtml(kidLabel(owner).name)} added</span></div>
+      <div class="pc-sub">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--ok" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
+        <button type="button" class="ui-btn ui-btn--danger" onclick="rejectKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑 Reject</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+}
+/* ── The same queue, for exercises ──
+   state.shared.customTasks is the girls' library of drills — "50m Freestyle
+   (x4)" — and anything either of them typed went straight into it with nothing
+   to tell a parent it had happened. It is a proposal now, like an activity.
+
+   Shared rather than per-child, so there is no owner array to read: addedBy on
+   the record says whose it is. */
+function pendingApprovalTasks() {
+  return (state.shared.customTasks || [])
+    .filter(t => t && t.pendingApproval && !t.archived)
+    .map(t => ({ task: t, owner: t.addedBy }));
+}
+/* Gifts a child has proposed. Same idiom as the two above — pendingApproval
+   plus addedBy — and rendered in the same place, because a parent answering
+   "she says Grandma gave her twenty dollars" is doing the same job as answering
+   "she added a new drill". Per-child rather than shared, so both are read. */
+function pendingApprovalGifts() {
+  const out = [];
+  ['jenn', 'jess'].forEach(kid => {
+    if (typeof mnyPendingDeposits !== 'function') return;
+    mnyPendingDeposits(kid).forEach(d => out.push({ gift: d, owner: kid }));
+  });
+  return out;
+}
+
+function renderPendingTaskApproval() {
+  const wrap = document.getElementById('pendingTaskList');
+  if (!wrap) return;
+  const pending = pendingApprovalTasks();
+  const gifts = pendingApprovalGifts();
+  if (!pending.length && !gifts.length) {
+    wrap.innerHTML = '<p class="feedback-empty">Nothing waiting — new exercises and gifts the girls add will appear here.</p>';
+    return;
+  }
+  wrap.innerHTML = '';
+  /* Money first: it is the one of the two that is a claim about something that
+     already happened, and it is the one that moves a wallet. */
+  gifts.forEach(({ gift, owner }) => {
+    const who = kidLabel(owner);
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">🎁 ${escapeHtml(fmtMoney(gift.amount))} · ${escapeHtml(gift.from || 'A gift')}
+        <span class="pc-meta">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
+      <div class="pc-sub">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(fmtDay(gift.dayKey || gift.weekKey, 'dated'))}
+        · nothing has moved yet</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--ok" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--danger" data-gift-reject="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">🗑 Reject</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+  pending.forEach(({ task, owner }) => {
+    const who = kidLabel(owner);
+    const sport = getTrainingTopic(task.sport);
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">🏋️ ${escapeHtml(task.name)}${task.reps ? ` <span class="pc-reps">(${escapeHtml(task.reps)})</span>` : ''}
+        <span class="pc-meta">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
+      <div class="pc-sub">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--ok" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
+        <button type="button" class="ui-btn ui-btn--danger" data-task-reject="${escapeAttr(task.id)}">🗑 Reject</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+}
+/* Approval is the single moment the money moves — mnyApproveDeposit stamps
+   appliedAt so a re-merge cannot credit it twice. Rejecting REMOVES the record
+   and tombstones it, which is right here and different from rejectKidActivity's
+   archive: an activity that was archived still has to resolve on old blocks,
+   while a gift that was never agreed names nothing. */
+function approveKidGift(kid, id) {
+  if (typeof mnyApproveDeposit !== 'function') return;
+  if (!mnyApproveDeposit(kid, id)) return;
+  renderPendingTaskApproval();
+  showToast('Gift approved — it is in her wallet');
+}
+function rejectKidGift(kid, id) {
+  if (typeof mnyRemoveDeposit !== 'function') return;
+  mnyRemoveDeposit(kid, id);
+  renderPendingTaskApproval();
+  showToast('Gift not recorded');
+}
+
+function approveKidTask(id) {
+  const t = (state.shared.customTasks || []).find(x => x.id === id);
+  if (!t) return;
+  delete t.pendingApproval;
+  markItemUpdated && markItemUpdated(t);
+  saveAll();
+  renderPendingTaskApproval();
+  showToast('Approved ✅ — it stays in the library');
+}
+/* Archived, not deleted, and for the same reason rejectKidActivity archives:
+   a task's text is already flattened into the blocks that used it, and keeping
+   the record is what stops a delete on one device resurrecting elsewhere. */
+async function rejectKidTask(id) {
+  const t = (state.shared.customTasks || []).find(x => x.id === id);
+  if (!t) return;
+  if (!(await showConfirm('Take this exercise off the girls\' list?', { okLabel: 'Take it off' }))) return;
+  t.archived = true;
+  t.archivedAt = syncNow();
+  delete t.pendingApproval;
+  markItemUpdated && markItemUpdated(t);
+  saveAll();
+  renderPendingTaskApproval();
+  showToast('Off the list');
+}
+/* One delegated listener for every button above, bound in js/99-main.js. The
+   gift rows render into the same list, so they ride the same listener rather
+   than growing a second one beside it. */
+function parentTaskApprovalClick(e) {
+  const gy = e.target.closest('[data-gift-approve]');
+  if (gy) { approveKidGift(gy.getAttribute('data-gift-kid'), gy.getAttribute('data-gift-approve')); return; }
+  const gn = e.target.closest('[data-gift-reject]');
+  if (gn) { rejectKidGift(gn.getAttribute('data-gift-kid'), gn.getAttribute('data-gift-reject')); return; }
+  const ok = e.target.closest('[data-task-approve]');
+  if (ok) { approveKidTask(ok.getAttribute('data-task-approve')); return; }
+  const no = e.target.closest('[data-task-reject]');
+  if (no) { rejectKidTask(no.getAttribute('data-task-reject')); }
+}
+
+function approveKidActivity(owner, id) {
+  const acts = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
+  const a = acts.find(x => x.id === id);
+  if (!a) return;
+  delete a.pendingApproval;
+  markItemUpdated && markItemUpdated(a);
+  saveAll();
+  renderPendingApproval();
+  renderParentActivities();
+  showToast('Approved ✅');
+}
+/* Archived, not deleted — the same rule as deleteParentActivity, and for a
+   sharper reason: a kid can place blocks with an activity while it is still
+   waiting for approval, and the old path removed the record and left those
+   blocks pointing at nothing, which made them fail to render at all. */
+async function rejectKidActivity(owner, id) {
+  if (!(await showConfirm('Take this activity the child added off the list?', { okLabel:'Take it off' }))) return;
+  const arr = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
+  const act = arr.find(x => x.id === id);
+  if (!act) return;
+  archiveParentActivity(act);
+  saveAll();
+  renderPendingApproval();
+  renderParentActivities();
+  showToast('Off the list');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PARENT ACTIVITY MANAGEMENT (CRUD + sync)
+════════════════════════════════════════════════════════════════ */
+let parentActivityEdit = { mode:'new', sourceProfile:null, originalId:null };
+
+const PARENT_ACT_IDS = { cat: 'paCat', sub: 'paSub', wrap: 'paSubWrap' };
+
+/* WHEN A FAMILY'S OWN ACTIVITY FITS, in the same vocabulary the shipped catalog
+   uses. `suitableTime` was a field only the catalog could set, so an activity a
+   parent added could never be suggested for a time of day — and with the picker
+   now leading on what fits the moment she tapped, one without it would sit
+   permanently in the "everything else" pile. `travels` likewise: a family's own
+   swimming club is a place you drive to, and the buffer defaults had no way to
+   be told so. */
+const PA_WINDOWS = [
+  ['paWhenBefore',  'before-school'],
+  /* The band the vocabulary could not say. School hours on a day with no
+     school — where Lunch lives, and where a family's own Saturday club does. */
+  ['paWhenMidday',  'midday'],
+  ['paWhenAfter',   'after-school'],
+  ['paWhenEvening', 'evening'],
+  ['paWhenWeekend', 'weekend'],
+];
+function paSetWindows(list) {
+  const want = new Set(Array.isArray(list) ? list : []);
+  PA_WINDOWS.forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = want.has(key);
+  });
+}
+function paReadWindows() {
+  return PA_WINDOWS
+    .filter(([id]) => { const el = document.getElementById(id); return el && el.checked; })
+    .map(([, key]) => key);
+}
+
+function renderParentActivities() {
+  const wrap = document.getElementById('parentActivitiesList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const retired = [];
+
+  const add = (a, owner) => {
+    if (a.archived) { retired.push({ act: a, owner }); return; }
+    wrap.appendChild(parentActivityCard(a, owner));
+  };
+
+  // Shared activities
+  getSharedActivities().forEach(a => add(a, 'shared'));
+
+  // Per-child activities
+  ['jenn','jess'].forEach(p=>{
+    const acts = (state.profiles[p] && state.profiles[p].customActivities) || [];
+    acts.forEach(a => {
+      // Skip routine-shadow activities (they're managed via the Routines section)
+      if (a.isRoutine) return;
+      // Pending kid-added activities show in the approval section above.
+      if (a.pendingApproval && !a.archived) return;
+      add(a, p);
+    });
+  });
+
+  if (!wrap.children.length && !retired.length) {
+    wrap.innerHTML = '<div class="gt-empty">No custom activities yet. Tap ＋ to add one.</div>';
+  }
+  /* Taken off the list, still holding their history — and reversible. A retired
+     activity that could not be brought back would be a delete with extra steps.
+     Collapsed by default: this is a shelf, not part of the working list. */
+  if (retired.length) {
+    const det = document.createElement('details');
+    det.className = 'pa-retired';
+    det.innerHTML = `<summary>🗄 Taken off the list (${retired.length})</summary>`;
+    retired.forEach(({ act, owner }) => {
+      const row = document.createElement('div');
+      row.className = 'pa-retired-row';
+      const n = countBlocksUsingActivity(act.id);
+      row.innerHTML = `<span class="pa-retired-name">${escapeHtml(act.icon || '⭐')} ${escapeHtml(act.name)}</span>
+        <span class="pa-retired-meta">${n} block${n === 1 ? '' : 's'} in history</span>`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ui-btn ui-btn--secondary';
+      btn.textContent = 'Put it back';
+      btn.onclick = () => unarchiveParentActivity(owner, act.id);
+      row.appendChild(btn);
+      det.appendChild(row);
+    });
+    wrap.appendChild(det);
+  }
+}
+
+function parentActivityCard(act, owner) {
+  const card = document.createElement('div');
+  card.className = 'challenge-card';
+  const ownerLabel = owner==='shared' ? '🔗 Shared'
+                    : `${kidLabel(owner).icon} ${kidLabel(owner).name} only`;
+  card.innerHTML = `
+    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span class="pc-meta">· ${escapeHtml(ownerLabel)}</span></div>
+    <div class="pc-sub">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
+    <div class="pc-actions">
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Edit</button>
+      <button type="button" class="ui-btn ui-btn--danger" onclick="deleteParentActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑</button>
+    </div>
+  `;
+  return card;
+}
+
+function openParentActivityEditor(owner, id) {
+  // No args = new activity
+  if (!owner) {
+    parentActivityEdit = { mode:'new', sourceProfile:null, originalId:null };
+    document.getElementById('parentActivityHeading').textContent = '✨ Add Activity';
+    document.getElementById('paConfirmBtn').textContent = 'Add ✅';
+    document.getElementById('paName').value = '';
+    document.getElementById('paIcon').value = '';
+    document.getElementById('paDur').value = '60';
+    renderCategorySelects('play', null, PARENT_ACT_IDS);
+    paSetWindows(['after-school', 'weekend']);
+    document.getElementById('paTravels').checked = false;
+    document.getElementById('paVisibility').value = 'shared';
+    renderEmojiGrid('paEmojiGrid', 'paIcon', '');
+    openSheet('parentActivityOverlay');
+    return;
+  }
+  const act = findParentActivity(owner, id);
+  if (!act) { showToast('Activity not found'); return; }
+  parentActivityEdit = { mode:'edit', sourceProfile:owner, originalId:id };
+  document.getElementById('parentActivityHeading').textContent = '✏️ Edit Activity';
+  document.getElementById('paConfirmBtn').textContent = 'Save ✅';
+  document.getElementById('paName').value = act.name || '';
+  document.getElementById('paIcon').value = act.icon || '';
+  document.getElementById('paDur').value = String(act.durationMin || 60);
+  const sg = activitySub(act);
+  renderCategorySelects(sg.cat, sg.id, PARENT_ACT_IDS);
+  paSetWindows(act.suitableTime);
+  document.getElementById('paTravels').checked = !!act.travels;
+  document.getElementById('paVisibility').value = owner==='shared' ? 'shared' : owner;
+  renderEmojiGrid('paEmojiGrid', 'paIcon', act.icon || '');
+  openSheet('parentActivityOverlay');
+}
+
+function findParentActivity(owner, id) {
+  if (owner === 'shared') return getSharedActivities().find(a=>a.id===id);
+  return ((state.profiles[owner]||{}).customActivities||[]).find(a=>a.id===id);
+}
+
+function removeParentActivity(owner, id) {
+  // Tombstone the removal so the sync merge can't restore it from another
+  // device (a move records the removal in the OLD collection only).
+  if (owner === 'shared') {
+    state.shared.sharedActivities = (state.shared.sharedActivities||[]).filter(a=>a.id!==id);
+    tombstoneIds('sa:', [id]);
+  } else {
+    state.profiles[owner].customActivities = (state.profiles[owner].customActivities||[]).filter(a=>a.id!==id);
+    tombstoneIds('ca:' + owner + ':', [id]);
+  }
+}
+
+function confirmParentActivity() {
+  const name = document.getElementById('paName').value.trim();
+  const icon = document.getElementById('paIcon').value.trim() || '⭐';
+  const sub  = document.getElementById('paSub').value;
+  const cat  = catForSub(sub);   // legacy, still read by the stickers and the goal presets
+  const durationMin = parseInt(document.getElementById('paDur').value) || 60;
+  const vis  = document.getElementById('paVisibility').value;
+  const suitableTime = paReadWindows();
+  const travels = !!document.getElementById('paTravels').checked;
+  if (!name) { showToast('Enter a name'); return; }
+  /* An activity that fits nowhere can never be suggested and reads as a mistake
+     rather than a choice, so the form refuses it rather than saving something
+     the picker will quietly never offer. */
+  if (!suitableTime.length) { showToast('Pick at least one time of day'); return; }
+
+  if (parentActivityEdit.mode === 'edit') {
+    // Find + update the existing activity in place.
+    const oldOwner = parentActivityEdit.sourceProfile;
+    const id = parentActivityEdit.originalId;
+    const existing = findParentActivity(oldOwner, id);
+    if (!existing) { showToast('Not found'); return; }
+    existing.name = name; existing.icon = icon; existing.cat = cat; existing.durationMin = durationMin;
+    existing.sub = sub; existing.suitableTime = suitableTime; existing.travels = travels;
+    markItemUpdated(existing);
+    // Visibility moved? Migrate the activity object to the new collection (preserving its id so placed blocks still resolve).
+    const newOwner = vis;
+    if (newOwner !== oldOwner) {
+      removeParentActivity(oldOwner, id);
+      if (newOwner === 'shared') {
+        state.shared.sharedActivities = [...(state.shared.sharedActivities||[]), existing];
+      } else {
+        state.profiles[newOwner].customActivities = [...((state.profiles[newOwner]||{}).customActivities||[]), existing];
+      }
+    }
+    saveAll();
+    closeSheet('parentActivityOverlay');
+    renderParentActivities();
+    showToast('Activity saved ✅');
+    return;
+  }
+
+  // Create new
+  const newAct = {
+    id: 'custom-'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    name, icon, cat, sub, durationMin, suitableTime, travels, custom:true
+  };
+  if (vis === 'shared') {
+    state.shared.sharedActivities = [...(state.shared.sharedActivities||[]), newAct];
+  } else {
+    state.profiles[vis].customActivities = [...((state.profiles[vis]||{}).customActivities||[]), newAct];
+  }
+  saveAll();
+  closeSheet('parentActivityOverlay');
+  renderParentActivities();
+  showToast('Activity added ✅');
+}
+
+/* ── Retiring an activity ──
+   This used to delete: it stripped the activity from the library and then swept
+   BOTH kids' `weeks` with no date filter, removing every block that had ever
+   referenced it — from last March as readily as from next Tuesday — tombstoning
+   the lot so sync could not bring them back, and then rebuilding
+   activityCounts/activityHours from what was left, which zeroed the level-up
+   progress those years of blocks had earned. Irreversible, and there was no
+   undo. A piano teacher stops and the record of two years of piano goes with
+   her.
+
+   It is the exact opposite of the rule the routine editor next door already
+   follows ("Past blocks are preserved as historical record"), and the opposite
+   of what a family means by "take this off the list".
+
+   So: archive. The activity record stays, marked, so every past block still
+   resolves to its own name, icon and colour — findActivity sees archived
+   entries on purpose. It disappears from every picker. Blocks from TODAY
+   forward are removed, because a plan for next week that names a retired
+   activity is a plan nobody can act on. Nothing before today is touched, and
+   the counts stand. */
+async function deleteParentActivity(owner, id) {
+  const act = findParentActivity(owner, id);
+  if (!act) { showToast('Not found'); return; }
+  const future = countBlocksUsingActivity(id, todayKey());
+  const past = countBlocksUsingActivity(id) - future;
+  const msg = future
+    ? `Take "${act.name}" off the list?\n\nIt is on ${future} day${future === 1 ? '' : 's'} from today onward — those will be removed.`
+      + (past ? `\n\n${past} earlier block${past === 1 ? '' : 's'} stay exactly as ${past === 1 ? 'it is' : 'they are'}.` : '')
+    : `Take "${act.name}" off the list?`
+      + (past ? `\n\n${past} earlier block${past === 1 ? '' : 's'} stay exactly as ${past === 1 ? 'it is' : 'they are'}.` : '');
+  if (!(await showConfirm(msg, { danger: true, okLabel: 'Take it off' }))) return;
+
+  archiveParentActivity(act);
+  if (future > 0) {
+    const removedBlockIds = [];
+    const from = todayKey();
+    ['jenn','jess'].forEach(p => {
+      const weeks = (state.profiles[p] && state.profiles[p].weeks) || {};
+      Object.keys(weeks).forEach(dayKey => {
+        if (dayKey < from) return;      // history is a record, not a working set
+        const arr = weeks[dayKey] || [];
+        const kept = arr.filter(b => {
+          if (b.actId !== id) return true;
+          removedBlockIds.push(b.id);
+          return false;
+        });
+        if (kept.length !== arr.length) state.profiles[p].weeks[dayKey] = kept;
+      });
+    });
+    tombstoneBlockIds(removedBlockIds);
+  }
+  /* recountActivityProgress is deliberately NOT called. It rebuilds the counts
+     from the blocks still standing, and the whole point here is that the past
+     ones are still standing — so there is nothing to recount, and calling it
+     would only risk undoing that. */
+  saveAll();
+  renderParentActivities();
+  showToast(future
+    ? `Off the list — ${future} upcoming removed, history kept 🗄`
+    : 'Off the list — history kept 🗄');
+}
+
+/* Marked, not removed, and NOT tombstoned: a tombstone is what makes a delete
+   stick across every device, and this must not stick as a delete. The record
+   has to survive so the blocks that name it keep rendering. */
+function archiveParentActivity(act) {
+  act.archived = true;
+  act.archivedAt = syncNow();
+  markItemUpdated(act);
+}
+function unarchiveParentActivity(owner, id) {
+  const act = findParentActivity(owner, id);
+  if (!act) return;
+  delete act.archived;
+  delete act.archivedAt;
+  markItemUpdated(act);
+  saveAll();
+  renderParentActivities();
+  showToast(`"${act.name}" is back on the list ✨`);
+}
+
+/* Count placed blocks across all profiles/weeks that reference an activity id.
+   `fromDayKey` narrows it to that day onward — the difference between "how much
+   history is there" and "how much of the plan ahead breaks". */
+function countBlocksUsingActivity(actId, fromDayKey) {
+  let n = 0;
+  ['jenn','jess'].forEach(p => {
+    const weeks = (state.profiles[p] && state.profiles[p].weeks) || {};
+    Object.keys(weeks).forEach(dayKey => {
+      if (fromDayKey && dayKey < fromDayKey) return;
+      (weeks[dayKey] || []).forEach(b => { if (b.actId === actId) n++; });
+    });
+  });
+  return n;
+}
+
+/* Promote a child-only activity to shared, or demote a shared back to a single child. */
+async function toggleShareActivity(owner, id) {
+  if (owner === 'shared') {
+    // Demote: ask which child to give it to
+    const which = await showPrompt('Move this activity to which child?\n\nType "jenn" or "jess":', { value:'jenn' });
+    if (!which) return;
+    const target = which.trim().toLowerCase();
+    if (target !== 'jenn' && target !== 'jess') { showToast('Type jenn or jess'); return; }
+    const act = (state.shared.sharedActivities||[]).find(a=>a.id===id);
+    if (!act) return;
+    // Stamp the moved copy first, then tombstone the old home — the fresh
+    // timestamp is what lets the move survive a merge with a stale device.
+    markItemUpdated(act);
+    removeParentActivity('shared', id);
+    state.profiles[target].customActivities = [...((state.profiles[target]||{}).customActivities||[]), act];
+  } else {
+    // Promote to shared
+    const list = (state.profiles[owner]||{}).customActivities || [];
+    const act = list.find(a=>a.id===id);
+    if (!act) return;
+    markItemUpdated(act);
+    removeParentActivity(owner, id);
+    state.shared.sharedActivities = [...(state.shared.sharedActivities||[]), act];
+  }
+  saveAll();
+  renderParentActivities();
+  showToast('Updated 🔗');
+}
+
+/* ── Performance tab — Function 2: analyse PAST weeks ──────────────
+   Read-only analytics over what actually happened: % of planned time
+   completed, routines kept, and money recorded at meetings (from the
+   finalizedWeeks ledger). Nothing here confirms or records a week —
+   that stays in the family meeting. */
+let perfWeekOffset = 0;   // 0 = current week, -1 = last week, …
+
+function perfMondayKey(offset) {
+  const mon = ctThisMonday();
+  mon.setDate(mon.getDate() + offset * 7);
+  return ctDateToKey(mon);
+}
+// One kid's numbers for the week starting at monKey.
+/* One computation, shared with the meeting and the week glance. It used to be
+   written out here with its own category bucketing, its own idea of which
+   blocks count, and a direct read of b.completed — which is why a routine
+   whose checklist was full showed as zero minutes done. */
+function perfWeekStats(monKey, kid) {
+  const h = getWeeklyHours(kid, monKey);
+  const fw = (state.shared.chore.finalizedWeeks || {})[monKey] || {};
+  /* Routines counted from the CHECKLISTS, like every other surface, and out of
+     the routines actually on the plan rather than a notional 21. The old line
+     read ctMandatoryPoints — the legacy per-session store — so this panel could
+     show "30m / 30m" of routine time completed in the rows above and "0/21
+     routines kept" in its own footer, about the same week. */
+  let rDone = 0, rTotal = 0;
+  mrWeekDayKeys(monKey).forEach(key => {
+    (getDayBlocksForProfile(key, kid) || []).forEach(b => {
+      const act = findActivity(b.actId, kid);
+      if (!act || !act.isRoutine) return;
+      rTotal++;
+      if (isRoutineCompleted(b, kid)) rDone++;
+    });
+  });
+  return {
+    planned: h.planned, done: h.completed, byCat: h.byGroup, schoolMin: h.schoolMin,
+    routinesDone: rDone, routinesTotal: rTotal,
+    routines: rDone, money: fw[kid],
+  };
+}
+
+function renderPerformance() {
+  ctEnsureShared();
+  renderPerfTrend();
+  renderPerfDetail();
+}
+
+function renderPerfTrend() {
+  const wrap = document.getElementById('perfTrend');
+  if (!wrap) return;
+  const heldMap = state.shared.chore.meetingsHeld || {};
+
+  /* Two passes, and the second one is the point. A percentage answered a
+     question nobody was asking — "of whatever she happened to plan, how much
+     got done" — so a child who planned two hours and did both read 100% beside
+     a sister who planned twenty and did eighteen. Worse, each bar was scaled
+     against its own kid's planned total, so two bars of equal length meant
+     different amounts of time and no bar could be compared week to week.
+
+     Hours now, on ONE scale computed across both children and every week shown.
+     And it is named for what it is: the app records no elapsed time, only which
+     planned blocks were completed, so it says "planned hours completed" and
+     never "time spent". */
+  const weeks = [];
+  for (let off = 0; off > -8; off--) {
+    const monKey = perfMondayKey(off);
+    const j = perfWeekStats(monKey, 'jenn'), s = perfWeekStats(monKey, 'jess');
+    if (off !== 0 && !j.planned && !s.planned && j.money == null && s.money == null && !j.routines && !s.routines) continue;
+    weeks.push({ off, monKey, mon: formatDayKey(monKey), j, s });
+  }
+  const scaleMax = Math.max(60, ...weeks.flatMap(w => [w.j.planned, w.s.planned]));
+
+  const bar = (st, cls) => {
+    const pw = Math.round(st.planned / scaleMax * 100);
+    const dw = Math.round(st.done / scaleMax * 100);
+    return `<span class="perf-track"><span class="perf-plan" style="width:${pw}%"></span>`
+      + `<span class="perf-fill ${cls}" style="width:${dw}%"></span></span>`
+      + `<span class="perf-num">${st.planned ? fmtHrsMin(st.done) + ' / ' + fmtHrsMin(st.planned) : '—'}</span>`;
+  };
+  const money = (st) => st.money != null ? `${fmtMoney(st.money)}` : '—';
+  let rows = '';
+  weeks.forEach(w => {
+    rows += `<button type="button" class="ui-btn" aria-pressed="${w.off === perfWeekOffset}" onclick="perfSelectWeek(${w.off})">
+        <span class="perf-week">${w.off === 0 ? 'This wk' : MONTH_SHORT[w.mon.getMonth()] + ' ' + w.mon.getDate()}${heldMap[w.monKey] ? ' ✅' : ''}</span>
+        ${bar(w.j, 'mm-bar-j')}${bar(w.s, 'mm-bar-s')}
+        <span class="perf-money">${money(w.j)} · ${money(w.s)}</span>
+      </button>`;
+  });
+  wrap.innerHTML = `<div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">planned hours completed · same scale across both girls and every week · ✅ = recorded at a meeting · $ = money recorded (Jenn · Jess)</span></div>
+    <div class="perf-table">${rows}</div>
+    <div class="ct-meta">Tap a week to see its detail below.</div>`;
+}
+function perfSelectWeek(off) {
+  perfWeekOffset = Math.min(0, off);
+  renderPerfTrend();
+  renderPerfDetail();
+}
+
+function renderPerfDetail() {
+  const wrap = document.getElementById('perfDetail');
+  if (!wrap) return;
+  const monKey = perfMondayKey(perfWeekOffset);
+  const mon = formatDayKey(monKey);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  /* One scale across BOTH girls, so the two cards can be read side by side —
+     each card used to normalise to its own kid's biggest row. */
+  const stats = { jenn: perfWeekStats(monKey, 'jenn'), jess: perfWeekStats(monKey, 'jess') };
+  const maxMin = Math.max(60, ...['jenn', 'jess'].flatMap(k =>
+    Object.values(stats[k].byCat).map(v => v.planned)));
+  const kidCard = (kid) => {
+    const st = stats[kid];
+    const rows = GROUP_ORDER.filter(g => st.byCat[g] && st.byCat[g].planned > 0).map(g => {
+      const p = st.byCat[g].planned, dn = st.byCat[g].completed;
+      /* School lives inside Brain, and at ~32 hours a week it would otherwise
+         swamp homework entirely — so the row says how much of itself was the
+         school day, and the rest becomes readable without its own row. */
+      const inner = (g === 'brain' && st.schoolMin > 0)
+        ? `<small class="mm-2b-sub"> (${fmtHrsMin(st.schoolMin)} school)</small>` : '';
+      return `<div class="mm-2b-row"><span class="mm-2b-label">${groupLabel(g)}${inner}</span>
+          <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${Math.round(p / maxMin * 100)}%"></span><span class="mm-2b-done" style="width:${Math.round(dn / maxMin * 100)}%;background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span></span>
+          <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
+    }).join('') || `<div class="ct-meta">Nothing was planned this week.</div>`;
+    const money = st.money != null
+      ? `${fmtMoney(st.money)} recorded`
+      : (perfWeekOffset === 0 ? `${fmtMoney(ctWeekMoney(monKey, kid))} preliminary — recorded at the meeting` : 'not recorded');
+    return `<div class="mm-2b-kid">
+        <div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${escapeHtml(kidLabel(kid).name)} — ${fmtHrsMin(st.done)} completed / ${fmtHrsMin(st.planned)} planned</div>${rows}
+        <div class="perf-facts">✅ ${st.routinesTotal ? `${st.routinesDone}/${st.routinesTotal} routines kept` : 'no routines on the plan'} · 💰 ${money}</div>
+      </div>`;
+  };
+  const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
+  wrap.innerHTML = `<div class="perf-detail-nav">
+      <button type="button" class="ui-btn ui-btn--icon" onclick="perfSelectWeek(${perfWeekOffset - 1})" aria-label="Previous week">◀</button>
+      <b>${perfWeekOffset === 0 ? 'This week' : 'Week of ' + label}</b>
+      <button type="button" class="ui-btn ui-btn--icon" ${perfWeekOffset >= 0 ? 'disabled' : ''} onclick="perfSelectWeek(${perfWeekOffset + 1})" aria-label="Next week">▶</button>
+    </div>
+    <div class="mm-2b">${kidCard('jenn')}${kidCard('jess')}</div>
+    <div class="mm-cap">Solid = planned hours completed · dashed = planned. The app records which planned blocks were finished, not how long anything actually took.</div>`;
+}
+
+function renderRoutinesList() {
+  const wrap = document.getElementById('routinesList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  // Built-in presets — now editable by parent (override saved separately)
+  Object.keys(ROUTINE_PRESETS).forEach(id=>{
+    const tmpl = getRoutineTemplate(id); // returns override if present
+    const isOverridden = !!(state.shared.builtInRoutineOverrides && state.shared.builtInRoutineOverrides[id]);
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span class="pc-meta">· built-in${isOverridden?' (edited)':''}</span></div>
+      <div class="pc-sub">${tmpl.items.length} items</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="openEditBuiltInRoutine('${escapeJsAttr(id)}')">✏️ Edit</button>
+        ${isOverridden ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="resetBuiltInRoutine('${escapeJsAttr(id)}')" title="Reset to default">↩️ Reset</button>` : ''}
+      </div>
+    `;
+    wrap.appendChild(card);
+  });
+
+  // Custom
+  (state.shared.routineTemplates||[]).forEach(r=>{
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">${r.icon||'📋'} ${escapeHtml(r.title)}</div>
+      <div class="pc-sub">${r.items.length} items</div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--secondary" onclick="openEditRoutine('${escapeJsAttr(r.id)}')">✏️ Edit</button>
+        <button type="button" class="ui-btn ui-btn--danger" onclick="deleteRoutine('${escapeJsAttr(r.id)}')">🗑</button>
+      </div>
+    `;
+    wrap.appendChild(card);
+  });
+}
+
+/* Custom routine builder state. editingId set when editing an existing routine. */
+let routineBuilder = { title:'', icon:'📋', items:[], editingId:null };
+
+function openNewRoutine() {
+  routineBuilder = { title:'', icon:'📋', items:[{id:'i1', text:'', timerSec:null}], editingId:null, editingBuiltinId:null };
+  document.getElementById('rbHeading').textContent = '🌅 New Custom Routine';
+  document.getElementById('rbConfirmBtn').textContent = 'Save Routine ✨';
+  renderRoutineBuilder();
+  openSheet('newRoutineOverlay');
+}
+
+function openEditRoutine(id) {
+  const r = (state.shared.routineTemplates||[]).find(x=>x.id===id);
+  if (!r) return;
+  routineBuilder = {
+    title: r.title,
+    icon: r.icon || '📋',
+    items: r.items.map(it=>({ id: it.id, text: it.text, timerSec: it.timerSec || null })),
+    editingId: r.id,
+    editingBuiltinId: null,
+  };
+  if (!routineBuilder.items.length) routineBuilder.items.push({id:'i'+Date.now().toString(36), text:'', timerSec:null});
+  document.getElementById('rbHeading').textContent = '✏️ Edit Routine';
+  document.getElementById('rbConfirmBtn').textContent = 'Save Changes ✅';
+  renderRoutineBuilder();
+  openSheet('newRoutineOverlay');
+}
+
+function openEditBuiltInRoutine(id) {
+  const tmpl = getRoutineTemplate(id);
+  if (!tmpl) return;
+  routineBuilder = {
+    title: tmpl.title,
+    icon: tmpl.icon || '📋',
+    items: tmpl.items.map(it=>({ id: it.id, text: it.text, timerSec: it.timerSec || null })),
+    editingId: null,
+    editingBuiltinId: id,
+  };
+  if (!routineBuilder.items.length) routineBuilder.items.push({id:'i'+Date.now().toString(36), text:'', timerSec:null});
+  document.getElementById('rbHeading').textContent = '✏️ Edit Built-in Routine';
+  document.getElementById('rbConfirmBtn').textContent = 'Save Changes ✅';
+  renderRoutineBuilder();
+  openSheet('newRoutineOverlay');
+}
+
+async function resetBuiltInRoutine(id) {
+  if (!(await showConfirm('Reset this routine to the built-in default? Your edits will be lost.', { danger:true, okLabel:'Reset' }))) return;
+  // The tombstone is what makes the reset stick: mergeRoutineOverrides unions
+  // by id, so without a record of the removal the override comes straight back
+  // from any device still holding it and the button undoes itself.
+  if (state.shared.builtInRoutineOverrides) delete state.shared.builtInRoutineOverrides[id];
+  tombstoneIds('ovr:', [id]);
+  saveAll();
+  renderRoutinesList();
+  showToast('Reset to default ↩️');
+}
+
+function renderRoutineBuilder() {
+  document.getElementById('rbTitle').value = routineBuilder.title;
+  document.getElementById('rbIcon').value  = routineBuilder.icon;
+  const list = document.getElementById('rbItems');
+  list.innerHTML = '';
+  routineBuilder.items.forEach((it, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'builder-item-row';
+    // The icon box shows what the item WILL get if left alone — the guess from
+    // its text — so a blank field never means a blank icon.
+    row.innerHTML = `
+      <input type="text" class="builder-item-icon" placeholder="${escapeAttr(routineItemIcon(it))}" value="${escapeAttr(it.icon)}" data-idx="${idx}" data-field="icon" title="Icon — leave blank to pick one from the words" aria-label="Icon">
+      <input type="text" placeholder="Task description" value="${escapeAttr(it.text)}" data-idx="${idx}" data-field="text">
+      <input type="number" placeholder="min" min="0" max="60" value="${it.timerSec?Math.round(it.timerSec/60):''}" data-idx="${idx}" data-field="timerMin" title="Timer (minutes)">
+      <button class="del-btn" data-idx="${idx}">×</button>
+    `;
+    list.appendChild(row);
+  });
+  // Wire up
+  list.querySelectorAll('input').forEach(inp=>{
+    inp.oninput = (e)=>{
+      const i = parseInt(e.target.dataset.idx);
+      const f = e.target.dataset.field;
+      if (f==='text') {
+        routineBuilder.items[i].text = e.target.value;
+        // Re-guess the placeholder as the words change, while the field is empty.
+        const iconField = list.querySelector(`input[data-idx="${i}"][data-field="icon"]`);
+        if (iconField && !iconField.value) iconField.placeholder = routineItemIcon(routineBuilder.items[i]);
+      }
+      if (f==='icon') routineBuilder.items[i].icon = e.target.value.trim() || null;
+      if (f==='timerMin') {
+        const min = parseInt(e.target.value);
+        routineBuilder.items[i].timerSec = (min && min>0) ? min*60 : null;
+      }
+    };
+  });
+  list.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const i = parseInt(btn.dataset.idx);
+      routineBuilder.items.splice(i,1);
+      if (!routineBuilder.items.length) routineBuilder.items.push({id:'i'+Date.now().toString(36), text:'', timerSec:null});
+      renderRoutineBuilder();
+    };
+  });
+}
+
+function addRoutineItem() {
+  routineBuilder.items.push({ id:'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,4), text:'', timerSec:null });
+  renderRoutineBuilder();
+}
+
+function confirmRoutine() {
+  const title = document.getElementById('rbTitle').value.trim();
+  const icon  = document.getElementById('rbIcon').value.trim() || '📋';
+  if (!title) { showToast('Enter a title'); return; }
+  const items = routineBuilder.items.filter(i=>i.text.trim()).map(i=>({
+    id: i.id, text: i.text.trim(), timerSec: i.timerSec || undefined
+  }));
+  if (!items.length) { showToast('Add at least one item'); return; }
+
+  if (routineBuilder.editingBuiltinId) {
+    // EDIT BUILT-IN — store as override; preset stays untouched
+    const id = routineBuilder.editingBuiltinId;
+    if (!state.shared.builtInRoutineOverrides) state.shared.builtInRoutineOverrides = {};
+    // updatedAt so two parents editing the same routine merge by recency
+    // rather than by whichever device pushed last.
+    state.shared.builtInRoutineOverrides[id] = { title, icon, items, updatedAt: syncNow() };
+
+    // Prune checklistState in FUTURE blocks for items that no longer exist (same logic as custom)
+    const validIds = new Set(items.map(i=>i.id));
+    const today = todayKey();
+    ['jenn','jess'].forEach(p=>{
+      const weeks = (state.profiles[p] && state.profiles[p].weeks) || {};
+      Object.keys(weeks).forEach(dayKey=>{
+        if (dayKey < today) return;
+        const blocks = weeks[dayKey] || [];
+        blocks.forEach(b=>{
+          const act = findActivity(b.actId, p);
+          if (!act?.isRoutine || act.routineId !== id) return;
+          if (!b.checklistState) return;
+          Object.keys(b.checklistState).forEach(itemId=>{
+            if (!validIds.has(itemId)) delete b.checklistState[itemId];
+          });
+        });
+      });
+    });
+
+    saveAll();
+    closeSheet('newRoutineOverlay');
+    renderRoutinesList();
+    showToast('Built-in routine updated ✅');
+    return;
+  }
+
+  if (routineBuilder.editingId) {
+    // EDIT MODE — update existing template + sync activity name/icon
+    const existing = (state.shared.routineTemplates||[]).find(r=>r.id===routineBuilder.editingId);
+    if (!existing) { showToast('Routine not found'); return; }
+    existing.title = title;
+    existing.icon  = icon;
+    existing.items = items;
+
+    // Update matching activity name/icon on both kids
+    ['jenn','jess'].forEach(p=>{
+      const acts = state.profiles[p].customActivities || [];
+      const a = acts.find(x=>x.routineId===routineBuilder.editingId);
+      if (a) { a.name = title; a.icon = icon; }
+    });
+
+    // Prune checklistState in FUTURE blocks for items that no longer exist.
+    // Past blocks are preserved as historical record (don't touch them).
+    const validIds = new Set(items.map(i=>i.id));
+    const today = todayKey();
+    ['jenn','jess'].forEach(p=>{
+      const weeks = state.profiles[p].weeks || {};
+      Object.keys(weeks).forEach(dayKey=>{
+        if (dayKey < today) return; // skip past days
+        const blocks = weeks[dayKey] || [];
+        blocks.forEach(b=>{
+          const act = findActivity(b.actId, p);
+          if (!act?.isRoutine || act.routineId !== routineBuilder.editingId) return;
+          if (!b.checklistState) return;
+          // Keep only valid template items in checklistState
+          Object.keys(b.checklistState).forEach(itemId=>{
+            if (!validIds.has(itemId)) delete b.checklistState[itemId];
+          });
+        });
+      });
+    });
+
+    saveAll();
+    closeSheet('newRoutineOverlay');
+    renderRoutinesList();
+    showToast('Routine updated ✅');
+    return;
+  }
+
+  // NEW ROUTINE
+  const routine = {
+    id: 'rt-'+Date.now().toString(36),
+    title, icon, items
+  };
+  state.shared.routineTemplates = [...(state.shared.routineTemplates||[]), routine];
+
+  // Also add a matching activity so it shows in the tray
+  const newAct = {
+    id: 'routine_'+routine.id,
+    name: title,
+    icon: icon,
+    cat: 'routine',
+    durationMin: 30,
+    isRoutine: true,
+    routineId: routine.id,
+    custom: true,
+  };
+  // Store on both kids' customActivities so it appears in both trays
+  ['jenn','jess'].forEach(p=>{
+    state.profiles[p].customActivities = [...(state.profiles[p].customActivities||[]), newAct];
+  });
+
+  saveAll();
+  closeSheet('newRoutineOverlay');
+  renderRoutinesList();
+  showToast('Routine created ✨');
+}
+
+async function deleteRoutine(id) {
+  if (!(await showConfirm('Delete this routine?', { danger:true, okLabel:'Delete' }))) return;
+  state.shared.routineTemplates = (state.shared.routineTemplates||[]).filter(r=>r.id!==id);
+  tombstoneIds('rt:', [id]);
+  // Remove matching activity from both kids (tombstoned so sync can't revive them)
+  ['jenn','jess'].forEach(p=>{
+    const removed = (state.profiles[p].customActivities||[]).filter(a=>a.routineId===id).map(a=>a.id);
+    state.profiles[p].customActivities = (state.profiles[p].customActivities||[]).filter(a=>a.routineId!==id);
+    tombstoneIds('ca:' + p + ':', removed);
+  });
+  saveAll();
+  renderRoutinesList();
+}
+/* ── One owner for the parent banner's way out ────────────────────
+   Both banners hard-coded "◀ Hub", which is right when you arrived from the
+   Parent Hub and wrong — actively misleading — when a family meeting is open
+   behind you and pressing it throws the sitting away.
+
+   It is one function so the two banners cannot drift, which is exactly how
+   they came to carry different controls in the first place. */
+function parentBannerBackButton() {
+  if (typeof mmHasReturn === 'function' && mmHasReturn()) {
+    return `<button type="button" class="ui-btn ui-btn--secondary no-print pb-back-btn" onclick="mmReturnToMeeting()" aria-label="Back to weekly meeting">`
+         + `◀<span class="pv-word"> Back to weekly meeting</span></button>`;
+  }
+  return `<button type="button" class="ui-btn ui-btn--secondary no-print pb-back-btn" onclick="showScreen('parent')" aria-label="Back to the parent hub">◀<span class="pv-word"> Hub</span></button>`;
+}
+
+/* A parent viewing a girl's Week or Day: the purple 44px sub-bar under the
+   kid's header (PR 5, D21, D35; header-exact-values.md, the Parent sub-bar
+   rows) — the way back, whose week or day it is, then the screen's own
+   actions (`actionsHtml`, in a span with `actionsId` so its owner can redraw
+   them). The kid's row above keeps its 52px avatar (D25). '' for a child. */
+function parentViewSub(what, actionsId, actionsHtml) {
+  if (!isParent()) return '';
+  const name = kidLabel(parentViewing).name;
+  return parentBannerBackButton()
+    + `<span class="pv-name" id="parentViewingName"><span class="pv-word">Reviewing </span>${escapeHtml(name)}<span class="pv-word">'s ${escapeHtml(what)}</span></span>`
+    + `<span class="pv-actions" id="${escapeAttr(actionsId)}">${actionsHtml || ''}</span>`;
+}
+
+/* While a meeting is waiting, the back button is the ONLY way out of the week
+   or day screen. The child switchers and the Hub link all silently abandon the
+   sitting, so they are hidden rather than left there to be pressed — a control
+   that loses your place without saying so is worse than no control. They come
+   back the moment the meeting is finished or closed. */
+/* Two corrections, both about a lock that could be applied and never lifted.
+
+   It ran a DOCUMENT-WIDE querySelectorAll('.profile-badge'), so a sitting on
+   the week screen hid the switcher on Today, the chore tab and Sister Sync as
+   well — four screens the comment above is not about. It is the week's and the
+   day's switchers a parent must not press mid-meeting, so it names those two
+   by id.
+
+   And `locked` is now a fact about a PARENT mid-sitting. Both call sites used
+   to be inside `if (isParent())`, so nothing ever ran this with locked ===
+   false: start a meeting, look at the week, switch to a kid, and the badge was
+   gone for the rest of the session. mmClearReturn() only nulls the variable —
+   it un-hides nothing. The calls in renderWeek and openDay now run on every
+   render, and a child's render is what puts the control back. */
+const MEETING_LOCK_BADGES = ['weekProfileBadge', 'dayProfileBadge'];
+function applyMeetingLock() {
+  const locked = isParent() && (typeof mmHasReturn === 'function') && mmHasReturn();
+  MEETING_LOCK_BADGES.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = locked;
+  });
+  document.querySelectorAll('#parentWeekActions .pb-switch')
+    .forEach(el => { el.hidden = locked; });
+  document.body.classList.toggle('meeting-return-pending', locked);
+}
+
+function parentView(p) {
+  parentViewing = p;
+  showScreen('week');
+  renderWeek();
+}
+function parentSwitchView() {
+  parentViewing = parentViewing==='jenn'?'jess':'jenn';
+  renderWeek();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PARENT MONTHLY HEATMAP
+════════════════════════════════════════════════════════════════ */
+let parentMonthlyKid = 'jenn';
+let parentMonthOffset = 0; // 0 = current month, -1 = prev, +1 = next
+
+function openParentMonthly(kid) {
+  parentMonthlyKid = kid;
+  parentMonthOffset = 0;
+  showScreen('parent-monthly');
+  renderParentMonthly();
+}
+
+function setParentMonthlyKid(kid) {
+  parentMonthlyKid = kid;
+  renderParentMonthly();
+}
+
+function changeParentMonth(delta) {
+  parentMonthOffset += delta;
+  renderParentMonthly();
+}
+
+/* The Monthly header (PR 5; no reference picture, difference 3): the parent
+   header with ◀ back to the portal, "Monthly", ◀ month ▶ in the middle like
+   the kids' week, and the Jenn / Jess switch where the portal has its girl
+   switch. Its buttons carry data-hdr-action, answered by kidHeadClick. */
+function parentMonthlyHeader() {
+  const kids = [['jenn', '🐥', 'Jenn'], ['jess', '🦊', 'Jess']].map(([id, icon, name]) =>
+    `<button type="button" id="pmKid${name}" aria-pressed="${parentMonthlyKid === id}"
+       aria-label="${name}" data-hdr-action="month-kid" data-hdr-kid="${id}">${icon}<span class="ps-word"> ${name}</span></button>`).join('');
+  hdrMount('screen-parent-monthly', {
+    variant: 'parent',
+    back: { to: 'Parent', named: true, data: { 'hdr-action': 'parent-home' } },
+    title: 'Monthly',
+    step: { prev: { aria: 'Previous month', data: { 'hdr-action': 'month-prev' } },
+            next: { aria: 'Next month', data: { 'hdr-action': 'month-next' } }, labelId: 'pmMonthLabel' },
+    context: ' ',
+    tools: `<div class="parent-scope ui-kids" role="group" aria-label="Which child">${kids}</div>`,
+  });
+}
+
+function renderParentMonthly() {
+  parentMonthlyHeader();
+
+  // Compute month — anchor "current month" to the app timezone (America/Edmonton)
+  // so it matches the day keys, not the device clock, near month boundaries.
+  const now = formatDayKey(toDayKeyInZone(new Date()));
+  const monthStart = new Date(now.getFullYear(), now.getMonth() + parentMonthOffset, 1);
+  const year = monthStart.getFullYear();
+  const month = monthStart.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+
+  // "October 2026" on the iPad, "Oct 2026" on a phone (css/app.css).
+  document.getElementById('pmMonthLabel').innerHTML =
+    `<span class="pm-month-long">${escapeHtml(MONTH_LONG[month])}</span><span class="pm-month-short">${escapeHtml(MONTH_SHORT[month])}</span> ${year}`;
+
+  // Compute weekday-of-first (Mon=0…Sun=6)
+  const firstDow = (monthStart.getDay() + 6) % 7;
+
+  const grid = document.getElementById('pmGrid');
+  grid.innerHTML = '';
+
+  // Empty leading cells
+  for (let i = 0; i < firstDow; i++) {
+    const e = document.createElement('div');
+    e.className = 'pm-cell empty';
+    grid.appendChild(e);
+  }
+
+  const profData = state.profiles[parentMonthlyKid] || { weeks:{} };
+  const todayK = todayKey();
+
+  for (let d = 1; d <= lastDay; d++) {
+    const dateObj = new Date(year, month, d);
+    const key = dateToLocalKey(dateObj);
+    const dayIdx = (dateObj.getDay() + 6) % 7;
+
+    // Sum durations from blocks across all weeks (data is stored by week-key)
+    const blocks = getDayBlocksForProfile(key, parentMonthlyKid);
+    const totalMin = blocks.reduce((s,b)=>s+(b.durationMin||0),0);
+    const pct = Math.min(100, Math.round(totalMin / DAY_MIN_SPAN * 100));
+
+    const cell = document.createElement('div');
+    cell.className = 'pm-cell' + (key===todayK?' today':'');
+    cell.style.background = pmDensityColor(pct);
+
+    const mood = profData.dayMoods?.[key];
+    cell.innerHTML = `
+      <div class="pm-cell-date">${d}</div>
+      <div class="pm-cell-pct">${pct}%</div>
+      ${mood ? `<div class="pm-cell-mood">${mood}</div>` : ''}
+    `;
+    cell.onclick = ()=>{
+      // Need to set weekOffset so getDayKeys lines up with this date's week
+      const wkOff = computeWeekOffsetFor(dateObj);
+      weekOffset = wkOff;
+      openDay(key, dayIdx);
+    };
+    grid.appendChild(cell);
+  }
+}
+
+function pmDensityColor(pct) {
+  if (pct === 0) return 'var(--paper)';
+  // Gradient: light yellow → orange → red
+  if (pct < 25) return 'var(--surface-density-low)';
+  if (pct < 50) return 'var(--surface-yellow-hover)';
+  if (pct < 75) return 'var(--surface-legend-warm)';
+  return 'var(--surface-legend-hot)';
+}
+
+/* Get blocks for a specific day key for an arbitrary profile (not just active) */
+function getDayBlocksForProfile(key, profId) {
+  const p = state.profiles[profId];
+  return p?.weeks?.[key] || [];
+}
+
+/* Given a date, compute the weekOffset relative to today's week */
+function computeWeekOffsetForDayKey(dayKey) {
+  return computeWeekOffsetFor(formatDayKey(dayKey));
+}
+
+function computeWeekOffsetFor(date) {
+  const today = new Date();
+  const todayMon = getWeekStart(0);
+  const targetMon = (function(){
+    // Mon-based week start of `date`
+    const d = new Date(date);
+    const dow = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - dow);
+    d.setHours(0,0,0,0);
+    return d;
+  })();
+  const ms = targetMon.getTime() - todayMon.getTime();
+  return Math.round(ms / (7*24*60*60*1000));
+}
+
+const MONTH_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function renderLevelRules() {
+  const list = document.getElementById('levelRulesList');
+  list.innerHTML = '';
+  const rules = state.shared.levelRules || [];
+  if (!rules.length) {
+    list.innerHTML = '<p class="pc-empty">No rules yet</p>';
+    return;
+  }
+  const acts = [...DEFAULT_ACTIVITIES, ...SEASONAL_ACTIVITIES];
+  rules.forEach(r=>{
+    const act = acts.find(a=>a.id===r.activityId);
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">${r.newIcon||act?.icon||''} ${escapeHtml(r.name||'Level Up')}</div>
+      <div class="pc-sub pc-rule">
+        ${act?.icon||''} ${escapeHtml(act?.name||r.activityId)} → level up after <b>${r.target} ${r.type==='count'?'times':'hours'}</b>
+      </div>
+      <div class="pc-actions">
+        <button type="button" class="ui-btn ui-btn--danger" onclick="deleteLevelRule('${escapeJsAttr(r.id)}')">🗑</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+function openNewLevelRule() {
+  const sel = document.getElementById('ruleActivity');
+  sel.innerHTML = '';
+  [...DEFAULT_ACTIVITIES, ...SEASONAL_ACTIVITIES].forEach(a=>{
+    const opt = document.createElement('option');
+    opt.value = a.id; opt.textContent = `${a.icon} ${a.name}`;
+    sel.appendChild(opt);
+  });
+  openSheet('newRuleOverlay');
+}
+function confirmNewRule() {
+  const name = document.getElementById('ruleName').value.trim() || 'Level Up';
+  const rule = {
+    id:'rule-'+Date.now().toString(36),
+    activityId: document.getElementById('ruleActivity').value,
+    type: document.getElementById('ruleType').value,
+    target: parseInt(document.getElementById('ruleTarget').value)||10,
+    name,
+    newIcon: document.getElementById('ruleNewIcon').value.trim() || null,
+  };
+  state.shared.levelRules = [...(state.shared.levelRules||[]), rule];
+  saveAll();
+  closeSheet('newRuleOverlay');
+  renderLevelRules();
+  showToast('Rule saved ⚙️');
+  document.getElementById('ruleName').value='';
+  document.getElementById('ruleNewIcon').value='';
+}
+function deleteLevelRule(id) {
+  state.shared.levelRules = (state.shared.levelRules||[]).filter(r=>r.id!==id);
+  tombstoneIds('lr:', [id]);
+  saveAll();
+  renderLevelRules();
+}
+

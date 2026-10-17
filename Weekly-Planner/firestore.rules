@@ -1,0 +1,68 @@
+// Weekly-Planner — Firestore security rules.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+//  NOT DEPLOYED. This file is the intended target, not the live state.
+//  Deploying it REQUIRES the Firebase Auth work first — see the runbook in
+//  SECURITY_TODO.md. Publishing it before the client authenticates will lock
+//  the app out of its own data, because every current read and write is
+//  unauthenticated.
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// What the app does today (js/03-sync.js):
+//   collection 'weekly_planner', document 'shared_state' — one document,
+//   shared by every deployment, read and written with no identity at all.
+//
+// What this file assumes instead:
+//   collection 'weekly_planner', document keyed by the authenticated family's
+//   uid, so one family cannot read or clobber another's.
+//
+// The client change that has to land first:
+//   FS_DOC_ID becomes the signed-in uid rather than the constant
+//   'shared_state', and initFirebase waits for an auth state before it
+//   subscribes. Both are deliberately deferred — the durability work came
+//   first, by decision.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // One document per family, named for the family's auth uid.
+    match /weekly_planner/{familyUid} {
+
+      // Only the signed-in family can see or change its own document.
+      allow read: if request.auth != null
+                  && request.auth.uid == familyUid;
+
+      // Writes additionally have to look like this app's payload. This is not
+      // a substitute for validating in the client — it is the floor that stops
+      // a compromised or mistaken client from replacing the document with
+      // something structurally wrong.
+      allow write: if request.auth != null
+                   && request.auth.uid == familyUid
+                   && isPlannerPayload();
+    }
+
+    // Anything else in the project is closed. Without this, adding a new
+    // collection later silently inherits no protection at all.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isPlannerPayload() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['profiles', 'shared', '_meta'])
+             && d.profiles is map
+             && d.shared is map;
+    }
+  }
+}
+
+// ── Migration note ────────────────────────────────────────────────────────
+// The existing single 'shared_state' document holds the family's real history.
+// Deploying these rules without moving it first means the app authenticates
+// successfully and then finds an empty document, which the merge layer will
+// treat as "remote has nothing" — harmless to local data, but the cloud copy
+// would need repopulating from a backup. Export a full backup from the parent
+// Backup tab before touching any of this. The order in SECURITY_TODO.md is
+// there for that reason.

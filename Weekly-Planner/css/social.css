@@ -1,0 +1,263 @@
+/* css/social.css — the profile picker, the profile switcher and Sister Sync
+   (index.html, js/10-social.js, openProfileSwitcher in js/06-quests.js) —
+   Stage 41. Their buttons, rows and section heads are the component kit's
+   (.ui-btn, .ui-row, .ui-sect-head in css/app.css; owner answer G11): the ◀ ▶
+   day arrows and the challenge ＋ and 🗑 are kit icon buttons, the invite
+   answers kit buttons, the switcher's rows kit rows. What stays private is
+   here: the profile cards and the picker's page, the Sync timeline, its
+   both-free note, the challenge cards and the invite cards, copied from
+   css/app.css with their values unchanged (Stage 53 deletes the old copies),
+   plus the classes that replace the two screens' inline styles. Shared parts
+   and sheets stay in css/app.css; css/floors.css loads after this file, so
+   the minimum sizes win. */
+
+/* ═══════════ PROFILE SELECT ═══════════ */
+#screen-profile {
+  align-items: center; justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--bg) 0%, var(--surface-profile-glow) 100%);
+}
+.profile-header { text-align: center; margin-bottom: 2rem; }
+.profile-header h1 {
+  font-family: var(--font-display);
+  font-size: calc(3.4rem * var(--text-scale, 1)); color: var(--accent-strong);
+  transform: rotate(-2deg);
+  text-shadow: 3px 3px 0 var(--shadow-black-6);
+}
+.profile-header p { color: var(--ink-light); font-size: calc(1.2rem * var(--text-scale, 1)); margin-top: 0.5rem; }
+
+.profile-cards { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
+
+.profile-card {
+  background: var(--paper);
+  border-radius: 24px;
+  padding: 2.2rem 1.8rem;
+  width: 170px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 4px 6px 0 var(--shadow-ink-12), 0 8px 24px var(--shadow-black-8);
+  border: 3px solid var(--ink);
+  transform: rotate(-1.5deg);
+}
+.profile-card:nth-child(2) { transform: rotate(2deg); }
+.profile-card:nth-child(3) { transform: rotate(-0.5deg); }
+.profile-card:hover { transform: rotate(0) translateY(-8px) scale(1.04); box-shadow: 6px 10px 0 var(--shadow-ink-15); }
+.profile-card .avatar { font-size: calc(3.8rem * var(--text-scale, 1)); margin-bottom: 0.8rem; display:block; }
+.profile-card h2 { font-size: calc(2rem * var(--text-scale, 1)); }
+.profile-card.jenn { background: var(--jenn-wash); }
+.profile-card.jess { background: var(--jess-wash); }
+.profile-card.parent { background: var(--profile-parent-wash); }
+
+.profile-motto {
+  margin-top: 2.2rem;
+  max-width: 760px;
+  text-align: center;
+}
+.profile-motto p {
+  font-family: var(--font-script);
+  font-size: calc(1.55rem * var(--text-scale, 1));
+  color: var(--ink-motto);
+  line-height: 1.4;
+  transform: rotate(-1deg);
+}
+.profile-motto .profile-message {
+  font-family: var(--font-text);
+  font-size: calc(1.1rem * var(--text-scale, 1));
+  line-height: 1.45;
+  color: var(--ink);
+  margin-top: 0.8rem;
+  background: var(--surface-glass-45);
+  border: 2px dashed var(--paper-line);
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  transform: none;
+}
+/* The connection lines at the foot of the picker (were an inline style). */
+.profile-status {
+  position: absolute; bottom: 1rem; color: var(--ink-light);
+  font-size: max(13px, calc(0.8rem * var(--text-scale, 1)));
+}
+/* iPad portrait (820–979px): the cards share the row. */
+@media (min-width: 820px) and (max-width: 979px) {
+  .profile-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-4);
+  }
+  .profile-card {
+    width: auto;
+    min-width: 150px;
+    flex: 1 1 170px;
+    max-width: 220px;
+  }
+}
+
+/* ═══════════ STATUS DOT (sync) ═══════════ */
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; margin-left: 4px;
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+}
+.sync-dot.offline { background: var(--status-offline); box-shadow: none; }
+.sync-dot.syncing { background: var(--accent-yellow); animation: pulse 1s infinite; }
+.sync-pending-msg {
+  margin-top: 0.35rem;
+  /* max(): Calm's type put it at 12.5px on the picker (Looks stage 4). */
+  font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)));
+  color: var(--ink-light);
+  min-height: 1.1rem;
+}
+.sync-debug-msg {
+  margin-top: 0.2rem;
+  font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1));
+  color: var(--ink-grey);
+  min-height: 1rem;
+}
+
+/* ═══════════ QUICK PROFILE SWITCHER ═══════════
+   Kit rows (.ui-row); the profile on screen is aria-current, wears the
+   selected colour and carries a ✓ in the right-hand slot. */
+.profile-switch-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.3rem; }
+.profile-switch-list > .ui-row[aria-current="true"] { background: var(--sel); color: var(--sel-ink); }
+.profile-switch-list .ui-row-icon { font-size: calc(1.7rem * var(--text-scale, 1)); line-height: 1; }
+
+/* ═══════════ SISTER SYNC ═══════════ */
+/* The day's ◀ title ▶ (kit icon buttons either side). */
+.sync-day-nav {
+  display: flex; align-items: center; justify-content: center;
+  gap: 1rem; padding: 0.8rem;
+}
+.sync-day-nav h3 { font-size: calc(1.4rem * var(--text-scale, 1)); transform: rotate(-1deg); }
+
+/* Sister Sync — one timeline, both sisters, one axis (js/10-social.js,
+   renderSync). The DOM order is Jenn, Jess, stripe, gutter, legend, because
+   the invite checks select `#syncGrid .sync-day-col:first-child`; the tracks
+   are placed here as gutter | Jenn | both-free stripe | Jess. The gutter and
+   the stripe start --sync-head down, so all four share one 6am line. Kid
+   screen: 13px floor, 15px for the name she reads to tap. */
+.sync-grid {
+  --sync-head: 2.2rem;
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) 12px minmax(0, 1fr);
+  column-gap: 6px;
+  padding: 0.6rem 0.6rem 1rem;
+  /* The screen centres its children, which would shrink the grid to its
+     content; the width is stated so the two columns share the screen. */
+  width: 100%; max-width: 860px; margin: 0 auto; box-sizing: border-box;
+}
+.sync-day-col { grid-row: 1; min-width: 0; }
+.sync-day-col--left  { grid-column: 2; }
+.sync-day-col--right { grid-column: 4; }
+.sync-day-col h4 {
+  height: var(--sync-head); line-height: var(--sync-head); margin: 0;
+  font-size: calc(1.1rem * var(--text-scale, 1)); text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sync-tl-canvas {
+  position: relative; isolation: isolate; overflow: hidden;
+  background: var(--paper); border-radius: 10px;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.sync-tl-gutter { grid-column: 1; grid-row: 1; padding-top: var(--sync-head); }
+.sync-tl-gutter-track { position: relative; }
+.sync-tl-hour {
+  position: absolute; right: 2px; transform: translateY(-50%);
+  font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1)); line-height: 1; white-space: nowrap;
+  color: var(--ink-light);
+}
+.sync-tl-stripe { grid-column: 3; grid-row: 1; padding-top: var(--sync-head); }
+.sync-tl-stripe-track {
+  position: relative; overflow: hidden; border-radius: 6px;
+  background: var(--surface-ink-10);
+}
+.sync-free-seg { position: absolute; left: 0; right: 0; background: var(--surface-sync-free); }
+.sync-tl-band-label, .sync-tl-empty {
+  position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
+  text-align: center; color: var(--ink-light);
+  font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1)); line-height: 1.2; padding-top: 2px;
+}
+.sync-tl-empty { top: 4px; }
+.hour-grid--sync { z-index: 0; }
+.sync-tl-strip { z-index: 1; }
+/* Every block shape is a .sync-block; only YOUR tappable ones are also
+   .sync-block-mini, floored at 44px tall (SYNC_TAP_MIN_PX). */
+.sync-block {
+  position: absolute; box-sizing: border-box; z-index: 2; overflow: hidden;
+  border: 1.5px solid var(--ink); border-radius: 6px; padding: 0 4px;
+  font-family: var(--font-text); line-height: 1.1;
+  color: var(--ink);
+}
+.sync-block--busy { background: var(--surface-busy); color: var(--ink-busy); border-color: var(--border-grey); }
+.sync-block-mini { cursor: pointer; }
+.sync-block-name {
+  display: block; font-size: calc(max(15px, 0.95rem) * var(--text-scale, 1));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sync-block-time, .sync-block-flag {
+  display: block; font-size: calc(max(13px, 0.82rem) * var(--text-scale, 1));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sync-block-flag { font-weight: 700; }
+.sync-tl-legend {
+  grid-column: 1 / -1; grid-row: 2; margin: 0.6rem 0 0;
+  font-size: calc(max(13px, 0.85rem) * var(--text-scale, 1)); color: var(--ink-light);
+}
+.sync-overlap {
+  background: var(--accent-yellow);
+  border-radius: 10px; padding: 0.5rem 0.7rem;
+  margin: 0.5rem 0.6rem; border: 2px dashed var(--ink);
+  font-weight: 700;
+}
+/* The household's sister-details setting, read-only for her (Plan v6 C5) —
+   a grown-up changes it in Parent › App › Profiles. */
+.sync-vis-note {
+  margin: 0 0.6rem 0.55rem; color: var(--ink-light);
+  font-size: calc(max(15px, calc(0.95rem * var(--fs-scale, 1))) * var(--text-scale, 1));
+}
+
+/* Challenges */
+.challenge-card {
+  background: var(--paper); border: 2px solid var(--ink); border-radius: 14px;
+  padding: 0.7rem 0.9rem; margin-bottom: 0.5rem;
+  box-shadow: var(--shadow-card);
+}
+.challenge-title { font-family: var(--font-display); font-size: calc(1.2rem * var(--text-scale, 1)); margin-bottom: 0.2rem; }
+.challenge-progress {
+  display: flex; gap: 0.4rem; align-items: center;
+  font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1)); margin-top: 0.4rem;
+}
+.challenge-bar {
+  flex: 1; height: 12px; background: var(--bg); border-radius: 6px;
+  border: 1.5px solid var(--ink); overflow: hidden;
+}
+.challenge-fill {
+  height: 100%; background: var(--accent);
+  transition: width 0.4s;
+}
+
+/* Invites */
+.invite-item {
+  background: var(--surface-today); border: 2px dashed var(--accent);
+  border-radius: 12px; padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem; font-size: calc(0.95rem * var(--fs-scale, 1) * var(--text-scale, 1));
+}
+/* The answers wrap on a phone rather than run off the card. */
+.invite-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.invite-missed-head {
+  color: var(--ink-light); font-size: calc(0.95rem * var(--text-scale, 1)); margin: 0.7rem 0 0.3rem;
+}
+.challenge-team { font-style: italic; margin-bottom: 0.2rem; }
+.challenge-actions { display: flex; justify-content: flex-end; margin-top: 0.4rem; }
+
+/* The Challenges and Invites sections under the timeline (were inline styles);
+   their heads are the kit's .ui-sect-head. */
+.sync-sect { padding: 0 0.8rem 0.4rem; }
+.sync-sect--last { padding-bottom: 1rem; }
+.sync-sect > .ui-sect-head { margin: 1rem 0 0.5rem; }
+.sync-sect-head { display: flex; align-items: center; justify-content: space-between; margin: 1rem 0 0.3rem; }
+.sync-sect-head > .ui-sect-head { margin: 0; }
+.sync-sect-note { color: var(--ink-light); font-size: calc(0.85rem * var(--text-scale, 1)); margin: 0 0 0.6rem; }
+.sync-empty { color: var(--ink-light); font-size: calc(0.95rem * var(--text-scale, 1)); }

@@ -1,0 +1,144 @@
+// Weekly-Planner — the price list, shared by the kid's page and the parent's.
+// Classic script, global scope — declarations only (see MODULARIZATION_PLAN.md).
+/* ════════════════════════════════════════════════════════════════
+   WHAT THINGS PAY
+
+   All that survives of the old Pocket Money screen. Its three sub-tabs have
+   moved to where each of them belonged:
+
+     balance → 💰 My money             (js/22-money-page1.js)
+     setup   → ⚙️ Money rules          (js/24-money-parent.js)
+     bank    → gone. What she owns is one record per holding now, edited by a
+               parent with no market simulation behind it.
+
+   What is left is the price list itself, kept in one place: the one sheet
+   "💷 What things pay ▸" opens, from 💰 My money's week sheet and from 🎓
+   Money school (js/45 `rqPricesBody`).
+   ════════════════════════════════════════════════════════════════ */
+/* The price list, rendered straight from the rules so it is always the truth.
+   Read-only: the parent edits prices on Money rules (js/24-money-parent.js),
+   which has its own steppers. An `editable` mode that drew ✏️ buttons here was
+   removed — nothing ever handled their clicks, and its only caller passed
+   false. */
+/* `only` (optional): the groups to draw — 'chores', 'due', 'learning',
+   'streak', 'comp', 'fines', 'xp' — for the sheet's group tabs; all of them
+   when left out. */
+function pmPriceCards(r, only = null) {
+  const row = (label, value) => `<div class="ct-item"><div class="ct-item-left"><span>${label}</span></div>
+      <span class="ct-meta">${value}</span></div>`;
+  const g = (r.chores && r.chores.grade) || {};
+  const want = id => !only || only.indexOf(id) >= 0;
+  let html = '';
+
+  if (want('chores')) html += `<div class="chore-card"><h3>🧹 Household chores</h3>
+    <div class="ct-meta">${(r.chores || {}).freeChoresPerWeek} each week are free — every chore after that pays. The free ones are always your <b>lowest-paying</b> chores, so doing your best work first never costs you.</div>
+    ${row('On time <b>and</b> to standard', fmtMoney(g[3] || 0))}
+    ${row('To standard, but late', fmtMoney(g[2] || 0))}
+    ${row('Redone, then to standard', fmtMoney(g[1] || 0))}
+    ${row('Not done, or fails the redo', fmtMoney(0))}
+    ${row('Most you can earn in a day', fmtMoney((r.chores || {}).dailyCap || 0))}
+    <div class="ct-meta">Past your daily max, extra chores earn <b>XP</b> instead of money.</div>
+  </div>`;
+
+  const pool = r.chorePool || [];
+  if (pool.length && want('due')) {
+    html += `<div class="chore-card"><h3>⏰ When each chore is due</h3>
+      <div class="ct-meta">"On time" is different for every chore — check the chore, not the clock.</div>
+      ${pool.map(c => row(escapeHtml(c.label), escapeHtml(c.deadline || '—'))).join('')}
+    </div>`;
+  }
+
+  const li = (r.learning && r.learning.items) || [];
+  if (want('learning')) html += `<div class="chore-card"><h3>📘 Learning</h3>
+    ${li.map(it => row(
+        escapeHtml(it.label) + ` <span class="ct-meta">(${it.perUnit} ${escapeHtml(it.unit)})</span>`,
+        it.xpOnly ? 'XP only' : fmtMoney(it.amount || 0))).join('')}
+    <div class="ct-meta">It has to be new material. Every Sunday ${(r.learning || {}).sundayCheckCount} get picked at random — can't answer, it's unpaid and you do it again.</div>
+  </div>`;
+
+  const tiers = ((r.streak || {}).tiers) || [];
+  if (want('streak')) html += `<div class="chore-card"><h3>🔥 Routine streak</h3>
+    ${tiers.map(t => row(t.days + ' days in a row', '+' + fmtMoney(t.bonus || 0))).join('')}
+    <div class="ct-meta">${pmStreakNote(r.streak || {})}</div>
+  </div>`;
+
+  const cp = r.competition || {};
+  if (want('comp')) html += `<div class="chore-card"><h3>🏆 Competitions</h3>
+    ${row('Swim — per point', fmtMoney((cp.swim || {}).perPoint || 0))}
+    ${row('Qualify for Provincials', '+' + fmtMoney((cp.swim || {}).qualifyBonus || 0))}
+    ${row('Provincials — per point', fmtMoney((cp.swim || {}).provincialPerPoint || 0))}
+    ${row('Skating — per point', fmtMoney((cp.skate || {}).perPoint || 0))}
+    ${row('Skating placement — group / overall (1st)', fmtMoney((((cp.skate||{}).placement||{}).group||{})[1] || 0) + ' each')}
+    ${row('Skating star level — Silver / Gold per item', fmtMoney((cp.dance || {}).silverPerItem || 0) + ' / ' + fmtMoney((cp.dance || {}).goldPerItem || 0))}
+    ${row('Skating star level — all Gold', '+' + fmtMoney((cp.dance || {}).allGoldBonus || 0) + ' (test max $' + Number((cp.dance || {}).testCap || 0).toFixed(0) + ')')}
+    <div class="ct-meta">Both skating placements stack. <b>No cap on points.</b> The official results sheet decides — not your parents, not you.</div>
+  </div>`;
+
+  const fi = (r.fines && r.fines.items) || [];
+  /* One short line, then the prices (the stage 8 drawing); what the rules
+     say about repeats is one short note under them. */
+  if (want('fines')) html += `<div class="chore-card"><h3>📦 Box fine</h3>
+    <div class="ct-meta">Leave something out and it's boxed until Sunday. <b>Box first, fine on repeat.</b></div>
+    ${fi.map(f => row(escapeHtml(f.label), '−' + fmtMoney(f.amount || 0)
+      + pmFineWhen(f, fi))).join('')}
+    <div class="ct-meta">${pmFinesNote(fi)} A day never goes below $0.</div>
+  </div>`;
+
+  const xp = (r.xp && r.xp.awards) || [];
+  if (want('xp')) html += `<div class="chore-card"><h3>⭐ XP</h3>
+    <div class="ct-meta">XP isn't money — it's the record of everything money doesn't capture. ${(r.xp || {}).perLevel} XP = one level.</div>
+    ${xp.map(a => row(escapeHtml(a.label), a.xp + ' XP')).join('')}
+  </div>`;
+
+  return html;
+}
+
+/* ── What the rules SAY, in words, from the rules ──
+   The fines card and the streak card used to be literal prose, so when the
+   house rules of 21 Sep gave four fines two free times a week and the streak a
+   grace day, the page she reads went on saying the opposite. Both sentences
+   are now written from the live values: with none set, each says exactly what
+   it always said. */
+function pmOrdinal(n) {
+  return ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh'][n - 1] || (n + 'th');
+}
+function pmCountWord(n) {
+  return ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][n] || String(n);
+}
+
+function pmFinesNote(items) {
+  const talk = items.filter(f => Math.round(Number(f.freeRepeats) || 0) > 0);
+  if (!talk.length) return `The second time that week, it's boxed <i>and</i> it costs.`;
+  const ns = [...new Set(talk.map(f => Math.round(Number(f.freeRepeats))))];
+  const first = ns.length === 1
+    ? (ns[0] === 1 ? 'The first time in a week is' : `The first ${pmCountWord(ns[0])} times in a week are`)
+    : 'The first few times in a week are';
+  return `${first} a talk, not a fine.`;
+}
+
+/* The short "when" beside a fine, so the row and the sentence above it say the
+   same thing. Nothing when no fine has free times — then every one costs from
+   the first, and the old card said so without a label. */
+function pmFineWhen(f, items) {
+  if (!items.some(x => Math.round(Number(x.freeRepeats) || 0) > 0)) return '';
+  const n = Math.round(Number(f.freeRepeats) || 0);
+  return n > 0 ? ` from the ${pmOrdinal(n + 1)} time` : ' every time';
+}
+
+function pmStreakNote(streak) {
+  const grace = Math.max(0, Math.round(Number(streak.graceDays) || 0));
+  if (!grace) {
+    return `<b>Highest one only</b> — they don't add up. Miss a day and the run starts over, but <b>your best run of the week</b> is what pays. Resets Sunday.`;
+  }
+  /* Plan v5 Deviation 30: with `graceCounts` the forgiving day counts as a
+     kept day (6 kept + the forgiving day is a full week). */
+  const counts = streak.graceCounts === true;
+  const days = grace === 1
+    ? (counts
+      ? `One missed day a week won't break your run — it's your forgiving day, and it counts as a day kept. Miss a second and the run starts over`
+      : `One missed day a week won't break your run — it just doesn't count as a day. Miss a second and the run starts over`)
+    : (counts
+      ? `Up to ${pmCountWord(grace)} missed days a week won't break your run — they're forgiving days, and they count as days kept. Miss one more and the run starts over`
+      : `Up to ${pmCountWord(grace)} missed days a week won't break your run — they just don't count as days. Miss one more and the run starts over`);
+  return `<b>Highest one only</b> — they don't add up. ${days}, and <b>your best run of the week</b> is what pays. Resets Sunday.`;
+}

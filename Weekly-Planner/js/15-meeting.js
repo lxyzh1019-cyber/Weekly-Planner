@@ -1,0 +1,2066 @@
+// Weekly-Planner — meeting mode: guided 4-step weekly family meeting.
+// Extracted verbatim from index.html (classic script, global scope).
+/* ════════════════════════════════════════════════════════════════
+   2c / 1b / 2b — MEETING MODE: a guided 4-step weekly family meeting
+   (Review → Celebrate → Confirm → Plan next week). Reuses the existing
+   money commit (commitFamilyMeeting) and adds an undo window.
+════════════════════════════════════════════════════════════════ */
+/* Five steps since the money system was redesigned. The old single "Confirm"
+   step did two different jobs badly: it agreed the week AND moved the money in
+   one press, which meant a correction after the fact had to be unwound. Steps
+   3 and 4 (js/23-money-meeting.js) separate them — 3 agrees the numbers, 4
+   decides where they go and is the only thing that moves money. */
+/* Five steps, named for the question each one answers rather than for what the
+   grown-ups do in it. "Celebrate" was step 2 and only ever showed the child a
+   list the app had written about her; it is a reflection now — she answers, and
+   the week's evidence sits underneath. */
+/* ── THREE STEPS, AND THEY HAVE IDS ──────────────────────────────
+   It was five: Check the week · Reflect · What I earned · What I do with it ·
+   Close & plan. Eight weeks went unsettled, and the reason was never that any
+   one step is hard — it is that five of them is the wrong shape for a Sunday
+   with two children in the room. Three of the five merged in pairs that were
+   always about the same thing:
+
+   | The week  | what happened, and what she made of it (was 1 + 2) |
+   | The money | what it came to, and where it goes (was 3 + 4)     |
+   | Close     | (was 5)                                            |
+
+   ── The numbers were POSITIONS, and 46 call sites held them ──
+
+   `mmGoStep(3)` appeared eleven times, `mmGoStep(4)` eight, and so on across
+   the app and the suite. Renumbering would have silently re-pointed every one
+   of them at a different screen — the same defect as `groupDef` returning
+   `ACTIVITY_GROUPS[4]` because daily happened to be the fifth row.
+
+   So a step has an ID, `mmGoTo(id)` is how to reach one, and `mmGoStep(n)`
+   translates the legacy numbering through `MM_LEGACY_STEP`. Every existing
+   caller keeps meaning what it meant: "go to what I earned" still lands on the
+   money, because that is what 3 was. Nothing was renumbered and nothing had to
+   be found. */
+const MM_STEPS = [
+  { id: 'week',  label: 'The week' },
+  { id: 'money', label: 'The money' },
+  { id: 'close', label: 'Close' },
+];
+/* Old number → new id. Read at the boundary only; nothing downstream knows
+   these numbers ever existed. */
+const MM_LEGACY_STEP = { 1: 'week', 2: 'week', 3: 'money', 4: 'money', 5: 'close' };
+function mmStepIndex(id) {
+  const i = MM_STEPS.findIndex(x => x.id === id);
+  return i < 0 ? 0 : i;
+}
+function mmStepId() { return (MM_STEPS[mmStep - 1] || MM_STEPS[0]).id; }
+let mmStep = 1;
+let mmSelectedDay = null;
+/* ↺ Redo, one girl at a time (Plan v3 §A, §E — Rev 2). Per-kid snapshots,
+   taken at her sign and sealed when it is done: { [kid]: {wk, …} }, and why
+   one was withdrawn: { [kid]: {wk, why} }. Session-local: gone when the page
+   is. The meeting-wide Undo ("puts both girls back") is retired with its
+   button in Stage 4 — ↺ Redo my plan on her Signed card is the one way back. */
+let mmUndoKid = {};
+let mmUndoKidGone = {};
+let mmAddChoreFor = null;   // "kid|dayIdx" whose add-a-chore picker is open
+let mmCatchUpAsked = false; // the catch-up question, asked once per page load
+
+/* ── Catching up a week ──
+   Eight weeks sat unopened, and the reason is not that the meeting is hard to
+   use once it is open — it is that a five-step sitting is the wrong shape for a
+   week that finished a month ago and that nobody is going to discuss. This is
+   the same commit reached by a shorter road: totals, adjust, close, next.
+
+   It is deliberately NOT a second way to move money. Everything below routes
+   through commitFamilyMeeting, exactly as step 4 does, and mmMarkWeekMet stays
+   the separate record of having sat down — the two facts do not imply each
+   other here any more than they do anywhere else. */
+let mmExpressWeek = null;   // week key while the catch-up screen is open
+let mmExpressMoney = true;  // tick 1 — record the money
+let mmExpressMet = false;   // tick 2 — we talked about this week together
+
+/* ── The meeting is a SCREEN, not a pop-up ────────────────────────
+   It ran inside `familyMeetingOverlay`, a `.sheet` — and a sheet is a box
+   floating over the page with its own scrollbar. A Sunday sitting is the
+   longest task in this app: two children, a week of days, a reflection each
+   and a money split. Inside a sheet that meant scrolling up and down a small
+   window all the way through it, which is the owner's own report of what using
+   it is like. A task that takes twenty minutes is not a dialog.
+
+   It is `screen-meeting` now, and `showScreen` is what opens it. That is
+   NOT a second dialog mechanism growing beside openSheet/closeSheet — it is
+   one fewer. The sheets that remain are what they should be: short, one
+   question, answered and gone.
+
+   ── Three owners, so the switch was a one-place change ──
+
+   Nineteen call sites across seven files asked their own version of "is the
+   meeting showing" — `document.getElementById('familyMeetingOverlay')` and
+   `.classList.contains('open')`, spelled out each time. That is the six-copies
+   defect this repo keeps recording, and it is also exactly what would have made
+   this move a nineteen-place edit with nineteen chances to miss one. Ask these;
+   do not re-derive them. */
+function mmIsOpen() {
+  const scr = document.getElementById('screen-meeting');
+  return !!(scr && scr.classList.contains('active'));
+}
+
+/* Where the sitting was opened FROM, so closing it puts a parent back rather
+   than somewhere plausible. As a sheet this was free — closing revealed
+   whatever had been behind it — and a screen has to remember. It is
+   device-local and deliberately not state: which screen someone was on is not
+   the family's data, and every state write is a full-document upload. */
+let mmCameFrom = 'parent';
+function mmShow() {
+  if (!mmIsOpen()) {
+    const active = document.querySelector('.screen.active');
+    /* Never record the meeting as its own origin — mmShow is called again by
+       every path that re-enters a sitting already open, and a self-reference
+       would trap the Close button on this screen. */
+    if (active && active.id && active.id !== 'screen-meeting') {
+      mmCameFrom = active.id.replace(/^screen-/, '');
+    }
+  }
+  if (typeof showScreen === 'function') showScreen('meeting');
+}
+/* Closing returns to whatever the sitting came from, and refreshes the parent
+   hub — that last part used to live inside `closeSheet` as a special case for
+   this one id, which is the kind of thing that makes a general mechanism carry
+   one caller's knowledge. It belongs here. */
+function mmHide() {
+  if (typeof showScreen === 'function') showScreen(mmCameFrom || 'parent');
+  const sp = document.getElementById('screen-parent');
+  if (sp && sp.classList.contains('active') && typeof renderParentHome === 'function') {
+    renderParentHome();
+  }
+}
+
+function openFamilyMeeting() {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  ctEnsureShared();
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null;
+  mmUndoKid = {}; mmUndoKidGone = {};
+  mmClearReturn();        // a fresh sitting has nowhere to go back to
+  mmExpressWeek = null;   // the full sitting, not the catch-up run
+  renderMeetingMode();
+  mmShow();
+}
+
+// Day-confirm in the meeting persists to the real parent day-confirm store
+// (state.shared.parentDayConfirm), shared with the Weekly Review tab. A meeting
+// day is "confirmed" when it's confirmed for BOTH kids.
+function mmDayKey(d) { return ctWeekInfo().keys[d]; }
+function mmIsDayConfirmed(d) {
+  const k = mmDayKey(d);
+  const store = state.shared.parentDayConfirm || {};
+  return !!((store.jenn || {})[k]) && !!((store.jess || {})[k]);
+}
+/* Reviewing a day is a fact about ONE child. This wrote both girls' entries
+   from a single press, which is where "Confirm all" quietly came to mean "both
+   children": a parent who had looked at Jenn's Tuesday and never opened Jess's
+   left a record saying she had reviewed both.
+
+   The all-in-one press survives as an explicit "Both" control — it is a real
+   thing to want when a day genuinely was fine for everyone — but it now says
+   so on the button instead of being what a per-day tick happened to do. */
+function mmIsDayReviewedFor(kid, d) { return isDayReviewed(kid, mmDayKey(d)); }
+/* Whether the meeting may review this day at all — asked, never re-derived.
+   This screen had its own idea of it, which is how a Sunday sitting could sign
+   off a Wednesday that had not arrived. Un-reviewing is always allowed: taking
+   back a record is never the thing that needs gating. */
+function mmCanReviewDay(kid, d) { return canReviewDay(kid, mmDayKey(d)); }
+/* ── The one refusal the MEETING may talk its way past ──────────────
+   A day refused for `unconfirmed` is refused over blocks nobody answered, and
+   that is the whole reason a backlogged week sticks. A day refused for
+   `future` or `running` is refused over time, which no amount of agreeing can
+   change, so those stay hard everywhere.
+
+   Meeting-only, deliberately. The parent day banner keeps its hard refusal:
+   the offer belongs to a sitting where a grown-up is working through a week on
+   purpose, not to the day screen where a stray tap would record a review
+   nobody meant. */
+function mmOverridableRefusal(info) {
+  return !!(info && !info.ok && info.reason === 'unconfirmed');
+}
+/* Today is reviewable but not finished, so it is signed off through an explicit
+   "nothing else is planned" rather than a plain tap — the same shape the parent
+   day banner uses for an empty day, and for the same reason: the record must not
+   be able to say a day was reviewed before the day was over. */
+async function mmConfirmOpenDay(names) {
+  return showConfirm(
+    `Today is not over yet.\n\nIs nothing else planned for ${names}?`,
+    { okLabel: 'Nothing else today', cancelLabel: 'Not yet' });
+}
+async function mmToggleDayReviewed(kid, d) {
+  const k = mmDayKey(d);
+  const on = isDayReviewed(kid, k);
+  if (!on) {
+    const can = canReviewDay(kid, k);
+    /* Enabled but not a shortcut. The row's own offer names the three answers
+       and says what each costs; reviewing silently from here would be a second
+       door to one of them with none of that said. */
+    if (mmOverridableRefusal(can)) {
+      showToast(`${reviewBlockedReason(can)} — choose what to do with them below`);
+      return;
+    }
+    if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
+    if (can.reason === 'open' && !(await mmConfirmOpenDay(kidLabel(kid).name))) return;
+  }
+  markDayReviewed(kid, k, !on);
+  saveAll();
+  renderMeetingMode();
+}
+/* "Leave them as they are — review the day."
+   Writes only parentDayConfirm. No completion, no grade, no XP, no money. The
+   blocks keep their unanswered state and the day counts as reviewed, which is
+   a parent saying "I have looked at this" and nothing more. */
+function mmReviewLeavingBlocks(kid, d) {
+  const nm = kidLabel(kid).name;
+  markDayReviewed(kid, mmDayKey(d), true);
+  saveAll();
+  renderMeetingMode();
+  showToast(`📋 ${nm}'s day reviewed — the blocks were left as they were`);
+}
+
+/* "They didn't happen — record and review."
+   The only answer here that moves money, so it is the only one that confirms
+   first. markRemainingNotDoneForChild (js/09-sheets.js) owns the write and
+   names every grade coming back before anything moves; this adds the review
+   and the meeting's own refresh. */
+async function mmRecordNotDoneAndReview(kid, d) {
+  const key = mmDayKey(d);
+  const nm = kidLabel(kid).name;
+  /* A settled week's money is frozen, and there is no way back: nothing clears
+     committedAt, mnyReopenWeek refuses a committed week, and the meeting's Undo
+     is a session-local snapshot that is gone once the sheet closes. An earlier
+     draft offered to "reopen her week" here and called mnyReopenWeek, which
+     returns false for exactly this case — a button that announced something it
+     had not done, which is the defect this repo keeps having to fix.
+
+     markRemainingNotDoneForChild (js/09-sheets.js) owns the decision now, and
+     it is narrower than "refuse the week": it refuses only the blocks whose
+     grades would move, and records the rest. So the review can still finish. */
+  const n = await markRemainingNotDoneForChild(kid, key);
+  if (!n) { renderMeetingMode(); return; }
+  markDayReviewed(kid, key, true);
+  saveAll();
+  renderMeetingMode();
+}
+
+async function mmToggleConfirmDay(d) {
+  const k = mmDayKey(d);
+  const next = !mmIsDayConfirmed(d);
+  /* "Both" is a convenience that calls the same owner twice — it must not be a
+     side door that reviews a day neither child could be reviewed for. */
+  if (next) {
+    const cans = ['jenn', 'jess'].map(kid => canReviewDay(kid, k));
+    // The hard reason wins over an overridable one — see mmOverridableRefusal.
+    const hard = cans.find(c => !c.ok && !mmOverridableRefusal(c));
+    if (hard) { showToast(reviewBlockedReason(hard)); return; }
+    const soft = cans.find(c => mmOverridableRefusal(c));
+    if (soft) {
+      showToast(`${reviewBlockedReason(soft)} — choose what to do with them below`);
+      return;
+    }
+    const blocked = cans.find(c => !c.ok);
+    if (blocked) { showToast(reviewBlockedReason(blocked)); return; }
+    if (cans.some(c => c.reason === 'open') && !(await mmConfirmOpenDay('Jenn or Jess'))) return;
+  }
+  ['jenn', 'jess'].forEach(kid => markDayReviewed(kid, k, next));
+  saveAll();
+  renderMeetingMode();
+}
+/* How far this sitting actually got. "We met" means the family reviewed the
+   week together, and the honest evidence is reaching THE MONEY — having gone
+   through the week and sat down in front of what it came to. Opening the
+   meeting and looking at the first screen is not a meeting.
+
+   Held as an index into MM_STEPS rather than as the literal 3 it used to be:
+   that number was the position of "What I earned" in a five-row list, and it
+   would have quietly come to mean "Close" the moment the list changed length.
+   Reset whenever the meeting points at a new week. */
+let mmMaxStep = 1;
+function mmGoStep(n) {
+  /* Leaving a step is a natural place to write the reflection through. Every
+     tap in step 2 edits a device-local draft rather than uploading the whole
+     family document — see reflCommitDraft (js/37-reflection.js). */
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
+  /* `n` is the OLD five-step numbering, and this is the one place that knows
+     it. Translating here rather than renumbering 46 call sites is what keeps
+     `mmGoStep(3)` meaning "what she earned" now that what she earned shares a
+     screen with what she does with it.
+
+     Getting this wrong once already cost a crash: the first cut of the
+     three-step meeting clamped `n` straight into the new list, so `mmGoStep(2)`
+     — every caller meaning "the reflection" — silently landed on the money.
+     That is the position-not-id defect this file's own comment above warns
+     about, committed while writing the warning. */
+  mmGoTo(MM_LEGACY_STEP[Math.max(1, Math.min(5, Number(n) || 1))] || 'week');
+}
+
+/* The way to name a step, and what everything inside the meeting uses. */
+function mmGoTo(id) { mmGoIndex(mmStepIndex(id) + 1); }
+
+/* 1-based index into MM_STEPS — the stepper and the ◀ ▶ nav, which are talking
+   about the three steps that exist rather than the five that used to. */
+function mmGoIndex(i) {
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
+  mmStep = Math.max(1, Math.min(MM_STEPS.length, i));
+  mmMaxStep = Math.max(mmMaxStep, mmStep);
+  renderMeetingMode();
+}
+/* Called when the meeting sheet is closed. Records that the family sat down —
+   nothing else. The money is step 4's to move, and a week closed at step 3 is
+   exactly the case that used to leave no trace at all. */
+function mmCloseMeeting() {
+  const wk = mmWeekKey();
+  // The sitting is over: whatever the reflection was holding goes to the
+  // document now rather than being lost with the overlay.
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
+  // mmMaxStep never leaves 1 in catch-up mode, so this cannot fire there — a
+  // week closed from the catch-up screen is only "met" if that box was ticked.
+  if (mmMaxStep >= mmStepIndex('money') + 1 && isParent() && !mmIsSettled(wk)) mmMarkWeekMet(wk);
+  mmExpressWeek = null;
+  // Nothing to come back to once the sitting is over, so the week and day
+  // screens get their Hub button and their switchers back.
+  mmClearReturn();
+  mmHide();
+  const hub = document.getElementById('meetingHub');
+  if (hub && document.getElementById('screen-parent')?.classList.contains('active')) renderMeetingHub();
+}
+
+/* ── Catching up on a week nobody got to ──────────────────────────
+   The meeting has always run on whatever week `ctWeekKey` points at, so
+   settling a past week already worked — it was just invisible. Nothing named
+   the week on screen, so three catch-ups in a row looked identical while step 4
+   moved real money, and nothing anywhere said a week had been skipped.
+
+   Editability needs no new rule: mnyReopenWeek already reopens any week that
+   is not committed, and a skipped week never got committed. So a blank past
+   week is open by construction — these functions only make that visible, and
+   give a blank week something to tick. */
+function mmWeekLabel(wk) {
+  const mon = formatDayKey(wk);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  return `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
+}
+/* The last week that was actually recorded. A family that meets most Sundays
+   never needs this; a family sitting down after a busy fortnight needs it
+   before anything else, because "which week did we last do?" is the first
+   question at the table and nothing on screen answered it. */
+function mmLastReviewed() {
+  ctEnsureShared();
+  const held = state.shared.chore.meetingsHeld || {};
+  const wks = Object.keys(held).filter(k => held[k]).sort();
+  if (!wks.length) return null;
+  const wk = wks[wks.length - 1];
+  return { wk, weeksAgo: mrWeeksSince(wk) };
+}
+function mmWeeksAgoWord(n) {
+  return n === 0 ? 'this week' : n === 1 ? 'a week ago' : `${n} weeks ago`;
+}
+function mmLastReviewedLine() {
+  const last = mmLastReviewed();
+  const rows = mmUnsettledWeeks(8);
+  const unopened = mmUnopenedWeeks(8).length;
+  const met = rows.length - unopened;
+  /* Counted separately on purpose. Lumping them together is what made two
+     meetings read as eight missed ones: a week the family sat down for is not
+     a week nobody got to, it is a week whose money is still waiting. */
+  const parts = [];
+  if (unopened) parts.push(`${unopened} earlier week${unopened === 1 ? '' : 's'} not yet opened`);
+  if (met) parts.push(`${met} met but not paid out`);
+  const gap = parts.length ? ` · ${parts.join(' · ')}` : '';
+  if (!last) {
+    const text = parts.length ? `No week has been settled yet${gap}` : 'No week has been settled yet.';
+    return `<div class="mm-weekbar-last">${escapeHtml(text)}</div>`;
+  }
+  // Dates and counts only — no user text on this line.
+  const text = `Last settled: ${mmWeekLabel(last.wk)} · ${mmWeeksAgoWord(last.weeksAgo)}${gap}`;
+  return `<div class="mm-weekbar-last">${escapeHtml(text)}</div>`;
+}
+/* ── The question, when the meeting is opened to be run ──
+   Deliberately not part of openFamilyMeeting. Half of that function's callers
+   are deep links — a specific day from the hub's strip, step 3 to show an
+   override, the tab rail jumping to "What I earned" — and a question about a
+   different week on top of one of those is a question about something the
+   parent did not ask for. So this hangs off the three "run the meeting"
+   buttons, and openFamilyMeeting stays exactly as it was.
+
+   Asked once per page load: a parent who says not now has answered, the hub's
+   list is still sitting there, and next Sunday is a new load. */
+function mmMaybeAskCatchUp() {
+  if (mmCatchUpAsked || !isParent()) return;
+  if (mmWeekKey() !== ctThisWeekKey()) return;   // already looking at a past week
+  const open = mmUnsettledWeeks(8);
+  if (!open.length) return;
+  mmCatchUpAsked = true;
+  const last = mmLastReviewed();
+  const nearest = open[0];
+  const unopened = mmUnopenedWeeks(8).length;
+  const met = open.length - unopened;
+  const where = last
+    ? `Last settled: week of ${mmWeekLabel(last.wk)} — ${mmWeeksAgoWord(last.weeksAgo)}.`
+    : 'No week has been settled yet.';
+  /* Says which kind of open each week is. It used to call all of them "never
+     settled", which told a family who had sat down twice that they had missed
+     eight weeks — the app disagreeing with something they had actually done. */
+  const what = [
+    unopened ? `${unopened} earlier week${unopened === 1 ? '' : 's'} nobody has opened` : '',
+    met ? `${met} you met about but did not pay out` : '',
+  ].filter(Boolean).join(', and ');
+  const msg = `${where} There ${open.length === 1 ? 'is' : 'are'} ${what}. Open one now?`;
+  showChoice(msg, [
+    { id: 'nearest', label: `Go to ${mmWeekLabel(nearest.wk)}`,
+      sub: nearest.status === 'met'
+        ? `${mmWeeksAgoWord(nearest.weeksLate)} — met, money still waiting`
+        : `${mmWeeksAgoWord(nearest.weeksLate)} — the most recent one still open` },
+    { id: 'now', label: 'Carry on with this week',
+      sub: 'The open weeks stay open, and stay editable' },
+  ], { cancelLabel: 'Not now' }).then(id => {
+    if (id === 'nearest') mmGoToWeek(nearest.wk);
+  });
+}
+/* Step 2 charts the week's blocks and stops there, deliberately: the meeting is
+   not a fourth place that lists a day's blocks with ticks beside them —
+   CLAUDE.md names that as the mistake, and three such lists have already been
+   retired for it. So this is a way THROUGH to the screen that already owns
+   them, which is what was missing once a kid could put a blank fortnight back
+   in herself: the blocks still need confirming, and confirming is a day-view
+   act. Lands on the meeting's week, not on today. */
+/* ── Leaving the meeting, and being able to come back ─────────────
+   Opening a child's week used to close the meeting and forget everything —
+   which week, which step, which child, which day, where you had scrolled to.
+   Getting back meant starting the sitting over from step 1.
+
+   Worse, once you landed there THREE buttons offered to take you somewhere
+   else: "◀ Hub", the parent's "Switch" and the round profile badge. Every one
+   of them silently abandoned the meeting and none of them said so.
+
+   This is the reusable return context. It is deliberately the shape the spec
+   named, because Meeting V2 is meant to use it unchanged. It lives in a module
+   global rather than synced state: it describes where THIS device is in a
+   sitting, and every synced write is a full-document upload. */
+let mmReturn = null;
+
+/* Which element actually scrolls the meeting. It was the sheet, and three
+   places read `.sheet` directly to save and restore a scroll position. The
+   sheet is a bounded flex column now and does not scroll at all — .mm-body
+   does — so a hardcoded `.sheet` would silently store 0 and restore 0, and
+   every return-to-meeting would land at the top of the step.
+
+   One owner, so the next layout change moves one selector. Falls back to the
+   sheet for any state where the body has not been rendered yet. */
+function mmScroller() {
+  return document.querySelector('#screen-meeting .mm-body')
+      || document.getElementById('screen-meeting');
+}
+
+function mmCaptureReturn(kid, dayIdx) {
+  /* Leaving the meeting for another screen is a moment to write, not a moment
+     to hold a draft in memory and hope the tab survives. */
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
+  const sheet = mmScroller();
+  mmReturn = {
+    source: 'weekly-meeting',
+    weekKey: mmWeekKey(),
+    step: mmStep,
+    child: kid || (typeof mnyMeetingKid === 'function' ? mnyMeetingKid() : 'jenn'),
+    selectedDay: (dayIdx == null) ? mmSelectedDay : dayIdx,
+    scrollTop: sheet ? sheet.scrollTop : 0,
+  };
+}
+function mmClearReturn() { mmReturn = null; }
+function mmHasReturn() { return !!(mmReturn && mmReturn.source === 'weekly-meeting'); }
+
+/* Put the sitting back exactly where it was. The scroll restore waits a frame
+   because renderMeetingMode replaces the body wholesale — setting scrollTop on
+   the old content would be measured against a height that is about to change. */
+function mmReturnToMeeting() {
+  if (!mmHasReturn()) { showScreen('parent'); return; }
+  const r = mmReturn;
+  mmClearReturn();
+  // The week's and the day's badges come back with the sitting (js/11).
+  applyMeetingLock();
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  ctWeekKey = r.weekKey;
+  mmSelectedDay = r.selectedDay;
+  if (typeof mnySetMeetKid === 'function') mnySetMeetKid(r.child);
+  showScreen('parent');
+  if (!mmIsOpen()) mmShow();
+  mmStep = Math.max(1, Math.min(MM_STEPS.length, r.step || 1));
+  mmMaxStep = Math.max(mmMaxStep, mmStep);
+  renderMeetingMode();
+  requestAnimationFrame(() => {
+    const sheet = mmScroller();
+    if (sheet) sheet.scrollTop = r.scrollTop || 0;
+  });
+}
+
+function mmOpenWeekForBlocks(kid) {
+  const wk = mmWeekKey();
+  mmCaptureReturn(kid);
+  mmHide();
+  weekOffset = computeWeekOffsetForDayKey(wk);
+  parentView(kid);
+}
+
+/* Open one DAY from the meeting — same context, plus the day itself, so the
+   parent lands on the thing the row was about rather than on the week. */
+function mmOpenDayForBlocks(kid, dayIdx) {
+  const wk = mmWeekKey();
+  const keys = mrWeekDayKeys(wk);
+  const dayKey = keys[dayIdx] || keys[0];
+  mmCaptureReturn(kid, dayIdx);
+  mmHide();
+  weekOffset = computeWeekOffsetForDayKey(wk);
+  parentViewing = kid;
+  currentDayKey = dayKey;
+  dayViewAnchorKey = dayKey;
+  // The Day's header as openDay draws it: ◀ back to the meeting, the date and
+  // the badge, which the sitting's lock hides (js/11-parent.js).
+  navReturnPush('day', 'meeting');
+  dayRenderHeader();
+  applyMeetingLock();
+  showScreen('day');
+  renderDaySpanTabs();
+  buildTimeline();
+}
+/* What the "run the family meeting" buttons call. */
+function openFamilyMeetingAsk() {
+  openFamilyMeeting();
+  mmMaybeAskCatchUp();
+}
+/* ── "We sat down" is a different fact from "the money moved" ──
+   meetingsHeld[wk] is written in exactly one place, commitMeetingShared, and
+   only once BOTH kids have finished step 4 — weekPlans[wk][kid].committedAt for
+   Jenn AND Jess. So a family that opened the meeting, reviewed the week,
+   celebrated it and even agreed the numbers on step 3 recorded nothing at all,
+   and "🎉 Finish meeting" left it unset. Two meetings held, and the catch-up
+   list still reported every one of the last eight weeks as never settled —
+   saturating at its own ceiling, which is where the number 8 came from.
+
+   The same press is what credits the money, so the wallet reading $0.00 while
+   the meeting showed real figures was not a second bug: it is this one seen
+   from the other end. Step 3 shows ctWeekMoney, a live preliminary figure;
+   nothing is in the wallet until step 4.
+
+   So there are two records now. meetingsMet says the family sat down;
+   meetingsHeld still says the money moved. Only a week with neither is
+   something to nag about. */
+function mmEnsureMet() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.meetingsMet) c.meetingsMet = {};
+  return c.meetingsMet;
+}
+function mmIsMet(wk) { return !!mmEnsureMet()[wk]; }
+function mmIsSettled(wk) {
+  ctEnsureShared();
+  return !!(state.shared.chore.meetingsHeld || {})[wk];
+}
+/* Recorded when the meeting is closed having done the reviewing, and by the
+   catch-up list's "we did this one" for a week that was run before this
+   existed. It records a fact about the family; it never moves money —
+   settling is step 4's job and stays there (CLAUDE.md: call an owner, never
+   contain one). */
+function mmMarkWeekMet(wk, opts) {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return false; }
+  const met = mmEnsureMet();
+  if (met[wk]) return false;
+  met[wk] = { at: syncNow(), by: (opts && opts.by) || 'a grown-up' };
+  ctStampWeekState(wk);   // see commitMeetingShared: an add after an undo must stamp too
+  saveAll();
+  return true;
+}
+
+/* The earliest week worth asking about: the later of the money model's start
+   (before it there is nothing to agree or decide — mmKidSettled treats those as
+   settled) and the program's start (before it there was no family in the app).
+   Whichever is later binds, because a week that fails either test is a week the
+   meeting cannot do anything with.
+
+   An "earliest week with any data" floor was tried here too and removed: it
+   suppressed genuinely open weeks whenever the first record happened to be
+   recent, which is the same class of wrongness as the bug this is fixing —
+   the count disagreeing with what the family actually did. programStartDate is
+   already the honest answer to "when did this family start". */
+function mmCatchUpFloor() { return mrStartWeek(); }
+
+/* Weeks behind us and what state each is in, most recent first:
+     'none'    nobody opened it   → the only state worth offering
+     'met'     the family sat down, the money has not moved
+     'settled' done
+   Returns only the weeks that are not settled, so existing callers that just
+   want a count of open weeks still read correctly. */
+function mmUnsettledWeeks(max) {
+  ctEnsureShared();
+  const floor = mmCatchUpFloor();
+  const out = [];
+  for (let i = 1; i <= (max || 8); i++) {
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
+    const wk = ctDateToKey(mon);
+    if (String(wk) < floor) break;
+    if (mmIsSettled(wk)) continue;
+    out.push({ wk, weeksLate: i, status: mmIsMet(wk) ? 'met' : 'none' });
+  }
+  return out;
+}
+/* Just the weeks nobody has opened. This is what the copy nags about — a week
+   the family sat down for is not a week they missed. */
+function mmUnopenedWeeks(max) {
+  return mmUnsettledWeeks(max).filter(x => x.status === 'none');
+}
+
+/* ── The catch-up screen ── */
+
+// How many rows the banner shows before rolling the rest up. Eight open weeks
+// is eight rows of guilt; four and a count is the same information.
+const MM_CATCHUP_VISIBLE = 4;
+
+function mmOpenExpress(wk) {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  ctEnsureShared();
+  mmExpressWeek = wk;
+  mmExpressMoney = true;
+  mmExpressMet = false;
+  // Set the mode first: mmGoToWeek points every downstream reader at the week,
+  // opens the sheet and renders — and renderMeetingMode already honours the flag.
+  mmGoToWeek(wk);
+}
+
+function mmCloseExpress() {
+  mmExpressWeek = null;
+  mmCloseMeeting();   // shares the close path, so the hub refreshes behind it
+}
+
+/* Leave this week as it is and look at the next one still open. */
+function mmExpressSkip() {
+  const next = mmUnsettledWeeks(8).find(x => x.wk !== mmExpressWeek);
+  if (next) mmOpenExpress(next.wk); else mmCloseExpress();
+}
+
+/* The only button here that changes anything. Money moves through
+   commitFamilyMeeting and nowhere else; "we talked about it" is recorded
+   separately, and either tick can be left off. */
+function mmExpressCommit() {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  const wk = mmExpressWeek;
+  if (!wk) return;
+  if (!mmExpressMoney && !mmExpressMet) {
+    showToast('Tick at least one, or skip this week');
+    return;
+  }
+  if (mmExpressMoney) commitFamilyMeeting(wk);
+  if (mmExpressMet) mmMarkWeekMet(wk);
+  saveAll();
+  const done = [mmExpressMoney ? 'money recorded' : '', mmExpressMet ? 'marked as met' : '']
+    .filter(Boolean).join(' · ');
+  showToast(`${mmWeekLabel(wk)} — ${done}`);
+  const next = mmUnsettledWeeks(8)[0];
+  if (next) mmOpenExpress(next.wk);
+  else { mmCloseExpress(); if (typeof renderParentHome === 'function') renderParentHome(); }
+}
+
+function mmExpressToggle(which) {
+  if (which === 'money') mmExpressMoney = !mmExpressMoney;
+  else mmExpressMet = !mmExpressMet;
+  renderMeetingMode();
+}
+
+/* One kid's column: the same five channels step 3 reads, from the same
+   accessor, so a figure here can never disagree with the full meeting's. */
+function mmExpressKidCard(wk, kid) {
+  const b = mrWeekBreakdown(wk, kid);
+  const name = kidLabel(kid).name;
+  const row = (label, value) =>
+    `<div class="mm-xp-row"><span>${escapeHtml(label)}</span><span class="mm-xp-n">${value}</span></div>`;
+  return `<div class="mm-xp-card">
+      <div class="mm-xp-name">${CT_PROFILE_ICON[kid]} <b>${name}</b></div>
+      ${row('Chores graded', fmtMoney(b.chorePaid))}
+      ${row('Learning', fmtMoney(b.learnPaid))}
+      ${row('Routine streak', fmtMoney(b.streakBonus))}
+      ${row('Competition', fmtMoney(b.compPaid))}
+      ${row('Fines', b.fines.total ? '−' + fmtMoney(b.fines.total) : 'none')}
+      <div class="mm-xp-row mm-xp-total"><span><b>Total</b></span><span class="mm-xp-n"><b>${fmtMoney(b.net)}</b></span></div>
+      <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="express-adjust">Adjust in the full meeting ›</button>
+    </div>`;
+}
+
+function mmRenderExpress(wk) {
+  const open = mmUnsettledWeeks(8);
+  const idx = open.findIndex(x => x.wk === wk);
+  const total = ['jenn', 'jess'].reduce((s, k) => s + mrWeekBreakdown(wk, k).net, 0);
+  const tick = on => on ? '☑' : '☐';
+  return `<div class="mm-express">
+      <div class="mm-xp-head">
+        <span>🕰️</span>
+        <div><div class="mm-xp-title">Catch up · ${escapeHtml(mmWeekLabel(wk))}</div>
+        <div class="ct-meta">${idx >= 0 ? `Week ${idx + 1} of ${open.length} still open` : 'This week is already closed'}</div></div>
+        <span class="ck-spacer"></span>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="express-full">Open the full meeting</button>
+      </div>
+      <div class="mm-xp-cards">${['jenn', 'jess'].map(k => mmExpressKidCard(wk, k)).join('')}</div>
+      <div class="mm-xp-ticks">
+        <button type="button" class="mm-xp-tick" data-mm-action="express-tick" data-which="money">
+          <span class="mm-xp-box">${tick(mmExpressMoney)}</span>
+          <span><b>Record the money</b><br><span class="ct-meta">Credits ${fmtMoney(total)} to their pockets</span></span>
+        </button>
+        <button type="button" class="mm-xp-tick" data-mm-action="express-tick" data-which="met">
+          <span class="mm-xp-box">${tick(mmExpressMet)}</span>
+          <span><b>We talked about this week together</b><br><span class="ct-meta">Leave this unticked if you are only recording — History will show the week as never met</span></span>
+        </button>
+      </div>
+      <div class="mm-xp-actions">
+        <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" data-mm-action="express-commit">Close this week and go to the next</button>
+        <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="express-skip">Skip for now</button>
+      </div>
+    </div>`;
+}
+/* The parent hub's way in. Deliberately not a warning: a fortnight nobody
+   wrote down is a normal outcome of a busy fortnight, and the copy says the
+   week is still there rather than that something was missed. */
+function mmCatchUpBanner() {
+  const list = mmUnsettledWeeks(8);
+  const older = (typeof mnyDefaultSweepPlan === 'function') ? mnyDefaultSweepPlan() : { weeks: [], total: 0, saved: false };
+  if (!list.length && !older.weeks.length) return '';
+  const unopened = mmUnopenedWeeks(8).length;
+  const met = list.length - unopened;
+  /* Each row says which kind of open it is, and offers the action that fits.
+     A week the family met about needs its money settling, not a nag about
+     having been missed; a week nobody opened can be ticked off as done if it
+     was run before the app could record it. Neither button moves money —
+     "Settle" jumps to the step that owns that (CLAUDE.md). */
+  // Four rows and a count, not eight rows of guilt. The roll-up keeps the rest
+  // reachable without making the hub a wall of missed weeks.
+  const shown = list.slice(0, MM_CATCHUP_VISIBLE);
+  const hidden = list.length - shown.length;
+  const rows = shown.map(x => {
+    const isMet = x.status === 'met';
+    const label = isMet ? '✅ met — money still waiting' : `${x.weeksLate} week${x.weeksLate === 1 ? '' : 's'} ago`;
+    const actions = isMet
+      ? `<button type="button" class="mm-catchup-go" data-mm-week="${escapeAttr(x.wk)}" data-mm-catch="settle">Settle the money ›</button>`
+      : `<button type="button" class="mm-catchup-did" data-mm-week="${escapeAttr(x.wk)}" data-mm-catch="met">We did this one ✓</button>
+         <button type="button" class="mm-catchup-go" data-mm-week="${escapeAttr(x.wk)}" data-mm-catch="open">Catch up ›</button>`;
+    return `<div class="mm-catchup-row${isMet ? ' met' : ''}">
+        <span class="mm-catchup-wk">${escapeHtml(mmWeekLabel(x.wk))}</span>
+        <span class="mm-catchup-late">${escapeHtml(label)}</span>
+        ${actions}
+      </div>`;
+  }).join('');
+  const more = hidden
+    ? `<div class="mm-catchup-row mm-catchup-more">
+         <span class="mm-catchup-wk">${hidden} older week${hidden === 1 ? '' : 's'}</span>
+         <span class="mm-catchup-late">still open</span>
+         <button type="button" class="mm-catchup-go" data-mm-catch="all">Work through them ›</button>
+       </div>`
+    : '';
+  /* ── Weeks older than this list can reach ──
+     mmUnsettledWeeks stops at eight, so anything older was invisible here AND
+     unsettleable: the only door to it was a card in Setup › Weeks on record
+     that a parent had no reason to open, so a household with a real backlog was
+     simply told nothing. The Grandfather rule belongs where the backlog is already
+     being looked at — the SAME plan as its own section, from the start week
+     saved there (js/24-money-parent.js). One tap, previewed, and it moves no
+     money until mnyRunDefaultSweep's own confirmation; never automatic. With
+     no start week saved there is nothing to offer yet, so the row points to
+     the section where it is entered. */
+  const n = older.weeks.length;
+  const sweep = !n ? ''
+    : older.saved
+      ? `<div class="mm-catchup-row mm-catchup-more">
+           <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
+           <span class="mm-catchup-late">no family meeting — the Grandfather rule</span>
+           <button type="button" class="mm-catchup-go" data-mm-catch="sweep">Credit ${escapeHtml(fmtMoney(older.amount))} each ›</button>
+         </div>`
+      : `<div class="mm-catchup-row mm-catchup-more">
+           <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
+           <span class="mm-catchup-late">enter the Grandfather rule's start week first</span>
+           <button type="button" class="mm-catchup-go" data-mm-catch="grandma">👴 Grandfather rule ›</button>
+         </div>`;
+  const cap = [
+    unopened ? `${unopened} week${unopened === 1 ? '' : 's'} nobody has opened` : '',
+    met ? `${met} met but not paid out` : '',
+    n ? `${n} further back` : '',
+  ].filter(Boolean).join(' · ');
+  return `<div class="mm-catchup">
+      <div class="mm-catchup-cap">🕰️ ${escapeHtml(cap)}.
+        Nothing expires — open one whenever you get to it, or tick off one you already did.</div>
+      ${rows}${more}${sweep}</div>`;
+}
+
+/* One delegated listener for the rows above, bound in js/99-main.js. Data
+   attributes rather than interpolated handlers — the pattern js/13-chores.js
+   and the money pages already use, and the one CLAUDE.md asks for in new code. */
+function mmHandleCatchUpClick(e) {
+  const el = e.target.closest('[data-mm-catch]');
+  if (!el) return;
+  const wk = el.getAttribute('data-mm-week');
+  const what = el.getAttribute('data-mm-catch');
+  if (what === 'sweep') {
+    if (typeof mnyRunDefaultSweep === 'function') mnyRunDefaultSweep();
+    return;
+  }
+  if (what === 'grandma') {
+    // Its start week is entered on Grown-ups › ⚙️ Rules › 👴 (Stage 4b).
+    mnyParentSection = 'rules';
+    setParentTab('money');
+    return;
+  }
+  if (what === 'met') {
+    if (mmMarkWeekMet(wk)) {
+      renderMeetingHub();
+      showToast('Marked as done — the money is still there to settle when you want');
+    }
+    return;
+  }
+  // 'open' and the roll-up start the catch-up run — the shorter road to the
+  // same commit. 'settle' is a week the family already met about, so it wants
+  // the step that owns the money rather than a screen that re-asks whether they
+  // sat down.
+  if (what === 'open') { mmOpenExpress(wk); return; }
+  if (what === 'all') {
+    const first = mmUnsettledWeeks(8)[0];
+    if (first) mmOpenExpress(first.wk);
+    return;
+  }
+  mmGoToWeek(wk);
+  if (what === 'settle') mmGoStep(4);
+}
+/* Point the meeting at another week. Everything downstream reads mmWeekKey(),
+   so this is the whole of it. The Sunday draft (js/44) is keyed by girl AND
+   week, so another week opens its own. */
+function mmGoToWeek(wk) {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  ctWeekKey = wk;
+  // A context captured against another week would send the parent back to a
+  // sitting that no longer exists.
+  mmClearReturn();
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmAddChoreFor = null;
+  mmUndoKid = {}; mmUndoKidGone = {};
+  if (!mmIsOpen()) mmShow();
+  renderMeetingMode();
+}
+
+/* New meeting controls ride on data attributes and this one delegated listener
+   rather than being interpolated into inline handlers — the pattern
+   js/13-chores.js and the money pages use, and the one CLAUDE.md asks for in
+   new code. Bound in js/99-main.js: #familyMeetingBody has its innerHTML
+   replaced on every render, but the element itself is never replaced. */
+function mmHandleClick(e) {
+  const el = e.target.closest('[data-mm-action]');
+  if (!el) return;
+  const a = el.getAttribute('data-mm-action');
+  const kid = el.getAttribute('data-kid') || '';
+  const d = Number(el.getAttribute('data-day'));
+  // The reflection owns its own taps — see js/37-reflection.js.
+  if (a.startsWith('refl-') && reflHandleAction(a, el, mmWeekKey())) return;
+  if (a === 'thisweek')       { mmGoToWeek(ctThisWeekKey()); return; }
+  if (a === 'openweek')       { mmOpenWeekForBlocks(kid); return; }
+  if (a === 'item')           { mmToggleItem(kid, d, el.getAttribute('data-kind'), el.getAttribute('data-key')); return; }
+  if (a === 'fine-add')       { mmAddFineOnDay(kid, d, el.getAttribute('data-fine')); return; }
+  if (a === 'fine-undo')      { mmUndoFine(kid, el.getAttribute('data-fine-id')); return; }
+  if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
+  if (a === 'nd-leave')       { mmReviewLeavingBlocks(kid, d); return; }
+  if (a === 'nd-open')        { mmOpenDayForBlocks(kid, d); return; }
+  if (a === 'nd-record')      { mmRecordNotDoneAndReview(kid, d); return; }
+  if (a === 'addchore-open')  { mmToggleAddChore(kid, d); return; }
+  if (a === 'addchore-pick')  { mmAddChoreHappened(kid, d, el.getAttribute('data-chore')); return; }
+  if (a === 'openday')        { mmSelectDay(d); return; }
+  if (a === 'confirmday')     { mmToggleConfirmDay(d); return; }
+  if (a === 'reviewday')      { mmToggleDayReviewed(kid, d); return; }
+  if (a === 'openkidday')     { mmOpenDayForBlocks(kid, d); return; }
+  if (a === 'express-tick')   { mmExpressToggle(el.getAttribute('data-which')); return; }
+  if (a === 'express-commit') { mmExpressCommit(); return; }
+  if (a === 'express-skip')   { mmExpressSkip(); return; }
+  // Both routes out of catch-up mode land in the full meeting on the same week.
+  if (a === 'express-full' || a === 'express-adjust') {
+    mmExpressWeek = null; mmGoStep(1); return;
+  }
+}
+
+/* ── What Step 1 reviews ───────────────────────────────────────────
+   The two halves of a day are stored in two different places, on purpose:
+
+     ROUTINES (Morning / Afternoon / Evening) are the parent's call and pay no
+     money. They live in the legacy per-session store (ctGetMandatory), which
+     is also exactly what mrStreakDayDone reads for the clean-day streak — so
+     ticking one here is what moves the streak channel.
+
+     CHORES come from the chore pool via the planner (mrChoresForDay) and are
+     what the money engine totals. A parent tapping one in the meeting IS the
+     grading act, so a tap writes a GRADE (mrSetChoreGrade), the same value
+     cpQueue writes from the portal.
+
+   Before this, Step 1 rendered the retired chore *groups* and wrote to
+   ctSetOptional — a store nothing downstream reads any more. That is why a
+   week reviewed at the table still showed $0 of "Jobs around the house" on
+   Step 3. */
+function mmReviewRows(kid, dayIdx) {
+  const wk = mmWeekKey();
+  /* Only what the day actually asked for. All three used to be offered on every
+     day of every week, so a family that never planned an after-school routine
+     was permanently marked down for one: a tick for something nobody had asked
+     the child to do, counted against her in the day percentage. Asked, never
+     re-derived — routineSessionsForDay (js/36-status.js) is the one owner, and
+     mrStreakDayDone reads it too. */
+  const rows = routineSessionsForDay(kid, wk, dayIdx).map(s => ({
+    kind: 'routine', key: s, label: s, icon: CT_SESSION_ICONS[s] || '📋',
+    on: !!ctGetMandatory(wk, dayIdx, s, kid),
+    claim: 0, pays: false,
+  }));
+  const r = mrRulesForWeek(wk);
+  mrChoresForDay(kid, wk, dayIdx).rows.forEach(({ row }) => {
+    if (!mrLanePays(row.lane)) return;   // 'own'/'helping' never pay — not money to agree
+    const grade = mrGetChoreGrade(kid, wk, dayIdx, row.id);
+    rows.push({
+      kind: 'chore', key: row.id, label: row.label, icon: row.icon || '🧺',
+      on: grade > 0, grade, claim: mrGetClaim(kid, wk, dayIdx, row.id),
+      pays: true, pay: ckGradePay(r, grade || 3),
+    });
+  });
+  return rows;
+}
+function mmWeekKey() { return ctWeekKey || ctThisWeekKey(); }
+
+// % of a kid's tracked items (routines + priced chores) settled on a given day.
+function mmDayPct(kid, dayIdx) {
+  const rows = mmReviewRows(kid, dayIdx);
+  if (!rows.length) return 0;
+  const done = rows.reduce((s, row) => s + (row.on ? 1 : 0), 0);
+  return Math.round(done / rows.length * 100);
+}
+// Days of the viewed week that have already happened (Mon..today inclusive).
+// A past week counts all 7; a future/other week counts 7 too (its numerator is
+// 0 anyway, so this just avoids divide-by-zero).
+function mmElapsedDays() {
+  const info = ctWeekInfo();
+  const idx = Math.round((formatDayKey(todayKey()) - info.mon) / 864e5);
+  if (idx < 0 || idx > 6) return 7;
+  return idx + 1;
+}
+// Average % of items done per elapsed day. Was a fixed /7, which let an
+// untouched, not-yet-happened weekend drag a strong Mon–Fri down; dividing by
+// elapsed days instead measures the days actually in play.
+function mmWeekPct(kid) {
+  const days = mmElapsedDays();
+  let s = 0; for (let d = 0; d < days; d++) s += mmDayPct(kid, d);
+  return Math.round(s / days);
+}
+
+function renderMeetingMode() {
+  ctPrepareRead();
+  const wk = ctWeekKey || ctThisWeekKey();
+  const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
+  /* The three steps as one joined switch in the middle of row 1: on the
+     iPad each step's name (✓ before a done one), on a phone its number (✓ for
+     a done one). */
+  const stepper = `<nav class="hdr-switch hdr-steps" aria-label="Meeting steps">${MM_STEPS.map((st, i) => {
+    const n = i + 1;
+    const done = n < mmStep;
+    return `<button type="button" class="hdr-switch-cell"${n === mmStep ? ' aria-current="step"' : ''} onclick="mmGoIndex(${n})" aria-label="${escapeAttr(n + ' · ' + st.label + (done ? ' · done' : ''))}">${done ? '✓<span class="hdr-seg-word"> ' + escapeHtml(st.label) + '</span>' : `<span class="hdr-seg-num">${n}</span><span class="hdr-seg-word">${escapeHtml(st.label)}</span>`}</button>`;
+  }).join('')}</nav>`;
+
+  // Catch-up mode replaces the stepper entirely: a week nobody is going to
+  // discuss does not need five steps to close.
+  if (mmExpressWeek) {
+    const xhost = document.getElementById('familyMeetingBody');
+    const xrestore = mmCaptureUiState(xhost);
+    xhost.innerHTML = pageHeader({ variant: 'meeting', moneySurface: true, title: 'Family meeting' })
+      + mmRenderExpress(mmExpressWeek);
+    xrestore();
+    return;
+  }
+
+  /* The week step is the two panels that were always about one thing,
+     concatenated: mmRenderReview and mmRenderReflect each still own exactly
+     what they owned. The money step is the Sunday ritual (js/44). */
+  const id = mmStepId();
+  let body;
+  if (id === 'week') body = mmRenderReview(wk) + mmRenderReflect(wk);
+  else if (id === 'money') {
+    /* The money step is the Sunday ritual (js/44-sunday.js): Guess → Payday
+       → I choose → Signed for the girl on screen, its own header and kid
+       switch, and the sign (`mnyDoCommit`) behind hold-to-sign. */
+    body = sdRenderMoneyStep(wk);
+  }
+  else body = mmRenderPlan(wk);
+
+  const back = mmStep > 1 ? `<button type="button" class="ui-btn ui-btn--secondary" onclick="mmGoIndex(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
+  /* Back / Next / Finish on the week and close steps. The money step has no
+     footer (Plan v17 §0): hold to sign is the one sign control. */
+  const next = mmStep < MM_STEPS.length
+    ? `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mmGoIndex(${mmStep + 1})">Next ▶</button>`
+    : mmFinishButtons(wk);
+
+  /* One scroller — the sheet — with the week-and-step header pinned to its top
+     and Back/Next/Finish pinned to its bottom. A five-step sitting spends most
+     of its time in the middle of a long panel, and both of the things you
+     navigate with used to scroll away with it: which week you were reviewing,
+     which step you were on, and the only way to the next one. */
+  const host = document.getElementById('familyMeetingBody');
+  const restore = mmCaptureUiState(host);
+  host.innerHTML = mmHead(wk, stepper, id)
+    + `<div class="mm-body">${body}</div>`
+    /* The money step has no bottom bar (Plan v17 §0): its own ◀ / → buttons
+       move between its steps, the girls switch in the head, and 3·Close is
+       a pill in the head. */
+    + (id === 'money' ? '' : `<div class="mm-nav">${back}${next}</div>`);
+  restore();
+  if (id === 'money' && typeof sdAfterRender === 'function') sdAfterRender();
+}
+
+/* ── The meeting's header: two rows (PR 4; Stage 20, the owner's turn-2
+   meeting picture) ──
+   The meeting variant of pageHeader. Row 1: on the money step the girls as
+   round pictures (js/44, `sdMeetingAvatars`), then the meeting's name, the
+   three steps (`stepper`) in the middle of the bar, and on the money step
+   🔊 Sound and 🗣️ Parent's card. Row 2: on the money step the four Sunday
+   steps (`sdMeetingSteps`), on the others where the family left off
+   (`mmLastReviewedLine`); at its right the week, "Week of Oct 5 – 11"
+   (`mmWeekLine`), with "catching up" and This week ▶ on an older week. A
+   phone drops the name and the week. No ◀ and no profile badge: the sitting
+   is left by its own Close step. */
+function mmHead(wk, stepper, id) {
+  const late = mrWeeksSince(wk);
+  // The money step names the money week, Monday to Sunday like the
+  // planner's (decision 15); the Sun–Sat mapping behind mrMoneyWeekEnds
+  // stays only as tested code until it is deleted (PR 13).
+  const ends = id === 'money' ? mrMoneyWeekEnds(wk) : mmWeekEnds(wk);
+  const week = `<span class="hdr-week">Week of ${escapeHtml(mmWeekLine(ends[0], ends[1]))}</span>`
+    + (late ? `<span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
+       <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button>` : '');
+  const money = id === 'money' && typeof sdMeetingAvatars === 'function';
+  return pageHeader({
+    variant: 'meeting',
+    moneySurface: true,
+    lead: money ? sdMeetingAvatars(wk) : '',
+    title: 'Family meeting',
+    centre: stepper,
+    actions: money ? sdMeetingActions() : [],
+    sub: `<div class="hdr-r2-start">${money ? sdMeetingSteps(wk) : mmLastReviewedLine()}</div><div class="hdr-r2-end">${week}</div>`,
+  });
+}
+/* The planner week's Monday and Sunday. */
+function mmWeekEnds(wk) {
+  const mon = formatDayKey(wk);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  return [mon, sun];
+}
+/* The meeting's week line, as the owner's picture writes it: the month once
+   when the week is in one ("Oct 5 – 11"), at both ends when it is not
+   ("Sep 28 – Oct 4"). */
+function mmWeekLine(a, b) {
+  return `${MONTH_SHORT[a.getMonth()]} ${a.getDate()} – ${a.getMonth() === b.getMonth() ? '' : MONTH_SHORT[b.getMonth()] + ' '}${b.getDate()}`;
+}
+
+/* ── Keeping the meeting usable across a re-render ──
+   Every tap in steps 3 and 4 rebuilds #familyMeetingBody wholesale. That threw
+   away two things the family notices immediately: the sheet's scroll position
+   (so a button pressed halfway down the page appeared to "do nothing" — the
+   view had jumped back to the top), and keyboard focus (so typing a
+   competition name lost the caret after the first letter, because the input
+   the letter went into no longer existed).
+
+   Captures both before the swap and puts them back after. Fields are matched by
+   `data-mm-field` rather than DOM position, so a re-render that changes the
+   surrounding markup still finds the right input. */
+function mmCaptureUiState(host) {
+  /* The VALUE, not the element. The scroller used to be the sheet, which
+     survives `host.innerHTML = ...`; it is .mm-body now, which does not — it is
+     inside the host being replaced. Holding the node meant restoring a scroll
+     position onto a detached element, which is silent: every tap in steps 3 and
+     4 quietly jumped the family back to the top of the panel. Re-query after
+     the swap. */
+  const scroller = mmScroller();
+  const scrollTop = scroller ? scroller.scrollTop : 0;
+  const active = document.activeElement;
+  let field = null, selStart = null, selEnd = null;
+  if (active && host && host.contains(active)) {
+    field = active.getAttribute('data-mm-field');
+    // Only text-like inputs carry a caret worth restoring.
+    try {
+      if (field && active.selectionStart != null) {
+        selStart = active.selectionStart;
+        selEnd = active.selectionEnd;
+      }
+    } catch (e) { /* number/date inputs throw on selectionStart — ignore */ }
+  }
+  return function restore() {
+    const scroller = mmScroller();
+    if (scroller) scroller.scrollTop = scrollTop;
+    if (!field || !host) return;
+    const next = host.querySelector(`[data-mm-field="${CSS.escape(field)}"]`);
+    if (!next) return;
+    next.focus();
+    if (selStart == null) return;
+    try { next.setSelectionRange(selStart, selEnd); } catch (e) { /* not text-like */ }
+  };
+}
+
+/* Step 1 — Review: 1b grouped bar chart + day drill-in + meeting readiness. */
+/* ── Step 1: seven rows, not a chart and a detour ──
+   It used to be a bar chart: tap a day, scroll to the detail below, confirm,
+   scroll back, tap the next day — seven times, and twenty-eight movements for a
+   week where nothing was wrong. Each day is a row now, confirmable in place,
+   and it only opens when something actually needs changing. The detail it opens
+   is the same two-column panel as before. */
+function mmRenderReview(wk) {
+  const info = ctWeekInfo();
+  const todayD = formatDayKey(todayKey());
+  let rows = '';
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
+    const isToday = Math.round((date - todayD) / 864e5) === 0;
+    const ahead = date > todayD && !isToday;
+    const jp = mmDayPct('jenn', d), sp = mmDayPct('jess', d);
+    const open = mmSelectedDay === d;
+    const done = mmIsDayConfirmed(d);
+    const empty = jp === 0 && sp === 0;
+    /* Three states, said out loud: Jenn reviewed, Jess reviewed, both. There is
+       no hidden reading of "confirmed" that means both children any more — the
+       Both control is there, and it is labelled Both. */
+    const kidCell = (kid) => {
+      const on = mmIsDayReviewedFor(kid, d);
+      const nm = kidLabel(kid).name;
+      /* A control that cannot act says why on itself. Un-ticking is always
+         offered: taking a record back needs no permission. */
+      const can = on ? null : mmCanReviewDay(kid, d);
+      const why = on ? '' : reviewBlockedReason(can);
+      /* Still says why; only stops REFUSING when the reason is one the offer
+         below can settle. A control that behaves unusually must say so out
+         loud, which is what the disabled title was doing before. */
+      const hard = !!why && !mmOverridableRefusal(can);
+      return `<button type="button" class="mm-drow-kid${on ? ' on' : ''}"
+          data-mm-action="reviewday" data-kid="${escapeAttr(kid)}" data-day="${d}"
+          ${hard ? `disabled ` : ''}${why ? `title="${escapeAttr(nm + ': ' + why)}"` : ''}
+          aria-label="${on ? nm + ' reviewed' : 'Mark ' + nm + ' reviewed'}${why ? ' — ' + escapeAttr(why) : ''}"
+        >${on ? '✓' : '○'} ${CT_PROFILE_ICON[kid]}</button>`;
+    };
+    /* Both: the HARD reason wins. A running block for Jess blocks the control
+       even when Jenn's day is merely unconfirmed — the convenience must not be
+       a side door into a day neither child could be reviewed for. */
+    const bothCans = ['jenn', 'jess'].map(k => mmCanReviewDay(k, d));
+    const bothHard = done ? null : bothCans.find(c => !c.ok && !mmOverridableRefusal(c));
+    const bothWhy = done ? '' : reviewBlockedReason(bothHard || bothCans.find(c => !c.ok));
+    const state = ahead
+      ? `<span class="mm-drow-note">Not here yet</span>`
+      : `<span class="mm-drow-review">${kidCell('jenn')}${kidCell('jess')}`
+        + `<button type="button" class="${done ? 'mm-drow-ok' : 'mm-drow-go'}"
+             data-mm-action="confirmday" data-day="${d}"
+             ${bothHard ? `disabled ` : ''}${bothWhy ? `title="${escapeAttr(bothWhy)}"` : ''}
+           >${done ? '✓ Both reviewed' : 'Both'}</button></span>`;
+    const mid = (!ahead && empty)
+      ? `<span class="mm-drow-note">Nothing logged — open it and add what actually happened</span>`
+      : `<span class="mm-drow-bars">
+           <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-j" style="width:${jp}%"></span></span>
+           <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-s" style="width:${sp}%"></span></span>
+         </span>`;
+    /* ── The offer, inline on the row ──────────────────────────────
+       Not a modal. Three answers a parent needs and a new three-button sheet
+       would be a second dialog mechanism beside openSheet/closeSheet, which own
+       focus and Escape. Inline is also visible rather than waiting to be
+       discovered, which is the same reason a refused control was made to say
+       why on itself.
+
+       Only the money-moving answer opens a confirmation, and that one is the
+       ordinary two-button showConfirm naming the cost. */
+    const offerFor = (kid) => {
+      if (ahead || mmIsDayReviewedFor(kid, d)) return '';
+      const can = mmCanReviewDay(kid, d);
+      if (!mmOverridableRefusal(can)) return '';
+      const nm = kidLabel(kid).name;
+      const n = can.pendingCount;
+      return `<div class="mm-drow-offer">
+          <span class="mm-drow-offer-say">${CT_PROFILE_ICON[kid]} ${escapeHtml(nm)} · `
+        + `${n} block${n === 1 ? ' was' : 's were'} never confirmed</span>
+          <button type="button" class="mm-offer-btn" data-mm-action="nd-leave"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Leave them</button>
+          <button type="button" class="mm-offer-btn" data-mm-action="nd-open"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Open the day ›</button>
+          <button type="button" class="mm-offer-btn mm-offer-btn--nd" data-mm-action="nd-record"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Didn't happen</button>
+        </div>`;
+    };
+    const offers = ahead ? '' : ['jenn', 'jess'].map(offerFor).join('');
+    rows += `<div class="mm-drow${open ? ' open' : ''}${done ? ' done' : ''}">
+        <div class="mm-drow-head">
+          <button type="button" class="mm-drow-day" data-mm-action="openday" data-day="${d}"
+            aria-expanded="${open ? 'true' : 'false'}">
+            <span class="mm-drow-dow">${DAY_SHORT[d]} ${date.getDate()}${isToday ? ' ★' : ''}</span>
+          </button>
+          ${mid}${state}
+          <button type="button" class="mm-drow-x" data-mm-action="openday" data-day="${d}"
+            aria-label="${open ? 'Close' : 'Open'} ${escapeAttr(DAY_SHORT[d])}">${open ? '▴' : '▾'}</button>
+        </div>
+        ${offers}
+        ${open ? `<div class="mm-drow-body">${mmRenderDayDetail(wk, d)}</div>` : ''}
+      </div>`;
+  }
+  const detail = `<div class="mm-drows">${rows}</div>`;
+  const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
+  // Framed as a team total, not a head-to-head scoreboard: lead with how the two
+  // did together, with each kid's number kept small for transparency.
+  const jp = mmWeekPct('jenn'), sp = mmWeekPct('jess');
+  const together = Math.round((jp + sp) / 2);
+  const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 💪 Together you kept ${together}% of the days so far <small>(🐥 ${jp}% · 🦊 ${sp}%)</small></div>`;
+  // The readiness list belongs before anything is agreed, not after (it lived
+   // in step 4 until now). Per-kid state, so it follows whoever step 3/4 is on.
+  /* Getting OUT of step 1 to the plan. mmOpenWeekForBlocks was written and
+     unreachable from here on any week — the only openweek button in the app
+     was in step 2 — so a parent working a backlogged week had no way to reach
+     the week itself. Always present rather than only on an unconfirmed day:
+     reading the plan is what a review is, and it is not a repair action.
+     Same writer and same labels as step 2's pair, so the two cannot drift. */
+  const openWeek = `<div class="mm-blocklink">${['jenn', 'jess'].map(k =>
+    `<button type="button" class="ui-btn ui-btn--secondary" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
+      >${CT_PROFILE_ICON[k]} Open ${escapeHtml(kidLabel(k).name)}'s week ›</button>`).join('')}
+    <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
+  return `${mnyChecklist(wk, mnyMeetingKid())}
+    <div class="mm-h">Review the week</div>
+    ${openWeek}
+    <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
+    ${mmFamilyChoreReview(wk)}
+    ${detail}${footer}`;
+}
+
+/* ── The family's chores, in the review voice ─────────────────────
+   The kid-facing banner is forward-looking and current-week only, on purpose.
+   This is the other half: a parent reviewing a week has to be able to see a
+   shortfall, including on a week that has already gone by, and nothing showed
+   it. A scheduled chore is not a fulfilled one — only a positive parent grade
+   is — and a chore the child claimed but nobody has answered is neither, so it
+   is named as waiting rather than counted against her.
+
+   Nothing is carried into the next week. The shortfall is the week's record. */
+function mmFamilyChoreReview(wk) {
+  if (typeof getFamilyChoreStatus !== 'function') return '';
+  const rows = ['jenn', 'jess'].map(kid => {
+    const st = getFamilyChoreStatus(kid, wk);
+    if (!st.required) return '';
+    const name = kidLabel(kid).name;
+    const met = st.unfulfilled === 0;
+    const waiting = st.waiting
+      ? ` · <span class="mm-chore-wait">${st.waiting} waiting for a parent check</span>` : '';
+    return `<div class="mm-chore-row${met ? ' met' : ''}">
+        <span class="mm-chore-who">${CT_PROFILE_ICON[kid]} ${escapeHtml(name)}</span>
+        <span>${st.required} family ${st.required === 1 ? 'chore' : 'chores'} owed · `
+      + `${st.fulfilled} fulfilled · ${st.unfulfilled} unfulfilled${waiting}</span>
+      </div>`;
+  }).join('');
+  if (!rows) return '';
+  return `<div class="mm-chore-review">${rows}
+      <div class="mm-cap">Only a parent's grade counts as fulfilled. A shortfall stays on this week — it is not carried forward.</div>
+    </div>`;
+}
+function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); renderMeetingMode(); }
+function mmRenderDayDetail(wk, d) {
+  const col = (kid) => {
+    const rows = mmReviewRows(kid, d);
+    const name = kidLabel(kid).name;
+    /* Both sections carry a footer, and it is what makes a blank week workable:
+       the chores one can add a chore that was never planned, the routines one
+       marks all three at once. Rendered in the empty branch too — an empty day
+       is precisely the day that needs them. */
+    const footer = (kind) => {
+      if (kind === 'routine') {
+        /* The label and the button must move TOGETHER with mmToggleAllRoutines
+           below. A footer counted over the day's own sessions beside a toggle
+           writing all three would leave the label permanently out of step with
+           what the button did — and the word "three" had to go with them, since
+           a Saturday asks two. */
+        const asked = routineSessionsForDay(kid, wk, d);
+        const n = asked.length;
+        const allOn = n > 0 && asked.every(s => ctGetMandatory(wk, d, s, kid));
+        const label = allOn
+          ? (n === 1 ? 'Clear it' : `Clear all ${n}`)
+          : (n === 1 ? 'Mark it kept' : `All ${n} kept`);
+        return `<button type="button" class="mm-routine-all" data-mm-action="allroutines"
+            data-kid="${escapeAttr(kid)}" data-day="${d}">${escapeHtml(label)}</button>`;
+      }
+      const open = mmAddChoreFor === kid + '|' + d;
+      const opts = open ? mmAddChoreOptions(kid, d) : [];
+      const list = open
+        ? `<div class="mm-addchore-list">${opts.map(row =>
+            `<button type="button" class="mm-addchore-pick" data-mm-action="addchore-pick"
+                data-kid="${escapeAttr(kid)}" data-day="${d}" data-chore="${escapeAttr(row.id)}"
+              >${row.icon} ${escapeHtml(row.label)}</button>`).join('')
+            || `<div class="mm-detail-empty">Every chore in the pool is already on this day.</div>`}</div>`
+        : '';
+      return `<button type="button" class="mm-addchore" data-mm-action="addchore-open"
+          data-kid="${escapeAttr(kid)}" data-day="${d}" aria-expanded="${open}"
+        >${open ? '✕ Never mind' : '＋ Add a chore that happened'}</button>${list}`;
+    };
+    /* ── Fines, on the day they belong to ──────────────────────────
+       NOT a second fines engine. mrAddFine owns the write and mrFinesWeek owns
+       the arithmetic — the repeat-only rule and the floor at zero — exactly as
+       they do for cpFines on the parent chore tab, which stays as the
+       day-to-day surface for a fine nobody wants to hold until Sunday.
+
+       Step 1 rather than step 3, because a fine belongs to a DAY:
+       mrAddFine takes a dayKey, this is the screen that already walks the week
+       day by day with that key in hand, and step 3 is a totals screen where
+       entering a per-day fact would mean picking the day from a control this
+       one gives you by position. Step 3 still SHOWS the week's total. */
+    const fineSection = (kid) => {
+      const r = mrRulesForWeek(wk);
+      // box_repeat is not given by hand: it fires off a repeat in the Sunday box.
+      const items = ((r.fines || {}).items || []).filter(f => f.id !== 'box_repeat');
+      if (!items.length) return '';
+      const key = mmDayKey(d);
+      const givenToday = mrFines(kid).filter(f => f.dayKey === key);
+      const names = {}; ((r.fines || {}).items || []).forEach(i => { names[i.id] = i.label; });
+      const chips = items.map(f => `<button type="button" class="mm-fine"
+          data-mm-action="fine-add" data-kid="${escapeAttr(kid)}" data-day="${d}"
+          data-fine="${escapeAttr(f.id)}"
+        >${escapeHtml(f.label)} <b>−${fmtMoney(f.amount)}</b></button>`).join('');
+      const given = givenToday.map(f => `<div class="mm-fine-given">
+          <span>${escapeHtml(names[f.itemId] || f.itemId)}</span>
+          <span class="ck-red">−${fmtMoney(1)}</span>
+          <button type="button" class="mm-fine-x" data-mm-action="fine-undo"
+            data-kid="${escapeAttr(kid)}" data-fine-id="${escapeAttr(f.id)}"
+            aria-label="Take this fine back">×</button>
+        </div>`).join('');
+      return `<div class="mm-detail-sect">
+        <div class="mm-detail-cap">Fines <small>${givenToday.length || ''}</small></div>
+        <div class="mm-detail-note">Flat, and a day never goes below $0. Something left out goes in the box first.</div>
+        ${chips}${given}</div>`;
+    };
+    const section = (title, note, kind) => {
+      const mine = rows.map((row, i) => ({ row, i })).filter(x => x.row.kind === kind);
+      if (!mine.length) {
+        return `<div class="mm-detail-sect"><div class="mm-detail-cap">${title}</div>
+          <div class="mm-detail-empty">${kind === 'chore'
+            ? 'No chores on the plan for this day.'
+            : 'No routines tracked for this day.'}</div>${footer(kind)}</div>`;
+      }
+      const items = mine.map(({ row }) => {
+        // What she said, before a grown-up agreed — so the parent is confirming
+        // her answer rather than guessing at it.
+        const said = row.claim > 0
+          ? (CK_QUALITY.find(q => q.g === row.claim) || {}).word || ''
+          : '';
+        const tag = row.kind === 'chore'
+          ? (row.on ? `<span class="mm-item-pay">${fmtMoney(row.pay)}</span>`
+             : said ? `<span class="mm-item-said">she said: ${escapeHtml(said.toLowerCase())}</span>`
+             : `<span class="mm-item-said">not answered</span>`)
+          : '';
+        /* Data attributes plus the delegated listener, which CLAUDE.md already
+           prefers over interpolating into a handler — and which drops three
+           escapeJsAttr sites on the way. */
+        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}"
+            data-mm-action="item" data-kid="${escapeAttr(kid)}" data-day="${d}"
+            data-kind="${escapeAttr(row.kind)}" data-key="${escapeAttr(row.key)}"
+            role="checkbox" aria-checked="${row.on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${name}"><span class="mm-item-box">${row.on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}${tag}</button>`;
+      }).join('');
+      const done = mine.filter(x => x.row.on).length;
+      // A chores total overridden at step 3 no longer follows from these marks,
+      // so say so here rather than letting the ticks imply a number they don't
+      // produce any more.
+      const banner = kind === 'chore' ? mnyOverrideBanner(kid, mmWeekKey(), 'chores') : '';
+      return `<div class="mm-detail-sect">
+        <div class="mm-detail-cap">${title} <small>${done}/${mine.length}</small></div>
+        <div class="mm-detail-note">${note}</div>${banner}${items}${footer(kind)}</div>`;
+    };
+    const done = rows.filter(r => r.on).length;
+    return `<div class="mm-detail-col">
+      <div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${name} <small>${done}/${rows.length} done</small></div>
+      ${section('Routines', 'You mark these. They pay no money — they build the clean-day streak.', 'routine')}
+      ${section('Chores', 'Tapping one agrees her answer and pays it.', 'chore')}
+      ${fineSection(kid)}
+    </div>`;
+  };
+  const confirmed = mmIsDayConfirmed(d);
+  return `<div class="mm-detail">
+      <div class="mm-detail-cols">${col('jenn')}<div class="mm-detail-div"></div>${col('jess')}</div>
+      <div class="mm-detail-editnote">Tap any item to change it for that kid — this is the same record the chore tab and "What I earned" read, so the money updates live. On a week nobody wrote down, add what actually happened.</div>
+      <button type="button" class="mm-confirm-day ${confirmed ? 'confirmed' : ''}" onclick="mmToggleConfirmDay(${d})">${confirmed ? '✓ Confirmed (both kids)' : 'Confirm this day'}</button>
+    </div>`;
+}
+/* Parent taps an item in the meeting review.
+
+   A routine toggles the tracked session (no money, feeds the streak). A chore
+   writes a GRADE — agreeing the kid's claim at the quality she said, or a
+   plain "on time" when she never answered. Tapping a graded chore ungrades it.
+   Either way it is the same store the portal and the money engine read, so
+   Step 3 recomputes from it the moment this returns. */
+/* ── Keyed by WHAT it is, never by where it sat ────────────────────
+   This took `idx` and indexed mmReviewRows(kid, d)[idx], with the rendered
+   button carrying that position. That was safe only while every day produced
+   the same rows. The moment the routine set varies per day — which is the whole
+   point of routineSessionsForDay — a stale index from a previous render toggles
+   the WRONG session, or falls past the routines into the chore branch and
+   writes a GRADE, which is money.
+
+   So the row is found by kind and key. A miss returns silently: the render is
+   stale, and doing nothing is the only safe answer when you cannot tell what
+   the tap meant. */
+function mmToggleItem(kid, d, kind, key) {
+  const wk = mmWeekKey();
+  const row = mmReviewRows(kid, d).find(r => r.kind === kind && r.key === key);
+  if (!row) return;
+  if (row.kind === 'routine') {
+    ctSetMandatory(wk, d, row.key, kid, !row.on);
+    ctMaybeFireGoalBonus(wk, kid);
+  } else {
+    // Agree at what she claimed; if she never claimed, agree at "on time".
+    const next = row.on ? 0 : (row.claim > 0 ? row.claim : 3);
+    mrSetChoreGrade(kid, wk, d, row.key, next);
+  }
+  mnyReopenWeek(kid, wk);
+  saveAll();
+  renderMeetingMode();
+}
+
+/* ── Filling in a week nobody wrote down ──────────────────────────
+   A paid chore reaches step 1 only where the planner scheduled it: the `chores`
+   lane is `needsBlock: true`, so a week with no blocks in it — the busy
+   fortnight this is all for — offered three routines a day and not one chore to
+   tick. The money channel that matters was unreachable, and the only way to put
+   anything on the week was step 3's override steppers, which agree a lump sum
+   with no working behind it.
+
+   The fix needs no new store and no change to mrChoresForDay. That reader
+   already has an `unplanned` branch — written for "she mops without being
+   asked" — which surfaces any chore carrying a claim or a grade even with no
+   block behind it. So recording one is just writing the grade, exactly as
+   ticking a planned chore does, and every surface downstream picks it up. */
+function mmAddChoreOptions(kid, d) {
+  const wk = mmWeekKey();
+  const have = new Set(mmReviewRows(kid, d).filter(r => r.kind === 'chore').map(r => r.key));
+  return mrPoolRows(wk).filter(row => mrLanePays(row.lane) && !have.has(row.id)
+    && (row.who === 'both' || row.who === kid));
+}
+function mmToggleAddChore(kid, d) {
+  const key = kid + '|' + d;
+  mmAddChoreFor = (mmAddChoreFor === key ? null : key);
+  renderMeetingMode();
+}
+/* Graded at "on time" because a parent adding a chore from memory is agreeing
+   it happened, not ranking how it went — and the grade buttons in the portal
+   and the tap in step 1 can still change it afterwards. */
+function mmAddChoreHappened(kid, d, choreId) {
+  const wk = mmWeekKey();
+  if (!mrPoolRow(choreId, wk)) return;
+  if (!mrSetChoreGrade(kid, wk, d, choreId, 3)) return;
+  mmAddChoreFor = null;
+  mnyReopenWeek(kid, wk);
+  saveAll();
+  renderMeetingMode();
+}
+/* All three routines for one kid on one day. Reconstructing a fortnight one tap
+   at a time is 42 taps per kid, which is how a catch-up becomes a week nobody
+   bothers to settle. Still the parent's assertion, and still the same store a
+   live tick writes — this only saves the taps. */
+/* Both go through the owners: mrAddFine and mrDeleteFine. This screen is a
+   second ENTRY POINT, never a second decision — the same shape as the gift's
+   two doors, and not the "six copies" defect, which was six places each
+   deciding the answer for themselves. */
+function mmAddFineOnDay(kid, d, itemId) {
+  if (!isParent()) { showToast('A grown-up records a fine 🔒'); return; }
+  if (!itemId) return;
+  mrAddFine(kid, itemId, mmDayKey(d));
+  mnyReopenWeek(kid, mmWeekKey());
+  saveAll();
+  renderMeetingMode();
+}
+function mmUndoFine(kid, fineId) {
+  if (!isParent()) { showToast('A grown-up records a fine 🔒'); return; }
+  if (!fineId) return;
+  mrRemoveFine(kid, fineId);
+  mnyReopenWeek(kid, mmWeekKey());
+  saveAll();
+  renderMeetingMode();
+}
+
+function mmToggleAllRoutines(kid, d) {
+  const wk = mmWeekKey();
+  // The same set the footer label counted — see mmRenderDayDetail above.
+  const asked = routineSessionsForDay(kid, wk, d);
+  if (!asked.length) return;
+  const all = asked.every(s => ctGetMandatory(wk, d, s, kid));
+  asked.forEach(s => ctSetMandatory(wk, d, s, kid, !all));
+  ctMaybeFireGoalBonus(wk, kid);
+  mnyReopenWeek(kid, wk);
+  saveAll();
+  renderMeetingMode();
+}
+
+/* ── Step 2 — Celebrate ───────────────────────────────────────────
+   This counted chores through ctGetOptional — `optionalByWeek`, the retired
+   chore-GROUP store that three separate comments in this codebase already say
+   nothing downstream reads. Under the graded model it returns nothing, so a
+   week with real graded chores was celebrated as "0 chores done", and the
+   money line showed ctWeekMoney: a live preliminary figure, not what was
+   actually recorded. A celebration that congratulates a child for the wrong
+   things is worse than no celebration, because she cannot tell which.
+
+   Every line now reads a live source: routines from the same routine
+   completion every screen uses, chores from real parent grades, hours from
+   getWeeklyHours, money from the FROZEN ledger once it exists, XP from the XP
+   ledger. Nothing here is computed a second way. */
+
+/* The third copy of this chart, and the third bucketing of the same blocks.
+   It read b.completed directly, so a routine finished by its checklist counted
+   as zero minutes done; and it scaled each kid's bars to her own biggest row,
+   so the two cards sat side by side and could not be compared. Both come from
+   getWeeklyHours now, on one scale. */
+function mm2b(kid, scaleMax) {
+  const wk = mmWeekKey();
+  const h = getWeeklyHours(kid, wk);
+  const maxMin = scaleMax || Math.max(60, ...Object.values(h.byGroup).map(v => v.planned));
+  const rows = GROUP_ORDER.filter(g => h.byGroup[g].planned > 0).map(g => {
+    const p = h.byGroup[g].planned, dn = h.byGroup[g].completed;
+    const inner = (g === 'brain' && h.schoolMin > 0)
+      ? `<small class="mm-2b-sub"> (${fmtHrsMin(h.schoolMin)} school)</small>` : '';
+    return `<div class="mm-2b-row"><span class="mm-2b-label">${groupLabel(g)}${inner}</span>
+        <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${Math.round(p / maxMin * 100)}%"></span><span class="mm-2b-done" style="width:${Math.round(dn / maxMin * 100)}%;background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span></span>
+        <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
+  }).join('') || `<div class="ct-meta">No scheduled blocks this week.</div>`;
+  return `<div class="mm-2b-kid"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${escapeHtml(kidLabel(kid).name)} — ${fmtHrsMin(h.completed)} completed / ${fmtHrsMin(h.planned)} planned</div>${rows}</div>`;
+}
+/* One scale for both girls, computed before either card is drawn. */
+function mm2bScale(wk) {
+  return Math.max(60, ...['jenn', 'jess'].flatMap(k =>
+    Object.values(getWeeklyHours(k, wk).byGroup).map(v => v.planned)));
+}
+
+/* ── ↺ Redo: ONE GIRL'S snapshot, taken at her sign ─────────────────
+   Sunday v15 signs one girl at a time, and ↺ Redo my plan returns her and
+   only her (Plan v3 §A, Rev 2). The meeting-wide picture that used to sit
+   here ("puts both girls back", idempotent per week) is retired with its
+   button in Stage 4; `undoReturnsBothChildren` went with it on purpose. */
+function mmTakeUndoSnapshot(wk, kid) {
+  if (kid !== 'jenn' && kid !== 'jess') return;
+  mmTakeKidUndoSnapshot(wk, kid);
+}
+
+/* Everything one girl's commit can change in HER profile — the part of the
+   picture the meeting-wide and the per-kid undo share. */
+function mmUndoKidState(kid) {
+  return {
+    wallet: ensureWallet(kid),
+    // Every debt, every holding and every deposit the commit can touch. A kid
+    // can owe for more than one thing, so snapshotting only the first debt
+    // would leave the others paid down against a week that was un-recorded.
+    debts: (typeof mnyDebts === 'function') ? mnyDebts(kid) : null,
+    holdings: (typeof mnyHoldings === 'function') ? mnyHoldings(kid) : null,
+    deposits: (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : null,
+    // Goal progress moves with the money, so it has to come back with it.
+    savingGoals: (typeof mnyEnsureGoals === 'function') ? mnyEnsureGoals(kid) : null,
+    /* Both XP fields AND the week's tally. Restoring the total without the
+       tally would leave the cap thinking the week's allowance was already
+       spent, so a re-record after an undo would credit nothing. */
+    xp: (typeof getQuestXP === 'function') ? getQuestXP(kid) : ((getProfData(kid).progress || {}).questXP || 0),
+    xpLegacy: (getProfData(kid).progress || {}).questXP || 0,
+    xpByWeek: JSON.parse(JSON.stringify((getProfData(kid).progress || {}).xpByWeek || {})),
+    // The meeting also empties the box, so undo has to put it back.
+    boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
+    /* The "made on its own since the last meeting" baseline needs no field of
+       its own: mnyStampPassiveBaseline writes `baselineAt` onto each
+       holding, and `holdings` above is a deep copy, so restoring it restores
+       the baseline with it. Worth saying out loud — it is not obvious, and an
+       undo that missed it would swallow a stretch of interest for good. */
+    // Sunday v15: her questions to a grown-up are stamped `appliedWeek` at
+    // sign, so they come back with everything else.
+    requests: (typeof mnyEnsureRequests === 'function') ? mnyEnsureRequests(kid) : null,
+    // …and her move questions, stamped `appliedWeek` at sign too (Stage 4).
+    moveRequests: (typeof mnyEnsureMoveRequests === 'function') ? mnyEnsureMoveRequests(kid) : null,
+  };
+}
+function mmStreamIdsOf(kid) {
+  return (typeof evIdsOf === 'function' && typeof evList === 'function') ? evIdsOf(evList(kid)) : {};
+}
+/* Put one girl's profile back from a picture taken by mmUndoKidState. */
+function mmRestoreKidState(kid, s) {
+  const pd = getProfData(kid);
+  pd.wallet = s.wallet;
+  if (s.debts) pd.debts = s.debts;
+  if (s.holdings) pd.holdings = s.holdings;
+  if (s.deposits) pd.deposits = s.deposits;
+  if (s.savingGoals) pd.savingGoals = s.savingGoals;
+  if (s.boxItems) pd.boxItems = s.boxItems;
+  if (s.requests) pd.requests = s.requests;
+  if (s.moveRequests) pd.moveRequests = s.moveRequests;
+  if (!pd.progress) pd.progress = {};
+  pd.progress.xp2 = s.xp;
+  pd.progress.questXP = s.xpLegacy;
+  pd.progress.xpByWeek = s.xpByWeek;
+}
+/* Take a commit's own stream lines back off her stream — removed and
+   tombstoned, never reversed: the commit did not happen. */
+function mmTakeBackStreamLines(kid, ids) {
+  if (!ids || !ids.length || typeof evWithout !== 'function') return 0;
+  const pd = getProfData(kid);
+  const before = (pd.events || []).length;
+  pd.events = evWithout(pd.events || [], ids);
+  tombstoneIds('ev:', ids);
+  return before - pd.events.length;
+}
+
+/* ── ↺ Redo: one girl's own snapshot (Plan v3 §A, §E) ──────────────
+   Taken at her sign, after the money moved since any earlier commit was asked
+   about (mmUndoHeld). Holds her profile, her row of each week map, and every
+   event id on her stream, so mmUndoRecord(kid) can return HER and leave her
+   sister's signing exactly as it is. Idempotent per kid per week. */
+function mmTakeKidUndoSnapshot(wk, kid) {
+  const had = mmUndoKid[kid];
+  if (had && had.wk === wk) return;
+  const gone = mmUndoKidGone[kid];
+  if (gone && gone.wk === wk) return;
+  delete mmUndoKidGone[kid];
+  if (typeof mnySimCatchUp === 'function') mnySimCatchUp(kid);
+  const c = state.shared.chore;
+  const row = (map) => (c[map] && c[map][wk] && Object.prototype.hasOwnProperty.call(c[map][wk], kid))
+    ? { has: true, value: JSON.parse(JSON.stringify(c[map][wk][kid])) } : { has: false };
+  mmUndoKid[kid] = {
+    wk, kid,
+    state: JSON.parse(JSON.stringify(mmUndoKidState(kid))),
+    rows: { finalizedWeeks: row('finalizedWeeks'), xpAwardedWeeks: row('xpAwardedWeeks'),
+            moneyLedger: row('moneyLedger'), weekPlans: row('weekPlans'), weekConfirms: row('weekConfirms') },
+    committedBefore: isChildMoneyCommitted(kid, wk),
+    streamIds: mmStreamIdsOf(kid),
+    seen: mmUndoMovementIds([kid]),
+    written: [],
+  };
+}
+
+/* ── The Undo is withdrawn once money moves after the meeting ──────
+   mmUndoRecord puts wallets, debts, holdings, deposits and the week's records
+   back WHOLESALE. So anything that moved money after the commit — a late meet
+   (mnyLateCompSync), a gift, a move, an approval, a payment that arrived from
+   the other device — was wiped from the wallet while its line stayed on the
+   stream: the wallet and the stream disagreed, and committing the week again
+   paid the meet a second time.
+
+   Every one of those movements lands on the stream, whether this device wrote
+   it (evAdd) or the other one did (the merge unions `profile.events` by id).
+   So the stream is the one place that catches the whole class, and this asks
+   it rather than hooking each writer: the snapshot keeps the id of every
+   movement on both girls' streams, and any movement that is not one of them
+   means the undo would wipe something real. The undo is dropped, and the
+   reason kept so the meeting can say it.
+
+   The commit's OWN movements must not count, for either girl — both are
+   settled one after the other in one sitting and the second must keep the
+   undo. That is an explicit bracket, not timing: a commit asks this question
+   before it writes anything (so what moved in between is caught), and
+   `mmUndoSeal` adds what it wrote once it is done. A commit that throws
+   half-way is never sealed, and its movements then withdraw the undo — the
+   safe way round. A marker (a zero-amount row) moves nothing and is ignored. */
+const MM_UNDO_GONE_SENTENCE = 'Undo is gone — money moved after this meeting; correct the item itself.';
+function mmUndoMovementIds(kids) {
+  const ids = {};
+  if (typeof evList !== 'function') return ids;
+  (kids || ['jenn', 'jess']).forEach(k => evList(k).forEach(e => {
+    if (e && e.id && money2(e.amount) > 0) ids[e.id] = true;
+  }));
+  return ids;
+}
+/* Is the undo still safe to offer? Drops it — and says why — when not.
+   With a kid: her own ↺ Redo, asked of her own stream only — money moved
+   after HER sign withdraws HER redo, and her sister's is untouched. */
+function mmUndoHeld(kid) {
+  const u = mmUndoKid[kid];
+  if (!u) return false;
+  const seen = u.seen || {};
+  const moved = (typeof evList === 'function' ? evList(kid) : []).find(e =>
+    e && e.id && money2(e.amount) > 0 && !seen[e.id]);
+  if (!moved) return true;
+  mmUndoKidGone[kid] = { wk: u.wk, why: (moved.note || moved.kind || 'money moved') };
+  delete mmUndoKid[kid];
+  return false;
+}
+/* The end of a commit: what it moved is part of the meeting, not after it —
+   and it is exactly what an undo takes back off the stream (`written`). */
+function mmUndoSeal(kid) {
+  const u = mmUndoKid[kid];
+  if (!u) return;
+  u.seen = mmUndoMovementIds([kid]);
+  u.written = (typeof evWrittenSince === 'function') ? evWrittenSince(evList(kid), u.streamIds) : [];
+}
+
+function mmUndoRecord(kid) { return mmUndoKidRecord(kid); }
+
+/* ↺ Redo for one girl. Her profile, her row of every week map and her
+   commit's stream lines go back; her sister's signing is not touched. The
+   week reads "recorded" (`meetingsHeld`) only while a girl is still signed,
+   and "we sat down" (`meetingsMet`) is left as it is. */
+function mmUndoKidRecord(kid) {
+  if (!mmUndoHeld(kid)) {
+    const g = mmUndoKidGone[kid];
+    if (g) showToast(MM_UNDO_GONE_SENTENCE);
+    return false;
+  }
+  const u = mmUndoKid[kid];
+  const c = state.shared.chore; const wk = u.wk;
+  mmRestoreKidState(kid, u.state);
+  mmTakeBackStreamLines(kid, u.written);
+  Object.keys(u.rows).forEach(map => {
+    const r = u.rows[map];
+    if (r.has) {
+      if (!c[map]) c[map] = {};
+      if (!c[map][wk]) c[map][wk] = {};
+      c[map][wk][kid] = r.value;
+    } else if (c[map] && c[map][wk]) {
+      // safe-delete: ctStampWeekState(wk) below hands the week over whole
+      delete c[map][wk][kid];
+    }
+  });
+  const sister = kid === 'jenn' ? 'jess' : 'jenn';
+  if (c.meetingsHeld && !isChildMoneyCommitted(sister, wk) && !u.committedBefore) {
+    // safe-delete: ctStampWeekState(wk) below hands the week over whole
+    delete c.meetingsHeld[wk];
+  }
+  ctStampWeekState(wk);
+  delete mmUndoKid[kid];
+  saveAll();
+  return true;
+}
+
+/* ── Where is this week, relative to now? ─────────────────────────
+   The last step used to offer "Copy this week → next week" whatever week the
+   meeting was pointed at, and mmPlanNextWeek read ctWeekInfo and then did
+   weekOffset += 1 — so opening a week from six weeks ago and pressing it
+   copied that historical week into the following historical one, over the top
+   of a week that had already happened. */
+function mmWeekPosition(wk) {
+  const now = ctThisWeekKey();
+  if (wk === now) return 'current';
+  return wk < now ? 'past' : 'future';
+}
+
+/* Step 5 — what this week can still have done to it. */
+/* ── What the week actually stands at, per child ──────────────────
+   Four facts, each read through whichever accessor already owns it: days
+   reviewed (isDayReviewed, with canReviewDay deciding which days could even
+   count), the reflection (reflGet), the money (mmKidSettled), and the action
+   she chose to carry forward. This owns none of them and decides nothing — it
+   is the last place in the sitting where a parent can see the whole week, and a
+   second opinion about any of these numbers is the thing the status vocabulary
+   exists to prevent. */
+function mmCloseSummary(wk) {
+  const keys = mrWeekDayKeys(wk);
+  return `<div class="mm-close-sum">${['jenn', 'jess'].map(kid => {
+    const name = kidLabel(kid).name;
+    /* Only days that COULD be reviewed count against her — a day that has not
+       happened is not a day anybody failed to review. A day still RUNNING is a
+       different matter and counts: this used to exclude it exactly as the close
+       gate did, so a week with Sunday's swim still in the pool read "6/6" and
+       closed. weekDaysAwaitingReview (js/36-status.js) is that one decision. */
+    const due = keys.filter(k => canReviewDay(kid, k).reason !== 'future');
+    const reviewed = due.filter(k => isDayReviewed(kid, k)).length;
+    const rec = (typeof reflGet === 'function') ? reflGet(wk, kid) : null;
+    /* Complete is no longer the end of the story: closing the week now needs
+       the conversation to have been recorded, so a finished reflection nobody
+       has ticked has to say which of the two it is waiting on. */
+    const refl = !rec ? '—'
+      : reflIsSkipped(rec) ? '⏭ skipped'
+      : reflIsComplete(rec) ? (rec.parentReviewedAt
+          ? '✅ complete' : '✅ complete · conversation not confirmed')
+      : `${reflDoneCount(rec)}/3`;
+    const money = mmKidSettled(wk, kid);
+    const action = (rec && typeof reflActionText === 'function') ? reflActionText(rec) : '';
+    /* Where the action went. The summary named the action and stopped, so the
+       one screen that exists to say what the week stands at could not say
+       whether the thing she decided to do had reached a plan she will open. */
+    const carry = (rec && action && typeof reflCarryLabel === 'function')
+      ? reflCarryLabel(rec, kid) : '';
+    /* A clash is the week's own finding, asked the week's way — the same
+       question computeBufferConflicts already answers for the week grid and for
+       the reflection's evidence. Reported here, never resolved here: the plan is
+       what does not fit, and closing a week must not quietly move a block. */
+    let clashes = 0;
+    if (typeof computeBufferConflicts === 'function') {
+      keys.forEach(k => {
+        clashes += computeBufferConflicts(getDayBlocksForProfile(k, kid) || []).affected.size;
+      });
+    }
+    return `<div class="mm-close-kid">
+        <div class="mm-close-name">${CT_PROFILE_ICON[kid]} ${escapeHtml(name)}</div>
+        <div class="mm-close-row"><span>Days reviewed</span><span>${reviewed}/${due.length}</span></div>
+        <div class="mm-close-row"><span>Reflection</span><span>${refl}</span></div>
+        <div class="mm-close-row"><span>Money</span><span>${money.decided ? '✅ settled' : (money.agreed ? 'agreed, not settled' : 'not agreed')}</span></div>
+        ${clashes ? `<div class="mm-close-row mm-close-clash"><span>Clashes</span><span>${clashes} block${clashes === 1 ? '' : 's'} ran into something else</span></div>` : ''}
+        ${action ? `<div class="mm-close-action"><b>Next week:</b> ${escapeHtml(action)}
+          <span class="mm-cap">${escapeHtml(carry)}</span></div>` : ''}
+      </div>`;
+  }).join('')}</div>`;
+}
+
+function mmRenderPlan(wk) {
+  const pos = mmWeekPosition(wk);
+  const strip = mmSettledStrip(wk);
+
+  if (pos === 'future') {
+    /* A week that has not happened cannot be reviewed, settled or closed —
+       there is nothing to review. Planning it is the week screen's job. */
+    return `${strip}
+      <div class="mm-h">This week hasn't happened yet</div>
+      <div class="ct-meta">A future week can't be reviewed or closed. Plan it in the weekly planner, and come back once it has been lived.</div>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" data-mm-action="thisweek">Go to this week ▶</button>`;
+  }
+
+  if (pos === 'past') {
+    /* Catching up. The two things that make sense here are finishing the
+       review and getting back to the present — never planning forward from a
+       week that is already behind. */
+    const unsettled = ['jenn', 'jess'].map(k => mmKidSettled(wk, k)).filter(x => !x.decided);
+    const go = unsettled[0];
+    return `${strip}
+      <div class="mm-h">Finish reviewing this week</div>
+      ${mmCloseSummary(wk)}
+      <div class="ct-meta">${escapeHtml(mmWeekLabel(wk))} has already been and gone, so there is nothing to plan forward from it. Finish what it still owes, then come back to the present.</div>
+      ${go
+        ? `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mnySetMeetKid('${escapeJsAttr(go.kid)}');mmGoStep(${go.agreed ? 4 : 3})">Finish ${escapeHtml(go.name)}'s week ▶</button>`
+        : `<div class="mm-recorded">✅ This week is fully reviewed and settled.</div>`}
+      <button type="button" class="ui-btn ui-btn--secondary" data-mm-action="thisweek">Return to this week</button>`;
+  }
+
+  // Current week: close it, then move on. Copying a schedule stays where it
+  // already lives — inside the next week's planner — rather than growing a
+  // second copy control here.
+  const gate = canCloseWeek(wk);
+  const closed = isWeekClosed(wk);
+  let closeBtn;
+  if (closed) {
+    closeBtn = `<div class="mm-recorded">✅ This week is closed.</div>
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="mmReopenWeek()">Reopen it</button>`;
+  } else if (gate.ok) {
+    closeBtn = `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mmCloseWeekNow()">🔒 Close the week</button>`;
+  } else {
+    const why = gate.missing.map(m => {
+      const who = kidLabel(m.kid).name;
+      if (m.reason === 'days') return `${who} has ${m.n} day${m.n === 1 ? '' : 's'} still to review`;
+      if (m.reason === 'reflection') return `${who}'s reflection is not finished or skipped`;
+      if (m.reason === 'reflection-talk') return `nobody has recorded talking through ${who}'s reflection`;
+      return `${who}'s money is not settled yet`;
+    }).join(' · ');
+    closeBtn = `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" disabled>🔒 Close the week</button>
+      <div class="ct-meta">${escapeHtml(why)}.</div>`;
+  }
+  return `${strip}
+    <div class="mm-h">Close the week</div>
+    ${mmCloseSummary(wk)}
+    <div class="ct-meta">Closing records that both girls' days were reviewed and the money was settled. It is a separate fact from "we met" and from "the money moved".</div>
+    ${closeBtn}
+    <div class="mm-h mm-h-sub">Next week</div>
+    <div class="ct-meta">Open next week to plan it. Copying a schedule across lives in the planner itself, next to the week it would land on.</div>
+    <button type="button" class="ui-btn ui-btn--secondary" onclick="mmOpenNextWeek()">Open next week ▶</button>`;
+}
+
+/* Which days of this week are still ahead, named. Empty on the last day, so the
+   ordinary Sunday-afternoon meeting is never asked to justify itself. Named by
+   POSITION in the week rather than by parsing the key — mrWeekDayKeys is already
+   Monday-first, which is the order DAY_LONG is written in. */
+function mmDaysStillAhead(wk) {
+  const keys = mrWeekDayKeys(wk);
+  const today = todayKey();
+  return keys.map((k, i) => ({ key: k, name: DAY_LONG[i] })).filter(d => d.key > today);
+}
+
+async function mmCloseWeekNow() {
+  const wk = mmWeekKey();
+  const gate = canCloseWeek(wk);
+  if (!gate.ok) { showToast('Both girls need reviewing and settling first'); return; }
+  /* Every elapsed day being reviewed is not the same as the week being over —
+     with today signed off through "nothing else today", a Tuesday can satisfy
+     the gate. Closing is reversible and does not touch the money, so this asks
+     rather than refuses; it names the days still to come, because "Close the
+     week" on a Wednesday does not sound like what it does. */
+  const ahead = mmDaysStillAhead(wk);
+  if (ahead.length) {
+    const span = ahead.length === 1
+      ? ahead[0].name : `${ahead[0].name} to ${ahead[ahead.length - 1].name}`;
+    const ok = await showConfirm(
+      `The week is still in progress — ${span} ${ahead.length === 1 ? 'has' : 'have'} not happened yet.\n\n`
+      + `Closing it records the week as reviewed and locks both reflections. You can reopen it.\n\nClose it early?`,
+      { okLabel: 'Close it early', cancelLabel: 'Not yet' });
+    if (!ok) return;
+  }
+  setWeekClosed(wk, true);
+  saveAll();
+  renderMeetingMode();
+  showToast('🔒 Week closed');
+}
+function mmReopenWeek() {
+  setWeekClosed(mmWeekKey(), false);
+  saveAll();
+  renderMeetingMode();
+  showToast('Week reopened');
+}
+/* Straight to next week's planner. No copying — the planner's own offer is
+   there, beside the week it would actually land on. */
+function mmOpenNextWeek() {
+  const wk = mmWeekKey();
+  // setDate(+7), not +7*864e5. A week is not always 168 hours: on the weekend
+  // the clocks go back it is 169, so adding milliseconds landed at 23:00 on the
+  // SUNDAY, dateToLocalKey returned a Sunday key, and computeWeekOffsetForDayKey
+  // mapped that straight back to the current Monday — "open next week" opened
+  // the week you were already on, once a year. Every other week-step in the repo
+  // uses setDate for exactly this reason.
+  const nextMon = formatDayKey(wk);
+  nextMon.setDate(nextMon.getDate() + 7);
+  const next = dateToLocalKey(nextMon);
+  mmClearReturn();
+  mmHide();
+  weekOffset = computeWeekOffsetForDayKey(next);
+  showScreen('week');
+  renderWeek();
+}
+
+/* ── Is this meeting actually finished? ──
+   The week is only recorded once BOTH kids are settled — commitMeetingShared
+   fires from step 4 on the condition that jenn and jess are each committed. So
+   a parent who worked through Jess and closed on "🎉 Finish meeting" left
+   Jenn's week un-agreed, un-decided and unrecorded, with nothing on screen
+   saying so. This strip is the missing readout: two rows, two states each,
+   every one of them a tap to the step that fixes it. */
+function mmKidSettled(wk, kid) {
+  return {
+    kid,
+    name: kidLabel(kid).name,
+    /* `old` was "earned under the retired group model", which counted such a
+       week as settled so it could not block the meeting forever. There is one
+       model now and every week has something to agree and decide, so nothing
+       is waved through — the field stays, always false, because the settle
+       strip and mmRenderExpress both read it. */
+    old: false,
+    agreed: mnyIsConfirmed(wk, kid),
+    decided: mnyIsCommitted(wk, kid),
+  };
+}
+function mmAllSettled(wk) {
+  return ['jenn', 'jess'].every(k => mmKidSettled(wk, k).decided);
+}
+function mmSettledStrip(wk) {
+  const rows = ['jenn', 'jess'].map(k => {
+    const s = mmKidSettled(wk, k);
+    const cell = (on, label, step) =>
+      `<button type="button" class="mm-settle-cell ${on ? 'on' : ''}"
+         onclick="mnySetMeetKid('${escapeJsAttr(k)}');mmGoStep(${step})">${on ? '✓' : '○'} ${label}</button>`;
+    return `<div class="mm-settle-row">
+        <span class="mm-settle-who">${CT_PROFILE_ICON[k]} ${escapeHtml(s.name)}</span>
+        ${cell(s.agreed, 'Agreed', 3)}${cell(s.decided, 'Decided', 4)}
+      </div>`;
+  }).join('');
+  const done = mmAllSettled(wk);
+  return `<div class="mm-settle ${done ? 'done' : ''}">
+      <div class="mm-settle-cap">${done
+        ? '✅ Both weeks are settled — the money has moved and the week is recorded.'
+        : 'Before you finish — tap anything unticked to go and do it.'}</div>
+      ${rows}
+    </div>`;
+}
+/* What the last button should say. A family genuinely might stop halfway and
+   come back, so this names the gap rather than refusing — and keeps a way out. */
+
+function mmFinishButtons(wk) {
+  if (mmAllSettled(wk)) {
+    return `<button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mmCloseMeeting()">🎉 Finish meeting</button>`;
+  }
+  const unsettled = ['jenn', 'jess'].map(k => mmKidSettled(wk, k)).filter(s => !s.decided);
+  const gap = unsettled.length === 2
+    ? "Neither week is decided yet"
+    : `${unsettled[0].name}'s week isn't decided yet`;
+  const goTo = unsettled[0];
+  return `<span class="mm-finish-gap">
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="mmCloseMeeting()">Close anyway</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
+    </span>`;
+}
+
+// Core money commit for the weekly meeting (no UI): credit each kid's prelim
+// pocket money to cash, advance the money world one month (interest + GIC
+// maturities), step the market, and mark the week held. Returns summary parts.
+/* The per-kid half. Split out of commitFamilyMeeting so the redesigned meeting
+   can settle one kid at a time — she decides what happens to her own money on
+   step 4, and her sister's week is a separate conversation that may not even
+   happen on the same evening. */
+function commitKidWeek(wk, kid) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.finalizedWeeks) c.finalizedWeeks = {};
+  if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
+  if (!c.meetingsHeld) c.meetingsHeld = {};
+  if (!c.moneyLedger) c.moneyLedger = {};
+  if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
+  const parts = [];
+  {
+    const w = ensureWallet(kid);
+    const name = kidLabel(kid).name;
+    // The breakdown is frozen HERE, before anything moves. Recomputing it later
+    // would read today's rules and today's grades, so a price edit or a late
+    // regrade would silently rewrite what a past week said it paid. History has
+    // to be a record, not a recomputation.
+    const ledger = (c.moneyLedger[wk][kid] == null) ? mrFreezeWeekLedger(wk, kid) : null;
+    if (c.finalizedWeeks[wk][kid] == null) {
+      const prelim = ctWeekMoney(wk, kid);
+      w.cash = money2(w.cash + prelim);
+      c.finalizedWeeks[wk][kid] = prelim;
+      /* The stream's record of the settlement (js/40-stream.js). The dollars and
+         the fact are two events on purpose: a week settled at $0 still has to be
+         answerable as settled, and a marker is the only row that survives a
+         quiet week. This is what will replace `finalizedWeeks`, `committedAt`
+         and `meetingsHeld` — three stored flags with three writers that could
+         and did disagree — once shadow mode has proved the balances agree. */
+      if (prelim > 0) evSettleLines(kid, wk, prelim, true);
+      evMirror(kid, { kind: 'settle', amount: 0, dayKey: wk, weekKey: wk, ref: wk,
+                      note: 'Week of ' + wk + ' settled' });
+      if (prelim > 0) parts.push(`${name} +${fmtMoney(prelim)}`);
+    }
+    // XP is computed all week but only credited here — awarding it on render
+    // would multiply it by however many times the screen redrew. Idempotent
+    // per week, so re-recording can't double-award.
+    {
+      const xp = mrCreditWeekXp(wk, kid);
+      if (xp > 0) parts.push(`${name} +${xp} XP`);
+      /* The loan is no longer paid here: the Sunday sign pays the must-pay
+         and the extra through the loan's own owners after this (mnyDoCommit,
+         js/23 — Plan v3 §E step 6), and fills `ledger.loan`. The old monthly
+         transfer and arrears charge are retired (Stage 4). */
+      // The box opens at the meeting, not on a calendar day.
+      const released = mrReleaseBoxForMeeting(kid);
+      if (released > 0) parts.push(`${name} box opened (${released})`);
+      // Fill in what only became known as the meeting ran.
+      if (ledger) {
+        ledger.xp = xp;
+        ledger.boxReleased = released;
+        c.moneyLedger[wk][kid] = ledger;
+      }
+    }
+    const adv = moneyAdvanceMonth(kid);
+    adv.matured.forEach(m => parts.push(`${name} unlocked +${fmtMoney(m.payout)}`));
+  }
+  saveAll();
+  return { parts, ledger: (c.moneyLedger[wk] || {})[kid] || null };
+}
+
+/* The half that belongs to the family rather than to one kid. Runs once, when
+   both weeks are settled — marking the meeting held before the second kid has
+   decided anything would lock her out of her own step 4. */
+function commitMeetingShared(wk) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.meetingsHeld) c.meetingsHeld = {};
+  bankSyncMarketMonth();   // the calendar moves the market, not the meeting count
+  c.meetingsHeld[wk] = true;
+  // Stamp the add as well as the removals: a week that has been undone once
+  // carries a stamp forever after, and an unstamped re-record would lose to it.
+  ctStampWeekState(wk);
+  saveAll();
+}
+
+/* Both kids in one press. The redesigned meeting settles them one at a time on
+   step 4; this stays for the legacy path and for anything that just wants the
+   week recorded. */
+function commitFamilyMeeting(wk) {
+  const parts = [];
+  ['jenn', 'jess'].forEach(kid => {
+    parts.push(...commitKidWeek(wk, kid).parts);
+    // That Sunday's must-pay, through the sign's own loan step (Stage 4b).
+    mnyCatchUpLoan(kid, wk);
+  });
+  commitMeetingShared(wk);
+  return parts;
+}

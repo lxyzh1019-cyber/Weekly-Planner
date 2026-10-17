@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Gochi+Hand&family=Nunito:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#fef9ef;font-family:'Patrick Hand',sans-serif;color:#2a2320} a{color:#c14a24} a:hover{color:#2a2320}</style>
+</helmet>
+<div data-screen-label="iPad · Grown-ups 21c" style="width:1194px;height:834px;position:relative;overflow:hidden;background:#fef9ef;font-family:'Patrick Hand',sans-serif;font-size:18px;color:#2a2320;box-sizing:border-box">
+  <div style="height:64px;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:3px solid #2a2320;background:#fffdf5">
+    <div style="font-family:'Gochi Hand',cursive;font-size:28px">📓 Weekly Planner</div>
+    <div style="margin-left:auto;min-height:40px;display:flex;align-items:center;border:2.5px dashed #2a2320;border-radius:11px;padding:0 12px;font-size:16px;background:#fff4db">🔒 Dad only</div>
+  </div>
+  <div style="height:56px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:3px solid #2a2320;box-sizing:border-box">
+    <a href="My Money v2 Screen.dc.html" style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#fffdf5;color:#2a2320;text-decoration:none">🏠 My money</a>
+    <a href="Sunday v15 Screen.dc.html" style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#fffdf5;color:#2a2320;text-decoration:none">☀️ Sunday</a>
+    <div style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#c14a24;color:#fff">👨‍👩‍👧 Grown-ups</div>
+    <div data-name="sub tabs" style="margin-left:auto;display:flex;gap:6px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+        <button type="button" onClick="{{ t.pick }}" style="min-height:44px;border:2.5px solid #2a2320;border-radius:11px;padding:0 11px;font:inherit;font-size:16px;white-space:nowrap;cursor:pointer;background:{{ t.bg }};color:{{ t.ink }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:14px;padding:12px 14px;height:714px;box-sizing:border-box">
+    <sc-if value="{{ isApprove }}" hint-placeholder-val="{{ true }}">
+      <div data-name="approve queue" style="display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:auto;padding:2px 6px 6px 2px">
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Gochi Hand',cursive;font-size:28px">✅ Waiting for you</div><div style="font-family:'Caveat',cursive;font-size:22px;color:#6b5d4f">Nothing pays until it passes here.</div></div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start">
+          <sc-for list="{{ queue }}" as="q" hint-placeholder-count="4">
+            <div data-name="request card" style="position:relative;background:{{ q.bg }};border:2.5px {{ q.borderStyle }} #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px;border:2px solid #2a2320;border-radius:8px;padding:0 8px;background:{{ q.kidBg }}">{{ q.kid }}</span><span style="font-size:14px;color:#6b5d4f">{{ q.kindLabel }}</span><div style="margin-left:auto;display:flex;align-items:center;gap:4px"><sc-if value="{{ q.adj }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ q.payLess }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">−</button></sc-if><b style="min-width:44px;text-align:center;font-family:'Nunito',sans-serif;font-size:20px">{{ q.amtLabel }}</b><sc-if value="{{ q.adj }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ q.payMore }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">+</button></sc-if></div></div>
+              <div style="font-size:18px;line-height:1.2">{{ q.icon }} {{ q.text }}</div>
+              <div style="font-size:15px;color:#5a4d41;line-height:1.25">{{ q.rulesLine }}</div>
+              <div style="font-size:14px;color:#2a5f59;border:1.5px dashed #2f7f77;border-radius:8px;padding:3px 8px">{{ q.check }}</div>
+              <sc-if value="{{ q.open }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;gap:6px">
+                  <button type="button" onClick="{{ q.yes }}" style="flex:1.3;min-height:44px;border:2.5px solid #2a2320;border-radius:10px;background:#e4f5ec;font:inherit;font-size:16px;cursor:pointer;color:#2a2320">{{ q.yesLabel }}</button>
+                  <button type="button" onClick="{{ q.talk }}" style="flex:1;min-height:44px;border:2px solid #2a2320;border-radius:10px;background:#fff4db;font:inherit;font-size:16px;cursor:pointer;color:#2a2320">💬 Talk first</button>
+                  <button type="button" onClick="{{ q.no }}" style="flex:1;min-height:44px;border:2px solid #2a2320;border-radius:10px;background:#fffdf5;font:inherit;font-size:16px;cursor:pointer;color:#2a2320">✗ No</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ q.done }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Gochi Hand',cursive;font-size:20px;color:{{ q.stampInk }};border:2.5px solid {{ q.stampInk }};border-radius:8px;padding:0 10px;transform:rotate(-4deg)">{{ q.stamp }}</span><span style="font-size:14px;color:#5a4d41">{{ q.after }}</span><button type="button" onClick="{{ q.undo }}" style="margin-left:auto;min-height:40px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:14px;cursor:pointer;color:#2a2320;padding:0 10px">↺ Undo</button></div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}"><div style="border:2.5px dashed #2a2320;border-radius:14px;padding:24px;text-align:center;font-size:18px;color:#6b5d4f">Nothing waiting. When they tap 🏆 or 🔀 on My money, it lands here.</div></sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCommit }}" hint-placeholder-val="{{ false }}">
+      <div data-name="commitments" style="display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:auto;padding:2px 6px 6px 2px">
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Gochi Hand',cursive;font-size:28px">➕ Commitments</div><div style="font-family:'Caveat',cursive;font-size:22px;color:#5a4d41">Each one is its own row on her wall, paid oldest first.</div></div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ cmKids }}" as="k" hint-placeholder-count="2">
+            <div style="background:{{ k.bg }};border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 14px;display:flex;flex-direction:column;gap:5px">
+              <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:22px">{{ k.name }}</div><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:18px">{{ k.total }}</b></div>
+              <div style="font-size:15px;color:#5a4d41">{{ k.pay }}</div>
+              <sc-for list="{{ k.rows }}" as="r" hint-placeholder-count="2">
+                <div style="display:flex;flex-direction:column;gap:2px"><div style="display:flex;justify-content:space-between;gap:6px;font-size:15px"><span>{{ r.n }}</span><b style="font-family:'Nunito',sans-serif">{{ r.v }}</b></div><div style="height:10px;border:2px solid #2a2320;border-radius:5px;background:#fffdf5;overflow:hidden"><div style="height:100%;width:{{ r.w }}%;background:#95d5b2"></div></div></div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div data-name="new commitment" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-family:'Gochi Hand',cursive;font-size:22px">{{ cmHead }}</div>
+          <input value="{{ cmWhat }}" onChange="{{ cmSetWhat }}" placeholder="{{ cmPh }}" style="min-height:48px;width:100%;box-sizing:border-box;border:2.5px solid #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:18px;background:#fffdf5;color:#2a2320">
+          <sc-for list="{{ cmRows }}" as="row" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center"><span style="font-size:16px">{{ row.q }}</span><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ row.opts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.pick }}" style="min-height:44px;min-width:48px;border:2px solid #2a2320;border-radius:10px;padding:0 12px;font:inherit;font-size:16px;cursor:pointer;background:{{ o.bg }};color:{{ o.ink }}">{{ o.label }}</button></sc-for></div></div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isFines }}" hint-placeholder-val="{{ false }}">
+      <div data-name="fines" style="display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:auto;padding:2px 6px 6px 2px">
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Gochi Hand',cursive;font-size:28px">📦 Box fines</div><div style="font-family:'Caveat',cursive;font-size:22px;color:#5a4d41">Log it when it happens. She sees when, what and who on Sunday.</div></div>
+        <div data-name="log a fine" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:22px">➕ Log a fine</div><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:19px;color:#c14a24">{{ fnAmt }}</b></div>
+          <sc-for list="{{ fnRows }}" as="row" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center"><span style="font-size:16px">{{ row.q }}</span><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ row.opts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.pick }}" style="min-height:44px;min-width:48px;border:2px solid #2a2320;border-radius:10px;padding:0 12px;font:inherit;font-size:16px;cursor:pointer;background:{{ o.bg }};color:{{ o.ink }}">{{ o.label }}</button></sc-for></div></div>
+          </sc-for>
+          <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center"><span style="font-size:16px">…or type it</span><input value="{{ fnOther }}" onChange="{{ fnSetOther }}" placeholder="✏️ something else · e.g. towel on the bed" style="min-height:44px;width:100%;box-sizing:border-box;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;font:inherit;font-size:17px;background:#fffdf5;color:#2a2320"></div>
+          <button type="button" data-name="log it" onClick="{{ fnSave }}" style="align-self:flex-end;min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:{{ fnSaveBg }};color:{{ fnSaveInk }};font:inherit;font-size:17px;cursor:pointer;padding:0 18px">📦 Put it in the box</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start">
+          <sc-for list="{{ fnKids }}" as="k" hint-placeholder-count="2">
+            <div style="background:{{ k.bg }};border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:22px">{{ k.name }} · this week</div><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:18px;color:#c14a24">{{ k.total }}</b></div>
+              <sc-for list="{{ k.rows }}" as="r" hint-placeholder-count="2">
+                <div style="display:grid;grid-template-columns:40px minmax(0,1fr) auto 44px;gap:6px;align-items:center;font-size:15px;border-top:1px dashed #b9ad98;padding-top:2px"><b>{{ r.day }}</b><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.what }} · {{ r.who }}</span><b style="font-family:'Nunito',sans-serif">{{ r.amt }}</b><button type="button" onClick="{{ r.remove }}" style="width:44px;height:40px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:15px;cursor:pointer;color:#2a2320;padding:0">✕</button></div>
+              </sc-for>
+              <span style="font-size:14px;color:#5a4d41">{{ k.empty }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isExpect }}" hint-placeholder-val="{{ false }}">
+      <div data-name="expected money" style="display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:auto;padding:2px 6px 6px 2px">
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Gochi Hand',cursive;font-size:28px">🎁 Expected money</div><div style="font-family:'Caveat',cursive;font-size:22px;color:#5a4d41">Your guess, for her timeline. Real money still comes in as a request.</div></div>
+        <sc-for list="{{ exKids }}" as="k" hint-placeholder-count="2">
+          <div style="background:{{ k.bg }};border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:22px">{{ k.name }}</div><span style="font-size:15px;color:#5a4d41">next 5 months</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:18px">{{ k.total }}</b></div>
+            <sc-for list="{{ k.rows }}" as="r" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto 44px;gap:8px;align-items:center;font-size:16px;border-top:1px dashed #b9ad98;padding-top:3px">
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+                <div style="display:flex;align-items:center;gap:3px"><button type="button" onClick="{{ r.monLess }}" style="width:40px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;cursor:pointer;color:#2a2320;padding:0">◀</button><b style="min-width:42px;text-align:center">{{ r.mon }}</b><button type="button" onClick="{{ r.monMore }}" style="width:40px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;cursor:pointer;color:#2a2320;padding:0">▶</button></div>
+                <div style="display:flex;align-items:center;gap:3px"><button type="button" onClick="{{ r.less }}" style="width:40px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:18px;cursor:pointer;color:#2a2320;padding:0">−</button><b style="min-width:46px;text-align:center;font-family:'Nunito',sans-serif">{{ r.amt }}</b><button type="button" onClick="{{ r.more }}" style="width:40px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:18px;cursor:pointer;color:#2a2320;padding:0">+</button></div>
+                <button type="button" onClick="{{ r.remove }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:15px;cursor:pointer;color:#2a2320;padding:0">✕</button>
+              </div>
+            </sc-for>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:15px;color:#5a4d41">➕ add</span><sc-for list="{{ k.adds }}" as="o" hint-placeholder-count="4"><button type="button" onClick="{{ o.pick }}" style="min-height:44px;border:2px dashed #2a2320;border-radius:10px;padding:0 10px;font:inherit;font-size:15px;cursor:pointer;background:#fffdf5;color:#2a2320">{{ o.label }}</button></sc-for></div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isRules }}" hint-placeholder-val="{{ false }}">
+      <div data-name="money rules" style="display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0">
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Gochi Hand',cursive;font-size:28px">⚙️ Money rules</div><div style="font-family:'Caveat',cursive;font-size:22px;color:#6b5d4f">Changes start next Sunday. The girls see what changed.</div></div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;overflow:auto;min-height:0;padding:2px 6px 6px 2px">
+          <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="5">
+            <div data-name="rule section" style="background:{{ sec.bg }};border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;flex-direction:column;gap:4px">
+              <div style="font-family:'Gochi Hand',cursive;font-size:21px">{{ sec.title }}</div>
+              <sc-for list="{{ sec.rows }}" as="r" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border-top:1px dashed #b9ad98;padding:4px 0">
+                  <div style="display:flex;flex-direction:column;line-height:1.15;min-width:0"><span style="font-size:16px">{{ r.label }}</span><span style="font-size:13px;color:#5a4d41">{{ r.she }}</span></div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <button type="button" onClick="{{ r.less }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">−</button>
+                    <b style="min-width:64px;text-align:center;font-family:'Nunito',sans-serif;font-size:17px;border-radius:7px;padding:2px 0;background:{{ r.valBg }};color:{{ r.valInk }}">{{ r.val }}</b>
+                    <button type="button" onClick="{{ r.more }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">+</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+      <sc-if value="{{ isApprove }}" hint-placeholder-val="{{ true }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:20px;color:#6b5d4f;padding:0 4px">This Sunday</div>
+        <sc-for list="{{ kidSum }}" as="k" hint-placeholder-count="2">
+          <div data-name="kid sunday card" style="background:{{ k.bg }};border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:22px">{{ k.name }}</div><span style="margin-left:auto;font-size:15px;font-weight:700;color:{{ k.ink }}">{{ k.status }}</span></div>
+            <div style="font-size:15px;line-height:1.3">{{ k.adds }}</div>
+            <div style="font-size:14px;color:#5a4d41">{{ k.moves }}</div>
+          </div>
+        </sc-for>
+        <div data-name="market wobble" style="background:#f6eefd;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:21px">📉 Market wobble</div><button type="button" onClick="{{ toggleWobble }}" style="margin-left:auto;min-height:40px;border:2.5px solid #2a2320;border-radius:10px;background:{{ wobbleBg }};color:{{ wobbleInk }};font:inherit;font-size:15px;cursor:pointer;padding:0 12px">{{ wobbleLabel }}</button></div>
+          <div style="font-size:15px;line-height:1.3;color:#5a4d41">{{ wobbleLine }}</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isCommit }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:20px;color:#5a4d41;padding:0 4px">{{ cmSide }}</div>
+        <div data-name="affordability" style="background:{{ cmBg }};border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:4px">
+          <sc-for list="{{ cmLines }}" as="l" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;font-size:16px;border-bottom:1px dashed #b9ad98;padding:3px 0"><span>{{ l.k }}</span><b style="font-family:'Nunito',sans-serif;font-size:15px;text-align:right">{{ l.v }}</b></div>
+          </sc-for>
+          <div style="font-size:16px;line-height:1.3;margin-top:4px">{{ cmVerdict }}</div>
+          <button type="button" data-name="add commitment" onClick="{{ cmSave }}" style="margin-top:6px;min-height:50px;border:2.5px solid #2a2320;border-radius:11px;background:{{ cmSaveBg }};color:{{ cmSaveInk }};font:inherit;font-size:17px;cursor:pointer">{{ cmSaveLabel }}</button>
+          <div style="font-size:15px;color:#5a4d41">{{ cmFoot }}</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isFines }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:20px;color:#6b5d4f;padding:0 4px">What she sees on Sunday</div>
+        <sc-for list="{{ fnSee }}" as="k" hint-placeholder-count="2">
+          <div style="background:#fff1ec;border:2px solid #c14a24;border-radius:12px;padding:8px 12px;display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:17px">{{ k.name }} · 🦊 Box fine</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:18px;color:#c14a24">{{ k.amt }}</b></div>
+            <span style="font-size:14px;color:#5a4d41">{{ k.note }}</span>
+          </div>
+        </sc-for>
+        <div style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;padding:8px 12px;font-size:15px;line-height:1.3;color:#5a4d41">It shows under ➖ Taken off on her payday. If she thinks it's wrong, she can dispute it from My money, and it lands in ✅ Approve.</div>
+      </sc-if>
+      <sc-if value="{{ isExpect }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:20px;color:#6b5d4f;padding:0 4px">Where it shows</div>
+        <div style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;padding:8px 12px;display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.3">
+          <span>📅 Her timeline on Signed: the 🎲 bonus part of each future month.</span>
+          <span>🏠 My money · Coming up: gifts and holidays.</span>
+          <span style="color:#5a4d41">Meets use her average per meet from the last 4. Change it here if a season is different.</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isRules }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:20px;color:#6b5d4f;padding:0 4px">What this changes</div>
+        <sc-for list="{{ impact }}" as="k" hint-placeholder-count="2">
+          <div data-name="kid impact card" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;flex-direction:column;gap:2px">
+            <div style="font-family:'Gochi Hand',cursive;font-size:21px">{{ k.name }}</div>
+            <sc-for list="{{ k.rows }}" as="r" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:1fr auto;gap:6px;font-size:15px;border-bottom:1px dashed #e8dfc3;padding:2px 0;background:{{ r.bg }}"><span>{{ r.k }}</span><span style="font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;text-align:right">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <div data-name="save rules" style="background:#fff4db;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;overflow:hidden">
+          <div style="font-size:15px;color:#5a4d41">{{ dirtyLine }}</div>
+          <div style="display:flex;gap:8px">
+            <button type="button" onClick="{{ discard }}" style="min-height:44px;border:2px solid #2a2320;border-radius:10px;background:#fffdf5;font:inherit;font-size:15px;cursor:pointer;color:#2a2320;padding:0 12px">↺ Undo</button>
+            <button type="button" data-name="save" onClick="{{ save }}" style="flex:1;min-height:48px;border:2.5px solid #2a2320;border-radius:10px;background:{{ saveBg }};color:{{ saveInk }};font:inherit;font-size:17px;cursor:pointer">Save · starts next Sunday</button>
+          </div>
+          <div style="font-family:'Gochi Hand',cursive;font-size:18px;margin-top:4px">📝 Rule changes</div>
+          <sc-for list="{{ log }}" as="l" hint-placeholder-count="2">
+            <div style="font-size:14px;line-height:1.25;border-top:1px dashed #d9c9a3;padding-top:2px"><b style="font-family:'Nunito',sans-serif;font-size:12px;color:#6b5d4f">{{ l.date }}</b> {{ l.text }}</div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1194,&quot;height&quot;:834}}">
+const RULES0 = { loanRate: 1, wordsJenn: 1, wordsJess: 1, chore: 3, streak: 3, fine: 0.5, p1: 15, p2: 10, p3: 6, took: 2, pb: 4, mJenn: 70, mJess: 56, wallBonus: 10, spendCap: 20, gReady: 20, gGic: 30, gStock: 40, rReady: 1.5, rGic: 4, rStock: 7, advMax: 5, swimPt: 1, swimQual: 20, swimProvPt: 2, skatePt: 1, g1: 20, g2: 10, g3: 5, o1: 20, o2: 10, o3: 5, wobble: false };
+const KIDS = { Jenn: { left: 700, days: 6, streak: true, fines: 2, bg: '#ffe9ef', steady: 28.8, savings: 12, loans: [['⛸️ Skates & boots', 600, 380], ['🏆 Fall season entries', 400, 320]] }, Jess: { left: 560, days: 5.5, streak: false, fines: 2, bg: '#e3f0fe', steady: 34.4, savings: 6, loans: [['🏊 Swim club fees', 500, 360], ['⛸️ Skates', 300, 200]] } };
+const SEED = [
+  { id: 1, kid: 'Jenn', icon: '🎁', kind: 'gift', text: 'Uncle Mike · $20 birthday money', amt: 20, status: null },
+  { id: 2, kid: 'Jenn', icon: '🔀', kind: 'move', text: 'Move $5 Savings → Locked away', note: 'Want it to grow', amt: 5, from: 'ready', to: 'gic', status: null },
+  { id: 3, kid: 'Jess', icon: '🏊', kind: 'comp', compId: 's1', sport: 'swim', name: 'Swim time trial', date: 'Thu 1 Oct', races: [{ ev: '50 Free', time: '0:41.8', pts: 6 }, { ev: '50 Back', time: '0:49.2', pts: 4 }], qual: false, prov: false, amt: 10, text: 'Swim time trial · 2 races · 10 pts', status: null },
+  { id: 4, kid: 'Jess', icon: '📦', kind: 'fine', text: 'Box fine · the bag wasn’t mine', amt: 1, status: null },
+  { id: 5, kid: 'Jess', icon: '⏪', kind: 'adv', text: 'Draw $2 early · school book fair', amt: 2, day: 'Wed', status: 'yes' }];
+const DEFS = [
+  ['🧹 Earning', '#e4f5ec', [['chore', 'Chores · per graded day', '$', 0.5, s => `“$${s} for a day done right”`], ['streak', 'Routine · 7 days in a row', '$', 1, s => `“${s} bonus for a full week”`], ['fine', 'Box fine · per thing left out', '$', 0.25, s => `“the 🐰 takes $${s}”`]]],
+  ['🏆 Competitions', '#ffe9ef', [['swimPt', 'Swim · per point', '$', 0.5], ['swimQual', 'Swim · qualify for Provincials', '$', 5], ['swimProvPt', 'Swim · per point at Provincials', '$', 0.5], ['skatePt', 'Skating · per point', '$', 0.5], ['g1', 'Skating · 1st in group', '$', 5], ['g2', 'Skating · 2nd in group', '$', 5], ['g3', 'Skating · 3rd in group', '$', 1], ['o1', 'Skating · 1st overall', '$', 5], ['o2', 'Skating · 2nd overall', '$', 5], ['o3', 'Skating · 3rd overall', '$', 1]]],
+  ['🧱 Loan', '#ece8f8', [['mJenn', 'Jenn · loan per month', '$', 5, s => `${'$' + (s * 12 / 52).toFixed(2)} a week`], ['mJess', 'Jess · loan per month', '$', 5, s => `${'$' + (s * 12 / 52).toFixed(2)} a week`], ['wallBonus', 'Bonus on extra wall money', '%', 5, s => `“$1 extra counts as $${(1 + s / 100).toFixed(2)}”`], ['loanRate', 'Loan interest', '%', 0.5, () => 'a year · added every 4 Sundays']]],
+  ['🌱 Pots', '#e3f0fe', [['gGic', 'Locked away opens at', '%', 5, () => 'of loan paid'], ['gStock', 'Companies opens at', '%', 5, () => 'of loan paid'], ['rReady', 'Kept ready pays', '%', 0.5, () => 'a year'], ['rGic', 'Locked away pays', '%', 0.5, () => 'a year, promised'], ['rStock', 'Companies (expected)', '%', 0.5, () => 'a year, can go down']]],
+  ['👛 Spending', '#fff7e3', [['spendCap', 'Most she can cash out', '%', 5, () => 'of her share each Sunday'], ['advMax', 'Most she can draw in advance', '$', 1, s => `“up to $${s}, taken off next Sunday”`]]],
+  ['📚 Words', '#f6eefd', [['wordsJenn', 'Jenn · words', 'st', 1, s => STAGEW[s] || ''], ['wordsJess', 'Jess · words', 'st', 1, s => STAGEW[s] || '']]]];
+const STAGEW = { 1: 'earn · save · owe', 2: '+ income · interest · cash flow', 3: '+ assets · debt · net worth' };
+const ROWS = Object.fromEntries(DEFS.flatMap(d => d[2]).map(r => [r[0], r]));
+const get = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} window.dispatchEvent(new Event('planner-sync')); };
+const m = v => '$' + v.toFixed(2);
+const ordG = n => n ? ['1st', '2nd', '3rd'][n - 1] : '—';
+const compCalc = (R, q) => { if (!q.sport) return { amt: q.amt, line: 'Older request: check what she says above.' };
+  if (q.sport === 'swim') { const pts = (q.races || []).reduce((a, r) => a + r.pts, 0), rate = q.prov ? R.swimProvPt : R.swimPt; return { amt: pts * rate + (q.qual ? R.swimQual : 0), line: (q.races || []).map(r => `${r.ev}${r.time ? ' ' + r.time : ''} · ${r.pts} pts`).join(' | ') + `. ${pts} pts × $${rate}${q.qual ? ` + $${R.swimQual} qualifying` : ''}.` }; }
+  const G = { 1: R.g1, 2: R.g2, 3: R.g3 }[q.grp] || 0, O = { 1: R.o1, 2: R.o2, 3: R.o3 }[q.ovr] || 0; return { amt: q.pts * R.skatePt + G + O, line: `Group ${ordG(q.grp)} $${G} · overall ${ordG(q.ovr)} $${O} · ${q.pts} pts × $${R.skatePt}.` }; };
+const fmt = (k, v) => ROWS[k][2] === 'st' ? 'Stage ' + v : ROWS[k][2] === '%' ? v + '%' : '$' + (v % 1 ? v.toFixed(2) : v);
+const FSEED = [{ id: 'f1', kid: 'Jenn', day: 'Tue', what: '⛸️ skates left in the hall', who: 'Mom', amt: 0.5 }, { id: 'f2', kid: 'Jenn', day: 'Thu', what: '⛸️ skates left in the hall', who: 'Mom', amt: 0.5 }, { id: 'f3', kid: 'Jess', day: 'Mon', what: '🎒 book bag on the stairs', who: 'Dad', amt: 0.5 }, { id: 'f4', kid: 'Jess', day: 'Fri', what: '🎒 book bag on the stairs', who: 'Dad', amt: 0.5 }];
+const EVSEED = { Jenn: [[0, '🏆 time trials', 10], [1, '🏆 Winter Inv.', 15], [2, '🎄 Christmas', 20], [4, '🧧 New Year', 50]], Jess: [[0, '🏊 swim meet', 12], [2, '🎄 Christmas', 20], [4, '🧧 New Year', 50]] };
+const FPRE = ['⛸️ skates left out', '🎒 bag on the stairs', '🧥 coat on the floor', '🍽️ dishes left out'];
+const MON = i => new Date(2026, 9 + i, 1).toLocaleDateString('en-US', { month: 'short' });
+const savingsOf = kid => { try { return ((JSON.parse(localStorage.getItem('sunday-v13')) || {}).kids || {})[kid].pots.ready; } catch (e) { return KIDS[kid].savings; } };
+const POTN = { ready: 'Savings', gic: 'Locked away', stock: 'Companies', wallet: 'wallet', wall: 'loan wall', cash: 'cash' };
+
+class Component extends DCLogic {
+  state = { tab: 'approve', draft: null, tick: 0, cm: { type: 'commit', kid: 'Jenn', what: '', cost: 60, share: 50, weeks: 26 }, fn: { kid: 'Jenn', what: '⛸️ skates left out', day: 'Sun', who: 'Dad' } };
+  componentDidMount() { this.sync = () => this.setState(s => ({ tick: s.tick + 1 })); window.addEventListener('planner-sync', this.sync); window.addEventListener('storage', this.sync); }
+  componentWillUnmount() { window.removeEventListener('planner-sync', this.sync); window.removeEventListener('storage', this.sync); }
+  commitVals(R) {
+    const s = this.state, c = s.cm, extra = get('planner-commit-v1', []), mm = v => '$' + v.toFixed(2), setC = o => this.setState(st => ({ cm: { ...st.cm, ...o } }));
+    const opt = (label, on, pick) => ({ label, pick, bg: on ? '#2f7f77' : '#fffdf5', ink: on ? '#fff' : '#2a2320' });
+    const rowsOf = kid => [...KIDS[kid].loans.map(([n, cost, left]) => ({ n, cost, left })), ...extra.filter(x => x.kid === kid && x.kind !== 'surprise').map(x => ({ n: x.what, cost: x.added, left: x.added }))];
+    const payW = kid => (R['m' + kid] || 0) * 12 / 52, K = KIDS[c.kid], her = c.cost * c.share / 100, down = Math.round(her * 10) / 100, added = Math.round((her - down) * 100) / 100, addW = added / c.weeks;
+    const leftNow = rowsOf(c.kid).reduce((a, r) => a + r.left, 0), p0 = payW(c.kid), p1 = p0 + addW, r0 = p0 / K.steady * 100, r1 = p1 / K.steady * 100;
+    const freeAt = (left, pw) => { const d = new Date(2026, 9, 4); d.setDate(d.getDate() + Math.ceil(left / pw) * 7); return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); };
+    const sav = savingsOf(c.kid) ?? K.savings, okAff = r1 <= 50, okDown = sav - down >= 10, sur = c.type === 'surprise', fromSafe = Math.min(c.cost, sav), borrow = Math.round((c.cost - fromSafe) * 100) / 100;
+    const typeRow = { q: 'Type', opts: [opt('🆕 Commitment', !sur, () => setC({ type: 'commit' })), opt('🌧️ Surprise cost', sur, () => setC({ type: 'surprise' }))] };
+    return {
+      cmKids: Object.keys(KIDS).map(kid => { const rs = rowsOf(kid); return { name: kid, bg: KIDS[kid].bg, total: mm(rs.reduce((a, r) => a + r.left, 0)) + ' left', pay: `${mm(payW(kid))} a week · ${Math.round(payW(kid) / KIDS[kid].steady * 100)}% of steady ${mm(KIDS[kid].steady)}`, rows: rs.map((r, i) => ({ n: `${i + 1}. ${r.n}`, v: `${mm(r.left)} of ${mm(r.cost)}`, w: (r.cost - r.left) / r.cost * 100 })) }; }),
+      cmRows: [typeRow,
+        { q: 'For', opts: Object.keys(KIDS).map(k => opt(k, c.kid === k, () => setC({ kid: k }))) },
+        { q: 'Cost', opts: [opt('−', false, () => setC({ cost: Math.max(5, c.cost - 5) })), { ...opt('$' + c.cost, true, () => {}), bg: '#fff4db', ink: '#2a2320' }, opt('+', false, () => setC({ cost: c.cost + 5 }))] },
+        ...(sur ? [] : [{ q: 'Her share', opts: [opt('−', false, () => setC({ share: Math.max(5, c.share - 5) })), { ...opt(c.share + '%', true, () => {}), bg: '#fff4db', ink: '#2a2320' }, opt('+', false, () => setC({ share: Math.min(100, c.share + 5) })), ...[25, 50, 75, 100].map(p => opt(p + '%', c.share === p, () => setC({ share: p })))] },
+        { q: 'Pay it over', opts: [opt('−', false, () => setC({ weeks: Math.max(1, c.weeks - 1) })), { ...opt(c.weeks + (c.weeks === 1 ? ' week' : ' weeks'), true, () => {}), bg: '#fff4db', ink: '#2a2320' }, opt('+', false, () => setC({ weeks: Math.min(104, c.weeks + 1) })), ...[[13, '3 months'], [26, '6 months'], [52, '1 year']].map(([w, l]) => opt(l, c.weeks === w, () => setC({ weeks: w })))] }])],
+      cmHead: sur ? '🌧️ Surprise cost' : '🆕 New commitment', cmPh: sur ? 'what happened · e.g. lost swim goggles' : 'what it is · e.g. Winter Invitational entry', cmSide: sur ? 'Is her safety money enough?' : 'Can she afford it?', cmSaveLabel: sur ? 'Send her the 🌧️ card' : 'Add to her wall',
+      cmFoot: sur ? 'Not a fine: nobody did anything wrong. 🛟 Savings pays first; the rest becomes a row on her wall. Savings refills first after.' : 'Her weekly payment goes up from next Sunday. Her 10% down comes out of Savings.',
+      cmWhat: c.what, cmSetWhat: e => { const v = e.target.value; setC({ what: v }); },
+      cmLines: sur ? [['Cost', mm(c.cost)], ['Her 🛟 Savings now', mm(sav)], ['Paid from Savings', mm(fromSafe)], ['New row on her wall', mm(borrow)]].map(([k, v]) => ({ k, v })) : [['Her share', mm(her)], ['10% down from her Savings', mm(down) + (okDown ? '' : ' ⚠️ under 🛟 $10')], ['New row on her wall', mm(added)], ['Weekly loan payment', `${mm(p0)} → ${mm(p1)}`], ['Of her steady income', `${Math.round(r0)}% → ${Math.round(r1)}%`], ['Free by', `${freeAt(leftNow, p0)} → ${freeAt(leftNow + added, p1)}`]].map(([k, v]) => ({ k, v })),
+      cmVerdict: sur ? (borrow ? `🛟 Not quite enough. ${mm(borrow)} goes on her wall.` : '✅ Her safety money covers it. That is what it is for.') : okAff ? '✅ Fits under the 50% limit.' : `⚠️ Over the 50% limit. Try a smaller share, a longer time, or wait for row 1 to finish.`, cmBg: sur ? (borrow ? '#fff1d6' : '#e4f5ec') : okAff ? '#e4f5ec' : '#fff1d6',
+      cmSave: () => { if (!c.what.trim()) return; if (sur) { put('planner-commit-v1', [...extra, { kind: 'surprise', kid: c.kid, what: c.what.trim(), cost: c.cost }]); this.setState({ cm: { ...c, what: '' } }); return; } put('planner-commit-v1', [...extra, { kid: c.kid, what: '🆕 ' + c.what.trim(), cost: c.cost, share: c.share, added, weeks: c.weeks }]); put('planner-rules-v1', { ...R, ['m' + c.kid]: Math.round((p1 * 52 / 12) * 100) / 100 }); this.setState({ cm: { ...c, what: '' } }); },
+      cmSaveBg: c.what.trim() ? '#c14a24' : '#e8dfc3', cmSaveInk: c.what.trim() ? '#fff' : '#5a4d41'
+    };
+  }
+  fineVals(R) {
+    const s = this.state, f = s.fn, all = get('planner-fines-v1', FSEED), open = all.filter(x => !x.applied), setF = o => this.setState(st => ({ fn: { ...st.fn, ...o } }));
+    const opt = (label, on, pick) => ({ label, pick, bg: on ? '#2f7f77' : '#fffdf5', ink: on ? '#fff' : '#2a2320' });
+    const note = kid => { const l = open.filter(x => x.kid === kid); return l.length ? `${[...new Set(l.map(x => x.day))].join(' + ')} · ${l[0].what.replace(/^\S+ /, '')} · ${[...new Set(l.map(x => x.who))].join(' + ')} logged` : 'no fines this week 🎉'; };
+    return {
+      fnAmt: '−' + m(R.fine), fnRows: [
+        { q: 'For', opts: Object.keys(KIDS).map(k => opt(k, f.kid === k, () => setF({ kid: k }))) },
+        { q: 'What', opts: FPRE.map(w => opt(w, f.what === w, () => setF({ what: w }))) },
+        { q: 'Day', opts: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => opt(d, f.day === d, () => setF({ day: d }))) },
+        { q: 'Logged by', opts: ['Mom', 'Dad'].map(w => opt(w, f.who === w, () => setF({ who: w }))) }],
+      fnOther: FPRE.includes(f.what) ? '' : f.what.replace(/^✏️ /, ''), fnSetOther: e => { const v = e.target.value; setF({ what: v.trim() ? '✏️ ' + v : FPRE[0] }); },
+      fnSave: () => put('planner-fines-v1', [...all, { id: 'f' + Date.now(), kid: f.kid, day: f.day, what: f.what, who: f.who, amt: R.fine }]), fnSaveBg: '#c14a24', fnSaveInk: '#fff',
+      fnKids: Object.keys(KIDS).map(kid => { const l = open.filter(x => x.kid === kid); return { name: kid, bg: KIDS[kid].bg, total: '−' + m(l.reduce((a, x) => a + x.amt, 0)), empty: l.length ? '' : 'Nothing in the box. 🎉', rows: l.map(x => ({ day: x.day, what: x.what, who: x.who, amt: '−' + m(x.amt), remove: () => put('planner-fines-v1', all.filter(y => y.id !== x.id)) })) }; }),
+      fnSee: Object.keys(KIDS).map(kid => ({ name: kid, amt: '−' + m(open.filter(x => x.kid === kid).reduce((a, x) => a + x.amt, 0)), note: note(kid) }))
+    };
+  }
+  expectVals() {
+    const all = { ...EVSEED, ...get('planner-expected-v1', {}) }, save = (kid, list) => put('planner-expected-v1', { ...all, [kid]: list });
+    const ADD = [['🎂 Birthday', 20], ['🎄 Christmas', 20], ['🧧 New Year', 50], ['🏆 Meet', 12]];
+    return { exKids: Object.keys(KIDS).map(kid => { const L = all[kid] || [], upd = (i, o) => save(kid, L.map((e, j) => j === i ? [o.mon ?? e[0], e[1], o.amt ?? e[2]] : e));
+      return { name: kid, bg: KIDS[kid].bg, total: '≈ $' + L.filter(e => e[0] < 5).reduce((a, e) => a + e[2], 0),
+        rows: L.map((e, i) => ({ label: e[1], mon: MON(e[0]), amt: '$' + e[2], monLess: () => upd(i, { mon: Math.max(0, e[0] - 1) }), monMore: () => upd(i, { mon: Math.min(4, e[0] + 1) }), less: () => upd(i, { amt: Math.max(0, e[2] - 5) }), more: () => upd(i, { amt: e[2] + 5 }), remove: () => save(kid, L.filter((_, j) => j !== i)) })),
+        adds: ADD.map(([label, amt]) => ({ label, pick: () => save(kid, [...L, [0, label, amt]]) })) }; }) };
+  }
+  rules() { return { ...RULES0, ...get('planner-rules-v1', {}) }; }
+  setPay(id, v) { put('planner-queue-v2', get('planner-queue-v2', SEED).map(q => q.id === id ? { ...q, pay: Math.max(0, v) } : q)); }
+  setStatus(id, st) { put('planner-queue-v2', get('planner-queue-v2', SEED).map(q => q.id === id ? { ...q, status: st } : q)); }
+  week(R, kid) { const K = KIDS[kid]; return K.days * R.chore + (K.streak ? R.streak : 0) - K.fines * R.fine; }
+  freeBy(R, kid) { const w = Math.ceil(KIDS[kid].left / (R['m' + kid] * 12 / 52)), d = new Date(2026, 9, 4); d.setDate(d.getDate() + w * 7); return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); }
+  renderVals() {
+    const s = this.state, saved = this.rules(), R = s.draft || saved, Q = get('planner-queue-v2', SEED);
+    const changed = Object.keys(ROWS).filter(k => R[k] !== saved[k]);
+    const kindLabel = { goal: 'wants a new goal', comp: 'says a result', gift: 'gift came in', move: 'asks to move', fine: 'disputes a fine', adv: 'wants to draw early', deposit: 'puts cash in', skip: 'can’t make a session' };
+    const queue = Q.map(q => { const open = !q.status, cc = q.kind === 'comp' ? compCalc(R, q) : null, ruleAmt = cc ? cc.amt : q.amt, amt = cc && q.pay != null ? q.pay : ruleAmt;
+      const rulesLine = q.kind === 'goal' ? `${q.icon} ${q.name} · $${q.amt}. ${q.keep === 'ready' ? 'Money in her old jar goes to Savings.' : 'Money in her old jar moves to the new goal.'} The jar earns no interest.` : q.kind === 'comp' ? `${q.custom ? 'Not on the planner yet. ' : ''}${cc.line}${q.pay != null && q.pay !== ruleAmt ? ` You made it $${q.pay}.` : ''}` : q.kind === 'gift' ? 'Gifts go straight into her payday once you say yes.' : q.kind === 'move' ? `Her reason: “${q.note || '—'}”.${q.to === 'gic' ? ' Locked for 4 weeks once moved.' : q.to === 'wall' ? ' Can’t come back off the wall.' : q.to === 'cash' ? ' Hand her the cash on Sunday. It leaves the bank.' : ''}` : q.kind === 'deposit' ? 'Cash from home goes into the bank. Count it with her on Sunday.' : q.kind === 'adv' ? `Cash now; it comes off Sunday’s payday. Her limit is $${R.advMax} a week.` : q.kind === 'skip' ? 'Yes marks it missed on Sunday. It pays $0. It is not a fine.' : `Yes gives back ${m(q.amt)} in Sunday’s payday.`;
+      const check = q.kind === 'goal' ? '🔎 Is it something she really wants? Is the price right?' : q.kind === 'comp' ? '🔎 Check the results sheet: every race and score' : q.kind === 'gift' ? '🔎 Did the money actually arrive?' : q.kind === 'move' ? `🔎 She has it in ${POTN[q.from]}?` : q.kind === 'deposit' ? '🔎 Count the cash' : q.kind === 'adv' ? '🔎 Is it for something this week?' : q.kind === 'skip' ? '🔎 Let the coach know' : '🔎 Whose bag was it?';
+      return { ...q, open, done: !open, kindLabel: kindLabel[q.kind], amtLabel: q.kind === 'skip' ? '⛸️' : '$' + amt, rulesLine, check, kidBg: KIDS[q.kid].bg, adj: open && q.kind === 'comp', payLess: () => this.setPay(q.id, amt - 1), payMore: () => this.setPay(q.id, amt + 1), bg: open ? '#fffdf5' : q.status === 'yes' ? '#e4f5ec' : q.status === 'talk' ? '#fff4db' : '#f5efe2', borderStyle: open ? 'solid' : 'dashed',
+        yesLabel: q.kind === 'goal' ? '✓ Set it' : q.kind === 'deposit' ? '✓ Got the cash' : q.kind === 'adv' ? '✓ Give her the cash' : q.kind === 'move' ? (q.to === 'cash' ? '✓ Hand it over' : '✓ Move it') : q.kind === 'fine' ? '✓ Give it back' : q.kind === 'skip' ? '✓ OK, mark missed' : '✓ Yes, pay it', stamp: { yes: '✓ YES', no: '✗ NO', talk: '💬 TALK' }[q.status] || '', stampInk: q.status === 'yes' ? '#2f7f77' : q.status === 'talk' ? '#c14a24' : '#6b5d4f',
+        after: q.status === 'yes' ? (q.kind === 'goal' ? 'jar switches Sunday' : q.kind === 'adv' ? 'comes off Sunday' : q.kind === 'move' ? 'moves before Sunday' : 'in Sunday’s payday') : q.status === 'talk' ? 'still blocks payday' : 'she sees “not this time”',
+        yes: () => this.setStatus(q.id, 'yes'), no: () => this.setStatus(q.id, 'no'), talk: () => this.setStatus(q.id, 'talk'), undo: () => this.setStatus(q.id, null) }; });
+    const sections = DEFS.map(([title, bg, rows]) => ({ title, bg, rows: rows.map(([k, label, unit, step, she]) => { const ch = R[k] !== saved[k], set = v => this.setState(st => ({ draft: { ...(st.draft || saved), [k]: unit === 'st' ? Math.min(3, Math.max(1, v)) : Math.max(0, Math.round(v * 100) / 100) } }));
+      return { label, she: (she ? she(R[k]) : '') + (ch ? ` · was ${fmt(k, saved[k])}` : ''), val: fmt(k, R[k]), valBg: ch ? '#c14a24' : 'rgba(255,253,245,0.8)', valInk: ch ? '#fff' : '#2a2320', less: () => set(R[k] - step), more: () => set(R[k] + step) }; }) }));
+    const arrow = (a, b) => a === b ? a : `${a} → ${b}`;
+    const log = get('planner-rules-log-v1', [{ date: '7 Sep', text: 'Started: chores $3 · loan $70 / $56 a month · wall bonus 10%' }]);
+    return {
+      tabs: [['approve', `✅ Approve (${queue.filter(q => q.open || q.status === 'talk').length})`], ['commit', '➕ Commitments'], ['fines', '📦 Fines'], ['expect', '🎁 Expected'], ['rules', '⚙️ Rules']].map(([id, label]) => ({ label, bg: s.tab === id ? '#2a2320' : '#fffdf5', ink: s.tab === id ? '#fff' : '#2a2320', pick: () => this.setState({ tab: id }) })),
+      isApprove: s.tab === 'approve', isRules: s.tab === 'rules', isCommit: s.tab === 'commit', isFines: s.tab === 'fines', isExpect: s.tab === 'expect', ...this.commitVals(saved), ...this.fineVals(saved), ...this.expectVals(), queue, queueEmpty: queue.length === 0,
+      kidSum: Object.keys(KIDS).map(kid => { const mine = queue.filter(q => q.kid === kid), wait = mine.filter(q => q.open || q.status === 'talk').length, yes = mine.filter(q => q.status === 'yes');
+        const add = yes.filter(q => !['move', 'adv', 'deposit', 'skip'].includes(q.kind)).reduce((a, q) => a + Number(q.amtLabel.slice(1)), 0), mv = yes.filter(q => ['move', 'adv', 'deposit'].includes(q.kind));
+        return { name: kid, bg: wait ? '#fffdf5' : '#e4f5ec', ink: wait ? '#c14a24' : '#2a5f59', status: wait ? `⏳ ${wait} to answer` : '✓ payday can open', adds: add ? `+$${add} added to her payday` : 'Nothing added on top of chores.', moves: mv.length ? mv.map(q => q.text).join(' · ') : 'No moves.' }; }),
+      toggleWobble: () => { const nr = { ...saved, wobble: !saved.wobble }; put('planner-rules-v1', nr); this.forceUpdate(); },
+      wobbleBg: saved.wobble ? '#c14a24' : '#fffdf5', wobbleInk: saved.wobble ? '#fff' : '#2a2320', wobbleLabel: saved.wobble ? 'On this week' : 'Off',
+      wobbleLine: saved.wobble ? 'Companies show −2% this Sunday. Ask her: “Do you sell, or wait?”' : 'Turn on to show companies dipping 2% this Sunday — practice for a real drop.',
+      sections,
+      impact: Object.keys(KIDS).map(kid => ({ name: kid, rows: [
+        ['Typical week', arrow(m(this.week(saved, kid)), m(this.week(R, kid)))],
+        ['Loan a week', arrow(m(saved['m' + kid] * 12 / 52), m(R['m' + kid] * 12 / 52))],
+        ['Free by', arrow(this.freeBy(saved, kid), this.freeBy(R, kid))],
+        ['Most to spend', arrow(m(Math.max(0, this.week(saved, kid) - saved['m' + kid] * 12 / 52) * saved.spendCap / 100), m(Math.max(0, this.week(R, kid) - R['m' + kid] * 12 / 52) * R.spendCap / 100))]
+      ].map(([k, v]) => ({ k, v, bg: v.includes('→') ? '#fff1d6' : 'transparent' })) })),
+      dirtyLine: changed.length ? `${changed.length} change${changed.length === 1 ? '' : 's'}: ${changed.map(k => `${ROWS[k][1]} ${fmt(k, saved[k])} → ${fmt(k, R[k])}`).join(' · ')}` : 'No changes yet. Tap − or + on any rule.',
+      saveBg: changed.length ? '#c14a24' : '#e8dfc3', saveInk: changed.length ? '#fff' : '#6b5d4f',
+      save: () => { if (!changed.length) return; put('planner-rules-v1', R); put('planner-rules-log-v1', [{ date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' }), text: changed.map(k => `${ROWS[k][1]} ${fmt(k, saved[k])} → ${fmt(k, R[k])}`).join(' · ') }, ...log].slice(0, 5)); this.setState({ draft: null }); },
+      discard: () => this.setState({ draft: null }), log
+    };
+  }
+}
+</script>
+</body>
+</html>

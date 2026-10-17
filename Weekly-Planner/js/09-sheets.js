@@ -1,0 +1,2954 @@
+// Weekly-Planner — tray + bottom sheets: training/activity/edit sheets, templates, custom, reflection.
+// Extracted verbatim from index.html (classic script, global scope).
+/* ════════════════════════════════════════════════════════════════
+   PLACING AN ACTIVITY
+
+   Tapping a time opens the picker right there. What is left here is for a
+   caller that already knows which activity, and needs somewhere to put it.
+   which activity, and needs somewhere to put it.
+════════════════════════════════════════════════════════════════ */
+
+/* The first quarter-hour from `fromMin` with room for `durationMin` and nothing
+   already there. Falls back to the tapped-for time so a full day still opens the
+   sheet rather than silently doing nothing. */
+function nextFreeSlotMin(dayKey, durationMin, fromMin) {
+  const dur = Math.max(15, durationMin || 60);
+  const blocks = (getDayBlocks(dayKey) || []).slice()
+    .sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
+  let start = fromMin != null ? fromMin : (dayKey === todayKey()
+    ? nowMinutesInZone()
+    : START_MIN + 120);
+  start = Math.max(START_MIN, Math.ceil(start / 15) * 15);
+  for (let t = start; t + dur <= END_MIN; t += 15) {
+    const clash = blocks.some(b => t < (b.startMin || 0) + (b.durationMin || 0) && (b.startMin || 0) < t + dur);
+    if (!clash) return t;
+  }
+  return Math.min(start, END_MIN - dur);
+}
+
+/* "Place this one." Called by the level-up reward flow and the mascot's
+   suggestions — each of which has already decided which activity, and used to
+   hand it to the tray to be highlighted. They open the placement sheet at the
+   next free slot now, which is one tap rather than two and does not depend on a
+   rail that no longer exists. */
+function startPlacingActivity(act) {
+  if (!act) return;
+  if (act._locked) { showToast(`🔒 Unlocks in ${seasonLabel(act)}!`); return; }
+  selectedActivity = act;
+  hideMascot();
+  if (!currentDayKey) currentDayKey = todayKey();
+  addActivityAtMin(nextFreeSlotMin(currentDayKey, activityDefaultDuration(act)));
+}
+
+/* Renders a tickable objectives/goals checklist — preset items plus any
+   matching saved custom tasks — into containerId, toggling entries in
+   stateObj.objectives and re-rendering via rerenderFn. Shared by the training
+   sheet and the plain activity sheet so every block type gets the same goal
+   UI instead of objectives being a training-only concept. */
+function renderObjectivesList(containerId, stateObj, presets, myTasks, rerenderFn) {
+  const objWrap = document.getElementById(containerId);
+  if (!objWrap) return;
+  objWrap.innerHTML = '';
+  if (!Array.isArray(stateObj.objectives)) stateObj.objectives = [];
+  presets.forEach(obj=>{
+    const item = document.createElement('div');
+    const checked = stateObj.objectives.includes(obj);
+    item.className = 'obj-item'+(checked?' checked':'');
+    item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${obj}</span>`;
+    item.onclick = ()=>{
+      if (stateObj.objectives.includes(obj)) stateObj.objectives = stateObj.objectives.filter(o=>o!==obj);
+      else stateObj.objectives.push(obj);
+      rerenderFn();
+    };
+    objWrap.appendChild(item);
+  });
+
+  if (myTasks.length) {
+    const hdr = document.createElement('div');
+    hdr.style.cssText='font-family:var(--font-display);font-size:calc(1rem * var(--text-scale, 1));color:var(--ink-light);margin-top:0.4rem';
+    hdr.textContent = 'From your library:';
+    objWrap.appendChild(hdr);
+    myTasks.forEach(t=>{
+      const label = `${t.name}${t.reps?` (${t.reps})`:''}`;
+      const checked = stateObj.objectives.includes(label);
+      const item = document.createElement('div');
+      item.className = 'obj-item'+(checked?' checked':'');
+      /* escapeHtml, and it was missing: t.name and t.reps are typed by a child
+         and arrive from a world-writable Firestore document, and this line put
+         them straight into markup. tests/check-escaping.js did not catch it
+         because its "texty local" rule wants a capital — `label` is not
+         `Label` — which is a gap in the lint, not a reason the hole was safe. */
+      const waiting = t.pendingApproval
+        ? '<span class="obj-meta obj-waiting">waiting</span>'
+        : '<span class="obj-meta">saved</span>';
+      item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${escapeHtml(label)}</span>${waiting}<span class="obj-delete" title="delete">×</span>`;
+      item.onclick = (e)=>{
+        if (e.target.classList.contains('obj-delete')) {
+          state.shared.customTasks = state.shared.customTasks.filter(x=>x.id!==t.id);
+          tombstoneIds('task:', [t.id]);
+          stateObj.objectives = stateObj.objectives.filter(o=>o!==label);
+          saveAll(); rerenderFn();
+          return;
+        }
+        if (stateObj.objectives.includes(label)) stateObj.objectives = stateObj.objectives.filter(o=>o!==label);
+        else stateObj.objectives.push(label);
+        rerenderFn();
+      };
+      objWrap.appendChild(item);
+    });
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TRAINING SHEET
+════════════════════════════════════════════════════════════════ */
+function openTrainingSheet() { renderTrainingSheet(); openSheet('trainingOverlay'); }
+
+function renderTrainingSheet() {
+  const isCompetition = !!(selectedActivity && selectedActivity.isCompetition);
+  const titleEl = document.getElementById('trainingSheetTitle');
+  if (titleEl) titleEl.textContent = isCompetition ? '🏆 Competition' : '🏋️ Training Session';
+  // Which competition. Only asked for when it is one — a training session has
+  // no name of its own, it has a sport.
+  const compRow = document.getElementById('trainingCompNameRow');
+  if (compRow) compRow.style.display = isCompetition ? 'block' : 'none';
+  const compIn = document.getElementById('trainingCompName');
+  if (compIn && compIn.value !== (ts.compName || '')) compIn.value = ts.compName || '';
+
+  // Start time picker
+  renderStartTimePicker('trainingStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderTrainingSheet(); });
+
+  // Tags
+  const tagWrap = document.getElementById('trainingTagBtns');
+  tagWrap.innerHTML = '';
+  const allTags = getTrainingTags();
+  allTags.forEach(t=>{
+    const b = document.createElement('button');
+    b.className = 'ui-chip';
+    b.setAttribute('aria-pressed', String(ts.tag===t.id));
+    b.textContent = t.label;
+    b.onclick = ()=>{
+      // Adopt the topic colour unless the user had picked a non-default custom one.
+      if (!ts.colour || TRAINING_DEFAULT_HEXES.has(String(ts.colour).toLowerCase()) || allTags.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
+      ts.tag=t.id; ts.objectives=[]; renderTrainingSheet();
+    };
+    tagWrap.appendChild(b);
+  });
+  // A sport that is not one of the four. Parents only: the sports list is shared
+  // by both girls, so it is a household decision rather than a per-kid one.
+  if (isParent()) {
+    const add = document.createElement('button');
+    add.className = 'ui-chip ts-add';
+    add.textContent = '＋ Sport';
+    add.onclick = ()=>openCustomSport();
+    tagWrap.appendChild(add);
+  }
+
+  // Duration (in minutes) — a competition (meet/event) runs much longer than
+  // a practice session, so it gets its own, larger set of preset lengths.
+  const durWrap = document.getElementById('trainingDurBtns');
+  durWrap.innerHTML = '';
+  const durOptions = isCompetition ? [120,180,240,300,360,420,480,540,600] : [30,60,90,120,150,180];
+  durOptions.forEach(min=>{
+    const b = document.createElement('button');
+    b.className='ui-chip';
+    b.setAttribute('aria-pressed', String(ts.durationMin===min));
+    b.textContent = formatDuration(min);
+    b.onclick = ()=>{ ts.durationMin=min; renderTrainingSheet(); };
+    durWrap.appendChild(b);
+  });
+  // …and any length that is not one of them.
+  renderCustomDuration('trainingCustomDur', ts.durationMin, (m)=>{
+    ts.durationMin = m; renderTrainingSheet();
+  });
+
+  // Colour
+  const cp = document.getElementById('trainingColourPicker');
+  cp.innerHTML = '';
+  COLOURS.forEach(c=>{
+    const d = document.createElement('div');
+    d.className = 'colour-dot'+(ts.colour===c?' selected':'');
+    d.style.background = c;
+    d.onclick = ()=>{ ts.colour=c; renderTrainingSheet(); };
+    cp.appendChild(d);
+  });
+
+  // Objectives — preset + custom tasks filtered by tag. Competition day gets its
+  // own performance/meet checklist rather than the practice-drill objectives.
+  const presets = getObjectivePresets(selectedActivity, ts.tag, isCompetition);
+  // Archived, not deleted — a rejected exercise leaves the picker but the record
+  // stays, the same rule the archive keeps for activities (CLAUDE.md, History).
+  const myTasks = (state.shared.customTasks||[]).filter(t=>!t.archived && (t.sport===ts.tag || t.sport==='general'));
+  renderObjectivesList('objectivesList', ts, presets, myTasks, renderTrainingSheet);
+
+  if (ts.travelBufMin == null || ts.travelBufMin < 5) ts.travelBufMin = DEFAULT_BUFFER_MIN;
+  if (ts.getReadyBufMin == null || ts.getReadyBufMin < 5) ts.getReadyBufMin = DEFAULT_BUFFER_MIN;
+  if (ts.warmupBufMin == null || ts.warmupBufMin < 5) ts.warmupBufMin = DEFAULT_WARMUP_MIN;
+  const tbToggle = document.getElementById('trainingTravelToggle');
+  tbToggle.classList.toggle('on', ts.travelBuffer);
+  const rbToggle = document.getElementById('trainingReadyToggle');
+  rbToggle.classList.toggle('on', !!ts.getReadyBuffer);
+  const wbToggle = document.getElementById('trainingWarmupToggle');
+  wbToggle.classList.toggle('on', !!ts.warmupBuffer);
+  document.getElementById('trainingTravelDurRow').style.display = ts.travelBuffer ? 'flex' : 'none';
+  document.getElementById('trainingReadyDurRow').style.display = ts.getReadyBuffer ? 'flex' : 'none';
+  document.getElementById('trainingWarmupDurRow').style.display = ts.warmupBuffer ? 'flex' : 'none';
+  const tIn = document.getElementById('trainingTravelBufMin');
+  const rIn = document.getElementById('trainingReadyBufMin');
+  const wIn = document.getElementById('trainingWarmupBufMin');
+  if (tIn) tIn.value = String(ts.travelBufMin);
+  if (rIn) rIn.value = String(ts.getReadyBufMin);
+  if (wIn) wIn.value = String(ts.warmupBufMin);
+  renderTrainingGearChecklist('trainingGearList', ts, ts.tag, false, isCompetition);
+
+  // Repeat + day picker
+  const rt = document.getElementById('trainingRepeat');
+  rt.classList.toggle('on', ts.repeat);
+  document.getElementById('trainingRepeatDays').style.display = ts.repeat?'block':'none';
+  renderDayPicker('trainingDayPicker', ts.repeatDays, (days)=>{ ts.repeatDays=days; });
+  renderRepeatSpan('training');
+
+  document.getElementById('trainingNote').value = ts.note;
+
+  renderSheetTimeSummary('trainingTimeSummary', pendingStartMin, ts.durationMin, ts.travelBuffer, ts.travelBufMin, !!ts.getReadyBuffer, ts.getReadyBufMin, !!ts.warmupBuffer, ts.warmupBufMin);
+}
+
+function onTrainingBufferMinInput() {
+  const tIn = document.getElementById('trainingTravelBufMin');
+  const rIn = document.getElementById('trainingReadyBufMin');
+  const wIn = document.getElementById('trainingWarmupBufMin');
+  if (tIn) ts.travelBufMin = clampBufferMin(tIn.value);
+  if (rIn) ts.getReadyBufMin = clampBufferMin(rIn.value);
+  if (wIn) ts.warmupBufMin = clampBufferMin(wIn.value);
+  renderTrainingSheet();
+}
+
+function cancelCreatePlacement(overlayId, skipClose=false) {
+  pendingStartMin = null;
+  selectedActivity = null;
+  // Nothing landed on a day, so the category learns nothing.
+  slotPickerPickedUnder = null;
+  currentTimelineGuideY = null;
+  clearPlacementGuide();
+  if (!skipClose && overlayId) closeSheet(overlayId);
+}
+
+function confirmTraining() {
+  // Guard against a rapid double-tap placing two blocks. The confirm button no
+  // longer hides itself after a tap, so we consume pendingStartMin immediately
+  // and bail if it's already been consumed (the second tap of a double-tap).
+  if (pendingStartMin == null) return;
+  // Read the span BEFORE consuming pendingStartMin: a refused span must leave
+  // the sheet exactly as it was, ready to be corrected and confirmed again.
+  const span = ts.repeat ? readRepeatSpan('training') : { start: null, end: null, every: 1 };
+  if (!span) return;
+  const startMin = pendingStartMin;
+  pendingStartMin = null;
+  const isComp = !!(selectedActivity && selectedActivity.isCompetition);
+  ts.note = document.getElementById('trainingNote').value;
+  ts.compName = isComp ? (document.getElementById('trainingCompName').value || '').trim().slice(0, 40) : '';
+  const actId = (selectedActivity && selectedActivity.id) || 'training';
+  placeBlock(actId, startMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
+    tag: ts.tag,
+    compName: ts.compName || null,
+    repeatDays: ts.repeat?ts.repeatDays:[],
+    travelBuffer: ts.travelBuffer,
+    getReadyBuffer: !!ts.getReadyBuffer,
+    warmupBuffer: !!ts.warmupBuffer,
+    gearState: ts.gearState || {},
+    travelBufMin: ts.travelBufMin,
+    getReadyBufMin: ts.getReadyBufMin,
+    warmupBufMin: ts.warmupBufMin,
+    repeatDateStart: span.start,
+    repeatDateEnd:   span.end,
+    repeatEvery:     span.every,
+  });
+  closeSheet('trainingOverlay');
+  showToast(isComp ? 'Competition placed 🏆' : 'Training placed 🏋️');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GENERIC ACTIVITY SHEET
+════════════════════════════════════════════════════════════════ */
+function openActivitySheet() { renderActivitySheet(); openSheet('activityOverlay'); }
+function renderActivitySheet() {
+  const act = selectedActivity;
+  document.getElementById('activitySheetTitle').textContent = `${act.icon} ${act.name}`;
+  if (as_.travelBufMin == null || as_.travelBufMin < 5) as_.travelBufMin = DEFAULT_BUFFER_MIN;
+
+  renderStartTimePicker('activityStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderActivitySheet(); }, ()=>syncDurationColumnSpacers('activity'));
+
+  const durWrap = document.getElementById('activityDurBtns');
+  durWrap.innerHTML = '';
+  [15,30,45,60,90,120,180].forEach(min=>{
+    const b = document.createElement('button');
+    b.className='ui-chip';
+    b.setAttribute('aria-pressed', String(as_.durationMin===min));
+    b.textContent = formatDuration(min);
+    b.onclick = ()=>{ as_.durationMin=min; renderActivitySheet(); };
+    durWrap.appendChild(b);
+  });
+  // Custom duration input
+  renderCustomDuration('activityCustomDur', as_.durationMin, (m)=>{
+    as_.durationMin = m; renderActivitySheet();
+  }, ()=>syncDurationColumnSpacers('activity'));
+
+  const cp = document.getElementById('activityColourPicker');
+  cp.innerHTML = '';
+  COLOURS.forEach(c=>{
+    const d = document.createElement('div');
+    d.className = 'colour-dot'+(as_.colour===c?' selected':'');
+    d.style.background = c;
+    d.onclick = ()=>{ as_.colour=c; renderActivitySheet(); };
+    cp.appendChild(d);
+  });
+
+  // Goals/objectives — same tickable-list UI as training, scoped to this
+  // activity's own presets (or its category's) plus any saved custom goals.
+  const objPresets = getObjectivePresets(act);
+  const objMyTasks = (state.shared.customTasks||[]).filter(t=>!t.archived && t.activityId===act.id);
+  renderObjectivesList('activityObjectivesList', as_, objPresets, objMyTasks, renderActivitySheet);
+
+  const tbToggle = document.getElementById('activityTravelToggle');
+  tbToggle.classList.toggle('on', as_.travelBuffer);
+  const atRow = document.getElementById('activityTravelDurRow');
+  if (atRow) atRow.style.display = as_.travelBuffer ? 'flex' : 'none';
+  const atIn = document.getElementById('activityTravelBufMin');
+  if (atIn) atIn.value = String(as_.travelBufMin);
+
+  const rbToggle = document.getElementById('activityReadyToggle');
+  if (rbToggle) rbToggle.classList.toggle('on', !!as_.getReadyBuffer);
+  const arRow = document.getElementById('activityReadyDurRow');
+  if (arRow) arRow.style.display = as_.getReadyBuffer ? 'flex' : 'none';
+  const arIn = document.getElementById('activityReadyBufMin');
+  if (arIn) arIn.value = String(as_.getReadyBufMin != null ? as_.getReadyBufMin : DEFAULT_BUFFER_MIN);
+
+  const rt = document.getElementById('activityRepeat');
+  rt.classList.toggle('on', as_.repeat);
+  document.getElementById('activityRepeatDays').style.display = as_.repeat?'block':'none';
+  renderDayPicker('activityDayPicker', as_.repeatDays, (days)=>{ as_.repeatDays=days; });
+  renderRepeatSpan('activity');
+
+  document.getElementById('activityNote').value = as_.note;
+
+  // Chore type picker — only shown when placing a House Chore block
+  const choreRow = document.getElementById('choreTypeRow');
+  const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
+  if (choreRow) {
+    choreRow.style.display = isChoreBlock ? 'block' : 'none';
+    if (isChoreBlock) {
+      const picker = document.getElementById('choreTypePicker');
+      if (picker) {
+        picker.innerHTML = '';
+        if (!Array.isArray(as_.choreTags)) as_.choreTags = [];
+        /* Multi-select: tag several chores on one House-Chore block. This block
+           is what puts a chore on a day — the pool says what a chore is, the
+           planner says when — so the picker offers POOL ROWS and writes their
+           ids. Writing a display name here is what produced tags matching no
+           pool row, which can never be claimed, graded or paid.
+
+           Pre-pool weeks keep the old name list, since they have no pool to
+           pick from. */
+        const wk = ctWeekKeyForDate(currentDayKey || todayKey());
+        const options = true
+          ? mrPoolRows(wk).filter(p => p.lane === 'chores').map(p => ({ id: p.id, label: p.label }))
+          : ctPickableChoreNames().map(n => ({ id: n, label: n }));
+        options.forEach(({ id, label }) => {
+          const b = document.createElement('button');
+          const on = as_.choreTags.some(t => t === id
+            || (true && (mrPoolRowForTag(t, wk) || {}).id === id));
+          b.className = 'ui-chip';
+          b.setAttribute('aria-pressed', String(on));
+          b.textContent = (on ? '✓ ' : '') + label;
+          b.onclick = () => {
+            as_.choreTags = on
+              ? as_.choreTags.filter(t => t !== id
+                  && (!true || (mrPoolRowForTag(t, wk) || {}).id !== id))
+              : [...as_.choreTags, id];
+            renderActivitySheet();
+          };
+          picker.appendChild(b);
+        });
+        if (!options.length) {
+          const note = document.createElement('div');
+          note.className = 'ct-meta';
+          note.textContent = 'No chores in the pool yet — a grown-up adds them in Chore setup.';
+          picker.appendChild(note);
+        }
+      }
+    }
+  }
+
+  renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, as_.travelBufMin, !!as_.getReadyBuffer, as_.getReadyBufMin);
+  requestAnimationFrame(()=>syncDurationColumnSpacers('activity'));
+}
+function confirmActivity() {
+  // Guard against a rapid double-tap placing two blocks (and against a second
+  // tap running after selectedActivity was cleared, which used to throw).
+  if (pendingStartMin == null || !selectedActivity) return;
+  // Before consuming pendingStartMin — see confirmTraining.
+  const span = as_.repeat ? readRepeatSpan('activity') : { start: null, end: null, every: 1 };
+  if (!span) return;
+  const startMin = pendingStartMin;
+  pendingStartMin = null;
+  as_.note = document.getElementById('activityNote').value;
+  const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
+  placeBlock(selectedActivity.id, startMin, as_.durationMin, as_.colour, as_.objectives || [], as_.note, {
+    repeatDays: as_.repeat?as_.repeatDays:[],
+    travelBuffer: as_.travelBuffer,
+    travelBufMin: as_.travelBufMin,
+    getReadyBuffer: !!as_.getReadyBuffer,
+    getReadyBufMin: as_.getReadyBufMin,
+    repeatDateStart: span.start,
+    repeatDateEnd:   span.end,
+    repeatEvery:     span.every,
+    choreTags: isChoreBlock ? (as_.choreTags || []).slice() : null,
+  });
+  closeSheet('activityOverlay');
+  showToast('Block placed ✅');
+}
+
+/* Start-time minute picker:
+   - Shows nearest hour with :00 :15 :30 :45 quick buttons
+   - "Custom" reveals a 5-min-step input */
+function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  // Display current time
+  const display = document.createElement('div');
+  display.className = 'time-display';
+  display.textContent = formatTimeFromMin(curMin);
+  wrap.appendChild(display);
+
+  // Hour nav
+  const hourRow = document.createElement('div');
+  hourRow.className = 'minute-picker';
+  const curH = Math.floor(curMin/60);
+  const curMinInHour = curMin%60;
+
+  const prevH = document.createElement('button');
+  prevH.className = 'ui-btn ui-btn--secondary ui-btn--icon';
+  prevH.textContent = '◀';
+  prevH.onclick = ()=>{
+    const newMin = Math.max(START_MIN, curMin - 60);
+    onChange(newMin);
+    renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
+  };
+  hourRow.appendChild(prevH);
+
+  const hourLabel = document.createElement('span');
+  hourLabel.style.cssText = 'font-family:var(--font-display);font-size:calc(1.1rem * var(--text-scale, 1));min-width:60px;text-align:center';
+  const h12 = curH>12?curH-12:(curH===0?12:curH);
+  hourLabel.textContent = `${h12}${curH>=12?'pm':'am'}`;
+  hourRow.appendChild(hourLabel);
+
+  const nextH = document.createElement('button');
+  nextH.className = 'ui-btn ui-btn--secondary ui-btn--icon';
+  nextH.textContent = '▶';
+  nextH.onclick = ()=>{
+    const newMin = Math.min(END_MIN - 15, curMin + 60);
+    onChange(newMin);
+    renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
+  };
+  hourRow.appendChild(nextH);
+  wrap.appendChild(hourRow);
+
+  // Minute quick-buttons (0/15/30/45)
+  const minRow = document.createElement('div');
+  minRow.className = 'minute-picker';
+  [0,15,30,45].forEach(m=>{
+    const b = document.createElement('button');
+    b.className = 'ui-chip';
+    b.setAttribute('aria-pressed', String(curMinInHour===m));
+    b.textContent = ':'+m.toString().padStart(2,'0');
+    b.onclick = ()=>{
+      const newMin = curH*60 + m;
+      onChange(newMin);
+      renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
+    };
+    minRow.appendChild(b);
+  });
+  wrap.appendChild(minRow);
+
+  // Custom (5-min step)
+  const customRow = document.createElement('div');
+  customRow.className = 'custom-time-row';
+  customRow.innerHTML = `<label>Custom min:</label>`;
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = 0; input.max = 55; input.step = 5;
+  input.value = curMinInHour;
+  input.onchange = ()=>{
+    const m = Math.max(0, Math.min(55, Math.round(parseInt(input.value||0)/5)*5));
+    const newMin = curH*60 + m;
+    onChange(newMin);
+    renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
+  };
+  customRow.appendChild(input);
+  wrap.appendChild(customRow);
+  requestAnimationFrame(()=>{ if (typeof onAfterRender === 'function') onAfterRender(curMin); });
+}
+
+/* The ceiling is the day, not an arbitrary number. It used to be a hard-coded
+   480, which was already below the app's own data — the competition presets go
+   to 600 — so a 9-hour meet could be picked from a pill but not typed. The real
+   limit is DAY_MIN_SPAN, and placeBlock trims anything that would run past the
+   end of the day anyway, so nothing here can create a block the canvas cannot
+   draw. */
+function renderCustomDuration(containerId, curMin, onChange, onAfterChange, maxMin) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const cap = Math.max(1, maxMin || DAY_MIN_SPAN);
+  wrap.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'custom-time-row';
+  row.innerHTML = `<label>Custom min:</label>`;
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = 1; input.max = cap; input.step = 1;
+  input.value = curMin;
+  input.onchange = ()=>{
+    const m = Math.max(1, Math.min(cap, parseInt(input.value||15, 10) || 15));
+    onChange(m);
+    if (typeof onAfterChange === 'function') onAfterChange(m);
+  };
+  row.appendChild(input);
+  wrap.appendChild(row);
+}
+
+function toggleTravelBuffer(which) {
+  if (which==='training') {
+    ts.travelBuffer = !ts.travelBuffer;
+    if (ts.travelBuffer && (ts.travelBufMin == null || ts.travelBufMin < 5)) ts.travelBufMin = DEFAULT_BUFFER_MIN;
+    renderTrainingSheet();
+  } else {
+    as_.travelBuffer = !as_.travelBuffer;
+    if (as_.travelBuffer && (as_.travelBufMin == null || as_.travelBufMin < 5)) as_.travelBufMin = DEFAULT_BUFFER_MIN;
+    renderActivitySheet();
+  }
+}
+function toggleGetReadyBuffer(which) {
+  if (which==='training') { ts.getReadyBuffer = !ts.getReadyBuffer; renderTrainingSheet(); }
+  else if (which==='activity') {
+    as_.getReadyBuffer = !as_.getReadyBuffer;
+    if (as_.getReadyBuffer && (as_.getReadyBufMin == null || as_.getReadyBufMin < 5)) as_.getReadyBufMin = DEFAULT_BUFFER_MIN;
+    renderActivitySheet();
+  }
+}
+function toggleWarmupBuffer(which) {
+  if (which==='training') { ts.warmupBuffer = !ts.warmupBuffer; renderTrainingSheet(); }
+}
+function toggleEditGetReadyBuffer() {
+  editState.getReadyBuffer = !editState.getReadyBuffer;
+  const tg = document.getElementById('editReadyToggle');
+  if (tg) tg.classList.toggle('on', !!editState.getReadyBuffer);
+  const row = document.getElementById('editReadyDurRow');
+  if (row) row.style.display = editState.getReadyBuffer ? 'flex' : 'none';
+  renderEditTimeSummary();
+}
+function toggleEditWarmupBuffer() {
+  editState.warmupBuffer = !editState.warmupBuffer;
+  const tg = document.getElementById('editWarmupToggle');
+  if (tg) tg.classList.toggle('on', !!editState.warmupBuffer);
+  const row = document.getElementById('editWarmupDurRow');
+  if (row) row.style.display = editState.warmupBuffer ? 'flex' : 'none';
+  renderEditTimeSummary();
+}
+
+/* Multi-day picker */
+/* ── How long a repeat lasts, and how often it comes round ──
+   The two date inputs already existed and were shown to a PARENT only — and on
+   the activity sheet, only for the school category. So the child who actually
+   swims every second Tuesday until December could describe none of it, and even
+   a parent's answer was read off the form, used once, and dropped: nothing was
+   stored, so nothing could read it back. Both sheets show the same control to
+   everyone now, and placeBlock stamps what it says onto every block it makes.
+
+   Empty dates still mean this week only, which is what the hint promises and
+   what a kid gets without touching anything. */
+function renderRepeatSpan(prefix) {
+  const wrap = document.getElementById(prefix + 'DateRange');
+  if (wrap) wrap.style.display = 'block';
+  const sel = document.getElementById(prefix + 'RepeatEvery');
+  if (!sel) return;
+  const cur = seriesEveryWeeks(sel.value);
+  sel.innerHTML = SERIES_EVERY_CHOICES.map(([n, label]) =>
+    `<option value="${n}"${n === cur ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+}
+
+/* Reads a sheet's repeat span, or refuses one that cannot mean anything.
+   Returns null when it has already said why — the caller must not place. */
+function readRepeatSpan(prefix) {
+  const start = (document.getElementById(prefix + 'DateStart') || {}).value || '';
+  const end   = (document.getElementById(prefix + 'DateEnd') || {}).value || '';
+  const every = seriesEveryWeeks((document.getElementById(prefix + 'RepeatEvery') || {}).value);
+  if (start && end && end < start) {
+    showToast('The last day is before the first one');
+    return null;
+  }
+  if (start && end) {
+    const weeks = Math.round((formatDayKey(end) - formatDayKey(start)) / (7 * 24 * 3600 * 1000));
+    if (weeks > SERIES_MAX_WEEKS) {
+      showToast(`That is longer than ${SERIES_MAX_WEEKS} weeks — pick a nearer last day`);
+      return null;
+    }
+  }
+  return { start: start || null, end: end || null, every };
+}
+
+function renderDayPicker(containerId, selectedDays, onChange) {
+  const wrap = document.getElementById(containerId);
+  wrap.innerHTML = '';
+  DAY_SHORT.forEach((d, i)=>{
+    const el = document.createElement('div');
+    el.className = 'day-pick'+(selectedDays.includes(i)?' active':'');
+    el.textContent = d;
+    el.onclick = ()=>{
+      if (selectedDays.includes(i)) selectedDays.splice(selectedDays.indexOf(i),1);
+      else selectedDays.push(i);
+      onChange(selectedDays);
+      renderDayPicker(containerId, selectedDays, onChange);
+    };
+    wrap.appendChild(el);
+  });
+}
+function pickPreset(which, preset) {
+  let target = which==='training' ? ts.repeatDays
+            : which==='edit'     ? editState.repeatDays
+            : as_.repeatDays;
+  target.length = 0;
+  if (preset==='weekdays') [0,1,2,3,4].forEach(i=>target.push(i));
+  else if (preset==='weekend') [5,6].forEach(i=>target.push(i));
+  else if (preset==='all') [0,1,2,3,4,5,6].forEach(i=>target.push(i));
+  if (which==='training') renderTrainingSheet();
+  else if (which==='edit') renderDayPicker('editDayPicker', editState.repeatDays, (days)=>{ editState.repeatDays = days; });
+  else renderActivitySheet();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   EDIT BLOCK SHEET
+════════════════════════════════════════════════════════════════ */
+let editState = {
+  startMin: null, durationMin: null, travelBuffer: false, getReadyBuffer: false, travelBufMin: 15, getReadyBufMin: 15,
+  /* The return legs. Default ON, which is what "each way" always meant, so a
+     block nobody has thought about behaves exactly as it does today. */
+  travelHome: true, travelHomeMin: 15, readyAfter: true, readyAfterMin: 15,
+  warmupBuffer: false, warmupBufMin: 20,
+  repeat: false, repeatDays: [],
+  completed: false,
+  stopwatchEnabled: false,
+  stopwatch: { goalSec: null, elapsedSec: 0, running: false, startedAt: null },
+};
+let editStopwatchTick = null;
+
+/* ONE CALLER FOR THE EDIT SHEET'S SUMMARY. This line was written out seven
+   times, byte for byte — seven chances to update six of them, which is exactly
+   what happened when travel grew a second leg. */
+function renderEditTimeSummary() {
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin,
+    editState.travelBuffer, editState.travelBufMin,
+    !!editState.getReadyBuffer, editState.getReadyBufMin,
+    !!editState.warmupBuffer, editState.warmupBufMin,
+    {
+      travelHome: editState.travelHome, travelHomeMin: editState.travelHomeMin,
+      readyAfter: editState.readyAfter, readyAfterMin: editState.readyAfterMin,
+    });
+}
+
+function defaultStopwatch() {
+  return { goalSec: null, elapsedSec: 0, running: false, startedAt: null, enabled: false };
+}
+
+function cloneStopwatch(sw) {
+  const d = defaultStopwatch();
+  if (!sw || typeof sw !== 'object') return d;
+  return {
+    goalSec: sw.goalSec != null ? sw.goalSec : null,
+    elapsedSec: Math.max(0, sw.elapsedSec|0),
+    running: !!sw.running,
+    startedAt: sw.startedAt != null ? sw.startedAt : null,
+    enabled: !!sw.enabled,
+  };
+}
+
+function stopwatchDisplayElapsed(sw) {
+  if (!sw) return 0;
+  let e = Math.max(0, sw.elapsedSec|0);
+  if (sw.running && sw.startedAt) {
+    e += Math.floor((Date.now() - sw.startedAt) / 1000);
+  }
+  return e;
+}
+
+function renderEditStopwatchStats() {
+  const el = document.getElementById('editStopwatchStats');
+  if (!el) return;
+  const sw = editState.stopwatch || defaultStopwatch();
+  const goal = sw.goalSec != null ? sw.goalSec : (Math.max(1, editState.durationMin|0) * 60);
+  const used = stopwatchDisplayElapsed(sw);
+  el.textContent = `Goal ${formatTimerSec(goal)} · Used ${formatTimerSec(used)}`;
+}
+
+function editStopwatchClearTick() {
+  if (editStopwatchTick) { clearInterval(editStopwatchTick); editStopwatchTick = null; }
+}
+
+function editStopwatchStartTick() {
+  editStopwatchClearTick();
+  editStopwatchTick = setInterval(()=>{ renderEditStopwatchStats(); }, 500);
+}
+
+function syncEditStopwatchUI() {
+  const wrap = document.getElementById('editStopwatchWrap');
+  const tg = document.getElementById('editStopwatchToggle');
+  if (wrap) wrap.style.display = 'block';
+  if (tg) tg.classList.toggle('on', editState.stopwatchEnabled);
+  renderEditStopwatchStats();
+  const sw = editState.stopwatch;
+  if (editState.stopwatchEnabled && sw && sw.running) editStopwatchStartTick();
+  else editStopwatchClearTick();
+}
+
+/* On a ROUTINE this toggle is not the owner of anything — the checklist above
+   it is. It used to be a second, independent switch, so a child could tick
+   every step and still leave this off (or leave it on with the list half done)
+   and the two would sit there disagreeing. It now drives the list, through the
+   same write the day view and the chore tab use. */
+function toggleEditComplete() {
+  const kid = isParent() ? parentViewing : activeProfile();
+  const blocks = getDayBlocks(currentDayKey, kid) || [];
+  const blk = blocks.find(b => b.id === editingBlockId);
+  const act = blk ? findActivity(blk.actId, kid) : null;
+  if (blk && act && act.isRoutine) {
+    toggleBlockDone(currentDayKey, blk.id);
+    editState.completed = isRoutineCompleted(blk, kid);
+    document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+    const wrap = document.getElementById('editChecklistWrap');
+    if (wrap && wrap.style.display !== 'none') renderChecklist(blk, act, 'editChecklistList');
+    return;
+  }
+  editState.completed = !editState.completed;
+  document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+}
+
+function toggleEditStopwatch() {
+  editState.stopwatchEnabled = !editState.stopwatchEnabled;
+  if (!editState.stopwatch) editState.stopwatch = defaultStopwatch();
+  editState.stopwatch.enabled = editState.stopwatchEnabled;
+  if (!editState.stopwatchEnabled) {
+    editStopwatchPause();
+    editState.stopwatch.running = false;
+    editState.stopwatch.startedAt = null;
+  }
+  syncEditStopwatchUI();
+}
+
+function editStopwatchStart() {
+  if (!editState.stopwatchEnabled) return;
+  if (!editState.stopwatch) editState.stopwatch = defaultStopwatch();
+  const sw = editState.stopwatch;
+  sw.goalSec = Math.max(60, (editState.durationMin|0) * 60);
+  if (sw.running) return;
+  sw.running = true;
+  sw.startedAt = Date.now();
+  syncEditStopwatchUI();
+}
+
+function editStopwatchPause() {
+  const sw = editState.stopwatch;
+  if (!sw || !sw.running) { syncEditStopwatchUI(); return; }
+  sw.elapsedSec = stopwatchDisplayElapsed(sw);
+  sw.running = false;
+  sw.startedAt = null;
+  syncEditStopwatchUI();
+}
+
+function editStopwatchReset() {
+  const sw = editState.stopwatch;
+  if (!sw) return;
+  sw.elapsedSec = 0;
+  sw.running = false;
+  sw.startedAt = null;
+  sw.goalSec = Math.max(60, (editState.durationMin|0) * 60);
+  if (editingBlockId) stopwatchGoalToasted.delete(editingBlockId);
+  syncEditStopwatchUI();
+}
+
+function onEditStartMinChange(m) {
+  editState.startMin = m;
+  renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange, ()=>syncDurationColumnSpacers('edit'));
+  renderEditTimeSummary();
+  if (editState.stopwatch && editState.stopwatchEnabled) {
+    editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
+    renderEditStopwatchStats();
+  }
+}
+
+/* A HIDDEN INPUT IS NEVER READ. These three elements exist in the DOM whether or
+   not their buffer is on, and this took all three unconditionally — so a number
+   nobody could see, left over from another block or from the static value in
+   index.html, was written into editState and saved by the next press. Each is
+   read only when its own buffer is switched on. */
+function onEditBufferMinInput() {
+  const tIn = document.getElementById('editTravelBufMin');
+  const rIn = document.getElementById('editReadyBufMin');
+  const wIn = document.getElementById('editWarmupBufMin');
+  if (tIn && editState.travelBuffer) editState.travelBufMin = clampBufferMin(tIn.value);
+  if (rIn && editState.getReadyBuffer) editState.getReadyBufMin = clampBufferMin(rIn.value);
+  if (wIn && editState.warmupBuffer) editState.warmupBufMin = clampBufferMin(wIn.value);
+  // The return legs. Same rule: a hidden input is never read.
+  const thTog = document.getElementById('editTravelHomeToggle');
+  const thIn = document.getElementById('editTravelHomeMin');
+  if (thTog && editState.travelBuffer) editState.travelHome = !!thTog.checked;
+  if (thIn && editState.travelBuffer && editState.travelHome) editState.travelHomeMin = clampBufferMin(thIn.value);
+  const raTog = document.getElementById('editReadyAfterToggle');
+  const raIn = document.getElementById('editReadyAfterMin');
+  if (raTog && editState.getReadyBuffer) editState.readyAfter = !!raTog.checked;
+  if (raIn && editState.getReadyBuffer && editState.readyAfter) editState.readyAfterMin = clampBufferMin(raIn.value);
+  renderEditTimeSummary();
+}
+
+/* The edit sheet's one control over the span. Confirmed first, and it reports
+   what it actually did — including the days it refused to remove because they
+   had already been lived. */
+async function applySeriesUntil() {
+  const block = getDayBlocks(currentDayKey).find(b => b.id === editingBlockId);
+  if (!block || !block.seriesId) return;
+  const val = (document.getElementById('seriesUntilInput') || {}).value || '';
+  if (!val) { showToast('Pick a last day'); return; }
+  if (val === block.seriesEnd) { showToast('That is already the last day'); return; }
+  const preview = seriesDayKeys({
+    days: block.seriesDays, everyWeeks: block.seriesEvery, anchorKey: block.seriesStart || currentDayKey,
+    startKey: block.seriesStart || currentDayKey, endKey: val,
+  });
+  const now = countSeriesBlocks(block.seriesId);
+  /* Red only when planned blocks are lost, and the question says how many
+     (owner P9). The dialog escapes the whole message once. */
+  const lose = seriesTrimPlan(block.seriesId, val).drop.length;
+  const ok = await showConfirm(
+    `Run this repeat until ${val}?\n\n${now} now, about ${preview.length} after. `
+    + (lose ? `${lose} planned block${lose === 1 ? '' : 's'} will be removed. ` : '')
+    + 'Days already ticked or confirmed are kept either way.',
+    { okLabel: 'Update it', cancelLabel: 'Not now', danger: lose > 0 });
+  if (!ok) return;
+  const res = seriesExtendTo(block.seriesId, val);
+  closeSheet('editOverlay');
+  buildTimeline();
+  const bits = [];
+  if (res.added) bits.push(`${res.added} added`);
+  if (res.removed) bits.push(`${res.removed} removed`);
+  if (res.kept) bits.push(`${res.kept} kept — already done`);
+  showToast(bits.length ? `🔁 ${bits.join(', ')}` : '🔁 Nothing to change');
+}
+
+function onActivityTravelBufMinInput() {
+  const tIn = document.getElementById('activityTravelBufMin');
+  if (tIn) as_.travelBufMin = clampBufferMin(tIn.value);
+  renderActivitySheet();
+}
+function onActivityReadyBufMinInput() {
+  const rIn = document.getElementById('activityReadyBufMin');
+  if (rIn) as_.getReadyBufMin = clampBufferMin(rIn.value);
+  renderActivitySheet();
+}
+
+function openEditSheet(blockId) {
+  editingBlockId = blockId;
+  const block = getDayBlocks(currentDayKey).find(b=>b.id===blockId);
+  if (!block) return;
+  const act = findActivity(block.actId);
+  if (!act) return;
+
+  editState.startMin    = block.startMin;
+  editState.durationMin = block.durationMin;
+  editState.travelBuffer = !!block.travelBuffer;
+  editState.getReadyBuffer = !!block.getReadyBuffer;
+  editState.warmupBuffer = !!block.warmupBuffer;
+  /* PER LEG, read through the accessors so a block that predates the split
+     still loads as the symmetric pair it has always been. The `home`/`after`
+     switches start ON for such a block, which is exactly what it does today. */
+  editState.travelBufMin = getTravelBufMin(block, 'pre') || DEFAULT_BUFFER_MIN;
+  editState.getReadyBufMin = getGetReadyBufMin(block, 'pre') || DEFAULT_BUFFER_MIN;
+  editState.travelHome = getTravelBufMin(block, 'post') > 0;
+  editState.travelHomeMin = getTravelBufMin(block, 'post') || DEFAULT_BUFFER_MIN;
+  editState.readyAfter = getGetReadyBufMin(block, 'post') > 0;
+  editState.readyAfterMin = getGetReadyBufMin(block, 'post') || DEFAULT_BUFFER_MIN;
+  editState.warmupBufMin = getWarmupBufMin(block) || DEFAULT_WARMUP_MIN;
+  editState.gearState = { ...(block.gearState||{}) }
+  editState.repeat = false;
+  editState.repeatDays = [];
+  // Reset edit-repeat UI to "off"
+  document.getElementById('editRepeat').classList.remove('on');
+  document.getElementById('editRepeatDays').style.display = 'none';
+  // Series-wrap visibility: show only if this block belongs to a series of >1
+  const sw = document.getElementById('seriesWrap');
+  if (sw) {
+    const n = block.seriesId ? countSeriesBlocks(block.seriesId) : 0;
+    sw.style.display = n > 1 ? 'block' : 'none';
+    /* Say what the repeat IS, not just how many of it there are. "Part of a
+       series of 12" was the whole of what this sheet could tell you about a
+       repeat, because the days, the frequency and the dates were never stored. */
+    const spec = document.getElementById('seriesSpec');
+    if (spec) {
+      const words = seriesSpecText(block);
+      spec.textContent = words
+        ? `🔁 ${words} — ${n} in all`
+        : `🔁 One of ${n} repeats`;
+    }
+    const row = document.getElementById('seriesUntilRow');
+    const inp = document.getElementById('seriesUntilInput');
+    // Only offered for a series that has a span; a this-week-only repeat has no
+    // last day to move, and inventing one would change what it meant.
+    if (row) row.hidden = !block.seriesEnd;
+    if (inp && block.seriesEnd) inp.value = block.seriesEnd;
+  }
+
+  document.getElementById('editSheetTitle').textContent = `${act.icon} ${act.name}`;
+
+  editState.completed = isBlockCompleted(block, isParent() ? parentViewing : activeProfile());
+  document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+  /* Say what the switch actually does. On a routine it closes or reopens the
+     checklist, and a label that claimed otherwise is how two controls for one
+     fact stayed invisible for so long. */
+  {
+    const lbl = document.querySelector('#editCompleteToggle .toggle-label');
+    const isRoutineBlock = !!(act && act.isRoutine);
+    if (lbl) lbl.textContent = isRoutineBlock
+      ? '✅ Tick every step in the checklist'
+      : '✅ Mark this activity done';
+  }
+  renderParentStampPicker(block);
+
+  editState.stopwatch = cloneStopwatch(block.stopwatch);
+  editState.stopwatchEnabled = !!(block.stopwatch && (block.stopwatch.enabled || block.stopwatch.running));
+  if (editState.stopwatch.running && editState.stopwatch.startedAt) {
+    editState.stopwatch.elapsedSec = stopwatchDisplayElapsed(editState.stopwatch);
+    editState.stopwatch.running = false;
+    editState.stopwatch.startedAt = null;
+  }
+
+  renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange, ()=>syncDurationColumnSpacers('edit'));
+  renderEditDurationPicker(act);
+
+  // Checklist (only if routine)
+  const clWrap = document.getElementById('editChecklistWrap');
+  if (act.isRoutine) {
+    clWrap.style.display = 'block';
+    renderChecklist(block, act, 'editChecklistList');
+  } else {
+    clWrap.style.display = 'none';
+  }
+
+  // Objectives/goals — every block can carry a target, not just training.
+  const objWrap = document.getElementById('editObjectivesWrap');
+  const objEditWrap = document.getElementById('editObjectivesEditWrap');
+  const objInput = document.getElementById('editObjectivesInput');
+  objWrap.style.display = 'block';
+  const list = Array.isArray(block.objectives) ? block.objectives : [];
+  document.getElementById('editObjectivesView').innerHTML = list.length
+    ? list.map(o=>`<div style="font-size:calc(0.9rem * var(--text-scale, 1));padding:0.3rem 0;border-bottom:1px dashed var(--paper-line)">🎯 ${escapeHtml(o)}</div>`).join('')
+    : '<p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light)">No objectives yet — add some below.</p>';
+  objInput.value = list.join('\n');
+  if (isParent()) objEditWrap.style.display = 'block';
+  else if (block.parentPinned) objEditWrap.style.display = 'none';
+  else objEditWrap.style.display = 'block';
+
+  document.getElementById('editNoteInput').value = block.note || '';
+
+  // Mood inline
+  const bmWrap = document.getElementById('editBlockMoods');
+  bmWrap.innerHTML = '';
+  const curMood = getProfData().blockMoods?.[blockId];
+  MOODS.forEach(m=>{
+    const el = document.createElement('div');
+    el.className = 'vibe-mood'+(curMood===m?' selected':'');
+    el.textContent = m;
+    el.onclick = ()=>{
+      const p = getProfData();
+      if (!p.blockMoods) p.blockMoods={};
+      p.blockMoods[blockId] = m;
+      saveAll();
+      bmWrap.querySelectorAll('.vibe-mood').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+      buildTimeline();
+    };
+    bmWrap.appendChild(el);
+  });
+
+  // Travel + get-ready + warm-up buffer
+  document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
+  const editReady = document.getElementById('editReadyToggle');
+  const editWarmup = document.getElementById('editWarmupToggle');
+  const editGearWrap = document.getElementById('editTrainingGearWrap');
+  const editTrRow = document.getElementById('editTravelDurRow');
+  const editRdRow = document.getElementById('editReadyDurRow');
+  const editWuRow = document.getElementById('editWarmupDurRow');
+  /* GET-READY IS EDITABLE ON ANYTHING THAT CARRIES IT. Both controls have been
+     in index.html all along, and this branch showed them for a TRAINING block
+     only — so travel could be adjusted anywhere and get-ready almost nowhere.
+
+     Which is exactly backwards. Placing an activity sets
+     `getReadyBuffer: activityTravels(act)` (js/01-config.js), so School Day,
+     all five appointments, Ballet, Swimming, Skating and every Explore outing
+     arrive with the buffer switched ON — and not one of them is isTraining.
+     Every block that carries get-ready by default was a block whose get-ready
+     could not be edited, which is also most of what the week grid now draws in
+     red: a parent looking at a twenty-minute clash had no control anywhere in
+     the app that would fix it.
+
+     WARM-UP stays training-only. It is a training-specific idea with its own
+     20-minute default and its own toggle (CLAUDE.md, buffer defaults), and
+     putting one in front of Breakfast is what that rule exists to prevent. */
+  editReady.style.display = 'flex';
+  editReady.classList.toggle('on', !!editState.getReadyBuffer);
+  editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
+  editRdRow.style.display = editState.getReadyBuffer ? 'flex' : 'none';
+  /* ALL THREE LOADED FROM THE BLOCK, on every path. The non-training branch
+     used to skip this, leaving #editReadyBufMin holding its static value="15"
+     or whatever was typed on the last training block opened this session — and
+     onEditBufferMinInput read it anyway. So changing the TRAVEL minutes on a
+     Swimming block copied that stale number into the block's get-ready and
+     saved it: a field with no visible control silently rewriting itself from
+     another block's value. */
+  const etIn = document.getElementById('editTravelBufMin');
+  const erIn = document.getElementById('editReadyBufMin');
+  const ewIn = document.getElementById('editWarmupBufMin');
+  if (etIn) etIn.value = String(editState.travelBufMin);
+  if (erIn) erIn.value = String(editState.getReadyBufMin);
+  if (ewIn) ewIn.value = String(editState.warmupBufMin);
+  const ethTog = document.getElementById('editTravelHomeToggle');
+  const ethIn  = document.getElementById('editTravelHomeMin');
+  const eraTog = document.getElementById('editReadyAfterToggle');
+  const eraIn  = document.getElementById('editReadyAfterMin');
+  if (ethTog) ethTog.checked = !!editState.travelHome;
+  if (ethIn)  { ethIn.value = String(editState.travelHomeMin); ethIn.disabled = !editState.travelHome; }
+  if (eraTog) eraTog.checked = !!editState.readyAfter;
+  if (eraIn)  { eraIn.value = String(editState.readyAfterMin); eraIn.disabled = !editState.readyAfter; }
+  // Watching is not training: no warm-up to set, no kit to pack.
+  if (act.isTraining && !blockIsWatching(block)) {
+    editWarmup.style.display = 'flex';
+    editWarmup.classList.toggle('on', !!editState.warmupBuffer);
+    editGearWrap.style.display = 'block';
+    renderTrainingGearChecklist('editTrainingGearList', editState, block.tag || 'skating', false, act.isCompetition);
+    editWuRow.style.display = editState.warmupBuffer ? 'flex' : 'none';
+  } else {
+    editWarmup.style.display = 'none';
+    editGearWrap.style.display = 'none';
+    editWuRow.style.display = 'none';
+  }
+
+  renderEditTimeSummary();
+  syncEditStopwatchUI();
+
+  // Parent pin toggle
+  const ppWrap = document.getElementById('parentPinWrap');
+  if (isParent()) {
+    ppWrap.style.display = 'block';
+    document.getElementById('pinToggle').classList.toggle('on', !!block.parentPinned);
+    document.getElementById('confirmToggle').classList.toggle('on', !!block.confirmed);
+    /* On a CHORE block the grade cycle owns this answer: reaching $0 is the
+       same assertion as "it did not happen", and two controls for one meaning
+       is the defect the NOW-card fix already records. Everywhere else the
+       toggle is the only way to say it. */
+    const ndWrap = document.getElementById('notDoneToggle');
+    const choreOwned = block.actId === 'chores';
+    ndWrap.style.display = choreOwned ? 'none' : '';
+    ndWrap.classList.toggle('on', !!block.notDone);
+  } else ppWrap.style.display = 'none';
+
+  // Sister Sync public toggle: parent-only
+  const ssWrap = document.getElementById('sisterSyncWrap');
+  if (isParent()) {
+    ssWrap.style.display = 'block';
+    document.getElementById('publicToggle').classList.toggle('on', !!block.public);
+  } else {
+    ssWrap.style.display = 'none';
+  }
+
+  /* The two invite buttons — kid AND parent. Each asks sisterInviteFor about
+     its OWN kind, so a watch invite never marks the share button sent, and a
+     declined invite frees the button again. `invitedTo` is not asked: it is a
+     bare list of names and cannot tell a share from a watch. */
+  const me = activeProfile();
+  const isKid = me === 'jenn' || me === 'jess';
+  const sister = me === 'jenn' ? 'jess' : 'jenn';
+  const sisterName = kidLabel(sister).name;
+
+  /* 💌 share — any ordinary block, but NOT a watching one: passing somebody
+     else's meet on as a plain invite would clone her competition block onto
+     the competitor's own calendar. */
+  /* A live invite for another day means the block was dragged since it was
+     sent: say so, and leave the button live so she can send it again. */
+  const inviteBtn = document.getElementById('inviteSisterBtn');
+  if (inviteBtn) {
+    const canShare = isKid && !blockIsWatching(block);
+    const share = canShare ? sisterInviteFor(block, sister, 'share', currentDayKey) : null;
+    const shareMoved = !!share && !inviteCoversDay(share, currentDayKey);
+    const shareOut = !!share && !shareMoved;
+    inviteBtn.style.display = canShare ? 'block' : 'none';
+    inviteBtn.textContent = shareOut ? `💌 Invite sent to ${sisterName}`
+      : shareMoved ? inviteMovedWords(share, currentDayKey, '💌') : `💌 Invite ${sisterName}`;
+    inviteBtn.disabled = shareOut;
+  }
+
+  /* 👀 watch — only on a competition, and blockIsCompetition answers false
+     for a watch block, so a block that is already somebody else's meet cannot
+     be passed on again. */
+  const watchBtn = document.getElementById('watchSisterBtn');
+  if (watchBtn) {
+    const canWatch = isKid && blockIsCompetition(block);
+    const watchInv = canWatch ? sisterInviteFor(block, sister, 'watch', currentDayKey) : null;
+    const watchMoved = !!watchInv && !inviteCoversDay(watchInv, currentDayKey);
+    const watchOut = !!watchInv && !watchMoved;
+    watchBtn.style.display = canWatch ? 'block' : 'none';
+    watchBtn.textContent = watchOut ? `👀 ${sisterName} is invited to watch`
+      : watchMoved ? inviteMovedWords(watchInv, currentDayKey, '👀') : `👀 Invite ${sisterName} to watch`;
+    watchBtn.disabled = watchOut;
+  }
+
+  openSheet('editOverlay');
+}
+
+function renderEditDurationPicker(act) {
+  const durWrap = document.getElementById('editDurBtns');
+  durWrap.innerHTML = '';
+  const options = act.isCompetition ? [120,180,240,300,360,420,480,540,600]
+    : act.isTraining ? [30,60,90,120,150,180] : [15,30,45,60,90,120,180,240];
+  options.forEach(min=>{
+    const b = document.createElement('button');
+    b.className='ui-chip';
+    b.setAttribute('aria-pressed', String(editState.durationMin===min));
+    b.textContent = formatDuration(min);
+    b.onclick = ()=>{ editState.durationMin = min; renderEditDurationPicker(act); };
+    durWrap.appendChild(b);
+  });
+  renderCustomDuration('editCustomDur', editState.durationMin, (m)=>{
+    editState.durationMin = m; renderEditDurationPicker(act);
+  }, ()=>syncDurationColumnSpacers('edit'));
+  renderEditTimeSummary();
+  if (editState.stopwatch) {
+    editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
+    renderEditStopwatchStats();
+  }
+  requestAnimationFrame(()=>syncDurationColumnSpacers('edit'));
+}
+
+function renderChecklist(block, act, listContainerId, options) {
+  const tmpl = getRoutineTemplate(act.routineId);
+  const listWrap = document.getElementById(listContainerId || 'editChecklistList');
+  const skipAdd = !!(options && options.skipAdd);
+  listWrap.innerHTML = '';
+  if (!tmpl?.items?.length && !getKidExtras(act.routineId).length && !getUnlockedRoutineRewards(act.routineId).length) {
+    listWrap.innerHTML = '<p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light)">No items in this routine</p>';
+    return;
+  }
+  if (!block.checklistState) block.checklistState = {};
+
+  // Render parent/template items first (kids cannot rename/delete)
+  const cid = listContainerId || 'editChecklistList';
+
+  (tmpl?.items || []).forEach(item=>{
+    listWrap.appendChild(buildChecklistRow(block, act, item, false, cid));
+  });
+
+  // Render kid-added items (only for child profiles, not parent — parent shouldn't see another kid's extras)
+  const extras = getKidExtras(act.routineId);
+  extras.forEach(item=>{
+    listWrap.appendChild(buildChecklistRow(block, act, item, true, cid));
+  });
+  const rewardItems = getUnlockedRoutineRewards(act.routineId);
+  rewardItems.forEach(item=>{
+    listWrap.appendChild(buildChecklistRow(block, act, item, false, cid));
+  });
+
+  // "+ Add my own item" row — only when a child is using their own profile (not parent mode)
+  if (!isParent() && !skipAdd) {
+    const addRow = document.createElement('div');
+    addRow.className = 'checklist-add-row';
+    addRow.innerHTML = `
+      <input type="text" class="checklist-add-input" placeholder="+ Add my own item" maxlength="60">
+      <button class="ui-btn ui-btn--secondary checklist-add-btn">Add</button>
+    `;
+    const inp = addRow.querySelector('input');
+    const btn = addRow.querySelector('button');
+    const submit = ()=>{
+      const txt = inp.value.trim();
+      if (!txt) return;
+      addKidExtra(act.routineId, txt);
+      inp.value = '';
+      renderChecklist(block, act, cid);
+    };
+    btn.onclick = submit;
+    inp.onkeydown = (e)=>{ if (e.key==='Enter') { e.preventDefault(); submit(); } };
+    listWrap.appendChild(addRow);
+  }
+}
+
+/* Build one checklist row. isKidItem=true means the row gets a delete (×) button. */
+function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
+  const cid = listContainerId || 'editChecklistList';
+  const checked = !!block.checklistState[item.id];
+  const row = document.createElement('div');
+  row.className = 'checklist-item'+(checked?' checked':'')+(isKidItem?' kid-item':'');
+
+  const box = document.createElement('div');
+  box.className = 'checklist-check';
+  box.textContent = checked ? '✓' : '';
+  box.onclick = (e)=>{
+    e.stopPropagation();
+    const blocks = getDayBlocks(currentDayKey);
+    const b = blocks.find(x=>x.id===block.id);
+    if (!b.checklistState) b.checklistState = {};
+    b.checklistState[item.id] = !b.checklistState[item.id];
+    const kid = isParent() ? parentViewing : activeProfile();
+    if (act.isRoutine) {
+      // Derive the compatibility flag BEFORE the write, so what lands in the
+      // profile and what every other screen reads are the same thing.
+      syncRoutineCompletion(b, kid);
+    }
+    setDayBlocks(currentDayKey, blocks);
+    renderChecklist(b, act, cid);
+    buildTimeline();
+    if (act.isRoutine) {
+      const { done, total } = routineTally(b, act, kid);
+      const prevDone = b.checklistState[item.id] ? Math.max(0, done - 1) : Math.min(total, done + 1);
+      markRoutineProgressOnChecklistToggle(b, act, prevDone, done, total, kid);
+      if (total > 0 && done >= total) {
+        if (!routineCompleteToasted.has(b.id)) {
+          routineCompleteToasted.add(b.id);
+          showToast('🌟 Routine complete — you did it!');
+        }
+      } else {
+        routineCompleteToasted.delete(b.id);
+      }
+    }
+  };
+  row.appendChild(box);
+
+  // The same icon the chore tab shows, so one item does not read as two
+  // different things depending on which screen ticked it.
+  const ico = document.createElement('span');
+  ico.className = 'checklist-icon';
+  ico.textContent = routineItemIcon(item);
+  row.appendChild(ico);
+
+  const txt = document.createElement('span');
+  txt.className = 'checklist-text';
+  txt.textContent = item.text;
+  row.appendChild(txt);
+
+  if (item.timerSec) {
+    const timerKey = `${block.id}-${item.id}`;
+    const timerBtn = document.createElement('button');
+    timerBtn.className = 'checklist-timer-btn'+(activeTimers[timerKey]?' running':'');
+    timerBtn.textContent = activeTimers[timerKey]
+      ? formatTimerSec(activeTimers[timerKey].remaining)
+      : `▶ ${formatTimerSec(item.timerSec)}`;
+    timerBtn.onclick = (e)=>{
+      e.stopPropagation();
+      toggleTimer(timerKey, item.timerSec, timerBtn);
+    };
+    row.appendChild(timerBtn);
+  }
+
+  if (isKidItem && !isParent()) {
+    const delBtn = document.createElement('button');
+    delBtn.className = 'checklist-del-btn';
+    delBtn.textContent = '×';
+    delBtn.title = 'Remove my item';
+    delBtn.onclick = (e)=>{
+      e.stopPropagation();
+      removeKidExtra(act.routineId, item.id);
+      renderChecklist(block, act, cid);
+    };
+    row.appendChild(delBtn);
+  }
+
+  return row;
+}
+
+/* Get kid-added extras for the current child profile, for a specific routineId */
+/* `p` used to be missing entirely, so this read the ACTIVE profile: the parent
+   portal viewing Jenn was handed Jess's extra items and then measured Jenn's
+   routine against them. Every caller passes the child now. */
+function getKidExtras(routineId, p = activeProfile()) {
+  const prof = getProfData(p);
+  if (!prof) return [];
+  const map = prof.routineExtras || {};
+  return map[routineId] || [];
+}
+
+function addKidExtra(routineId, text) {
+  const p = getProfData();
+  if (!p.routineExtras) p.routineExtras = {};
+  if (!p.routineExtras[routineId]) p.routineExtras[routineId] = [];
+  p.routineExtras[routineId].push({
+    id: 'kx-'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    text: text,
+    addedBy: profile,
+  });
+  saveAll();
+}
+
+function removeKidExtra(routineId, itemId) {
+  const p = getProfData();
+  if (!p.routineExtras?.[routineId]) return;
+  p.routineExtras[routineId] = p.routineExtras[routineId].filter(x=>x.id!==itemId);
+  // Also remove any checklistState references in this kid's blocks
+  const weeks = p.weeks || {};
+  Object.values(weeks).forEach(blocks=>{
+    blocks.forEach(b=>{
+      if (b.checklistState && itemId in b.checklistState) delete b.checklistState[itemId];
+    });
+  });
+  saveAll();
+}
+
+function formatTimerSec(s) {
+  const m = Math.floor(s/60); const ss = s%60;
+  if (m===0) return ss+'s';
+  return m+':'+ss.toString().padStart(2,'0');
+}
+
+function toggleTimer(key, totalSec, btnEl) {
+  if (activeTimers[key]) {
+    clearInterval(activeTimers[key].interval);
+    delete activeTimers[key];
+    btnEl.classList.remove('running');
+    btnEl.textContent = `▶ ${formatTimerSec(totalSec)}`;
+    return;
+  }
+  activeTimers[key] = { remaining: totalSec, interval: null };
+  btnEl.classList.add('running');
+  activeTimers[key].interval = setInterval(()=>{
+    activeTimers[key].remaining--;
+    if (activeTimers[key].remaining <= 0) {
+      clearInterval(activeTimers[key].interval);
+      delete activeTimers[key];
+      playBell();
+      if (btnEl.isConnected) {
+        btnEl.classList.remove('running');
+        btnEl.textContent = `✓ Done!`;
+        setTimeout(()=>{ if(btnEl.isConnected) btnEl.textContent = `▶ ${formatTimerSec(totalSec)}`; }, 3000);
+      }
+      showToast('⏰ Time!');
+    } else if (btnEl.isConnected) {
+      btnEl.textContent = formatTimerSec(activeTimers[key].remaining);
+    }
+  }, 1000);
+}
+
+/* Web Audio bell — two-tone chime */
+let _audioCtx = null;
+function playBell() {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const ctx = _audioCtx;
+    const now = ctx.currentTime;
+    [
+      {freq: 880, start: 0,   dur: 0.8}, // A5
+      {freq: 659, start: 0.25, dur: 1.2}, // E5
+    ].forEach(({freq, start, dur})=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now+start);
+      gain.gain.linearRampToValueAtTime(0.25, now+start+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now+start+dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now+start);
+      osc.stop(now+start+dur+0.1);
+    });
+  } catch(e){ console.warn('Audio failed', e); }
+}
+
+function toggleEditTravelBuffer() {
+  editState.travelBuffer = !editState.travelBuffer;
+  document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
+  const row = document.getElementById('editTravelDurRow');
+  if (row) row.style.display = editState.travelBuffer ? 'flex' : 'none';
+  renderEditTimeSummary();
+}
+
+async function saveEditChanges() {
+  if (!editingBlockId) return;
+  editStopwatchPause();
+  const blocks = getDayBlocks(currentDayKey);
+  const blk = blocks.find(b=>b.id===editingBlockId);
+  if (!blk) { closeSheet('editOverlay'); return; }
+  if (blk.parentPinned && !isParent()) {
+    showToast('📌 Parent-pinned — ask a grown-up');
+    return;
+  }
+  const act = findActivity(blk.actId);
+
+  const newStart = Math.max(START_MIN, Math.min(END_MIN-15, editState.startMin));
+  // W5: never let a block run past the end of the day — clamp its duration to
+  // the room left from its start, so what's saved is what renders. Toast if we
+  // had to shorten it.
+  const requestedDur = Math.max(5, Math.min(DAY_MIN_SPAN, editState.durationMin));
+  const newDur = Math.min(requestedDur, END_MIN - newStart);
+  if (newDur < requestedDur) showToast('✂️ Trimmed to fit the day');
+  const newTravel = !!editState.travelBuffer;
+  const newGetReady = !!editState.getReadyBuffer;
+  const newWarmup = !!editState.warmupBuffer;
+  const newTravelBuf = newTravel ? clampBufferMin(editState.travelBufMin) : null;
+  const newReadyBuf = newGetReady ? clampBufferMin(editState.getReadyBufMin) : null;
+  const newTravelHomeBuf = (newTravel && editState.travelHome) ? clampBufferMin(editState.travelHomeMin) : 0;
+  const newReadyAfterBuf = (newGetReady && editState.readyAfter) ? clampBufferMin(editState.readyAfterMin) : 0;
+  const newWarmupBuf = newWarmup ? clampBufferMin(editState.warmupBufMin) : null;
+  const newGearState = editState.gearState ? { ...editState.gearState } : {};
+  const newNote  = document.getElementById('editNoteInput').value;
+  const newCompleted = !!editState.completed;
+  let newObjectives = Array.isArray(blk.objectives) ? [...blk.objectives] : [];
+  if (isParent() || !blk.parentPinned) {
+    const raw = (document.getElementById('editObjectivesInput')?.value || '').split('\n')
+      .map(s => s.trim()).filter(Boolean);
+    newObjectives = raw;
+  }
+
+  let newStopwatch = null;
+  if (editState.stopwatchEnabled && editState.stopwatch) {
+    const sw = { ...editState.stopwatch };
+    sw.elapsedSec = stopwatchDisplayElapsed(sw);
+    sw.running = false;
+    sw.startedAt = null;
+    sw.enabled = true;
+    sw.goalSec = sw.goalSec != null ? sw.goalSec : Math.max(60, newDur * 60);
+    newStopwatch = sw;
+  }
+
+  const fieldsChanged = (
+    blk.startMin !== newStart ||
+    blk.durationMin !== newDur ||
+    blk.travelBuffer !== newTravel ||
+    !!blk.getReadyBuffer !== newGetReady ||
+    !!blk.warmupBuffer !== newWarmup ||
+    getTravelBufMin(blk, 'pre') !== (newTravelBuf || 0) ||
+    getGetReadyBufMin(blk, 'pre') !== (newReadyBuf || 0) ||
+    getTravelBufMin(blk, 'post') !== (newTravelHomeBuf || 0) ||
+    getGetReadyBufMin(blk, 'post') !== (newReadyAfterBuf || 0) ||
+    getWarmupBufMin(blk) !== (newWarmupBuf || 0) ||
+    JSON.stringify(blk.gearState||{}) !== JSON.stringify(newGearState||{}) ||
+    (blk.note||'') !== newNote ||
+    !!blk.completed !== newCompleted ||
+    JSON.stringify(blk.objectives||[]) !== JSON.stringify(newObjectives) ||
+    JSON.stringify(blk.stopwatch||null) !== JSON.stringify(newStopwatch)
+  );
+
+  // Series-aware update prompt
+  let applyToSeries = false;
+  if (blk.seriesId && fieldsChanged) {
+    const siblings = countSeriesBlocks(blk.seriesId);
+    if (siblings > 1) {
+      applyToSeries = await showConfirm(`This block is part of a series of ${siblings}.\n\nOK = update ALL in series\nCancel = update only this one`, { okLabel:'Update all', cancelLabel:'Only this' });
+    }
+  }
+
+  // Apply edits to this block
+  blk.startMin    = newStart;
+  blk.durationMin = newDur;
+  blk.travelBuffer = newTravel;
+  blk.getReadyBuffer = newGetReady;
+  blk.warmupBuffer = newWarmup;
+  /* Both legs written out whenever the master toggle is on, so the block says
+     what it means rather than leaning on the symmetric fallback — which cannot
+     express "no drive home" at all. */
+  if (newTravel) {
+    blk.travelBufMin = newTravelBuf;
+    blk.travelTo = true;
+    blk.travelToMin = newTravelBuf;
+    blk.travelHome = newTravelHomeBuf > 0;
+    blk.travelHomeMin = newTravelHomeBuf || newTravelBuf;
+  } else {
+    delete blk.travelBufMin; delete blk.travelTo; delete blk.travelToMin;
+    delete blk.travelHome; delete blk.travelHomeMin;
+  }
+  if (newGetReady) {
+    blk.getReadyBufMin = newReadyBuf;
+    blk.readyBefore = true;
+    blk.readyBeforeMin = newReadyBuf;
+    blk.readyAfter = newReadyAfterBuf > 0;
+    blk.readyAfterMin = newReadyAfterBuf || newReadyBuf;
+  } else {
+    delete blk.getReadyBufMin; delete blk.readyBefore; delete blk.readyBeforeMin;
+    delete blk.readyAfter; delete blk.readyAfterMin;
+  }
+  if (newWarmup) blk.warmupBufMin = newWarmupBuf;
+  else delete blk.warmupBufMin;
+  blk.gearState = newGearState;
+  blk.note = newNote;
+  const wasCompleted = !!blk.completed;
+  /* A routine's flag is derived from its checklist and was already written when
+     the list was ticked — writing the sheet's own copy back over it here would
+     reintroduce exactly the disagreement this release removes. */
+  const savingRoutine = !!(act && act.isRoutine);
+  if (!savingRoutine) {
+    blk.completed = newCompleted;
+    if (!wasCompleted && newCompleted) awardBlockLinks(blk, currentDayKey);
+  } else {
+    syncRoutineCompletion(blk, isParent() ? parentViewing : activeProfile());
+  }
+  blk.objectives = newObjectives;
+  if (newStopwatch) blk.stopwatch = newStopwatch;
+  else delete blk.stopwatch;
+  markItemUpdated(blk); // stamp so edits win cross-device merges
+  setDayBlocks(currentDayKey, blocks);
+
+  // Optionally apply same edits to siblings
+  if (applyToSeries && blk.seriesId) {
+    const seriesPatch = {
+      startMin: newStart, durationMin: newDur, travelBuffer: newTravel, getReadyBuffer: newGetReady, warmupBuffer: newWarmup, gearState: { ...newGearState }, note: newNote,
+      completed: newCompleted,
+    };
+    if (newTravel) {
+      seriesPatch.travelBufMin = newTravelBuf;
+      seriesPatch.travelTo = true;
+      seriesPatch.travelToMin = newTravelBuf;
+      seriesPatch.travelHome = newTravelHomeBuf > 0;
+      seriesPatch.travelHomeMin = newTravelHomeBuf || newTravelBuf;
+    } else {
+      seriesPatch.travelBufMin = null; seriesPatch.travelTo = null;
+      seriesPatch.travelToMin = null; seriesPatch.travelHome = null;
+      seriesPatch.travelHomeMin = null;
+    }
+    if (newGetReady) {
+      seriesPatch.getReadyBufMin = newReadyBuf;
+      seriesPatch.readyBefore = true;
+      seriesPatch.readyBeforeMin = newReadyBuf;
+      seriesPatch.readyAfter = newReadyAfterBuf > 0;
+      seriesPatch.readyAfterMin = newReadyAfterBuf || newReadyBuf;
+    } else {
+      seriesPatch.getReadyBufMin = null; seriesPatch.readyBefore = null;
+      seriesPatch.readyBeforeMin = null; seriesPatch.readyAfter = null;
+      seriesPatch.readyAfterMin = null;
+    }
+    if (newWarmup) seriesPatch.warmupBufMin = newWarmupBuf;
+    else seriesPatch.warmupBufMin = null;
+    seriesPatch.objectives = [...newObjectives];
+    if (newStopwatch) seriesPatch.stopwatch = { ...newStopwatch };
+    else seriesPatch.stopwatch = null;
+    applySeriesEdit(blk.seriesId, editingBlockId, seriesPatch);
+  }
+
+  // New "Repeat to other days" — create a fresh series for THIS week
+  if (editState.repeat && editState.repeatDays.length) {
+    createSeriesFromBlock(blk, editState.repeatDays);
+  }
+
+  closeSheet('editOverlay');
+  buildTimeline();
+  showToast(applyToSeries ? 'Series updated ✅' : 'Saved ✅');
+  renderGoalsTodos();
+}
+
+/* Count how many blocks share a seriesId across all weeks of this profile. */
+function countSeriesBlocks(seriesId) {
+  if (!seriesId) return 0;
+  const weeks = (getProfData().weeks)||{};
+  let n = 0;
+  Object.values(weeks).forEach(arr => {
+    (arr||[]).forEach(b => { if (b.seriesId === seriesId) n++; });
+  });
+  return n;
+}
+
+/* Apply the same field edits to every block in the series EXCEPT the source. */
+function applySeriesEdit(seriesId, sourceBlockId, fields) {
+  if (!seriesId) return;
+  const weeks = (getProfData().weeks)||{};
+  Object.keys(weeks).forEach(dayKey=>{
+    const arr = weeks[dayKey]||[];
+    let changed = false;
+    arr.forEach(b => {
+      if (b.seriesId !== seriesId || b.id === sourceBlockId) return;
+      Object.assign(b, fields);
+      if (Object.prototype.hasOwnProperty.call(fields, 'stopwatch') && fields.stopwatch == null) {
+        delete b.stopwatch;
+      }
+      if (fields.travelBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'travelBufMin')) delete b.travelBufMin;
+      if (fields.getReadyBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'getReadyBufMin')) delete b.getReadyBufMin;
+      if (fields.warmupBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'warmupBufMin')) delete b.warmupBufMin;
+      changed = true;
+    });
+    if (changed) setDayBlocks(dayKey, arr);
+  });
+}
+
+/* ── Change a series' last day, and mean it ──
+   A repeat is materialised, so a stored end date nobody acts on is decoration:
+   pushing it out has to add real blocks and pulling it in has to remove them.
+
+   What it will not remove is a day that already happened to somebody. A block
+   she has ticked, or a parent has confirmed, is a record of a day rather than a
+   line in a plan — the same distinction weekCloneBlock draws — so those are
+   kept and counted, and the caller says how many. */
+/* The planned blocks a new last day would take away: the series' blocks
+   outside the new span that nothing has been done on yet. Read only — the
+   confirm counts them (owner P9) and seriesExtendTo removes exactly these. */
+function seriesTrimPlan(seriesId, endKey, p = activeProfile()) {
+  const plan = { members: [], want: new Set(), drop: [], kept: 0, days: [] };
+  if (!seriesId || !endKey) return plan;
+  const weeks = getProfData(p).weeks || {};
+  const members = plan.members;
+  Object.keys(weeks).forEach(dayKey => (weeks[dayKey] || []).forEach(b => {
+    if (b && b.seriesId === seriesId) members.push({ dayKey, b });
+  }));
+  if (!members.length) return plan;
+  members.sort((x, y) => (x.dayKey < y.dayKey ? -1 : x.dayKey > y.dayKey ? 1 : 0));
+  const first = members[0];
+  const template = first.b;
+  const days = (template.seriesDays && template.seriesDays.length)
+    ? template.seriesDays
+    // A series placed before the dates existed carries no seriesDays; the days
+    // it actually lands on are the next best answer, and a true one.
+    : [...new Set(members.map(m => (formatDayKey(m.dayKey).getDay() + 6) % 7))];
+  const startKey = template.seriesStart || first.dayKey;
+  plan.days = days;
+  plan.want = new Set(seriesDayKeys({
+    days, everyWeeks: template.seriesEvery, anchorKey: startKey, startKey, endKey,
+  }));
+  // Outside the new span, anything already lived is kept.
+  members.forEach(({ dayKey, b }) => {
+    if (plan.want.has(dayKey)) return;
+    if (b.completed || b.confirmed || Object.keys(b.checklistState || {}).length) { plan.kept++; return; }
+    plan.drop.push({ dayKey, id: b.id });
+  });
+  return plan;
+}
+
+function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
+  const out = { added: 0, removed: 0, kept: 0 };
+  if (!seriesId || !endKey) return out;
+  const weeks = getProfData(p).weeks || {};
+  const plan = seriesTrimPlan(seriesId, endKey, p);
+  const members = plan.members;
+  if (!members.length) return out;
+  const first = members[0];
+  const template = first.b;
+  const want = plan.want;
+  const days = plan.days;
+
+  // Trim what falls outside the new span, keeping anything already lived.
+  const drop = plan.drop;
+  out.kept = plan.kept;
+  const byDay = {};
+  drop.forEach(d => { (byDay[d.dayKey] = byDay[d.dayKey] || []).push(d.id); });
+  Object.keys(byDay).forEach(dayKey => {
+    const ids = new Set(byDay[dayKey]);
+    setDayBlocks(dayKey, (weeks[dayKey] || []).filter(b => !ids.has(b.id)), p);
+    out.removed += ids.size;
+  });
+  if (drop.length) tombstoneBlockIds(drop.map(d => d.id));
+
+  // Then fill in the days the span now covers and the series does not hold.
+  const held = new Set(members.filter(m => want.has(m.dayKey)).map(m => m.dayKey));
+  want.forEach(dayKey => {
+    if (held.has(dayKey)) return;
+    const arr = getDayBlocks(dayKey, p).slice();
+    if (arr.some(b => b.seriesId === seriesId)) return;
+    const added = Object.assign({}, template, {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      checklistState: {}, gearState: {}, trainingCheck: {},
+      completed: false, confirmed: false, xpAwarded: false,
+      seriesEnd: endKey, createdAt: syncNow(), updatedAt: syncNow(),
+    });
+    // The 💌 is for a block that was really shared, not for the weeks added after it.
+    delete added.invitedTo; delete added.sentInviteIds;
+    arr.push(added);
+    setDayBlocks(dayKey, arr, p);
+    out.added++;
+  });
+
+  /* Every surviving member agrees about when the series ends. Done here rather
+     than through applySeriesEdit because that one reads getProfData() with no
+     argument — right for the edit sheet, wrong the moment a caller names a
+     profile that is not the active one. */
+  const after = getProfData(p).weeks || {};
+  Object.keys(after).forEach(dayKey => {
+    let changed = false;
+    (after[dayKey] || []).forEach(b => {
+      if (b.seriesId !== seriesId) return;
+      b.seriesEnd = endKey;
+      b.seriesDays = days.slice();
+      markItemUpdated && markItemUpdated(b);
+      changed = true;
+    });
+    if (changed) setDayBlocks(dayKey, after[dayKey], p);
+  });
+  saveAll();
+  return out;
+}
+
+/* How many members of a series a parent pinned — the ones a child's "remove
+   all" leaves where they are (see deleteSeriesBlocks). */
+function seriesPinnedCount(seriesId) {
+  if (!seriesId) return 0;
+  let n = 0;
+  Object.values((getProfData().weeks) || {}).forEach(arr => {
+    (arr || []).forEach(b => { if (b && b.seriesId === seriesId && b.parentPinned) n++; });
+  });
+  return n;
+}
+
+/* Delete every block in series (optionally exclude one).
+
+   For a child, a parent-pinned member stays — the rule removeBlock already
+   applies to one pinned block (Plan v6 C4); a parent removes them all. The
+   series' own `sr:` tombstone deletes EVERY member on the next merge, a kept
+   pin included (blockTombstoned, js/04-merge.js), so it is written only when
+   the whole series went; otherwise only the removed ids are tombstoned, as
+   when one block is excepted. */
+function deleteSeriesBlocks(seriesId, exceptBlockId=null) {
+  if (!seriesId) return 0;
+  const keepPins = !isParent();
+  const weeks = (getProfData().weeks)||{};
+  let removed = 0, pinsKept = 0;
+  const removedIds = [];
+  Object.keys(weeks).forEach(dayKey=>{
+    const arr = weeks[dayKey]||[];
+    const kept = arr.filter(b => {
+      if (b.seriesId !== seriesId) return true;
+      if (b.id === exceptBlockId) return true;
+      if (keepPins && b.parentPinned) { pinsKept++; return true; }
+      removed++;
+      removedIds.push(b.id);
+      return false;
+    });
+    if (kept.length !== arr.length) setDayBlocks(dayKey, kept);
+  });
+  // Tombstone every removed id AND — when nothing was kept — the series itself,
+  // so the sync merge can't resurrect any member, even one this device never saw.
+  tombstoneBlockIds(removedIds.concat(exceptBlockId || pinsKept ? [] : ['sr:' + seriesId]));
+  if (removedIds.length) saveAll();
+  return removed;
+}
+
+/* Build a new series in the current week from a source block. */
+function createSeriesFromBlock(sourceBlock, repeatDays) {
+  const keys = getDayKeys(weekOffset);
+  const curIdx = keys.indexOf(currentDayKey);
+  // If source already has a seriesId, extend it. Otherwise create new.
+  if (!sourceBlock.seriesId) {
+    sourceBlock.seriesId = 'sr-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+    setDayBlocks(currentDayKey, getDayBlocks(currentDayKey));
+  }
+  const seriesId = sourceBlock.seriesId;
+  const profd = getProfData();
+  if (!profd.activityCounts) profd.activityCounts = {};
+  if (!profd.activityHours)  profd.activityHours  = {};
+  let added = 0;
+  repeatDays.forEach(idx=>{
+    if (idx === curIdx) return;
+    const targetKey = keys[idx];
+    if (!targetKey) return;
+    const dayBlocks = getDayBlocks(targetKey);
+    // Avoid duplicating: skip if same series already lives on that day
+    if (dayBlocks.some(b => b.seriesId === seriesId)) return;
+    const nb = {
+      ...sourceBlock,
+      id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      checklistState: {},
+      seriesId,
+    };
+    // A repeat of a shared block was never shared itself: no 💌 on the new days.
+    delete nb.invitedTo; delete nb.sentInviteIds;
+    dayBlocks.push(nb);
+    setDayBlocks(targetKey, dayBlocks);
+    profd.activityCounts[sourceBlock.actId] = (profd.activityCounts[sourceBlock.actId]||0) + 1;
+    profd.activityHours[sourceBlock.actId]  = (profd.activityHours[sourceBlock.actId]||0)  + (sourceBlock.durationMin/60);
+    added++;
+  });
+  if (added) saveAll();
+  return added;
+}
+
+function togglePin() {
+  const blocks = getDayBlocks(currentDayKey);
+  const blk = blocks.find(b=>b.id===editingBlockId);
+  if (!blk) return;
+  blk.parentPinned = !blk.parentPinned;
+  setDayBlocks(currentDayKey, blocks);
+  document.getElementById('pinToggle').classList.toggle('on', blk.parentPinned);
+  buildTimeline();
+}
+
+function toggleConfirm() {
+  if (!isParent()) { showToast('Only parents can confirm 🔒'); return; }
+  const blocks = getDayBlocks(currentDayKey);
+  const blk = blocks.find(b=>b.id===editingBlockId);
+  if (!blk) return;
+  blk.confirmed = !blk.confirmed;
+  /* Confirmed and not-done are the same question answered two ways, so the
+     exclusion is written into the RECORD rather than worked out at read time.
+     Blocks merge whole-record newest-wins (mergeArrayById, js/04-merge.js), so
+     a block carrying both flags survives a sync intact and every predicate
+     downstream then disagrees with the next. */
+  if (blk.confirmed) delete blk.notDone;
+  /* …and the stamp, which was missing. setDayBlocks does not stamp, so until
+     now a confirmation could lose arbitration to a stale remote copy of the
+     same block and quietly come undone on the next snapshot. */
+  markItemUpdated(blk);
+  setDayBlocks(currentDayKey, blocks);
+  document.getElementById('confirmToggle').classList.toggle('on', !!blk.confirmed);
+  const ndEl = document.getElementById('notDoneToggle');
+  if (ndEl) ndEl.classList.toggle('on', !!blk.notDone);
+  recountActivityProgress();
+  if (blk.confirmed) {
+    checkLevelUp(blk.actId);
+    // A parent confirming the block is the grading act — see gradeChoresFromBlock.
+    if (blk.actId === 'chores') gradeChoresFromBlock(blk, currentDayKey, isParent() ? parentViewing : activeProfile());
+  }
+  saveAll();
+  buildTimeline();
+}
+
+/* ── The day's chores, graded where the day is ─────────────────────
+   Confirming a chore block ALREADY graded it at "on time", silently, through
+   gradeChoresFromBlock — so the day view has always moved money, it just never
+   said so or let a parent pick a different answer. A visible cycle is strictly
+   better than a hidden side effect.
+
+   Tap to cycle $3 → $2 → $1 → $0, which is the shipped grade table: on time
+   and to standard, to standard but late, a passed redo, not done.
+
+   TWO THINGS MAKE THIS ONE CONTROL RATHER THAN A FIFTH WAY TO SAY THE SAME
+   THING:
+
+   · $0 and "it did not happen" are the same assertion about a chore, so
+     reaching $0 sets the block's notDone mark and the separate toggle does not
+     render on a chore block. Two controls for one meaning is the NOW-card
+     defect CLAUDE.md already records.
+   · mrSetChoreGrade DELETES the entry at zero, so "graded zero" and "never
+     graded" are identical in the store. The block's notDone mark is what
+     carries the difference — the same $0 ambiguity the competition channel has,
+     and the same answer: a zero that was DECIDED needs its own marker beside
+     the number.
+
+   Driven by the planner. A day with no chore on it renders nothing at all,
+   which is the planned/simple rule the routines follow. */
+function dayChoreRowsForParent(dayKey, kid) {
+  const out = [];
+  (getDayBlocks(dayKey, kid) || []).forEach(b => {
+    if (b.actId !== 'chores') return;
+    if (typeof blockChoreTargets !== 'function') return;
+    const { wk, dayIdx, targets } = blockChoreTargets(b, dayKey, kid);
+    if (dayIdx < 0) return;
+    targets.forEach(t => out.push({
+      blockId: b.id, choreId: t.choreId, label: t.label, wk, dayIdx,
+      grade: mrGetChoreGrade(kid, wk, dayIdx, t.choreId),
+      notDone: isBlockNotDone(b),
+    }));
+  });
+  return out;
+}
+
+function renderParentChoreStrip() {
+  const bar = document.getElementById('parentDayChores');
+  if (!bar) return;
+  if (!isParent()) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  const who = parentViewing;
+  const key = currentDayKey;
+  const rows = dayChoreRowsForParent(key, who);
+  // Blank when the planner put no chore here. Nothing to grade is not an
+  // empty state to explain, it is simply a day without chores on it.
+  if (!rows.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  const r = mrRulesForWeek(rows[0].wk);
+  const name = kidLabel(who).name;
+  bar.style.display = 'flex';
+  bar.innerHTML = `<span class="pc-cap">🧺 ${escapeHtml(name)}'s chores today</span>`
+    + rows.map(row => {
+      const paid = row.grade > 0 ? ckGradePay(r, row.grade) : 0;
+      const said = row.grade > 0 ? fmtMoney(paid) : (row.notDone ? '$0 · didn\'t happen' : 'not graded');
+      return `<button type="button" class="pc-chore${row.grade > 0 ? ' on' : ''}"
+          data-pc-chore="${escapeAttr(row.choreId)}" data-pc-block="${escapeAttr(row.blockId)}"
+          title="Tap to cycle $3 → $2 → $1 → $0"
+        >${escapeHtml(row.label)} <b>${escapeHtml(said)}</b></button>`;
+    }).join('');
+}
+
+/* One tap down the ladder, wrapping back to the top. Grading goes through
+   mrSetChoreGrade — the owner — and this screen holds no second rule about
+   what a grade is worth. */
+function cycleDayChoreGrade(choreId, blockId) {
+  if (!isParent()) { showToast('A grown-up grades the chores 🔒'); return; }
+  const who = parentViewing;
+  const key = currentDayKey;
+  const row = dayChoreRowsForParent(key, who).find(x => x.choreId === choreId && x.blockId === blockId);
+  if (!row) return;
+  // 3 → 2 → 1 → 0 → 3. An ungraded chore starts the ladder at the top, which is
+  // what confirming the block used to assert without asking.
+  const next = row.grade > 0 ? row.grade - 1 : 3;
+  mrSetChoreGrade(who, row.wk, row.dayIdx, choreId, next);
+
+  /* Reaching zero IS "it did not happen" for a chore, so the block carries the
+     mark and the two cannot disagree. Coming back up clears it. */
+  const blocks = getDayBlocks(key, who) || [];
+  const blk = blocks.find(b => b.id === blockId);
+  if (blk) {
+    const others = dayChoreRowsForParent(key, who)
+      .filter(x => x.blockId === blockId && x.choreId !== choreId);
+    const allZero = next === 0 && others.every(x => x.grade === 0);
+    if (allZero && !blk.notDone) { blk.notDone = true; delete blk.confirmed; blk.completed = false; markItemUpdated(blk); }
+    if (next > 0 && blk.notDone) { delete blk.notDone; markItemUpdated(blk); }
+    setDayBlocks(key, blocks, who);
+  }
+  saveAll();
+  renderParentChoreStrip();
+  renderParentBanners();
+  buildTimeline();
+}
+
+/* ── "It was planned and it did not happen" ────────────────────────
+   The third answer. See isBlockNotDone (js/36-status.js) for why it exists;
+   these are the writers.
+
+   Split into a reader, a confirmation and a writer on purpose. The reader is
+   what lets the confirmation NAME the money before it moves — a parent taking
+   a grade back must never discover it afterwards — and the writer is the one
+   place the flags are set, so the per-block toggle, the bulk day button and
+   the meeting's offer cannot drift apart. */
+
+/* Read-only. What recording these blocks as not done would cost, through the
+   money owner. Returns rows the confirmation can print plus the total. */
+function notDoneBlocksWouldCost(blocks, dayKey, kid) {
+  const rows = [];
+  (blocks || []).forEach(b => {
+    if (typeof blockChoreGradesGiven !== 'function') return;
+    blockChoreGradesGiven(b, dayKey, kid).forEach(g => rows.push(g));
+  });
+  const total = rows.reduce((s, r) => s + (Number(r.pay) || 0), 0);
+  return { rows, total: Math.round(total * 100) / 100 };
+}
+
+/* A completed ROUTINE is refused rather than overwritten: a routine's
+   completion IS its checklist (js/36-status.js), so clearing it would wipe the
+   child's own ticks to make a parent's record fit. She unticks it, or it
+   stands. */
+function notDoneWouldWipeARoutine(block, kid) {
+  return typeof isRoutineCompleted === 'function' && isRoutineCompleted(block, kid);
+}
+
+/* The one confirmation. Says what the mark means, names every grade coming
+   back and the total, and says plainly what it does NOT undo. */
+async function confirmNotDone(blocks, dayKey, kid) {
+  const name = kidLabel(kid).name;
+  const n = blocks.length;
+  const { rows, total } = notDoneBlocksWouldCost(blocks, dayKey, kid);
+  let msg = `Record ${n} block${n === 1 ? '' : 's'} as not done for ${name}?\n\n`
+    + `${n === 1 ? 'It is' : 'They are'} marked as planned but not carried out. `
+    + `Nothing is marked done.`;
+  if (rows.length) {
+    msg += `\n\nThis money comes back:\n`
+      + rows.map(r => `  ${r.label} — ${fmtMoney(r.pay)}`).join('\n')
+      + `\n  Total — ${fmtMoney(total)}`;
+  }
+  // XP is forward-only by design: xpCredit is its single writer and there is no
+  // path back into the ledger. Say so rather than let it be discovered.
+  msg += `\n\nXP she already earned stays.`;
+  return showConfirm(msg, { okLabel: n === 1 ? 'Record it' : 'Record them', cancelLabel: 'Not now' });
+}
+
+/* The one writer. Takes ids rather than block objects because completing and
+   grading write through setDayBlocks, so any object held across those calls is
+   stale. One save at the end: setDayBlocks saves on every call, and a bulk
+   press would otherwise upload the whole family document once per block. */
+function applyNotDoneToBlocks(ids, dayKey, kid) {
+  const want = new Set(ids || []);
+  const blocks = getDayBlocks(dayKey, kid) || [];
+  let n = 0;
+  blocks.forEach(b => {
+    if (!want.has(b.id) || isBlockNotDone(b)) return;
+    b.notDone = true;
+    // Mutually exclusive with both other answers — see toggleConfirm above.
+    delete b.confirmed;
+    if (!notDoneWouldWipeARoutine(b, kid)) b.completed = false;
+    // A grade above zero is paying for work that did not happen. The owner
+    // clears it; ungradeChoresFromBlock also takes back an unanswered claim.
+    if (typeof ungradeChoresFromBlock === 'function') ungradeChoresFromBlock(b, dayKey, kid);
+    markItemUpdated(b);
+    n++;
+  });
+  if (!n) return 0;
+  setDayBlocks(dayKey, blocks, kid);
+  recountActivityProgress();
+  saveAll();
+  return n;
+}
+
+/* ── Settled money is frozen, and only the money is ─────────────────
+   A week's money is committed at the meeting and there is no way back: nothing
+   clears `committedAt`, mnyReopenWeek refuses a committed week outright, and
+   the meeting's own Undo lives in a session-local `mmUndo` that is gone the
+   moment the sheet closes. So a grade in a settled week genuinely cannot
+   change, and any control that offers to is lying.
+
+   The guard is deliberately narrow: it asks whether THIS action would move
+   money, not whether the week is settled. Recording a swim as not done in a
+   settled week costs nothing and must still be allowed — refusing it would
+   make a whole week of plan unrecordable to protect a grade that is not there. */
+function notDoneIsFrozenFor(blocks, dayKey, kid) {
+  if (typeof mnyIsCommitted !== 'function' || typeof ctWeekKeyForDate !== 'function') return null;
+  const wk = ctWeekKeyForDate(dayKey);
+  if (!mnyIsCommitted(wk, kid)) return null;
+  const cost = notDoneBlocksWouldCost(blocks, dayKey, kid);
+  if (!cost.rows.length) return null;
+  return cost;
+}
+
+/* The edit sheet's toggle. Shaped like togglePin and toggleConfirm beside it. */
+async function toggleNotDone() {
+  if (!isParent()) { showToast('Only a grown-up records this 🔒'); return; }
+  const who = isParent() ? parentViewing : activeProfile();
+  const blocks = getDayBlocks(currentDayKey, who) || [];
+  const blk = blocks.find(b => b.id === editingBlockId);
+  if (!blk) return;
+
+  // Un-marking takes a record back and needs no permission and no money move.
+  if (isBlockNotDone(blk)) {
+    delete blk.notDone;
+    markItemUpdated(blk);
+    setDayBlocks(currentDayKey, blocks, who);
+    document.getElementById('notDoneToggle').classList.toggle('on', false);
+    saveAll();
+    buildTimeline();
+    return;
+  }
+
+  /* A block that has not ended yet cannot be recorded as not having happened —
+     the same guard that makes dayBlocksEligibleToConfirm safe to press at nine
+     in the morning. */
+  if (typeof blockHasEnded === 'function' && !blockHasEnded(blk, currentDayKey)) {
+    showToast('That has not happened yet');
+    return;
+  }
+  if (notDoneWouldWipeARoutine(blk, who)) {
+    const nm = kidLabel(who).name;
+    showToast(`${nm} ticked every step — untick the routine first`);
+    return;
+  }
+  const frozen = notDoneIsFrozenFor([blk], currentDayKey, who);
+  if (frozen) {
+    showToast(`That week's money is settled — ${fmtMoney(frozen.total)} cannot come back`);
+    return;
+  }
+  if (!(await confirmNotDone([blk], currentDayKey, who))) return;
+  applyNotDoneToBlocks([blk.id], currentDayKey, who);
+  const el = document.getElementById('notDoneToggle');
+  if (el) el.classList.toggle('on', true);
+  const cf = document.getElementById('confirmToggle');
+  if (cf) cf.classList.toggle('on', false);
+  refreshAfterCompletion();
+  renderParentBanners();
+  buildTimeline();
+}
+
+/* The bulk day action, beside "Confirm all". Four blocks is one tap, not
+   twelve. A completed routine is skipped and said out loud rather than
+   silently left behind. */
+async function markRemainingNotDoneForChild(kid, dayKey) {
+  if (!isParent()) { showToast('Only a grown-up records this 🔒'); return; }
+  const who = kid || parentViewing;
+  const key = dayKey || currentDayKey;
+  const name = kidLabel(who).name;
+  const waiting = dayBlocksAwaitingAccount(who, key);
+  if (!waiting.length) { showToast(`Nothing left to answer for ${name}`); return 0; }
+
+  const routines = waiting.filter(b => notDoneWouldWipeARoutine(b, who));
+  const doable = waiting.filter(b => !notDoneWouldWipeARoutine(b, who));
+  if (!doable.length) {
+    showToast(`${name} ticked every step of ${routines.length === 1 ? 'that routine' : 'those routines'}`);
+    return 0;
+  }
+  const frozenBulk = notDoneIsFrozenFor(doable, key, who);
+  if (frozenBulk) {
+    /* Refuse the money, not the day. The blocks that carry no grade can still
+       be recorded, which is what lets a settled week's review finish. */
+    const free = doable.filter(b => !notDoneBlocksWouldCost([b], key, who).rows.length);
+    if (!free.length) {
+      showToast(`${name}'s money for that week is settled — ${fmtMoney(frozenBulk.total)} cannot come back`);
+      return 0;
+    }
+    if (!(await showConfirm(
+      `${name}'s money for this week is already settled, so the graded chores cannot change.`
+      + `\n\nRecord the other ${free.length} block${free.length === 1 ? '' : 's'} as not done?`,
+      { okLabel: 'Record the rest', cancelLabel: 'Not now' }))) return 0;
+    const nFree = applyNotDoneToBlocks(free.map(b => b.id), key, who);
+    refreshAfterCompletion();
+    renderParentBanners();
+    showToast(`${name}: ${nFree} recorded · graded chores left as settled`);
+    return nFree;
+  }
+  if (!(await confirmNotDone(doable, key, who))) return 0;
+  const n = applyNotDoneToBlocks(doable.map(b => b.id), key, who);
+  refreshAfterCompletion();
+  renderParentBanners();
+  /* Only when the day screen is the one on show. The meeting calls this too,
+     and rebuilding a timeline nobody is looking at is work for nothing. */
+  const dayScreen = document.getElementById('screen-day');
+  if (dayScreen && dayScreen.classList.contains('active')) buildTimeline();
+  showToast(`${name}: ${n} block${n === 1 ? '' : 's'} recorded as not done`
+    + (routines.length ? ` · ${routines.length} finished routine${routines.length === 1 ? '' : 's'} left alone` : ''));
+  /* The count, so the meeting can tell "recorded" from "cancelled" and only
+     mark the day reviewed when something actually was. */
+  return n;
+}
+
+/* ── "Confirm all today" was two promises it did not keep ─────────
+   It set `confirmed` and nothing else. Every screen draws its tick from
+   `completed`, so pressing it changed the one small ✅ badge — which is hidden
+   on shorter blocks anyway — and on a busy day nothing visible moved at all.
+   It then repainted only the day timeline, so from Today the screen never
+   redrew either. And its label promised a day review it never performed.
+
+   Two named actions now. This one asserts the WORK: every block that has
+   already started is marked completed and confirmed for ONE named child.
+   Completion goes through completeQuest, the function that already owned it,
+   so XP, sticker counting and chore claims fire exactly once and cannot
+   double-count; a routine completes by closing its checklist.
+
+   "Already ENDED" is the guard that makes this safe to press at nine in the
+   morning: a block later today has not happened yet, and confirming it would
+   be the app inventing a fact. On a past day everything qualifies.
+
+   It measures the end, not the start. It used to ask `startMin <= now`, which
+   meant a swim that began ten minutes ago and runs for another hour counted as
+   something a parent could mark done — the app asserting a fact about an hour
+   that had not been lived yet. `startMin + durationMin` is the honest test, and
+   it is the same one canReviewDay (js/36-status.js) asks, because "can this be
+   confirmed" and "can this day be reviewed" must not disagree about whether an
+   afternoon is over. */
+function dayBlocksEligibleToConfirm(dayKey, kid) {
+  const blocks = getDayBlocks(dayKey, kid) || [];
+  const isToday = dayKey === todayKey();
+  const isFuture = dayKey > todayKey();
+  if (isFuture) return [];
+  const now = (typeof tdNowMin === 'function') ? tdNowMin() : 24 * 60;
+  /* A block a parent has recorded as not having happened is already answered,
+     so it is not something left to confirm: it must not be swept into "Confirm
+     all" (which would mark it done and grade its chores at "on time"), and it
+     must not keep counting on the button's own badge. */
+  return blocks.filter(b => b && b.startMin != null
+    && !(typeof isBlockNotDone === 'function' && isBlockNotDone(b))
+    && (!isToday || (b.startMin + (b.durationMin || 0)) <= now));
+}
+
+async function confirmAllBlocksForChild(kid, dayKey) {
+  if (!isParent()) return;
+  const who = kid || parentViewing;
+  const key = dayKey || currentDayKey;
+  const name = kidLabel(who).name;
+  const eligible = dayBlocksEligibleToConfirm(key, who);
+  if (!eligible.length) {
+    showToast(key > todayKey() ? 'That day has not happened yet' : `Nothing to confirm for ${name}`);
+    return;
+  }
+  const pending = eligible.filter(b => !isBlockCompleted(b, who) || !isBlockConfirmed(b));
+  if (!pending.length) { showToast(`${name}'s day is already confirmed ✅`); return; }
+  if (!(await showConfirm(
+    `Confirm ${pending.length} block${pending.length === 1 ? '' : 's'} for ${name}?`
+    + `\n\nThey are marked done and confirmed. This does not mark the day reviewed, `
+    + `and it does not touch ${kidLabel(who === 'jenn' ? 'jess' : 'jenn').name}.`,
+    { okLabel: 'Confirm them', cancelLabel: 'Not now' }))) return;
+
+  // Complete first, through the owner — it writes and saves per block.
+  pending.forEach(b => { if (!isBlockCompleted(b, who)) completeQuest(b.id, key); });
+  // Then confirm, re-reading because completing wrote through setDayBlocks.
+  const blocks = getDayBlocks(key, who) || [];
+  const ids = new Set(pending.map(b => b.id));
+  const seen = new Set();
+  blocks.forEach(b => {
+    if (!ids.has(b.id) || b.confirmed) return;
+    b.confirmed = true;
+    // The other half of the exclusion written in toggleConfirm: confirming is
+    // the opposite answer to "it did not happen", so it clears that mark.
+    delete b.notDone;
+    markItemUpdated(b);
+    // A parent confirming a chore block IS the grading act — see gradeChoresFromBlock.
+    if (b.actId === 'chores') gradeChoresFromBlock(b, key, who);
+    if (!seen.has(b.actId)) { seen.add(b.actId); checkLevelUp(b.actId); }
+  });
+  setDayBlocks(key, blocks, who);
+  recountActivityProgress();
+  saveAll();
+  refreshAfterCompletion();
+  renderParentBanners();
+  showToast(`${name}: ${pending.length} block${pending.length === 1 ? '' : 's'} done and confirmed ✅`);
+}
+
+/* ── …and this one asserts the REVIEW ──────────────────────────────
+   A different fact, for one named child, changing no activity completion.
+   Offered only once nothing on the day is left unconfirmed, so the record can
+   never claim more than happened. */
+async function markDayReviewedForChild(kid, dayKey) {
+  if (!isParent()) return;
+  const who = kid || parentViewing;
+  const key = dayKey || currentDayKey;
+  const name = kidLabel(who).name;
+  if (isDayReviewed(who, key)) {
+    markDayReviewed(who, key, false);
+    saveAll(); renderParentBanners();
+    showToast(`${name}'s day is no longer marked reviewed`);
+    return;
+  }
+  /* One decision, asked rather than re-derived — see canReviewDay
+     (js/36-status.js). It refuses a day that has not happened, and a day the
+     child is still living. */
+  const can = canReviewDay(who, key);
+  if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
+  /* An empty day is reviewable, but never silently: a parent should not be
+     able to sign off a blank page without being told it is blank. Today gets
+     the same treatment for a different reason — it is not over, so anything
+     still to come would be reviewed before it happened. */
+  if (can.reason === 'empty' && !(await showConfirm(
+      `Nothing was recorded for ${name} on this day.\n\nMark it reviewed anyway?`,
+      { okLabel: 'Mark it reviewed', cancelLabel: 'Not now' }))) return;
+  if (can.reason === 'open' && !(await showConfirm(
+      `Today is not over yet.\n\nIs nothing else planned for ${name}?`,
+      { okLabel: 'Nothing else today', cancelLabel: 'Not yet' }))) return;
+  markDayReviewed(who, key, true);
+  saveAll();
+  renderParentBanners();
+  showToast(`📋 ${name}'s day reviewed`);
+}
+
+/* The day screen's parent sub-bar names the child it is acting on, and says
+   whether the review is still blocked. Its actions are drawn by
+   parentDayActionsHtml, for the header (dayRenderHeader) and for a redraw
+   here, so the buttons can never describe a different child from the one
+   shown. */
+function renderParentBanners() {
+  // The chore strip is the same surface's other half, so it is never redrawn
+  // separately and cannot fall out of step with the child the sub-bar names.
+  renderParentChoreStrip();
+  /* The Day's header was drawn for a child (no sub-bar): draw it again for
+     the parent, sub-bar and all, and let the meeting lock read it. */
+  if (isParent() && !document.getElementById('parentDayActions')) { dayRenderHeader(); applyMeetingLock(); }
+  const bar = document.getElementById('parentDayActions');
+  if (!bar) return;
+  bar.innerHTML = isParent() ? parentDayActionsHtml() : '';
+}
+
+/* The three named actions, in the parent sub-bar's 44px buttons: the icon
+   and the count always, the words beside them on the iPad (a phone keeps
+   them in the label). */
+function parentDayActionsHtml() {
+  const who = parentViewing;
+  const name = kidLabel(who).name;
+  const key = currentDayKey;
+  const eligible = dayBlocksEligibleToConfirm(key, who);
+  const left = eligible.filter(b => !isBlockConfirmed(b)).length;
+  const reviewed = isDayReviewed(who, key);
+  /* The refusal names itself. "Confirm the blocks first" was the only thing it
+     could ever say, so a day refused for having not happened yet told the
+     parent to go and confirm blocks that did not exist. */
+  const can = canReviewDay(who, key);
+  const why = reviewed ? '' : reviewBlockedReason(can);
+  /* The third control: what is left when a parent is not going to confirm it.
+     Hidden rather than disabled at zero — a day already answered should not
+     carry a dead button — and it counts through the same one list the review
+     gate reads, so the badge and the gate cannot disagree. */
+  const waiting = (typeof dayBlocksAwaitingAccount === 'function')
+    ? dayBlocksAwaitingAccount(who, key).length : 0;
+  const confirmWords = `Confirm all ${name}'s blocks`;
+  const reviewWords = reviewed ? 'Day reviewed' : `Mark ${name}'s day reviewed`;
+  return `<button type="button" class="pv-btn pv-btn--main pb-action" onclick="confirmAllBlocksForChild()" aria-label="${escapeAttr(confirmWords)}${left ? ` (${left})` : ''}">`
+    + `✅<span class="pv-word"> ${escapeHtml(confirmWords)}</span>${left ? ` (${left})` : ''}</button>`
+    + (waiting
+      ? `<button type="button" class="pv-btn pb-action pb-action--notdone"`
+        + ` onclick="markRemainingNotDoneForChild()" aria-label="Mark the rest not done (${waiting})">`
+        + `🚫<span class="pv-word"> Mark the rest not done</span> (${waiting})</button>`
+      : '')
+    + `<button type="button" class="pv-btn pb-action${reviewed ? ' on' : ''}"`
+    + `${why ? ` disabled title="${escapeAttr(why)}"` : ''}`
+    + ` onclick="markDayReviewedForChild()" aria-label="${escapeAttr(reviewWords)}">`
+    + `📋<span class="pv-word"> ${escapeHtml(reviewWords)}</span>${reviewed ? ' ✓' : ''}</button>`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   COPY A DAY / CLEAR
+   The 📋 sheet was "Start from a Template" — two hard-coded shapes (School Day,
+   Weekend) that replaced the whole day with no confirm, pinned and done blocks
+   included, and a child could press them. Copying a day she actually planned
+   does what they did, so they are retired (R5 §7 Q1) and the sheet is Copy a
+   day plus 😌 Rest. The opener and overlay keep their old names
+   (openTemplateSheet, #templateOverlay): renaming them is churn with no reader.
+════════════════════════════════════════════════════════════════ */
+function openTemplateSheet() {
+  copyDaySrcWeek = 0;
+  copyDayDstKid = null;
+  refreshRestDayButton();
+  renderReflectDayButton(currentDayKey);
+  renderCopyDayList();
+  openSheet('templateOverlay');
+}
+
+/* A past day is still reflected on from its own screen (R5 §7 Q3): the Day
+   view's 🌙 top-bar button is gone, and this sheet is the day's own menu. Past
+   days only — today's door is the 🌙 row on Today, and a day still to come has
+   nothing to look back on. The day is captured here, when the sheet opens, and
+   handed to openReflectSheet; the reflect sheet never reads currentDayKey. */
+function renderReflectDayButton(dayKey) {
+  const wrap = document.getElementById('reflectDayWrap');
+  const btn = document.getElementById('reflectDayBtn');
+  if (!wrap || !btn) return;
+  const past = !!dayKey && dayKey < todayKey();
+  wrap.hidden = !past;
+  if (!past) { btn.onclick = null; return; }
+  btn.textContent = '🌙 ' + reflectDayQuestion(dayKey);
+  btn.onclick = () => { closeSheet('templateOverlay'); openReflectSheet(dayKey); };
+}
+
+/* Which week the days on offer come from, and — for a parent only — whose day
+   they land on. Both are transient: they last as long as the sheet is open and
+   are reset by openTemplateSheet, because a copy is a decision about the day in
+   front of you and should not carry a stale choice in from the last one. Never
+   synced; every synced write is a full-document upload. */
+let copyDaySrcWeek = 0;
+let copyDayDstKid = null;
+
+const COPY_DAY_WEEKS = [[-1, 'Last week'], [0, 'This week'], [1, 'Next week']];
+
+/* Days to copy from, each with what it actually holds, so "copy Tuesday" is a
+   decision made from the numbers rather than from memory. Days with nothing on
+   them are listed but not offered — copying a blank day onto a planned one is a
+   way to lose a plan, not a way to build one.
+
+   Three weeks, not one. "Make this Tuesday like last Tuesday" was the obvious
+   thing to want and the one thing this sheet could not do; the engine
+   (copyDayInto) always could. Three and no more: a stepper that walks the year
+   is a date picker, and this is a sheet a nine-year-old opens to fix one day.
+
+   Each row OPENS to list its blocks before anything is copied (R5 §7 Q2): a
+   count said how much, not what, and "is that the Tuesday with swimming?" was
+   answered only by copying it. The copy button lives inside the opened row, so
+   nobody copies a day they have not seen. */
+function renderCopyDayList() {
+  renderCopyDayControls();
+  renderCopyDayNow();
+  const wrap = document.getElementById('copyDayList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const srcKid = activeProfile();
+  const dstKid = copyDayDestKid();
+  const keys = getDayKeys(weekOffset + copyDaySrcWeek);
+  let offered = 0;
+  keys.forEach((k, i) => {
+    if (k === currentDayKey && dstKid === srcKid) return;
+    const blocks = getDayBlocks(k, srcKid) || [];
+    const n = blocks.length;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'copy-day-row' + (n ? '' : ' empty');
+    b.disabled = !n;
+    b.innerHTML = `<span class="cdr-day">${escapeHtml(DAY_LONG[i])}</span>
+      <span class="cdr-count">${n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing planned'}</span>
+      ${n ? '<span class="cdr-go" aria-hidden="true">▸</span>' : ''}`;
+    wrap.appendChild(b);
+    if (!n) return;
+    offered++;
+    const panel = document.createElement('div');
+    panel.className = 'cdr-panel';
+    panel.id = 'copyDayPanel' + i;
+    panel.hidden = true;
+    panel.innerHTML = copyDayBlockList(blocks, srcKid)
+      + `<button type="button" class="ui-btn ui-btn--secondary cdr-copy">📋 Copy ${escapeHtml(DAY_LONG[i])} ${escapeHtml(copyDayOntoWords(dstKid))}</button>`;
+    panel.querySelector('.cdr-copy').onclick = () => confirmCopyDay(k, DAY_LONG[i]);
+    b.setAttribute('aria-expanded', 'false');
+    b.setAttribute('aria-controls', panel.id);
+    b.onclick = () => {
+      const open = panel.hidden;
+      panel.hidden = !open;
+      b.setAttribute('aria-expanded', String(open));
+      b.querySelector('.cdr-go').textContent = open ? '▾' : '▸';
+    };
+    wrap.appendChild(panel);
+  });
+  /* A week with nothing in it says which week it is. Seven greyed rows read as
+     "copying is broken" rather than "you did not plan that week". */
+  if (!offered) {
+    const p = document.createElement('p');
+    p.className = 'cdr-empty';
+    p.textContent = copyDaySrcWeek === 0
+      ? 'Nothing else is planned this week yet.'
+      : `Nothing was planned ${copyDaySrcWeek < 0 ? 'last' : 'next'} week.`;
+    wrap.appendChild(p);
+  }
+}
+
+/* "4:00–5:00pm 🏊 Swimming", plain text — each surface escapes it where it
+   lands. The same line in the rows, the top box and the confirm, so the three
+   cannot describe one block three ways. */
+function copyDayBlockLine(b, p) {
+  const d = blockDisplayName(b, p);
+  const start = b.startMin || 0;
+  return `${tdTimeRange(start, start + (b.durationMin || 0))} ${d.icon} ${d.name}`;
+}
+function copyDayBlockList(blocks, p, pinnedWord) {
+  const items = blocks.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .map(b => `<li>${escapeHtml(copyDayBlockLine(b, p))}${pinnedWord && b.parentPinned
+      ? ` <span class="cdr-pinned">📌 ${escapeHtml(pinnedWord)}</span>` : ''}</li>`);
+  return `<ul class="cdr-blocks">${items.join('')}</ul>`;
+}
+
+/* What is on the day being copied ONTO, at the top, so both days are in view
+   before either is chosen. Whose day follows the parent's sister toggle. A
+   pinned block says it stays: that is what copyDayPlan does with it. */
+function renderCopyDayNow() {
+  const box = document.getElementById('copyDayNow');
+  if (!box) return;
+  const dstKid = copyDayDestKid();
+  const cross = dstKid !== activeProfile();
+  const blocks = getDayBlocksForProfile(currentDayKey, dstKid) || [];
+  const day = DAY_LONG[(formatDayKey(currentDayKey).getDay() + 6) % 7];
+  const whose = cross ? `${kidLabel(dstKid).name}'s ${day}` : day;
+  box.innerHTML = blocks.length
+    ? `<p class="cdr-now-head">On ${escapeHtml(whose)} now:</p>${copyDayBlockList(blocks, dstKid, 'stays')}`
+    : `<p class="cdr-now-head">Nothing on ${escapeHtml(whose)} yet.</p>`;
+}
+
+/* Where a copy lands, in the button's and the confirm's words: "onto this
+   day" for her own day, "onto Jess's Tue" when a parent has picked the sister
+   (Plan v6 C8) — the one case where whose day it is matters most, and the
+   button used to say "this day" there too. Plain text. */
+function copyDayOntoWords(dstKid) {
+  if (dstKid === activeProfile()) return 'onto this day';
+  return `onto ${kidLabel(dstKid).name}'s ${DAY_SHORT[(formatDayKey(currentDayKey).getDay() + 6) % 7]}`;
+}
+
+/* Who the copy lands on. Always a real child, and always this one unless a
+   parent has deliberately picked the sister. */
+function copyDayDestKid() {
+  const me = activeProfile();
+  if (!isParent()) return me;
+  return (copyDayDstKid === 'jenn' || copyDayDstKid === 'jess') ? copyDayDstKid : me;
+}
+
+/* The week stepper, and the sister row a parent gets. Writing into the other
+   child's plan is a parent action — a copy REPLACES the destination day, so a
+   child able to do it could overwrite her sister's week from her own screen. */
+function renderCopyDayControls() {
+  const weeks = document.getElementById('copyDayWeekTabs');
+  if (weeks) {
+    weeks.innerHTML = COPY_DAY_WEEKS.map(([off, label]) =>
+      `<button type="button" class="copy-day-tab${off === copyDaySrcWeek ? ' active' : ''}"
+         data-copyday-week="${off}" aria-pressed="${off === copyDaySrcWeek}">${escapeHtml(label)}</button>`
+    ).join('');
+  }
+  const kids = document.getElementById('copyDayKidTabs');
+  if (!kids) return;
+  const me = activeProfile();
+  const sister = me === 'jenn' ? 'jess' : 'jenn';
+  if (!isParent()) { kids.innerHTML = ''; kids.hidden = true; return; }
+  kids.hidden = false;
+  const dst = copyDayDestKid();
+  kids.innerHTML = [[me, `${kidLabel(me).icon} Her own day`], [sister, `${kidLabel(sister).icon} Over to ${kidLabel(sister).name}`]]
+    .map(([kid, label]) =>
+      `<button type="button" class="copy-day-tab${kid === dst ? ' active' : ''}"
+         data-copyday-kid="${escapeAttr(kid)}" aria-pressed="${kid === dst}">${escapeHtml(label)}</button>`
+    ).join('');
+}
+
+/* One delegated listener for both rows, bound in js/99-main.js. */
+function copyDayHandleClick(e) {
+  const wk = e.target.closest('[data-copyday-week]');
+  if (wk) { copyDaySrcWeek = parseInt(wk.getAttribute('data-copyday-week'), 10) || 0; renderCopyDayList(); return; }
+  const kid = e.target.closest('[data-copyday-kid]');
+  if (kid) { copyDayDstKid = kid.getAttribute('data-copyday-kid'); renderCopyDayList(); }
+}
+
+/* The confirm names what goes and what stays, read from copyDayPlan — the same
+   decision copyDayInto carries out — rather than "what is on that day now will
+   be replaced", which was untrue of a pinned block once pins were kept. */
+async function confirmCopyDay(srcKey, srcLabel) {
+  const srcKid = activeProfile();
+  const dstKid = copyDayDestKid();
+  const whose = ' ' + copyDayOntoWords(dstKid);
+  const plan = copyDayPlan(srcKey, currentDayKey, srcKid, dstKid);
+  const n = plan.copy.length;
+  const when = copyDaySrcWeek === 0 ? '' : copyDaySrcWeek < 0 ? ' last week' : ' next week';
+  /* Nothing would be copied — every block on the source day is already here
+     under a kept pin, or is not on the sister's list (Plan v7). It used to ask
+     "Copy Thursday's 0 things?", and OK then replaced this day with nothing.
+     Say so and change nothing, the way Start this day over does. */
+  if (!n) {
+    const total = (getDayBlocksForProfile(srcKey, srcKid) || []).length;
+    const covered = total - plan.dropped;
+    const why = [];
+    if (covered > 0) {
+      const who = covered < total ? `${covered} ${covered === 1 ? 'is' : 'are'}` : covered === 1 ? "it's" : `all ${covered} are`;
+      why.push(`${who} already here, pinned`);
+    }
+    if (plan.dropped) why.push(`${plan.dropped} ${plan.dropped === 1 ? "isn't" : "aren't"} on ${kidLabel(dstKid).name}'s list`);
+    showToast(`Nothing to copy from ${srcLabel}${when}${why.length ? ' — ' + why.join(', and ') : ''}`);
+    return;
+  }
+  const thing = `${n} thing${n === 1 ? '' : 's'}`;
+  const lines = (blocks) => blocks.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .map(b => copyDayBlockLine(b, dstKid)).join('\n');
+  /* A copied block that lands across a kept pin (Plan v7). Both stay — what is
+     copied and kept is copyDayPlan's decision, unchanged — so the confirm says
+     where they will sit on top of each other before she agrees. */
+  const endOf = (b) => (b.startMin || 0) + (b.durationMin || 0);
+  const overlaps = plan.copy.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .flatMap(c => plan.keep.filter(k => (c.startMin || 0) < endOf(k) && (k.startMin || 0) < endOf(c))
+      .map(k => `${copyDayBlockLine(c, dstKid)} overlaps 📌 ${copyDayBlockLine(k, dstKid)}`));
+  let msg = `Copy ${srcLabel}${when}'s ${thing}${whose}?`;
+  /* Red only when blocks are lost, and the question says how many (owner
+     P9). Every unpinned block is replaced, ticked or confirmed ones too, so
+     it says "blocks", not "planned blocks". The dialog escapes the whole
+     message once. */
+  const lost = plan.replace.length;
+  if (lost) msg += `\n\n${lost} block${lost === 1 ? '' : 's'} will be replaced:\n${lines(plan.replace)}`;
+  if (plan.keep.length) msg += `\n\n📌 Pinned, so it stays:\n${lines(plan.keep)}`;
+  if (overlaps.length) msg += `\n\n⚠️ These would overlap a pinned one:\n${overlaps.join('\n')}`;
+  const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: lost > 0 });
+  if (!ok) return;
+  const res = copyDayInto(srcKey, currentDayKey, srcKid, dstKid);
+  closeSheet('templateOverlay');
+  buildTimeline();
+  if (!res.copied) { showToast('Nothing to copy'); return; }
+  /* Say what was left behind. A copy that silently dropped blocks is how
+     someone comes to believe a day is planned when it is half planned. */
+  showToast(res.dropped
+    ? `📋 Copied ${res.copied} — ${res.dropped} left behind, not on ${kidLabel(dstKid).name}'s list`
+    : `📋 Copied ${res.copied} — now fix what's wrong`);
+}
+
+/* 🗑 Start this day over — the last button on the 📋 sheet (R5 §7 Q4). It was
+   🗑 on the Day view's top bar and took EVERY block, done and parent-pinned
+   ones included. A done block is a record of what happened, a pin is a
+   parent's, and a block a parent marked not done (isBlockNotDone) is the
+   parent's "$0 · didn't happen" money verdict — deleting it would erase that
+   record. All three stay; everything else goes.
+
+   Name what goes, block by block, and what stays. There is no undo behind this
+   — the ids are tombstoned, so an undo would mean re-adding blocks under new
+   ids — which makes the dialog the whole safety net, and it has to say the true
+   thing. A day with nothing to take off says so and asks nothing. */
+function dayBlockStays(b) {
+  return !!(b && (b.completed || b.confirmed || b.parentPinned || isBlockNotDone(b)));
+}
+async function clearDay() {
+  const all = getDayBlocks(currentDayKey) || [];
+  const doomed = all.filter(b => !dayBlockStays(b));
+  const kept = all.filter(dayBlockStays);
+  const p = activeProfile();
+  const dayName = DAY_LONG[(formatDayKey(currentDayKey).getDay() + 6) % 7];
+  if (!doomed.length) {
+    showToast(all.length
+      ? `Nothing to take off ${dayName} — what's there is done, pinned or marked not done`
+      : `Nothing on ${dayName} to start over`);
+    return;
+  }
+  const lines = (blocks) => blocks.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .map(b => `${b.parentPinned ? '📌' : isBlockNotDone(b) ? '🚫' : '✅'} ${copyDayBlockLine(b, p)}`).join('\n');
+  let msg = `Start ${dayName} over? This takes off:\n`
+    + doomed.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+      .map(b => copyDayBlockLine(b, p)).join('\n');
+  if (kept.length) msg += `\n\nDone, pinned and not-done things stay:\n${lines(kept)}`;
+  msg += '\n\nThere is no undo.';
+  if (!(await showConfirm(msg, { danger: true, okLabel: 'Start over', cancelLabel: 'Not now' }))) return;
+  tombstoneBlockIds(doomed.map(b => b.id));
+  setDayBlocks(currentDayKey, kept);
+  closeSheet('templateOverlay');
+  buildTimeline();
+  showToast(kept.length ? `🗑 ${dayName} started over — ${kept.length} kept` : `🗑 ${dayName} started over`);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CUSTOM ACTIVITY & TASK
+════════════════════════════════════════════════════════════════ */
+
+/* Tap-to-pick emoji grid for activity icons (easier than typing an emoji,
+   especially on desktop). */
+const EMOJI_PICKER = [
+  '⚽','🏀','🎾','🏐','🏊','🚴','🏃','⛸️','🤸','🥋','🧗','🏋️','🛹','⛹️','🥅',
+  '🎸','🎹','🎺','🎻','🥁','🎨','🖌️','🎭','🎤','🩰','🎬',
+  '📚','📖','✏️','🔬','🧪','🧮','🌍','💻','📝','🗣️','🎓',
+  '🍽️','🥣','🍳','🛁','🪥','🧹','🧺','🛏️','👕','🐶','🌳',
+  '🎮','🧩','♟️','🎲','🪁','🎈','⭐','🎯','💤','🧸'
+];
+
+function renderEmojiGrid(gridId, inputId, current) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  EMOJI_PICKER.forEach(e => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'emoji-cell' + (e === current ? ' selected' : '');
+    btn.textContent = e;
+    btn.setAttribute('aria-label', 'Use ' + e);
+    btn.onclick = () => {
+      const input = document.getElementById(inputId);
+      if (input) input.value = e;
+      syncEmojiGrid(gridId, e);
+    };
+    grid.appendChild(btn);
+  });
+}
+
+/* Highlight the cell that matches the typed value (keeps grid + input in sync). */
+function syncEmojiGrid(gridId, current) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  [...grid.children].forEach(c => c.classList.toggle('selected', c.textContent === current));
+}
+
+/* ── The category and its subgroup, filled from one table ──
+   Both dialogs held a hardcoded list of eight options, copied byte for byte
+   from one to the other — so a category added to the app reached neither, and
+   the two could drift apart with nothing to say so. One writer now, driven by
+   ACTIVITY_CATEGORIES (js/01-config.js).
+
+   The subgroup select follows the category and HIDES when that category has
+   only one, because asking "which kind of Explore?" when there is one answer is
+   a control that can only be got wrong. */
+function renderCategorySelects(catId, subId, ids) {
+  const catEl = document.getElementById(ids.cat);
+  const subEl = document.getElementById(ids.sub);
+  const wrap  = document.getElementById(ids.wrap);
+  if (!catEl || !subEl) return;
+  const cat = catDef(catId || 'play');
+  catEl.innerHTML = ACTIVITY_CATEGORIES
+    .map(c => `<option value="${escapeAttr(c.id)}"${c.id === cat.id ? ' selected' : ''}>${escapeHtml(c.label)}</option>`)
+    .join('');
+  const chosen = cat.subs.some(sg => sg.id === subId) ? subId : cat.subs[0].id;
+  subEl.innerHTML = cat.subs
+    .map(sg => `<option value="${escapeAttr(sg.id)}"${sg.id === chosen ? ' selected' : ''}>${escapeHtml(sg.label)}</option>`)
+    .join('');
+  if (wrap) wrap.style.display = cat.subs.length > 1 ? '' : 'none';
+  catEl.onchange = () => renderCategorySelects(catEl.value, null, ids);
+}
+
+const CUSTOM_ACT_IDS = { cat: 'customCat', sub: 'customSub', wrap: 'customSubWrap' };
+
+/* `fromCat` is the picker chip that was open when she tapped "＋ Custom
+   activity". Adding a drawing from inside Brain and being handed a form that
+   says Play & Rest is the app forgetting where she was one tap ago. */
+function openCustomActivity(fromCat) {
+  openSheet('customOverlay');
+  const cur = (document.getElementById('customIcon').value || '').trim();
+  renderEmojiGrid('customEmojiGrid', 'customIcon', cur);
+  const start = ACTIVITY_CATEGORIES.some(c => c.id === fromCat) ? fromCat : 'play';
+  renderCategorySelects(start, null, CUSTOM_ACT_IDS);
+}
+
+function confirmCustomActivity() {
+  const name = document.getElementById('customName').value.trim();
+  const icon = document.getElementById('customIcon').value.trim() || '⭐';
+  const sub  = document.getElementById('customSub').value;
+  const durationMin = parseInt(document.getElementById('customDur').value);
+  if (!name) { showToast('Enter a name!'); return; }
+  /* `cat` is still written, derived from the subgroup. Nothing reads it for
+     colour or filtering any more, but the sticker conditions, the Athlete
+     achievement and ACTIVITY_OBJECTIVES_BY_CAT all key on it, and a record
+     without one would quietly drop out of those. */
+  const act = { id:'custom-'+Date.now().toString(36), name, icon, sub, cat: catForSub(sub),
+    durationMin, custom:true,
+    /* When it can be planned. A kid-made activity inherits the window she is
+       standing in, so the thing she just invented turns up in the picker's
+       suggestions at the time she invented it for rather than never. */
+    /* BOTH dimensions, so the thing she just invented turns up in the
+       suggestions at the time she invented it for. This stamped the calendar
+       zone alone, which on a non-school day is 'weekend' — no hour at all — so
+       a Saturday-afternoon invention scored nothing for the clock and sank
+       straight into "everything else" the next time she looked for it. */
+    suitableTime: [...new Set([
+      slotPickerWindow(),
+      pendingStartMin == null ? null : clockZoneForMin(pendingStartMin),
+    ].filter(Boolean))],
+    addedBy: isParent() ? 'parent' : activeProfile(),
+    pendingApproval: !isParent() };  // a kid's new activity waits for a parent's OK
+  getProfData().customActivities = [...getCustomActivities(), act];
+  saveAll();
+  closeSheet('customOverlay');
+  showToast(isParent() ? `"${name}" added ✨` : `"${name}" added — a grown-up will approve it ✨`);
+  document.getElementById('customName').value='';
+  document.getElementById('customIcon').value='';
+}
+
+/* ── A sport the family added ──
+   Shared, parent-only, and archived rather than deleted: a training block
+   stores its tag, so a sport that stopped resolving would turn every block
+   under it into "Training" with the wrong colour. Custom tasks already filter
+   by `sport`, so a new sport gets the "＋ Add custom task" path for free; the
+   starter objective list falls back to the general one (js/01-config.js). */
+let sportDraftColour = null;
+
+function openCustomSport() {
+  if (!isParent()) { showToast('A grown-up adds a sport 🔒'); return; }
+  sportDraftColour = COLOURS[0];
+  const nameEl = document.getElementById('sportName');
+  const iconEl = document.getElementById('sportIcon');
+  if (nameEl) nameEl.value = '';
+  if (iconEl) iconEl.value = '';
+  renderCustomSportSheet();
+  openSheet('customSportOverlay');
+}
+
+function renderCustomSportSheet() {
+  renderEmojiGrid('sportEmojiGrid', 'sportIcon', (document.getElementById('sportIcon')||{}).value || '');
+  const cp = document.getElementById('sportColourPicker');
+  if (cp) {
+    cp.innerHTML = '';
+    COLOURS.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'colour-dot' + (sportDraftColour === c ? ' selected' : '');
+      d.style.background = c;
+      d.onclick = () => { sportDraftColour = c; renderCustomSportSheet(); };
+      cp.appendChild(d);
+    });
+  }
+  // The sports already added, each with a way to retire it. The built-in four
+  // are not listed: they are not the family's to remove.
+  const list = document.getElementById('sportExistingList');
+  if (!list) return;
+  const mine = getCustomSports();
+  list.innerHTML = mine.length
+    ? `<div class="ct-meta">Sports you added</div>` + mine.map(s =>
+        `<div class="sport-row"><span class="sport-row-name">${escapeHtml(s.icon)} ${escapeHtml(s.name)}</span>
+           <button type="button" class="ui-btn ui-btn--secondary" data-sport-retire="${escapeAttr(s.id)}">Retire</button></div>`).join('')
+    : '';
+  list.querySelectorAll('[data-sport-retire]').forEach(btn => {
+    btn.onclick = () => retireCustomSport(btn.getAttribute('data-sport-retire'));
+  });
+}
+
+function confirmCustomSport() {
+  if (!isParent()) { showToast('A grown-up adds a sport 🔒'); return; }
+  const name = (document.getElementById('sportName').value || '').trim();
+  const icon = (document.getElementById('sportIcon').value || '').trim() || '🤸';
+  if (!name) { showToast('Enter a name!'); return; }
+  const id = 'sport-' + Date.now().toString(36);
+  const sport = { id, name, label: `${icon} ${name}`, icon,
+                  colour: sportDraftColour || COLOURS[0],
+                  createdAt: Date.now(), updatedAt: syncNow() };
+  if (!state.shared.customSports) state.shared.customSports = [];
+  state.shared.customSports = [...state.shared.customSports, sport];
+  saveAll();
+  // Land on the sport that was just added, so the block being planned uses it.
+  if (typeof ts !== 'undefined' && ts) { ts.tag = id; ts.colour = sport.colour; ts.objectives = []; }
+  closeSheet('customSportOverlay');
+  if (document.getElementById('trainingOverlay')?.classList.contains('open')) renderTrainingSheet();
+  showToast(`${icon} ${name} added ✨`);
+}
+
+/* Retire, never remove: blocks already tagged with this sport keep resolving
+   through getTrainingTopic, which sees archived sports on purpose. */
+function retireCustomSport(id) {
+  if (!isParent()) { showToast('A grown-up manages sports 🔒'); return; }
+  const s = (state.shared.customSports || []).find(x => x && x.id === id);
+  if (!s) return;
+  s.archived = true;
+  s.updatedAt = syncNow();
+  saveAll();
+  renderCustomSportSheet();
+  showToast(`${s.name} retired — past sessions keep their name`);
+}
+
+function openCustomTask(context='training') {
+  customTaskContext = context;
+  // The Sport picker only makes sense for a training task; a plain-activity
+  // goal is tagged to that activity instead (see confirmCustomTask).
+  const sportRow = document.getElementById('taskSportRow');
+  if (sportRow) sportRow.style.display = context === 'training' ? '' : 'none';
+  // Built from the live list — this select used to be a hardcoded copy of the
+  // four built-ins, so a custom sport could never be tagged on a custom task.
+  const sportSel = document.getElementById('taskSport');
+  if (sportSel) {
+    const keep = sportSel.value;
+    sportSel.innerHTML = getTrainingTags()
+      .map(t => `<option value="${escapeAttr(t.id)}">${escapeHtml(t.label)}</option>`).join('');
+    if (keep) sportSel.value = keep;
+    if (!sportSel.value) sportSel.value = 'general';
+  }
+  const titleEl = document.getElementById('customTaskSheetTitle');
+  if (titleEl) titleEl.textContent = context === 'training' ? '➕ Custom Training Task' : '➕ Custom Goal';
+  openSheet('customTaskOverlay');
+}
+function confirmCustomTask() {
+  // Capitalised on the way in: an exercise typed in a hurry on a phone reads
+  // "backstroke drill", and it is then the label on every session that uses it.
+  const name = capitaliseFirst(document.getElementById('taskName').value.trim());
+  const sport = document.getElementById('taskSport').value;
+  const reps = document.getElementById('taskReps').value.trim();
+  const notes = document.getElementById('taskNotes').value.trim();
+  if (!name) { showToast('Enter a name!'); return; }
+  /* An exercise a child adds is a proposal, exactly as a new ACTIVITY is
+     (confirmCustomActivity, below): addedBy says whose, pendingApproval puts it
+     in the parent's queue. She can tick it in this session straight away —
+     making her wait for the thing she just typed, in the session she typed it
+     for, is not a control worth having — and a parent decides whether it stays
+     in the shared library. */
+  const base = { id:'t-'+Date.now().toString(36), name, reps, notes,
+                 addedBy: isParent() ? 'parent' : activeProfile() };
+  if (!isParent()) base.pendingApproval = true;
+  const task = customTaskContext === 'activity'
+    ? { ...base, sport:'general', activityId: selectedActivity?.id || null }
+    : { ...base, sport };
+  state.shared.customTasks = [...(state.shared.customTasks||[]), task];
+  saveAll();
+  closeSheet('customTaskOverlay');
+  if (customTaskContext === 'activity') renderActivitySheet();
+  else renderTrainingSheet();
+  showToast(isParent() ? 'Task saved to library ✨' : 'Saved — a grown-up will approve it ✨');
+  document.getElementById('taskName').value='';
+  document.getElementById('taskReps').value='';
+  document.getElementById('taskNotes').value='';
+}
+
+/* ════════════════════════════════════════════════════════════════
+   END-OF-DAY REFLECTION + RITUAL
+════════════════════════════════════════════════════════════════ */
+/* The sheet is about ONE day, and the caller names it. It used to read the
+   global currentDayKey, the same global behind the invite wrong-day bug (PR
+   #93): the Day view sets it and it outlives that screen, so a mood could land
+   on whichever day was open last. Today's 🌙 row passes today or yesterday; a
+   past day's 📋 sheet passes that day. Neither this nor saveReflection reads
+   currentDayKey. No day, or a day still to come, opens nothing. */
+function reflectDayQuestion(dayKey) {
+  const today = todayKey();
+  if (dayKey === today) return 'How was today?';
+  if (dayKey === dayKeyBefore(today)) return 'How was yesterday?';
+  return `How was ${DAY_LONG[dayIdxOfKey(dayKey)]}?`;
+}
+function openReflectSheet(dayKey) {
+  if (!dayKey || dayKey > todayKey()) return;
+  document.getElementById('reflectSheetTitle').textContent = '🌙 ' + reflectDayQuestion(dayKey);
+  document.getElementById('reflectSaveBtn').onclick = () => saveReflection(dayKey);
+  const blocks = getDayBlocks(dayKey);
+  // Overall
+  const overallWrap = document.getElementById('reflectOverallMoods');
+  overallWrap.innerHTML = '';
+  const curOverall = getProfData().dayMoods?.[dayKey];
+  MOODS.forEach(m=>{
+    const el = document.createElement('div');
+    el.className = 'vibe-mood'+(curOverall===m?' selected':'');
+    el.textContent = m;
+    el.onclick = ()=>{
+      overallWrap.querySelectorAll('.vibe-mood').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+      el.dataset.mood = m;
+      el.parentElement.dataset.mood = m;
+    };
+    if (curOverall===m) el.parentElement.dataset.mood = m;
+    overallWrap.appendChild(el);
+  });
+
+  const listWrap = document.getElementById('reflectBlockList');
+  listWrap.innerHTML = '';
+  if (!blocks.length) {
+    listWrap.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.9rem * var(--text-scale, 1))">Nothing was planned.</p>';
+  } else {
+    const acts = getAllActivities(activeProfile(), { includeArchived: true });
+    blocks.forEach(b=>{
+      const act = acts.find(a=>a.id===b.actId);
+      if (!act) return;
+      const cur = getProfData().blockMoods?.[b.id];
+      const row = document.createElement('div');
+      // .refl-block-row wraps: her five 44px moods go under the name on a phone.
+      row.className = 'obj-item refl-block-row';
+      row.innerHTML = `<span>${act.icon} ${escapeHtml(act.name)}</span>`;
+      const moodPicker = document.createElement('div');
+      moodPicker.className = 'refl-block-moods';
+      MOODS.forEach(m=>{
+        const dot = document.createElement('div');
+        dot.className = 'vibe-mood'+(cur===m?' selected':'');
+        dot.textContent = m;
+        dot.onclick = ()=>{
+          const p = getProfData(); if(!p.blockMoods) p.blockMoods={};
+          p.blockMoods[b.id] = m;
+          saveAll();
+          moodPicker.querySelectorAll('.vibe-mood').forEach(x=>x.classList.remove('selected'));
+          dot.classList.add('selected');
+        };
+        moodPicker.appendChild(dot);
+      });
+      row.appendChild(moodPicker);
+      listWrap.appendChild(row);
+    });
+  }
+  openSheet('reflectOverlay');
+}
+
+function saveReflection(dayKey) {
+  if (!dayKey) return;
+  const overallEl = document.querySelector('#reflectOverallMoods .vibe-mood.selected');
+  if (overallEl) {
+    const p = getProfData();
+    if (!p.dayMoods) p.dayMoods={};
+    p.dayMoods[dayKey] = overallEl.textContent;
+    saveAll();
+  }
+  closeSheet('reflectOverlay');
+  refreshCurrentScreen();
+  /* The closing ritual is a goodnight to TODAY, and it reads currentDayKey
+     itself (left as it is). So it follows only a reflection on today, and only
+     when currentDayKey is today — never after yesterday's or a past day's. */
+  if (dayKey === todayKey() && currentDayKey === dayKey) openClosingRitual();
+}
+
+function openClosingRitual() {
+  const blocks = getDayBlocks(currentDayKey);
+  if (!blocks.length) return;
+  const ritualBlocks = document.getElementById('ritualBlocks');
+  ritualBlocks.innerHTML = '';
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
+  blocks.slice().sort((a,b)=>a.startMin-b.startMin).forEach((b, i)=>{
+    const act = acts.find(a=>a.id===b.actId);
+    if (!act) return;
+    const mini = document.createElement('div');
+    mini.className = 'ritual-block-mini';
+    mini.style.animationDelay = (i*0.08)+'s';
+    mini.textContent = `${act.icon} ${act.name}`;
+    ritualBlocks.appendChild(mini);
+  });
+
+  // Stars
+  const stars = document.getElementById('ritualStars');
+  stars.innerHTML = '';
+  for (let i=0;i<25;i++){
+    const s = document.createElement('span');
+    s.className='ritual-star';
+    s.style.left = Math.random()*100+'%';
+    s.style.top  = Math.random()*100+'%';
+    s.style.animationDelay = (Math.random()*2)+'s';
+    s.textContent = ['✨','⭐','💫','🌟'][Math.floor(Math.random()*4)];
+    stars.appendChild(s);
+  }
+
+  /* Whose day it is and what she DID (Plan v7): the child being viewed — the
+     global `profile` is "parent" for a grown-up, which named Jess to a parent
+     looking at Jenn — and the blocks done, a routine by its checklist
+     (isBlockCompleted), not every block planned. None done is said kindly. */
+  const kid = activeProfile();
+  const done = blocks.filter(b => isBlockCompleted(b, kid)).length;
+  document.getElementById('ritualTitle').textContent = `Well done, ${kidLabel(kid).name}!`;
+  document.getElementById('ritualSubtitle').textContent = done
+    ? `You did ${done} thing${done === 1 ? '' : 's'} today.`
+    : `Nothing ticked off today, and that's OK.`;
+
+  // Mood picker in ritual
+  const moodsWrap = document.getElementById('ritualMoods');
+  moodsWrap.innerHTML = '';
+  MOODS.forEach(m=>{
+    const el = document.createElement('div');
+    el.className = 'vibe-mood';
+    el.textContent = m;
+    el.onclick = ()=>{
+      moodsWrap.querySelectorAll('.vibe-mood').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+      const p = getProfData(); if(!p.dayMoods) p.dayMoods={};
+      p.dayMoods[currentDayKey] = m;
+      saveAll();
+    };
+    moodsWrap.appendChild(el);
+  });
+
+  document.getElementById('ritualScreen').classList.add('show');
+}
+function closeRitual() { document.getElementById('ritualScreen').classList.remove('show'); refreshCurrentScreen(); }
+

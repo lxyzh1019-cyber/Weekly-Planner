@@ -1,0 +1,90 @@
+Header heights measured in headless Chrome from the owner's design (source/header-system.dc.html), css px.
+Header height = all bar rows (content + bottom rule, as drawn at 1x); the cream area under the bar is filler page, not counted.
+
+## standard-ipad-pop  (picture 1210x627 css px, saved at 2x)
+- Today · now ≈62px → v2 64px · 3 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Full · now one row ≈62px → v1 116px ✗ → v2 64px · 4 things (no Print here)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Preview selected · Print appears only here · 5 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Day · now ≈62px → v2 64px · 5 things (the date is the title)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+
+## standard-phone-pop  (picture 406x556 css px, saved at 2x)
+- Today · phone 60px · 3 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Week · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Day · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+
+## money-ipad-pop  (picture 1210x160 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 74px; rows (content+rule) 72+2
+
+## money-phone-pop  (picture 406x199 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 66px; rows (content+rule) 64+2
+
+## meeting-ipad-pop  (picture 1210x187 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 109px; rows (content+rule) 62+1 , 44+2
+
+## meeting-phone-pop  (picture 406x185 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 107px; rows (content+rule) 60+1 , 44+2
+
+## parent-ipad-pop  (picture 1210x347 css px, saved at 2x)
+- Portal · now ≈58px → v2 64px · 3 groups
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Parent viewing Jenn's week · now ≈102px (strip + bar) → v2 108px · row 1 = the kid's Week 
+    panel width 1198px; header height 111px; rows (content+rule) 64+1 , 44+2
+
+## parent-phone-pop  (picture 406x148 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+
+## standard-ipad-calm  (picture 1210x627 css px, saved at 2x)
+- Today · now ≈62px → v2 64px · 3 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Full · now one row ≈62px → v1 116px ✗ → v2 64px · 4 things (no Print here)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Week · Preview selected · Print appears only here · 5 things
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Day · now ≈62px → v2 64px · 5 things (the date is the title)
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+
+## standard-phone-calm  (picture 406x556 css px, saved at 2x)
+- Today · phone 60px · 3 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Week · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+- Day · phone 60px · 4 things
+    panel width 394px; header height 62px; rows (content+rule) 60+2
+
+## money-ipad-calm  (picture 1210x160 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 74px; rows (content+rule) 72+2
+
+## money-phone-calm  (picture 406x199 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 66px; rows (content+rule) 64+2
+
+## meeting-ipad-calm  (picture 1210x187 css px, saved at 2x)
+- (no label)
+    panel width 1198px; header height 109px; rows (content+rule) 62+1 , 44+2
+
+## meeting-phone-calm  (picture 406x185 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 107px; rows (content+rule) 60+1 , 44+2
+
+## parent-ipad-calm  (picture 1210x347 css px, saved at 2x)
+- Portal · now ≈58px → v2 64px · 3 groups
+    panel width 1198px; header height 66px; rows (content+rule) 64+2
+- Parent viewing Jenn's week · now ≈102px (strip + bar) → v2 108px · row 1 = the kid's Week 
+    panel width 1198px; header height 111px; rows (content+rule) 64+1 , 44+2
+
+## parent-phone-calm  (picture 406x148 css px, saved at 2x)
+- (no label)
+    panel width 394px; header height 62px; rows (content+rule) 60+2

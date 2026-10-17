@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="en" data-look="pop">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Weekly Planner ✨</title>
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png">
+<!-- Installable: this lives on an iPad and a phone, so it should open from the
+     home screen without browser chrome eating the top of a dense week grid.
+     The icons were already in the repo at the right sizes; only the manifest
+     was missing. --meta theme-color matches --bg so the status bar blends. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#fff6e3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Planner">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Gochi+Hand&family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat builds for simplicity) — defer so they don't block HTML parsing -->
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/today.css">
+<link rel="stylesheet" href="css/week-day.css">
+<link rel="stylesheet" href="css/money.css">
+<link rel="stylesheet" href="css/parent.css">
+<link rel="stylesheet" href="css/social.css">
+<link rel="stylesheet" href="css/floors.css">
+</head>
+<body>
+
+<!-- ═══════════ TOAST ═══════════ -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ═══════════ UNDO ═══════════
+     A mis-tapped tick is a nine-year-old's most common mistake on this app, and
+     until now the only way back was to find the block again and toggle it.
+
+     This node lives OUTSIDE every .screen, deliberately, for three reasons:
+
+     1. tdRenderToday replaces #tdWrap.innerHTML wholesale, and the completion
+        that raises this toast also triggers that re-render — a toast inside the
+        wrap would be destroyed by the very event that created it.
+     2. The kid-standards sweep in tests/smoke.js walks only #screen-today, so a
+        node outside it costs nothing against the 200-word budget whether or not
+        it happens to be showing when the sweep runs. Inside, the budget would
+        depend on the timing of a 6-second timer.
+     3. Same for the 44px probe: an undo button should be a big target without
+        having to argue with elementFromPoint about it.
+
+     It sits at the bottom, above the kid nav; #toast is at the top, so the two
+     never collide. -->
+<div class="undo-toast" id="undoToast" role="status" aria-live="polite" hidden>
+  <span class="undo-toast-text" id="undoToastText"></span>
+  <button type="button" class="undo-toast-btn" id="undoToastBtn">↩ Undo</button>
+</div>
+
+<!-- ═══════════ MASCOT ═══════════ -->
+<button class="mascot-btn" id="mascotBtn" onclick="onMascotClick()" aria-label="Owl mascot — tap for tips">
+  🦉<span class="deco" id="mascotDeco"></span>
+</button>
+<div class="mascot-bubble" id="mascot" role="dialog" aria-label="Mascot message">
+  <button class="mascot-close" onclick="hideMascot()" aria-label="Close mascot message">×</button>
+  <div id="mascotMsg"></div>
+  <div class="mascot-suggestions" id="mascotSuggestions"></div>
+</div>
+
+<!-- ═══════════ CLOSING RITUAL ═══════════ -->
+<div class="ritual-screen" id="ritualScreen">
+  <div class="ritual-stars" id="ritualStars"></div>
+  <div class="ritual-moon">🌙</div>
+  <h2 id="ritualTitle">Goodnight!</h2>
+  <p id="ritualSubtitle"></p>
+  <div class="ritual-blocks" id="ritualBlocks"></div>
+  <p style="font-size:calc(0.95rem * var(--text-scale, 1));opacity:0.7;margin-top:0.5rem">How was your day?</p>
+  <div class="vibe-moods" style="margin-top:0.6rem" id="ritualMoods"></div>
+  <button onclick="closeRitual()">Sleep Tight ⭐</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: PROFILE SELECT
+════════════════════════════════════════════════════════ -->
+<main>
+<div class="screen active" id="screen-profile" data-area="planner">
+  <div class="profile-header">
+    <h1>My Weekly Planner</h1>
+    <p>Who's here today? <span class="sync-dot" id="syncDot"></span></p>
+  </div>
+  <nav class="profile-cards" aria-label="Who's here today?">
+    <button class="profile-card jenn" onclick="selectProfile('jenn')" aria-label="Select Jenn's profile">
+      <span class="avatar" aria-hidden="true">🐥</span>
+      <h2>Jenn</h2>
+    </button>
+    <button class="profile-card jess" onclick="selectProfile('jess')" aria-label="Select Jess's profile">
+      <span class="avatar" aria-hidden="true">🦊</span>
+      <h2>Jess</h2>
+    </button>
+    <button class="profile-card parent" onclick="selectProfile('parent')" aria-label="Enter parent mode">
+      <span class="avatar" aria-hidden="true">👨‍👩‍👧‍👦</span>
+      <h2>Parent</h2>
+    </button>
+  </nav>
+  <div class="profile-motto">
+    <p>✨ Plan what matters — the rest of the time is yours ✨</p>
+    <div class="profile-message">
+      This planner is yours. It's not a list of rules to follow, and it's not a clock telling you to hurry. Think of it as a way to make room for the things you care about.<br><br>
+      Pick a few things that matter to you this week — then the rest of the time is yours to rest, play, and explore. You don't have to fill every minute. Some weeks are busy and some are slow, and both are okay.<br><br>
+      Here's the idea:<br>
+      Make Space: Set aside time for the things you want to get better at.<br>
+      Protect Your Joy: Always keep room for rest, play, and the things that make you smile.<br>
+      Lead Yourself: It's your day — you get to choose how it goes.<br><br>
+      Remember: you're in charge of your own day. Be kind to yourself, try things, and enjoy the week.
+    </div>
+  </div>
+  <p class="profile-status">
+    <span id="fbStatus">⚙️ Connecting...</span>
+    <br><span id="syncPendingMsg" role="status" aria-live="polite" class="sync-pending-msg"></span>
+    <br><span id="syncDebugMsg" class="sync-debug-msg"></span>
+  </p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: QUEST BOARD (Hero Mode)
+════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: TODAY
+
+     Answers "what am I meant to be doing, and what needs me?" and then gets out
+     of the way. It owns no data and no rules: every number is read through the
+     accessors the other screens use, and every row hands off to the screen that
+     already owns the action. Rendered by js/31-today.js.
+
+     Reachable from the week's tab bar; not yet the default landing.
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-today" data-area="planner">
+  <!-- The standard page header (pageHeader, js/47-header.js): Today, the date,
+       the profile badge. Drawn by tdRenderToday; the date comes from
+       todayKey(), the family's clock rather than the device's — the same
+       reason theAppTellsFamilyTimeOnAnyDevice exists. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
+  <div id="tdWrap" class="td-wrap"></div>
+
+  <!-- Moved here off the day timeline's left rail, which was headed "Today" and
+       printed the same "next up" sentence this screen already leads with. These
+       keep their original ids so renderDayGoalsTodos /
+       maybeShowRewardPrompt work untouched — every screen is in the DOM at once,
+       so those renderers find their elements wherever the markup lives.
+       The day screen is now only for building a day; this is where one gets done. -->
+  <div class="td-panels">
+    <div id="dayRewardPrompt" class="day-reward-prompt">
+      <div id="dayRewardText"></div>
+      <div class="day-reward-actions">
+        <button type="button" class="reward-pill" onclick="acceptRewardPrompt()">Add today</button>
+        <button type="button" class="reward-pill" onclick="skipRewardPrompt()">Not today</button>
+      </div>
+    </div>
+    <!-- The two break buttons lived here — "I need a break (15 min)" and
+         "Short break (10 min)". They were a permanent row on the screen a child
+         opens most, for something she asked for a handful of times, and two
+         buttons that differ only by five minutes is a decision nobody wants to
+         make. addQuickBreak stays: it is still the owner anything else calls to
+         place a break. -->
+
+    <!-- Collapsed by default and remembered in localStorage — the house
+         disclosure pattern (mnyPricesOpen / weekGlanceOpen). Never
+         synced state: every state write is a full-document upload. Three panels
+         under one toggle keeps this screen inside its 200-word budget. -->
+    <button type="button" class="ui-btn ui-btn--secondary" id="tdExtrasBtn" onclick="tdToggleExtras()"></button>
+    <div class="td-fold-body" id="tdExtrasBody" style="display:none">
+      <!-- "Today's Vibe" was here. It is folded into the 🌙 How was today? row
+           in the day column (tdReflectRow): one door for the day's mood. -->
+      <div class="day-mini-panel">
+        <div class="day-mini-panel__header">
+          <h3>✅ To-do</h3>
+          <button class="ui-btn ui-btn--secondary ui-btn--icon gt-add-btn" onclick="addTodo()" title="Add todo">＋</button>
+        </div>
+        <div id="dayTodosList" class="day-mini-list"></div>
+      </div>
+      <div class="day-mini-panel">
+        <div class="day-mini-panel__header">
+          <h4>🎯 Goals</h4>
+          <button class="ui-btn ui-btn--secondary ui-btn--icon gt-add-btn" onclick="addGoal()" title="Add goal">＋</button>
+        </div>
+        <div id="dayGoalsList" class="day-mini-list"></div>
+      </div>
+      <!-- Moved off the retired Quest Board. A note box is something you go and
+           look at rather than something that answers "what now", so it stays
+           behind this toggle. Id kept, so loadKidWeekFeedback /
+           saveKidWeekFeedback work untouched. -->
+      <div class="kid-feedback-box">
+        <label for="kidWeekFeedback">💬 Tell your grown-ups how your week is going</label>
+        <textarea id="kidWeekFeedback" rows="2" placeholder="What was fun? What was tricky?" onchange="saveKidWeekFeedback()"></textarea>
+      </div>
+    </div>
+
+    <!-- The sticker wall, at the foot of the screen and out from behind the
+         fold. It sat inside the disclosure with the reference material, and its
+         renderer had no caller anywhere in the repo — so it rendered nothing at
+         all, from either place. It is the one thing here that is purely hers to
+         collect, which is reason enough for it to be visible; it goes last
+         because it is a reward to find at the bottom, not an instruction. -->
+    <div class="sticker-collection" id="questStickers"></div>
+  </div>
+
+  <!-- The three-button shortcut row that used to sit here is gone. "The whole
+       week" and "My money" were the Week and Money tabs of the persistent nav
+       under other names, and "Plan my day" could not say whether the day
+       already had a plan because it never re-rendered. It is one button now,
+       written by tdRenderToday at the end of #tdWrap so its verb can change. -->
+</div>
+
+<!-- The QUEST BOARD screen lived here. It was the fourth rendering of one day
+     — after Checklist mode, the Quest Board's own list and day-view Quest mode —
+     and CLAUDE.md names that as the mistake: a tick that can happen in two
+     places is a tick that can disagree with itself. Today is the one list.
+
+     Only the screen went. Its three unique panels moved to Today (the Lv/XP
+     hero, the sticker collection, the note to grown-ups) and every owner it
+     called — completeQuest, blastQuest, getQuestXP, heroTierForLevel, the
+     sticker store, spawnQuestSparkles — is untouched and still called from
+     there. The quest-* CSS classes those panels use went with them. -->
+
+<!-- Quest Complete popup -->
+<div class="quest-popup" id="questPopup" aria-hidden="true">
+  <div class="quest-popup-icon" id="questPopupIcon">⭐</div>
+  <div class="quest-popup-title">Quest Complete!</div>
+  <div class="quest-popup-xp" id="questPopupXp">+20 XP</div>
+  <div class="quest-popup-sub" id="questPopupSub"></div>
+</div>
+
+<!-- Mission Clear celebration -->
+<div class="mission-clear" id="missionClear" aria-hidden="true">
+  <div class="mission-clear-emoji" id="missionClearEmoji">🏆</div>
+  <div class="mission-clear-title" id="missionClearTitle">MISSION CLEAR!</div>
+  <div class="mission-clear-sub" id="missionClearSub">All today's quests done — go enjoy your day!</div>
+  <button class="mission-clear-btn" onclick="closeMissionClear()">Close 👋</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: WEEK VIEW
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-week" data-area="planner">
+  <!-- The standard page header, drawn by renderWeek (weekRenderHeader): My
+       Week, the week stepper, the Full / Print preview tabs, Print only on
+       the preview, the profile badge. One row at every size; a parent viewing
+       a girl gets the purple 44px sub-bar under it (parentViewSub, PR 5): the
+       way back, whose week it is and Switch. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
+  <!-- A phone's Print, first on the preview page: the header there is Full's
+       (owner, 2026-10-09). Shown by setWeekView on the preview, by css/app.css
+       .wpp-print on a phone only. -->
+  <button type="button" class="hdr-btn hdr-print wpp-print" id="weekPagePrint" data-hdr-action="print-open" aria-label="Print this week" hidden>Print</button>
+  <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
+
+  <!-- The offer to add the missing School Day cards, above the grid it is about,
+       and the only place it appears. It is a to-do, and it used to sit at the
+       bottom of .weekly-full-wrap: after about 691px of grid (960 minutes at
+       0.72px/min) plus the colour key and the streak, which on a phone is a
+       screen and a half below the fold. A to-do nobody sees is not a to-do.
+       (A copy under the 🧱 Day Blocks tab, #tgSchoolBanner, went with that tab —
+       which is how the offer came to live only below the fold.) -->
+  <div class="week-todo-banner" id="weekSchoolBannerTop" style="display:none"></div>
+
+  <!-- The compact week view lived here, with #weekGrid and #weekLegend. It was
+       the original third week layout and had been unreachable for a long time:
+       the tabs only ever set 'full' or 'timegrid'. #weekLegend went with it —
+       a parent-only, hardcoded copy of the category key that could never show,
+       because its container was permanently display:none. The Day Blocks view
+       builds a live one from CAT_HEX (#tgLegend) that everyone can see. -->
+
+  <!-- Full week view — the one the week opens on, and the only one you plan in. -->
+  <div id="weekFull" role="tabpanel" aria-labelledby="viewTabFull" style="display:flex">
+    <div class="weekly-full-wrap">
+      <div class="weekly-full" id="weeklyFullGrid"></div>
+      <!-- Under the grid it describes, same as the Day Blocks copy. -->
+      <!-- The colour key, live from the group table. It lived under Day Blocks;
+           the Full week's cards carry the same colours, so it moved here rather
+           than being retired with the tab. -->
+      <div class="tg-legend" id="weekLegend"></div>
+      <!-- The longest free stretch. It lived under Day Blocks; it is a fact
+           about the week rather than about a layout, so it moved here rather
+           than being retired with the tab. -->
+      <div class="tg-streak" id="weekStreak"></div>
+      <div class="week-todo-banner" id="weekFamilyBanner" style="display:none"></div>
+      <!-- #weekSchoolBanner stood here. The offer to add the missing School Day
+           cards is a to-do, and a to-do under a 691px grid is a to-do nobody
+           sees, so it moved above the grid it is about (#weekSchoolBannerTop,
+           under #weekCoachTip) and there is one of it. -->
+      <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
+      <div class="week-signature" id="weekSignatureBar"></div>
+    </div>
+  </div>
+
+  <!-- Print preview. The same sheet the Print button produces, rendered
+       read-only into the week screen so a parent can see what will come out
+       before spending paper. renderPrintSheet (js/16-print.js) is the one
+       renderer; this is a second HOST, never a second copy of it. Its output
+       carries no handlers, which is what makes read-only free to enforce. -->
+  <div id="weekPrintPreview" role="tabpanel" aria-labelledby="viewTabPrintPreview" style="display:none">
+    <div class="wpp-wrap">
+      <p class="wpp-note">This is what the Print button prints. Tap 🖨 Print to open it full size.</p>
+      <div class="print-sheet wpp-sheet" id="weekPreviewSheet" aria-label="Print preview of this week"></div>
+    </div>
+  </div>
+
+  <!-- This week at a glance: time per day by category, what is still free, and
+       the week's notes. Collapsed by default — it is a reference panel, and open
+       it cost about a fifth of the screen's 200-word budget before the week
+       itself was read.
+       The age field that used to live here is gone: a child should not be asked
+       her own age by an app, and the only thing it changed was the sleep line.
+       currentAge() answers it now, and a grown-up corrects it in the portal. -->
+  <div class="week-glance" id="weekGlance">
+    <div class="week-glance-header">
+      <button type="button" class="week-glance-toggle" onclick="toggleWeekGlance()"
+              aria-expanded="false" aria-controls="weekGlanceBody">
+        <h3>📊 This week at a glance</h3>
+        <span class="week-glance-caret" id="weekGlanceCaret">Show ▸</span>
+      </button>
+    </div>
+    <div class="week-glance-body" id="weekGlanceBody" hidden></div>
+  </div>
+
+  <!-- 🧹 Chores this week: the chore tab's whole-week grid as a read-only
+       report (R5 §5 C2, row 14) — routines kept and each chore graded,
+       answered, open or not planned, per day. Answering an earlier day is
+       Today's 🕓 Catch up card's job, so nothing here is a control but the
+       toggle. Drawn by renderWeekChores (js/07-week-view.js); closed by
+       default and remembered, like the glance panel above. -->
+  <div class="week-glance week-chores" id="weekChores" hidden></div>
+
+  <!-- Goals + Todos panel (side-by-side, below Full Week grid) -->
+  <h2 class="sr-only">Week Tools</h2>
+  <div class="gt-panel">
+    <div class="gt-col">
+      <div class="gt-col-header">
+        <h3>🎯 Goals — long-term</h3>
+        <button class="ui-btn ui-btn--secondary ui-btn--icon gt-add-btn" onclick="addGoal()" title="Add goal">＋</button>
+      </div>
+      <div id="goalsList"></div>
+    </div>
+    <div class="gt-col">
+      <div class="gt-col-header">
+        <h3>✅ This Week's To-do</h3>
+        <button class="ui-btn ui-btn--secondary ui-btn--icon gt-add-btn" onclick="addTodo()" title="Add todo">＋</button>
+      </div>
+      <div id="todosList"></div>
+    </div>
+    <div class="gt-col">
+      <div class="gt-col-header">
+        <h3>🏅 Achievements</h3>
+        <button class="ui-btn ui-btn--secondary ui-btn--icon gt-add-btn" onclick="addAchievement()" title="Add achievement">＋</button>
+      </div>
+      <p class="gt-hint">Linked to one activity.</p>
+      <div id="achievementsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ POCKET MONEY ═══════════════════
+     Three sub-tabs: what you have and what each task pays (kids + parent),
+     the bank (kids read-only, parent transacts), and the rules editor
+     (parent only — the tab itself is hidden for kids). -->
+<!-- 1 💰 My money — the kid's own money page -->
+<div class="screen" id="screen-mymoney" data-area="money">
+  <div class="chore-wrap" id="mnyPage1Wrap"></div>
+</div>
+
+<!-- 🌊 My money story — the flow first, then every week that was settled -->
+<div class="screen" id="screen-moneystory" data-area="money">
+  <div class="chore-wrap" id="mnyStoryWrap"></div>
+</div>
+
+<!-- 5 🎓 Money school -->
+<div class="screen" id="screen-moneyschool" data-area="money">
+  <div class="chore-wrap" id="mnySchoolWrap"></div>
+</div>
+
+<!-- Weekly family meeting overlay -->
+<!-- 🧑‍🧑‍🧒 Weekly family meeting — a SCREEN, not a sheet.
+     A Sunday sitting is the longest task in this app: two children, a week of
+     days, a reflection each and a money split. Inside a floating sheet that
+     meant scrolling a small window up and down the whole way through. -->
+<div class="screen" id="screen-meeting" data-area="money">
+  <div class="mm-screen">
+    <div id="familyMeetingBody"></div>
+  </div>
+</div>
+
+<!-- The Record sheet: one door for a chore grade, a meet, a gift, a fine and a move -->
+<div class="overlay" id="recordOverlay" data-area="money" onclick="overlayClick(event,'recordOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="rcSheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="rcSheetTitle">✍️ Record something</h3>
+      <div id="recordBody"></div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeRecordSheet()">✕</button>
+  </div>
+</div>
+
+<!-- Her request sheets — Tell Dad a result, club sessions, move / cash out /
+     put in, draw in advance, a new goal, everything she asked (js/45-requests.js).
+     Chrome here, body filled by JS, the recordOverlay pattern. -->
+<div class="overlay" id="requestOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'requestOverlay')">
+  <div class="ui-sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
+    <div class="ui-sheet-body">
+      <h3 id="rqSheetTitle">✋ Ask parents</h3>
+      <div id="requestBody"></div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="rqClose()">✕</button>
+  </div>
+</div>
+
+<!-- 🗣️ Dad's card on Sunday — ASK / SAY / WAIT for the step (js/44-sunday.js).
+     Chrome here, body filled by JS, the recordOverlay pattern. -->
+<div class="overlay" id="sundayOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'sundayOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
+    <div class="ui-sheet-body">
+      <h3 id="sdSheetTitle">🗣️ Parent's card</h3>
+      <div id="sundayBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ✏️ Grown-ups' fix sheets — fix a loan row, fix what she owns, every rule
+     change (js/46-grownups.js). Chrome here, body filled by JS, the
+     recordOverlay pattern; its controls are data-mnyp-action. -->
+<!-- 🚪 "She told me…" (Parent › Now, Plan v9 §N): the On-her-behalf card in a
+     sheet. Body filled by pnRenderToldSheet (js/32-parent-now.js); its
+     data-pn-action controls go to pnHandleClick (js/99-main.js). -->
+<div class="overlay" id="pnToldOverlay" data-area="parent" data-money-surface onclick="overlayClick(event,'pnToldOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="pnToldTitle">
+    <div class="ui-sheet-body">
+      <h3 id="pnToldTitle">🚪 She told me… — on her behalf</h3>
+      <div id="pnToldBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="grownupsOverlay" data-area="money" data-money-surface onclick="overlayClick(event,'grownupsOverlay')">
+  <div class="ui-sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
+    <div class="ui-sheet-body">
+      <h3 id="guSheetTitle">✏️ Fix</h3>
+      <div id="grownupsBody"></div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="guCloseSheet()">✕</button>
+  </div>
+</div>
+
+<!-- Quick profile switcher (tap the profile icon) -->
+<div class="overlay" id="profileSwitchOverlay" data-area="planner" onclick="overlayClick(event,'profileSwitchOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="profileSwitchTitle">Switch profile 👤</h3>
+      <div class="profile-switch-list" id="profileSwitchBody"></div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('profileSwitchOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: DAY EDITOR
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-day" data-area="planner">
+  <!-- The day's paid chores, graded where the day is. Parent-only, filled by
+       renderParentChoreStrip, and deliberately EMPTY when the planner put no
+       chore on this day: the plan is what says there is anything to grade. -->
+  <div class="parent-chores sticky" id="parentDayChores" style="display:none"></div>
+
+  <!-- The standard page header, drawn by openDay (dayRenderHeader): ◀ back
+       through the one back stack, the date as the title between ◀ ▶, the
+       1 / 2 / 3 day tabs, 📑 Copy a day and the profile badge. One row: the
+       schedule below is the screen's whole job. A parent viewing a girl gets
+       the purple 44px sub-bar under it (parentViewSub, PR 5): the way back
+       (parentBannerBackButton: "Back to weekly meeting" when a meeting is
+       waiting), whose day it is and two named actions, not one that promised
+       both — "Confirm all" asserts the work happened, "Mark reviewed" that a
+       grown-up looked at the day — drawn by parentDayActionsHtml so they
+       always name the child actually being viewed. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
+
+  <!-- One scroll container for the whole screen. It used to be three nested
+       ones — workspace, lane, timeline-wrap — which on an iPad meant the schedule
+       scrolled inside a box that itself scrolled inside the page, and a flick
+       could move the wrong one.
+
+       The Activities rail lived to the right of this. It is gone: placement now
+       goes through the popup that opens where you tap, which is the interaction
+       that was already doing the work. -->
+  <div class="day-workspace">
+    <div class="timeline" id="timeline"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: SISTER SYNC
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-sync" data-area="planner">
+  <!-- The standard page header, drawn by renderSync: Sister Sync and the
+       profile badge. No ◀ — it is a nav tab. -->
+  <header class="hdr hdr--standard"><div class="hdr-row"></div></header>
+
+  <div class="sync-day-nav">
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" onclick="changeSyncDay(-1)" aria-label="Previous day">◀</button>
+    <h3 id="syncDayLabel"></h3>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" onclick="changeSyncDay(1)" aria-label="Next day">▶</button>
+  </div>
+
+  <div id="syncOverlapWrap"></div>
+  <div class="sync-grid" id="syncGrid"></div>
+
+  <!-- Challenges now live here under Sisters — friendly weekly goals you race on. -->
+  <div class="sync-sect">
+    <div class="sync-sect-head">
+      <h3 class="ui-sect-head">🎯 Our Challenges</h3>
+      <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon" onclick="openNewChallenge()" aria-label="Add challenge">＋</button>
+    </div>
+    <p class="sync-sect-note">Friendly weekly goals you both race on.</p>
+    <div id="challengesList"></div>
+  </div>
+
+  <!-- id: Today's 💌 note (tdOpenInvites) scrolls here, so she lands on the invites. -->
+  <div id="invitesSection" class="sync-sect sync-sect--last">
+    <h3 class="ui-sect-head">💌 Invites</h3>
+    <div id="invitesList"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: PARENT HOME
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-parent" data-area="parent">
+  <!-- The parent header (PR 5, D35): pageHeader({variant:'parent'}), drawn
+       once by parentRenderHeader (js/11-parent.js) — 🔒 Parent ▾ (PIN, the
+       look, Exit inside it), the six destinations, then who is shown, on one
+       purple 64px row (60 on a phone, where the destinations move to the
+       bottom bar and the row names the destination). -->
+  <header class="hdr hdr--parent"><div class="hdr-row"></div></header>
+  <div class="parent-back" id="parentBack" hidden></div>
+
+  <!-- Two devices saved different versions of one record. Above the panels, so
+       it is on every destination rather than only the one that can fix it. It
+       renders nothing at all when there is nothing to decide. -->
+  <div id="parentConflictBanner" hidden></div>
+
+  <!-- TAB: Weekly Review — Function 1: review & confirm THIS week.
+       All reviewing/confirming happens inside the family meeting; this tab
+       is a read-only hub that shows status and launches the meeting. -->
+  <div class="parent-panel" id="ptab-history" role="tabpanel" aria-labelledby="pdestbtn-history" hidden>
+    <div id="ptab-history-wrap"></div>
+  </div>
+  <div class="parent-panel" id="ptab-setup" role="tabpanel" aria-labelledby="pdestbtn-setup" hidden>
+    <div id="ptab-setup-wrap"></div>
+  </div>
+  <div class="parent-panel" id="ptab-access" role="region" aria-label="Access and PIN" hidden><div id="paAccessWrap"></div></div>
+  <div class="parent-panel" id="ptab-profiles" role="region" aria-label="Profiles" hidden><div id="paProfilesWrap"></div></div>
+  <div class="parent-panel" id="ptab-prefs" role="region" aria-label="Preferences" hidden><div id="paPrefsWrap"></div></div>
+  <div class="parent-panel" id="ptab-school" role="region" aria-label="School calendar" hidden><div id="paSchoolWrap"></div></div>
+  <div class="parent-panel" id="ptab-calendars" role="region" aria-label="Follow a calendar" hidden><div id="paCalWrap"></div></div>
+  <div class="parent-panel" id="ptab-app" role="tabpanel" aria-labelledby="pdestbtn-app" hidden>
+    <div id="ptab-app-wrap"></div>
+  </div>
+
+  <!-- TAB: Now — what is waiting on a grown-up, most urgent first. It owns no
+       data and no rules: every count is read through the accessor the owning
+       screen uses, and every row links to that screen. -->
+  <div class="parent-panel active" id="ptab-now" role="tabpanel" aria-labelledby="pdestbtn-now">
+    <div id="pnWrap"></div>
+  </div>
+
+  <!-- Meeting. What used to be a "Weekly Review" tab whose whole job was to
+       launch the meeting and jump to another tab. The launcher is Now's rail,
+       the queue is Now, and what is left here is the meeting itself: which
+       weeks are open, which days are confirmed, and what the girls said. -->
+  <div class="parent-panel" id="ptab-review" role="tabpanel" aria-labelledby="pdestbtn-meeting" hidden>
+    <h3 class="parent-h3">🧑‍🧑‍🧒 The family meeting</h3>
+    <p class="parent-hint">Check each day together, celebrate the week, agree what was earned and what happens to it, then plan the next one. Tap a day to open the meeting straight at it.</p>
+    <div id="meetingHub"></div>
+
+    <h3 class="parent-h3">💬 What <span id="reviewKidName">Jenn</span> logged this week</h3>
+    <p class="parent-hint">Her own note and daily vibes — worth a look before you sit down.</p>
+    <div id="reviewFeedback"></div>
+  </div>
+
+  <!-- TAB: Chores — the redesign's Parent frame. What's waiting on you, grade
+       it, put work on a day. It settles nothing: the meeting does that. -->
+  <div class="parent-panel" id="ptab-chores" role="region" aria-label="Chores" hidden>
+    <div class="chore-wrap" id="cpWrap" onclick="cpHandleClick(event);cpHandleCtClick(event)"></div>
+  </div>
+
+  <!-- TAB: Chore setup — the pool, the goals and the prices. In the handoff
+       drawing this tab was an archive of superseded directions; it is the
+       setup screen the portal was actually missing. -->
+  <div class="parent-panel" id="ptab-options" role="region" aria-label="Chores and pay" hidden>
+    <div class="chore-wrap" id="coWrap" onclick="coHandleClick(event)" onchange="coHandleChange(event)"></div>
+  </div>
+
+  <!-- TAB: Trends — the eight-week read of what the chore system actually paid. -->
+  <div class="parent-panel" id="ptab-trends" role="region" aria-label="Trends" hidden>
+    <div class="chore-wrap" id="ctrWrap" onclick="ctrHandleClick(event)"></div>
+  </div>
+
+  <!-- TAB: Performance — Function 2: analyse PAST weeks. Read-only:
+       nothing here confirms or records; that stays in the meeting. -->
+  <div class="parent-panel" id="ptab-analysis" role="region" aria-label="Analysis" hidden>
+    <h3 class="parent-h3">📊 Past weeks at a glance</h3>
+    <p class="parent-hint">How the last 8 weeks actually went — planned hours completed, routines kept, and the pocket money recorded at each meeting.</p>
+    <div id="perfTrend"></div>
+
+    <h3 class="parent-h3">🔍 One week in detail</h3>
+    <div id="perfDetail"></div>
+
+    <h3 class="parent-h3">📅 Monthly overview</h3>
+    <p class="parent-hint">Planned-density heatmap by month. Tap a day to open it.</p>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentMonthly('jenn')">🐥 Jenn's Month</button>
+      <button type="button" class="ui-btn ui-btn--secondary" onclick="openParentMonthly('jess')">🦊 Jess's Month</button>
+    </div>
+  </div>
+
+  <!-- TAB: Routines -->
+  <div class="parent-panel" id="ptab-routines" role="region" aria-label="Routines" hidden>
+    <h3 class="parent-h3">🌅 Routines</h3>
+    <p class="parent-hint">Built-in (Morning / After-School / Evening) and custom routines. All shared with both girls.</p>
+    <div id="routinesList"></div>
+    <button type="button" class="ui-btn ui-btn--primary pn-wide" style="margin-top:0.6rem" onclick="openNewRoutine()">＋ Add Routine</button>
+  </div>
+
+  <!-- TAB: Tasks -->
+  <div class="parent-panel" id="ptab-tasks" role="region" aria-label="Activities and sports" hidden>
+    <h3 class="parent-h3">🕓 Pending approval</h3>
+    <p class="parent-hint">New activities the girls added themselves. Approve, edit, or remove.</p>
+    <div id="pendingApprovalList"></div>
+    <!-- Exercises typed into a training session go the same way an activity
+         does: usable straight away, and here for a grown-up to keep or drop. -->
+    <h3 class="parent-h3">🏋️ New exercises</h3>
+    <p class="parent-hint">Drills the girls added to a training session. Approving keeps it in their shared library.</p>
+    <div id="pendingTaskList"></div>
+    <h3 class="parent-h3">🎨 All activities</h3>
+    <p class="parent-hint">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
+    <div id="parentActivitiesList"></div>
+    <button type="button" class="ui-btn ui-btn--primary pn-wide" style="margin-top:0.6rem" onclick="openParentActivityEditor()">＋ Add Activity</button>
+    <!-- Sports are shared by both girls and tag training blocks rather than
+         being activities of their own, so they are managed here rather than in
+         the activity list above. -->
+    <button type="button" class="ui-btn ui-btn--secondary" style="margin-top:0.6rem" onclick="openCustomSport()">🤸 Sports for training</button>
+  </div>
+
+  <!-- TAB: Level-Up Rules -->
+  <!-- TAB: Money rules — everything a grown-up can change about the money
+       system, in one place. Every save is effective-dated and logged. -->
+  <div class="parent-panel" id="ptab-money" role="tabpanel" aria-labelledby="pdestbtn-money" hidden>
+    <div class="chore-wrap" id="mnyRulesWrap"></div>
+  </div>
+
+  <div class="parent-panel" id="ptab-rules" role="region" aria-label="Level-up" hidden>
+    <h3 class="parent-h3">⚙️ Level-Up Rules</h3>
+    <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
+    <div id="levelRulesList"></div>
+    <button type="button" class="ui-btn ui-btn--primary pn-wide" style="margin-top:0.6rem" onclick="openNewLevelRule()">＋ Add Rule</button>
+  </div>
+
+  <!-- TAB: Copy a week — one week's plan onto another, or onto her sister's.
+       Rendered by pcwRender (js/34-parent-copyweek.js). It owns no clone rule:
+       weekCloneBlock still decides what a copied block arrives as. -->
+  <div class="parent-panel" id="ptab-copyweek" role="region" aria-label="Copy a plan" hidden>
+    <div id="pcwWrap"></div>
+  </div>
+
+  <!-- TAB: Backup — the only route back after a lost device, plus the cloud
+       size readout. Rendered by bkRenderPanel (js/30-backup.js). -->
+  <div class="parent-panel" id="ptab-backup" role="region" aria-label="Backup" hidden>
+    <div id="bkWrap"></div>
+  </div>
+  <div class="parent-panel" id="ptab-conflicts" role="region" aria-label="Conflicts" hidden>
+    <div id="cfWrap"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: PARENT MONTHLY HEATMAP
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-parent-monthly" data-area="parent">
+  <!-- The parent header (PR 5): ◀ back to the portal, Monthly, ◀ month ▶ in
+       the middle and the Jenn / Jess switch, drawn by renderParentMonthly. -->
+  <header class="hdr hdr--parent"><div class="hdr-row"></div></header>
+
+  <div style="padding:0 0.8rem 0.4rem;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">
+    Color shows how much each day is <b>planned</b> — not how much was completed. Tap a day to open it.
+  </div>
+
+  <div class="pm-grid-wrap">
+    <div class="pm-dow-row">
+      <div class="pm-dow">Mon</div><div class="pm-dow">Tue</div><div class="pm-dow">Wed</div>
+      <div class="pm-dow">Thu</div><div class="pm-dow">Fri</div><div class="pm-dow">Sat</div><div class="pm-dow">Sun</div>
+    </div>
+    <div class="pm-grid" id="pmGrid"></div>
+  </div>
+
+  <div class="pm-legend">
+    <span>Light</span>
+    <div class="pm-legend-bar"></div>
+    <span>Heavy</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: PRINT
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-print" data-area="planner">
+  <!-- The standard page header, drawn by openPrint, never printed: ◀ back
+       through the one back stack, Print week, 🖨 Print. -->
+  <header class="hdr hdr--standard no-print"><div class="hdr-row"></div></header>
+  <div class="print-controls no-print">
+    <label class="print-ctrl">🕐 Show
+      <select id="printStartHour" aria-label="Print from hour" onchange="onPrintWindowChange()"></select>
+      to
+      <select id="printEndHour" aria-label="Print to hour" onchange="onPrintWindowChange()"></select>
+    </label>
+    <span class="print-ctrl-hint">Prints the weekly plan on one A4 landscape page.</span>
+  </div>
+  <div class="print-sheet" id="printSheet"></div>
+</div>
+</main>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ═══════════ OVERLAYS / SHEETS ═══════════
+═══════════════════════════════════════════════════════════════ -->
+
+<!-- Training Sheet -->
+<div class="overlay" id="trainingOverlay" onclick="overlayClick(event,'trainingOverlay')">
+  <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="trainingSheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="trainingSheetTitle">🏋️ Competitive Sports Session</h3>
+
+      <!-- Competitions only. Without it every meet on every screen read "Skating
+           Comp." and the one thing that tells them apart lived nowhere. -->
+      <div id="trainingCompNameRow" style="display:none">
+        <h4>WHICH COMPETITION</h4>
+        <input type="text" id="trainingCompName" maxlength="40"
+          placeholder="e.g. Winter Invitational" aria-label="Competition name">
+      </div>
+
+      <h4>START TIME</h4>
+      <div id="trainingStartPicker"></div>
+
+      <h4>SPORT TAG</h4>
+      <div class="sheet-row" id="trainingTagBtns"></div>
+
+      <h4>DURATION</h4>
+      <div class="sheet-row" id="trainingDurBtns"></div>
+      <!-- A training session has never had a custom length: the presets were the
+           whole of it, so a 75-minute practice or a meet that runs past the longest
+           pill could not be entered. Same control the activity and edit sheets use. -->
+      <div id="trainingCustomDur"></div>
+      <div id="trainingTimeSummary"></div>
+
+      <h4>COLOUR</h4>
+      <div class="colour-picker" id="trainingColourPicker"></div>
+
+      <h4>OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
+      <div class="objectives-list" id="objectivesList"></div>
+      <button class="ui-btn ui-btn--secondary" style="margin-bottom:0.8rem" onclick="openCustomTask()">＋ Add custom task</button>
+
+      <h4>NOTE</h4>
+      <textarea class="note-input" id="trainingNote" aria-label="Note for this session" rows="2" placeholder="e.g. Terwillegar, bring skates…"></textarea>
+
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingWarmupToggle" onclick="toggleWarmupBuffer('training')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔥 Needs warm-up time (default 20 min right before — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="trainingWarmupDurRow" style="display:none">
+        <label for="trainingWarmupBufMin">Warm-up minutes (before only)</label>
+        <input type="number" id="trainingWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onTrainingBufferMinInput()">
+      </div>
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">👕 Get ready before, 🧺 unpack after (15 min each — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="trainingReadyDurRow" style="display:none">
+        <label for="trainingReadyBufMin">Get-ready minutes (each way)</label>
+        <input type="number" id="trainingReadyBufMin" min="5" max="120" step="5" value="15" onchange="onTrainingBufferMinInput()">
+      </div>
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingTravelToggle" onclick="toggleTravelBuffer('training')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🚗 Needs travel time (default 15 min before & after — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="trainingTravelDurRow" style="display:none">
+        <label for="trainingTravelBufMin">Travel minutes (each way)</label>
+        <input type="number" id="trainingTravelBufMin" min="5" max="180" step="5" value="15" onchange="onTrainingBufferMinInput()">
+      </div>
+      <div>
+        <h4>GEAR LIST</h4>
+        <div class="checklist-wrap" id="trainingGearList"></div>
+      </div>
+
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingRepeat" onclick="toggleRepeat('trainingRepeat')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔁 Repeat on other days…</span>
+      </div>
+      <div id="trainingRepeatDays" style="display:none">
+        <div class="day-pick-presets">
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','weekdays')">Weekdays</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','weekend')">Weekend</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','all')">All</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('training','none')">None</button>
+        </div>
+        <div class="day-picker" id="trainingDayPicker"></div>
+        <div id="trainingDateRange" class="date-range-wrap" style="display:none">
+          <label>Repeat from</label>
+          <input type="date" id="trainingDateStart" aria-label="Repeat start date">
+          <label>through</label>
+          <input type="date" id="trainingDateEnd" aria-label="Repeat end date">
+          <label for="trainingRepeatEvery">How often</label>
+          <select id="trainingRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+          <p class="hint">Leave the dates empty to repeat only this week.</p>
+        </div>
+      </div>
+
+      <div class="sheet-action-row">
+        <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmTraining()">Place Training ✅</button>
+      </div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="cancelCreatePlacement('trainingOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Generic Activity Sheet -->
+<!-- Quick activity picker: opens when a kid taps an empty time slot without
+     having selected an activity first (item 6). -->
+<div class="overlay" id="slotPickerOverlay" onclick="overlayClick(event,'slotPickerOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="slotPickerTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="slotPickerTitle">Add an activity</h3>
+      <p class="slot-picker-hint" id="slotPickerHint">Pick what goes here.</p>
+      <div class="slot-picker-filter" id="slotPickerFilter"></div>
+      <div class="slot-picker-list" id="slotPickerList"></div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('slotPickerOverlay')">✕</button>
+  </div>
+</div>
+
+<div class="overlay" id="activityOverlay" onclick="overlayClick(event,'activityOverlay')">
+  <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="activitySheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="activitySheetTitle"></h3>
+      <div class="sheet-time-grid-row">
+        <div class="sheet-time-col">
+          <h4>START TIME</h4>
+          <div id="activityStartPicker"></div>
+        </div>
+        <div class="sheet-time-col sheet-time-col--duration">
+          <h4>DURATION</h4>
+          <div class="duration-custom-slot" id="activityDurationTopSpacer" aria-hidden="true"></div>
+          <div class="sheet-row" id="activityDurBtns"></div>
+          <div id="activityCustomDur"></div>
+        </div>
+      </div>
+      <div id="activityTimeSummary"></div>
+      <h4>COLOUR</h4>
+      <div class="colour-picker" id="activityColourPicker"></div>
+      <div id="choreTypeRow" style="display:none">
+        <h4>CHORE TYPE</h4>
+        <div class="sheet-row" id="choreTypePicker"></div>
+      </div>
+      <h4>GOAL / OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
+      <div class="objectives-list" id="activityObjectivesList"></div>
+      <button class="ui-btn ui-btn--secondary" style="margin-bottom:0.8rem" onclick="openCustomTask('activity')">＋ Add custom goal</button>
+      <h4>NOTE</h4>
+      <textarea class="note-input" id="activityNote" aria-label="Note for this activity" rows="2" placeholder="Add a note…"></textarea>
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🚗 Needs travel time (default 15 min each way — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="activityTravelDurRow" style="display:none">
+        <label for="activityTravelBufMin">Travel minutes (each way)</label>
+        <input type="number" id="activityTravelBufMin" min="5" max="180" step="5" value="15" onchange="onActivityTravelBufMinInput()">
+      </div>
+      <!-- Get-ready existed only on the training sheet, so an appointment or a
+           school day placed from here could name a journey but never the time
+           it takes to be ready for it. -->
+      <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityReadyToggle" onclick="toggleGetReadyBuffer('activity')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">👕 Get ready before, 🧺 unpack after (15 min each — adjust below)</span>
+      </div>
+      <div class="buffer-dur-row" id="activityReadyDurRow" style="display:none">
+        <label for="activityReadyBufMin">Get-ready minutes (each way)</label>
+        <input type="number" id="activityReadyBufMin" min="5" max="120" step="5" value="15" onchange="onActivityReadyBufMinInput()">
+      </div>
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔁 Repeat on other days…</span>
+      </div>
+      <div id="activityRepeatDays" style="display:none">
+        <div class="day-pick-presets">
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','weekdays')">Weekdays</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','weekend')">Weekend</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','all')">All</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('activity','none')">None</button>
+        </div>
+        <div class="day-picker" id="activityDayPicker"></div>
+        <div id="activityDateRange" class="date-range-wrap" style="display:none">
+          <label>Repeat from</label>
+          <input type="date" id="activityDateStart" aria-label="Repeat start date">
+          <label>through</label>
+          <input type="date" id="activityDateEnd" aria-label="Repeat end date">
+          <label for="activityRepeatEvery">How often</label>
+          <select id="activityRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+          <p class="hint">Leave the dates empty to repeat only this week.</p>
+        </div>
+      </div>
+      <div class="sheet-action-row">
+        <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmActivity()">Place Block ✅</button>
+      </div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="cancelCreatePlacement('activityOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Edit Sheet -->
+<div class="overlay" id="editOverlay" onclick="overlayClick(event,'editOverlay')">
+  <div class="ui-sheet ui-sheet--docked" role="dialog" aria-modal="true" aria-labelledby="editSheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <div class="edit-title-row">
+        <h3 id="editSheetTitle"></h3>
+        <div class="edit-mood-inline" id="editBlockMoods"></div>
+      </div>
+
+      <div id="editChecklistWrap" style="display:none">
+        <h4>CHECKLIST</h4>
+        <div class="checklist-wrap" id="editChecklistList"></div>
+      </div>
+
+      <div class="sheet-time-grid-row">
+        <div class="sheet-time-col">
+          <h4>START TIME</h4>
+          <div id="editStartPicker"></div>
+        </div>
+        <div class="sheet-time-col sheet-time-col--duration">
+          <h4>DURATION</h4>
+          <div class="duration-custom-slot" id="editDurationTopSpacer" aria-hidden="true"></div>
+          <div class="sheet-row" id="editDurBtns"></div>
+          <div id="editCustomDur"></div>
+        </div>
+      </div>
+      <div id="editTimeSummary"></div>
+
+      <div id="editObjectivesWrap" style="display:none">
+        <h4>OBJECTIVES</h4>
+        <div id="editObjectivesView" style="margin-bottom:0.8rem"></div>
+        <div id="editObjectivesEditWrap" style="display:none">
+          <label style="font-size:calc(0.95rem * var(--text-scale, 1));font-weight:700;color:var(--ink-muted)">Edit your goals (one per line)</label>
+          <textarea class="note-input" id="editObjectivesInput" aria-label="Objectives" rows="4" placeholder="e.g. 10 good jumps&#10;2 run-throughs"></textarea>
+        </div>
+      </div>
+
+      <h4>NOTE</h4>
+      <textarea class="note-input" id="editNoteInput" aria-label="Note" rows="2" placeholder="Add a note…"></textarea>
+
+      <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editWarmupToggle" onclick="toggleEditWarmupBuffer()" style="display:none">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔥 Needs warm-up time</span>
+      </div>
+      <div class="buffer-dur-row" id="editWarmupDurRow" style="display:none">
+        <label for="editWarmupBufMin">Warm-up minutes (before only)</label>
+        <input type="number" id="editWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onEditBufferMinInput()">
+      </div>
+      <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">👕 Get ready before, 🧺 unpack after</span>
+      </div>
+      <!-- TWO LEGS, NOT ONE FIGURE MIRRORED. Tuesday is school, then straight on
+           to training, then home: no drive back from school, a short hop from the
+           school gates to the pool, a longer one home afterwards. "each way"
+           could say none of it. -->
+      <div class="buffer-dur-row buffer-leg-row" id="editReadyDurRow" style="display:none">
+        <label for="editReadyBufMin">👕 Get ready, minutes</label>
+        <input type="number" id="editReadyBufMin" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
+        <label class="buffer-leg-off" for="editReadyAfterToggle">🧺 Unpack after</label>
+        <input type="checkbox" id="editReadyAfterToggle" onchange="onEditBufferMinInput()">
+        <input type="number" id="editReadyAfterMin" aria-label="Minutes unpacking afterwards" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
+      </div>
+      <div class="edit-primary-toggle-row">
+        <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">🚗 Needs travel time</span>
+        </div>
+        <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editCompleteToggle" onclick="toggleEditComplete()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">✅ Mark this activity done</span>
+        </div>
+        <div id="editParentStampRow" class="parent-stamp-row" style="display:none">
+          <span class="toggle-label">💖 Proud stamp</span>
+          <div class="parent-stamp-picker" id="editParentStampPicker"></div>
+        </div>
+      </div>
+      <div class="buffer-dur-row buffer-leg-row" id="editTravelDurRow" style="display:none">
+        <label for="editTravelBufMin">🚗 Getting there, minutes</label>
+        <input type="number" id="editTravelBufMin" min="5" max="180" step="5" value="15" onchange="onEditBufferMinInput()">
+        <label class="buffer-leg-off" for="editTravelHomeToggle">Coming home after</label>
+        <input type="checkbox" id="editTravelHomeToggle" onchange="onEditBufferMinInput()">
+        <input type="number" id="editTravelHomeMin" aria-label="Minutes travelling home afterwards" min="5" max="180" step="5" value="15" onchange="onEditBufferMinInput()">
+      </div>
+      <div id="editTrainingGearWrap" style="display:none">
+        <h4>GEAR LIST</h4>
+        <div class="checklist-wrap" id="editTrainingGearList"></div>
+      </div>
+
+      <div class="edit-stopwatch-wrap" id="editStopwatchWrap">
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="editStopwatchToggle" onclick="toggleEditStopwatch()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">⏱ Stopwatch (goal vs time used)</span>
+        </div>
+        <div class="edit-stopwatch-stats" id="editStopwatchStats"></div>
+        <div class="edit-stopwatch-btns">
+          <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchStart" onclick="editStopwatchStart()">Start</button>
+          <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchPause" onclick="editStopwatchPause()">Pause</button>
+          <button type="button" class="ui-btn ui-btn--secondary" id="editStopwatchReset" onclick="editStopwatchReset()">Reset</button>
+        </div>
+      </div>
+
+      <!-- Repeat to other days of this week -->
+      <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editRepeat" onclick="toggleRepeat('editRepeat')">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🔁 Repeat on other days…</span>
+      </div>
+      <div id="editRepeatDays" style="display:none">
+        <div class="day-pick-presets">
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','weekdays')">Weekdays</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','weekend')">Weekend</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','all')">All</button>
+          <button class="ui-btn ui-btn--secondary" onclick="pickPreset('edit','none')">None</button>
+        </div>
+        <div class="day-picker" id="editDayPicker"></div>
+      </div>
+
+      <!-- Series membership: only shown when this block is part of a multi-block series -->
+      <div id="seriesWrap" style="display:none">
+        <!-- What the repeat actually says, and the one thing about it you can
+             change from here. Moving the last day adds or removes real blocks:
+             the repeat is materialised, so a date nobody acts on is decoration. -->
+        <p class="series-spec" id="seriesSpec"></p>
+        <div class="series-until" id="seriesUntilRow" hidden>
+          <label for="seriesUntilInput">Last day</label>
+          <input type="date" id="seriesUntilInput" aria-label="Last day of this repeat">
+          <button type="button" class="ui-btn ui-btn--secondary" onclick="applySeriesUntil()">Update</button>
+        </div>
+        <button class="ui-btn ui-btn--secondary" style="width:100%" onclick="detachFromSeries()">✂️ Detach from series</button>
+        <p style="font-size:calc(0.75rem * var(--text-scale, 1));color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
+      </div>
+
+      <!-- Sister Sync: public visibility — parent-only -->
+      <div id="sisterSyncWrap" style="display:none">
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="publicToggle" onclick="togglePublic()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">👯 Show details to your sister (Sister Sync)</span>
+        </div>
+      </div>
+
+      <!-- Outside #sisterSyncWrap on purpose, like #watchSisterBtn below: that
+           block is parent-only, and inviting your sister along is a child's own
+           decision — Sister Sync was her only other way. Hidden on a watching
+           block: passing somebody else's meet on as a plain invite would clone
+           her competition block onto the competitor's own calendar. -->
+      <button class="ui-btn ui-btn--secondary" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite my sister</button>
+
+      <!-- Outside #sisterSyncWrap on purpose: that block is parent-only, and
+           asking your sister to come and watch you compete is a child's own
+           decision. Shown only on a competition block, and blockIsCompetition
+           already answers false for a watch block, so a watch block cannot be
+           re-shared as a meet. -->
+      <button class="ui-btn ui-btn--secondary" id="watchSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterToWatch()">👀 Invite my sister to watch</button>
+
+      <div id="parentPinWrap" style="display:none">
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="pinToggle" onclick="togglePin()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">📌 Parent-pinned (locked)</span>
+        </div>
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="confirmToggle" onclick="toggleConfirm()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">✅ Confirm progress (counts toward level-up)</span>
+        </div>
+        <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="notDoneToggle" onclick="toggleNotDone()">
+          <div class="toggle-track"><div class="toggle-knob"></div></div>
+          <span class="toggle-label">🚫 Didn't happen (recorded, not done)</span>
+        </div>
+      </div>
+
+      <div class="sheet-actions-sticky">
+        <button class="ui-btn ui-btn--danger ui-btn--block act-guard" onclick="removeBlock()">🗑 Remove this block</button>
+        <button class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.4rem" onclick="saveEditChanges()">Save Changes ✅</button>
+      </div>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('editOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Kid quick view: routine checklist + auto stopwatch -->
+<div class="overlay kid-block-overlay" id="kidRoutineOverlay" onclick="overlayClick(event,'kidRoutineOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="kidRoutineTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="kidRoutineTitle"></h3>
+      <div class="checklist-wrap" id="kidRoutineChecklist"></div>
+      <div class="kid-run-stopwatch" id="kidRoutineStopwatch" style="display:none"></div>
+      <button type="button" class="ui-btn ui-btn--secondary" style="width:100%;margin-top:0.5rem" onclick="kidRoutineOpenEdit()">✏️ Edit (times, notes, stopwatch…)</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.45rem" onclick="closeSheet('kidRoutineOverlay')">Done ✨</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('kidRoutineOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Kid quick view: training objectives + gear -->
+<div class="overlay kid-block-overlay" id="kidTrainingOverlay" onclick="overlayClick(event,'kidTrainingOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="kidTrainingTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="kidTrainingTitle"></h3>
+      <p style="font-size:calc(0.92rem * var(--text-scale, 1));color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
+      <div id="kidTrainingObjectives"></div>
+      <div class="kid-run-stopwatch" id="kidTrainingStopwatch" style="display:none"></div>
+      <h4 style="margin-top:0.75rem">HOW IT WENT</h4>
+      <div class="checklist-wrap" id="kidTrainingChecks"></div>
+      <h4 style="margin-top:0.75rem">GEAR TO PACK</h4>
+      <div class="checklist-wrap" id="kidTrainingGear"></div>
+      <button type="button" class="ui-btn ui-btn--secondary" style="width:100%;margin-top:0.5rem" onclick="kidTrainingOpenEdit()">✏️ Edit (objectives, times, travel…)</button>
+      <button type="button" class="ui-btn ui-btn--primary ui-btn--block act-guard" style="margin-top:0.45rem" onclick="closeSheet('kidTrainingOverlay')">Done ✨</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('kidTrainingOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- #tutorialOverlay lived here: "Build your first Family Hero task", three
+     chores to pick from and a line promising more would unlock as rewards.
+     Family Hero is a chore rather than a prize now, so the sheet had nothing
+     left to offer — every activity it listed is on the ordinary picker, opened
+     from the slot the child just tapped. -->
+
+<!-- Copy a day (the 📋 sheet). It was "Start from a Template" with two
+     hard-coded shapes, School Day and Weekend; both are retired (R5 §7 Q1) —
+     copying a day you actually planned does what they did. The ids keep their
+     old names (templateOverlay, templateSheetTitle). -->
+<div class="overlay" id="templateOverlay" onclick="overlayClick(event,'templateOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="templateSheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="templateSheetTitle">📋 Copy a day</h3>
+      <!-- What is on this day now, drawn by renderCopyDayNow, so both days are in
+           view before a copy is chosen. -->
+      <div id="copyDayNow" class="copy-day-now"></div>
+      <!-- Copy a day you have already planned onto this one. A week rarely has
+           seven different shapes: two Tuesdays that look alike were two Tuesdays
+           built by hand. Rows are built by renderCopyDayList; each opens to list
+           its blocks, and the copy button is inside. The two toggles above them
+           choose which week to take from and — a parent only — whose day it
+           lands on. -->
+      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Pick a day to copy onto this one. Tap it to see what's on it.</p>
+      <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
+      <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
+      <div id="copyDayList" class="copy-day-list"></div>
+      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
+      <button class="ui-btn ui-btn--secondary" style="width:100%;font-size:calc(1rem * var(--text-scale, 1))" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
+      <!-- Looking back on a past day (R5 §7 Q3). The 🌙 left the Day view's top
+           bar; today's mood is asked on Today. A past day keeps its door here, on
+           its own menu — renderReflectDayButton shows it for past days only and
+           passes the day to openReflectSheet. -->
+      <div id="reflectDayWrap" hidden>
+        <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Looking back on this day?</p>
+        <button type="button" class="ui-btn ui-btn--secondary reflect-day-btn" id="reflectDayBtn"></button>
+      </div>
+      <!-- Start this day over (R5 §7 Q4). It was 🗑 on the Day view's top bar,
+           beside 📋 and 🌙, and it deleted done and parent-pinned blocks too.
+           Down here, last, it keeps them; clearDay's confirm lists what goes. -->
+      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
+      <button type="button" class="ui-btn ui-btn--secondary day-over-btn" onclick="clearDay()">🗑 Start this day over</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('templateOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Weekly Wins recap (#6) -->
+<div class="overlay" id="weeklyWinsOverlay" onclick="overlayClick(event,'weeklyWinsOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="weeklyWinsTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="weeklyWinsTitle">🎉 This week's wins</h3>
+      <div id="weeklyWinsBody"></div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="closeSheet('weeklyWinsOverlay')">Awesome! 🙌</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('weeklyWinsOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- The "How I earn" sheet is gone: both roles now land on the Pocket Money
+     screen, whose Balance & Prices tab reads the live rules. A second copy of
+     the price list is exactly how the old sheet went stale. -->
+
+<!-- Custom Activity -->
+<div class="overlay" id="customOverlay" onclick="overlayClick(event,'customOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customSheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="customSheetTitle">✨ Create Activity</h3>
+      <div class="custom-builder">
+        <label>Activity Name</label>
+        <input type="text" id="customName" placeholder="e.g. Guitar, Swimming…" maxlength="30" aria-label="Activity name">
+        <div class="row">
+          <div>
+            <label>Icon (emoji)</label>
+            <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)" oninput="syncEmojiGrid('customEmojiGrid', this.value)">
+          </div>
+          <div>
+            <label>Default Duration</label>
+            <select id="customDur" aria-label="How long">
+              <option value="15">15 min</option>
+              <option value="20">20 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60" selected>1 hour</option>
+              <option value="90">1.5 hours</option>
+              <option value="120">2 hours</option>
+            </select>
+          </div>
+        </div>
+        <label>Or tap an icon</label>
+        <div class="emoji-grid" id="customEmojiGrid"></div>
+        <!-- Built from ACTIVITY_CATEGORIES by renderCategorySelects (js/09-sheets.js).
+             It was a hardcoded list of eight, copied byte for byte into the parent
+             editor below, so the two could drift and a category added to the app
+             reached neither. -->
+        <label for="customCat">Category</label>
+        <select id="customCat" aria-label="Category"></select>
+        <div id="customSubWrap">
+          <label for="customSub">Kind</label>
+          <select id="customSub" aria-label="Kind"></select>
+        </div>
+      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomActivity()">Add Activity ✅</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Custom Sport — the training tag list used to be a frozen four, so a sport
+     the family took up could not be entered at all. Shared by both girls, so a
+     grown-up adds it. -->
+<div class="overlay" id="customSportOverlay" onclick="overlayClick(event,'customSportOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customSportTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="customSportTitle">🤸 Add a sport</h3>
+      <div class="custom-builder">
+        <label for="sportName">Sport name</label>
+        <input type="text" id="sportName" placeholder="e.g. Gymnastics" maxlength="24" aria-label="Sport name">
+        <label for="sportIcon">Icon (emoji)</label>
+        <input type="text" id="sportIcon" placeholder="🤸" maxlength="2" aria-label="Sport icon (emoji)" oninput="syncEmojiGrid('sportEmojiGrid', this.value)">
+        <label>Or tap an icon</label>
+        <div class="emoji-grid" id="sportEmojiGrid"></div>
+        <label>Colour</label>
+        <div class="colour-picker" id="sportColourPicker"></div>
+      </div>
+      <div class="sport-existing" id="sportExistingList"></div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomSport()">Add sport ✅</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customSportOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Parent Activity Editor (create + edit) -->
+<div class="overlay" id="parentActivityOverlay" onclick="overlayClick(event,'parentActivityOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="parentActivityHeading">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="parentActivityHeading">✨ Add Activity</h3>
+      <div class="custom-builder">
+        <label>Activity Name</label>
+        <input type="text" id="paName" placeholder="e.g. Tennis, Drama…" maxlength="30" aria-label="Activity name">
+        <div class="row">
+          <div>
+            <label>Icon (emoji)</label>
+            <input type="text" id="paIcon" aria-label="Icon" placeholder="🎾" maxlength="2" oninput="syncEmojiGrid('paEmojiGrid', this.value)">
+          </div>
+          <div>
+            <label>Default Duration</label>
+            <select id="paDur" aria-label="How long">
+              <option value="15">15 min</option>
+              <option value="20">20 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60" selected>1 hour</option>
+              <option value="90">1.5 hours</option>
+              <option value="120">2 hours</option>
+            </select>
+          </div>
+        </div>
+        <label>Or tap an icon</label>
+        <div class="emoji-grid" id="paEmojiGrid"></div>
+        <label for="paCat">Category</label>
+        <select id="paCat" aria-label="Category"></select>
+        <div id="paSubWrap">
+          <label for="paSub">Kind</label>
+          <select id="paSub" aria-label="Kind"></select>
+        </div>
+        <!-- When it can be planned, and whether you go somewhere to do it. Both
+             were fields only the shipped catalog could set, so a family's own
+             activity never turned up in the picker's suggestions and never
+             arrived with its travel time. -->
+        <!-- A labelled group rather than a bare row of boxes: four checkboxes with
+             a heading above them and nothing tying the two together reads to a
+             screen reader as four unrelated questions. -->
+        <label id="paWhenLabel">When does it fit?</label>
+        <div class="pa-when-row" role="group" aria-labelledby="paWhenLabel">
+          <label class="pa-when"><input type="checkbox" id="paWhenBefore"> 🌅 Before school</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenMidday"> 🥗 Middle of the day</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenAfter" checked> 🎒 After school</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenEvening"> 🌙 Evening</label>
+          <label class="pa-when"><input type="checkbox" id="paWhenWeekend" checked> 🎉 Weekend</label>
+        </div>
+        <label class="pa-when pa-when--solo"><input type="checkbox" id="paTravels"> 🚗 You go somewhere to do it</label>
+        <label>Visibility</label>
+        <select id="paVisibility" aria-label="Who can see it">
+          <option value="shared">🔗 Shared (both girls)</option>
+          <option value="jenn">🐥 Jenn only</option>
+          <option value="jess">🦊 Jess only</option>
+        </select>
+      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="paConfirmBtn" onclick="confirmParentActivity()">Save ✅</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('parentActivityOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Custom Training Task -->
+<div class="overlay" id="customTaskOverlay" onclick="overlayClick(event,'customTaskOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="customTaskSheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="customTaskSheetTitle">➕ Custom Training Task</h3>
+      <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
+      <div class="custom-builder">
+        <label>Task name (e.g. Backstroke drill)</label>
+        <input type="text" id="taskName" placeholder="e.g. 50m Freestyle" aria-label="Training task name">
+        <div class="row">
+          <div id="taskSportRow">
+            <label>Sport</label>
+            <select id="taskSport" aria-label="Sport">
+              <option value="skating">⛸ Skating</option>
+              <option value="swimming">🏊 Swimming</option>
+              <option value="dryland">💪 Dryland</option>
+              <option value="general">🏃 General</option>
+            </select>
+          </div>
+          <div>
+            <label>Reps / Count</label>
+            <input type="text" id="taskReps" placeholder="e.g. x4 or 6 mins" aria-label="Reps or duration">
+          </div>
+        </div>
+        <label>Notes (optional)</label>
+        <textarea class="note-input" id="taskNotes" aria-label="Notes for this task" rows="2" placeholder="Focus on form, breathing, etc."></textarea>
+      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmCustomTask()">Save Task ✅</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('customTaskOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- Reflect Sheet: one day's overall mood, then each block. The day is
+     openReflectSheet(dayKey)'s argument; the title names it ("How was
+     yesterday?") and the Save button is bound to it when the sheet opens. -->
+<div class="overlay" id="reflectOverlay" onclick="overlayClick(event,'reflectOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="reflectSheetTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="reflectSheetTitle">🌙 How was today?</h3>
+      <h4>Overall vibe</h4>
+      <div class="vibe-moods" id="reflectOverallMoods" style="margin-bottom:1rem"></div>
+      <h4>How did each block feel? <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1))">(optional)</span></h4>
+      <div id="reflectBlockList"></div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="reflectSaveBtn">Save ✨</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('reflectOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- My level: tapping the level on Today's hero. Her level, XP and the whole
+     privileges ladder (mrPrivileges), filled by tdOpenLevel (js/31-today.js).
+     Read-only: Close (or the sheet's ✕) is the one thing to do. -->
+<div class="overlay" id="tdLevelOverlay" onclick="overlayClick(event,'tdLevelOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="tdLevelTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="tdLevelTitle">⭐ My level</h3>
+      <div id="tdLevelBody"></div>
+      <button type="button" class="td-level-close" onclick="closeSheet('tdLevelOverlay')">Close</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('tdLevelOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- New Challenge -->
+<div class="overlay" id="newChallengeOverlay" onclick="overlayClick(event,'newChallengeOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="newChallengeTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="newChallengeTitle">🎯 New Weekly Challenge</h3>
+      <div class="custom-builder">
+        <label>Challenge title</label>
+        <input type="text" id="chTitle" placeholder="e.g. Practice piano 5x this week" aria-label="Challenge title">
+        <label>Activity</label>
+        <select id="chActivity" aria-label="Activity"></select>
+        <div class="row">
+          <div>
+            <label>Target count</label>
+            <input type="number" id="chTarget" min="1" value="5" aria-label="Challenge target count">
+          </div>
+          <div>
+            <label>For</label>
+            <select id="chWho" aria-label="Who it is for">
+              <option value="both">Both sisters</option>
+              <option value="jenn">Jenn only</option>
+              <option value="jess">Jess only</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmNewChallenge()">Create ✨</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newChallengeOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- New Level Rule -->
+<div class="overlay" id="newRuleOverlay" onclick="overlayClick(event,'newRuleOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="newRuleTitle">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="newRuleTitle">⚙️ New Level-Up Rule</h3>
+      <div class="custom-builder">
+        <label>Activity</label>
+        <select id="ruleActivity" aria-label="Activity"></select>
+        <label>Rule type</label>
+        <select id="ruleType" aria-label="Kind of rule">
+          <option value="count">Count (do X times)</option>
+          <option value="hours">Time (accumulate X hours)</option>
+        </select>
+        <label>Target amount</label>
+        <input type="number" id="ruleTarget" min="1" value="10" aria-label="Level-up target count">
+        <label for="ruleName">Level-up name (e.g. "Piano Master")</label>
+        <input type="text" id="ruleName" placeholder="e.g. Math Wizard" aria-label="Level-up title">
+        <label for="ruleNewIcon">New icon (optional)</label>
+        <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2" aria-label="Level-up icon (emoji)">
+      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" onclick="confirmNewRule()">Save Rule ✨</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newRuleOverlay')">✕</button>
+  </div>
+</div>
+
+<!-- New Custom Routine -->
+<div class="overlay" id="newRoutineOverlay" onclick="overlayClick(event,'newRoutineOverlay')">
+  <div class="ui-sheet" role="dialog" aria-modal="true" aria-labelledby="rbHeading">
+    <div class="ui-sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 id="rbHeading">🌅 New Custom Routine</h3>
+      <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Add a checklist routine both girls can use.</p>
+      <div class="custom-builder">
+        <div class="row">
+          <div style="flex:3">
+            <label for="rbTitle">Routine name</label>
+            <input type="text" id="rbTitle" placeholder="e.g. Saturday Clean-up" aria-label="Routine name">
+          </div>
+          <div style="flex:1">
+            <label for="rbIcon">Icon</label>
+            <input type="text" id="rbIcon" placeholder="📋" maxlength="2" aria-label="Routine icon (emoji)">
+          </div>
+        </div>
+        <label>Checklist items (timer in minutes, optional)</label>
+        <div id="rbItems"></div>
+        <button class="ui-btn ui-btn--secondary" style="margin-top:0.4rem" onclick="addRoutineItem()">＋ Add item</button>
+      </div>
+      <button class="ui-btn ui-btn--primary ui-btn--block act-guard" id="rbConfirmBtn" style="margin-top:0.8rem" onclick="confirmRoutine()">Save Routine ✨</button>
+    </div>
+    <button type="button" class="ui-btn ui-btn--secondary ui-btn--icon ui-sheet-x" aria-label="Close" onclick="closeSheet('newRoutineOverlay')">✕</button>
+  </div>
+</div>
+
+<script src="js/01-config.js"></script>
+<script src="js/02-state.js"></script>
+<script src="js/03-sync.js"></script>
+<script src="js/04-merge.js"></script>
+<script src="js/05-helpers.js"></script>
+<script src="js/06-quests.js"></script>
+<script src="js/07-week-view.js"></script>
+<script src="js/08-day-view.js"></script>
+<script src="js/09-sheets.js"></script>
+<script src="js/10-social.js"></script>
+<script src="js/11-parent.js"></script>
+<script src="js/12-goals.js"></script>
+<script src="js/13-chores.js"></script>
+<script src="js/14-money.js"></script>
+<script src="js/15-meeting.js"></script>
+<script src="js/16-print.js"></script>
+<script src="js/17-ui-misc.js"></script>
+<script src="js/18-rules.js"></script>
+<script src="js/19-pocket.js"></script>
+<script src="js/20-loan.js"></script>
+<script src="js/21-money-data.js"></script>
+<script src="js/22-money-page1.js"></script>
+<script src="js/23-money-meeting.js"></script>
+<script src="js/24-money-parent.js"></script>
+<script src="js/25-money-school.js"></script>
+<script src="js/26-chore-kid.js"></script>
+<script src="js/27-chore-parent.js"></script>
+<script src="js/28-chore-trends.js"></script>
+<script src="js/29-chore-options.js"></script>
+<!-- The kid nav: one fixed element outside the screens, filled by tdRenderNav
+     (js/31-today.js). Six screens each carrying their own copy is six places for
+     it to drift, which is what happened to the topbar row it will replace. -->
+<nav id="kidNav" class="kid-nav" aria-label="Where to go" hidden></nav>
+<nav id="parentNav" class="parent-nav" aria-label="Parent sections" hidden></nav>
+
+<script src="js/30-backup.js"></script>
+<script src="js/31-today.js"></script>
+<script src="js/32-parent-now.js"></script>
+<script src="js/33-parent-app.js"></script>
+<script src="js/34-parent-copyweek.js"></script>
+<script src="js/35-school-calendar.js"></script>
+<!-- The status vocabulary. Loaded last of the declaration files because it
+     calls into every one of them at runtime and none of them at load time.
+     99-main.js still owns all top-level executable code. -->
+<script src="js/36-status.js"></script>
+<script src="js/37-reflection.js"></script>
+<script src="js/38-conflicts.js"></script>
+  <script src="js/39-block-drag.js"></script>
+<script src="js/40-stream.js"></script>
+<script src="js/41-record.js"></script>
+<script src="js/42-flow.js"></script>
+<script src="js/43-sunday-core.js"></script>
+<script src="js/44-sunday.js"></script>
+<script src="js/45-requests.js"></script>
+<script src="js/46-grownups.js"></script>
+<script src="js/47-header.js"></script>
+<script src="js/48-cal-follow.js"></script>
+<script src="js/99-main.js"></script>
+</body>
+</html>

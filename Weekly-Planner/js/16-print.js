@@ -1,0 +1,327 @@
+// Weekly-Planner — print view: controls, sheet render, summary.
+// Extracted verbatim from index.html (classic script, global scope).
+/* ════════════════════════════════════════════════════════════════
+   PRINT VIEW
+════════════════════════════════════════════════════════════════ */
+// Print display window — the start/end the parent chooses for what the
+// printout shows and totals over. Defaults to the app's 6am–10pm (START_HOUR–END_HOUR).
+let printWindow = { startHour: START_HOUR, endHour: END_HOUR };
+
+// AAP/NSF sleep guidance by age → the printout shows this as a required
+// nightly amount so a week can be planned around it.
+function recommendedSleep(age) {
+  if (age == null || isNaN(age)) return null;
+  if (age <= 2)  return { min: 11, max: 14, group: 'toddler' };
+  if (age <= 5)  return { min: 10, max: 13, group: 'preschool' };
+  if (age <= 12) return { min: 9,  max: 12, group: 'school-age' };
+  if (age <= 18) return { min: 8,  max: 10, group: 'teen' };
+  return { min: 7, max: 9, group: 'adult' };
+}
+
+function fmtHrsMin(totalMin) {
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
+// Fill the start/end controls and reflect the current state.
+function renderPrintControls() {
+  const startSel = document.getElementById('printStartHour');
+  const endSel = document.getElementById('printEndHour');
+  if (!startSel || !endSel) return;
+  const hourLabel = (h) => {
+    const hr12 = ((h + 11) % 12) + 1;
+    return `${hr12}${h < 12 ? 'am' : (h === 24 ? 'am' : 'pm')}`;
+  };
+  const opts = (lo, hi, sel) => {
+    let s = '';
+    for (let h = lo; h <= hi; h++) s += `<option value="${h}"${h===sel?' selected':''}>${hourLabel(h)}</option>`;
+    return s;
+  };
+  startSel.innerHTML = opts(4, 12, printWindow.startHour);
+  endSel.innerHTML = opts(15, 23, printWindow.endHour);
+}
+
+function onPrintWindowChange() {
+  const start = parseInt(document.getElementById('printStartHour').value, 10);
+  const end = parseInt(document.getElementById('printEndHour').value, 10);
+  if (!isNaN(start)) printWindow.startHour = start;
+  if (!isNaN(end)) printWindow.endHour = end;
+  if (printWindow.endHour <= printWindow.startHour) printWindow.endHour = printWindow.startHour + 1;
+  renderPrintControls();
+  renderPrintSheet();
+}
+
+/* Print's standard header, never printed: ◀ back through the one back stack
+   (the week it was opened from), Print week, and 🖨 Print, which prints. */
+function openPrint() {
+  navReturnPush('print');
+  hdrMount('screen-print', {
+    noPrint: true,
+    back: { to: navReturnTo('week'), data: { 'hdr-action': 'back', 'hdr-fallback': 'week' } },
+    title: 'Print Week',
+    actions: [{ label: '🖨 Print', aria: 'Print', cls: 'hdr-btn--word', data: { 'hdr-action': 'print-now' } }],
+  });
+  showScreen('print');
+  renderPrintControls();
+  renderPrintSheet();
+}
+
+// Auto-contrast: choose ink vs white by the fill's luminance so titles stay
+// readable on every colour — and on a black & white printer, where each
+// colour prints as its matching shade of grey, the same choice still holds.
+function printTextColor(hex) {
+  if (!hex || hex[0] !== '#') return '#1a1a1a'; /* look: colour maths — printTextColor picks ink by luminance */
+  let h = hex.slice(1);
+  if (h.length === 3) h = h.split('').map(c=>c+c).join('');
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  const L = (0.299*r + 0.587*g + 0.114*b) / 255;
+  return L > 0.6 ? '#1a1a1a' : '#fff'; /* look: colour maths — printTextColor picks ink by luminance */
+}
+
+// Proportional title size: taller blocks (which have the room) get larger
+// text; short blocks stay small so the label still fits.
+function printBlockFontPt(heightPx) {
+  if (heightPx >= 240) return 12;    // ~5h+ (e.g. a full school day)
+  if (heightPx >= 120) return 10.5;  // ~3h+
+  if (heightPx >= 60)  return 9.5;   // ~1h30+
+  if (heightPx >= 36)  return 8.5;   // ~1h
+  if (heightPx >= 18)  return 7.5;   // ~30m
+  return 6.5;                        // ~15m sliver
+}
+
+// How many detail lines (checks/objective/etc.) fit under the title in a block
+// of this height, given the title's own font size — continuous, so a big
+// competition block naturally gets room for its whole list instead of a fixed
+// 1/2/3-row cap regardless of how tall the block actually is.
+//
+// Deliberately NOT blockContentTier (js/05-helpers.js), which the day and week
+// views share: this measures against real font metrics at the block's own point
+// size, and print px are not screen px — the sheet has its own --print-slot
+// scale, so those five pixel thresholds would mean nothing here.
+function printDetailCapacity(heightPx, titleFpt) {
+  const pxPerPt = 1.333;
+  const titleLinePx = titleFpt * pxPerPt * 1.15 + 2;
+  const rowFpt = titleFpt * 0.78;
+  const rowLinePx = rowFpt * pxPerPt * 1.15 + 1;
+  return Math.max(0, Math.floor((heightPx - titleLinePx - 2) / rowLinePx));
+}
+
+// Tick-box side length scaled to the block/strip's own height, so a 15-min
+// sliver gets a small box and an hours-long block gets a comfortably tappable
+// one, instead of one fixed size for every time slot.
+function printCheckboxPx(heightPx, { min = 6, max = 12, base = 5, divisor = 20 } = {}) {
+  return Math.max(min, Math.min(max, Math.round(base + heightPx / divisor)));
+}
+
+/* ── One renderer, two hosts ──────────────────────────────────────
+   This read `weekOffset`, `activeProfile()` and `printWindow` straight out of
+   the module scope and wrote to a hardcoded `#printSheet`. That is fine while
+   there is one copy on the page and impossible the moment there are two: the
+   week's read-only preview shows the same sheet, and both would have fought
+   over the same element and the same `--print-slot`, which was being set on
+   <html>.
+
+   So it takes a host and an explicit week/profile/window, each defaulting to
+   what it used to read. `--print-slot` is set on the HOST — the rule that uses
+   it inherits, and two copies at different sizes stay independent.
+
+   Copying this renderer into the week view instead would have been the fifth
+   place that lists a day's blocks, which is the mistake CLAUDE.md names. */
+function renderPrintSheet(host, opts) {
+  const o = opts || {};
+  const el = (typeof host === 'string' ? document.getElementById(host) : host)
+    || document.getElementById('printSheet');
+  if (!el) return;
+  const wkOffset = o.weekOffset != null ? o.weekOffset : weekOffset;
+  const win = o.window || printWindow;
+  const keys = getDayKeys(wkOffset);
+  const mon = formatDayKey(keys[0]);
+  const sun = formatDayKey(keys[6]);
+  const p = o.profile || activeProfile();
+  const nameStr = `${kidLabel(p).icon} ${kidLabel(p).name}`;
+
+  // Chosen display window (defaults to 6am–10pm).
+  const winStartMin = win.startHour * 60;
+  const winEndMin   = win.endHour * 60;
+  const winSlots    = Math.round((winEndMin - winStartMin) / 15);
+  const winStartHr  = win.startHour;
+
+  const fmtHr = (h) => `${((h+11)%12)+1}${h>=12 && h<24 ? 'pm' : 'am'}`;
+  let html = `
+    <div class="print-header">
+      <h1>${nameStr}'s Week — ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} to ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()} &nbsp;·&nbsp; ${fmtHr(winStartHr)}–${fmtHr(win.endHour)}</h1>
+    </div>
+  `;
+
+  // Row height scales so the chosen window still fits one landscape page.
+  const slotPx = Math.max(7, Math.min(11, Math.floor(660 / winSlots)));
+  el.style.setProperty('--print-slot', slotPx + 'px');
+
+  html += `<div class="print-week-grid">`;
+  // header row (band-axis corner + time corner + 7 days)
+  html += `<div class="print-header-cell"></div><div class="print-header-cell"></div>`;
+  keys.forEach((k,i)=>{
+    const d = formatDayKey(k);
+    html += `<div class="print-header-cell">${DAY_SHORT[i]} ${d.getDate()}</div>`;
+  });
+  /* The sideband is one axis for seven days, so it describes the week's first
+     school day — the same choice the Full week's axis makes. These four were
+     hardcoded at 9am–3pm, which disagreed with the app by an hour and printed
+     a "🏫 School" band across a week in July. */
+  const printAxisKey = keys.find(k => isSchoolDay(k)) || null;
+  const printSegs = printAxisKey
+    ? dayZoneSegments(printAxisKey)
+    : [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time', cls: 'tl-band-free' }];
+  const PRINT_BANDS = printSegs.map(b => ({
+    start: START_MIN + b.start,
+    end: START_MIN + b.end,
+    cls: b.cls.replace('tl-band-', 'print-band-'),
+    label: ZONE_SHORT[b.label] || b.label,
+  }));
+  const bandForSlot = (absMin) => PRINT_BANDS.find(b => absMin >= b.start && absMin < b.end);
+  // rows
+  const acts = getAllActivities(p, { includeArchived: true });
+  // Time clashes flagged the same way as the Full/Day-Blocks views so the three
+  // views agree on the printed sheet.
+  const printConflicts = {};
+  keys.forEach(k => { printConflicts[k] = computeBufferConflicts(getDayBlocks(k, p) || []).affected; });
+  for (let s=0;s<winSlots;s++) {
+    const totalMin=s*15;
+    const hour = winStartHr + Math.floor(totalMin/60);
+    const min  = totalMin%60;
+    const isHourStart = min===0;
+    // Sideband cell: tinted per band; the band's first visible slot carries a
+    // vertical label spanning the band's full (clipped) height.
+    const absMin = winStartMin + totalMin;
+    const band = bandForSlot(absMin);
+    let bandHtml = '';
+    if (band) {
+      const bandVisStart = Math.max(band.start, winStartMin);
+      if (absMin === bandVisStart) {
+        const visSlots = Math.round((Math.min(band.end, winEndMin) - bandVisStart) / 15);
+        bandHtml = `<span class="print-band-label" style="height:${visSlots * slotPx - 1}px">${escapeHtml(band.label)}</span>`;
+      }
+    }
+    html += `<div class="print-band-cell${band ? ' ' + band.cls : ''}">${bandHtml}</div>`;
+    html += `<div class="print-time-cell${isHourStart?' print-hour-start':''}">${isHourStart ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
+    keys.forEach(k=>{
+      const bks = getDayBlocks(k, p);
+      let blockHtml = '';
+      bks.forEach(b=>{
+        const act = acts.find(a=>a.id===b.actId);
+        if (!act) return;
+        const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+        // Computed once so the buffer strips can be tinted to match, the same
+        // way the week view's strips hug their own activity's colour.
+        const bg = blockColour(b);
+
+        // Travel / get-ready buffer strips around the block, so the printed
+        // sheet shows "leave at 5:00" for a 5:30 training just like the app —
+        // each with its own tick box and a real deadline, not just "🚗15m".
+        /* Clipped to the minutes that exist, through the same owner the day view
+           and the Full week read (bufferClip, js/05-helpers.js) — a printed
+           strip must not claim half an hour of driving that the next activity
+           is already using. Rows here are 15 minutes and Math.max(1, …) below
+           rounds a remnant UP to a whole row, so anything under 8 minutes is
+           dropped rather than printed as a quarter-hour that is not there. A
+           strip that loses its row loses its tick box with it, which is right:
+           you cannot tick time that does not exist. */
+        // Per leg, like every other surface that clips a buffer window.
+        const preBufMin  = getTravelBufMin(b, 'pre') + getGetReadyBufMin(b, 'pre');
+        const postBufMin = getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
+        const pClip = bufferClip(b.startMin, b.startMin + (b.durationMin || 0),
+          preBufMin + getWarmupBufMin(b), postBufMin,
+          (bks || []).filter(o => o && o.id !== b.id));
+        wfBufferSegments(b).forEach(seg=>{
+          const absStart = seg.startRel + START_MIN;
+          const rawStart = seg.side === 'pre' ? Math.max(absStart, pClip.preFrom) : absStart;
+          const rawEnd   = seg.side === 'pre' ? absStart + seg.dur
+                                              : Math.min(absStart + seg.dur, pClip.postTo);
+          if (rawEnd - rawStart < 8) return;
+          const segStart = Math.max(rawStart, winStartMin);
+          const segEnd   = Math.min(rawEnd, winEndMin);
+          if (segEnd <= segStart) return;
+          if (Math.round((segStart - winStartMin)/15) !== s) return;
+          const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
+          const bh = slotSpan*slotPx - 1;
+          const tier = bh >= 12 ? 'long' : bh >= 9 ? 'short' : 'tiny';
+          const label = bh >= 6 ? bufferSegLabels(seg, tier) : '';
+          // One owner (js/07-week-view.js), side-aware: after a block is Unpack.
+          const kindLabel = bufferKindLabel(seg);
+          const kindCls = seg.kind === 'ready' ? ' print-buffer--ready' : seg.kind === 'warmup' ? ' print-buffer--warmup' : ' print-buffer--travel';
+          const bufCheckPx = printCheckboxPx(bh, { min: 5, max: 9, base: 4, divisor: 8 });
+          const checkbox = bh >= 9 ? `<span class="print-check" style="border-color:${printTextColor(bg)};width:${bufCheckPx}px;height:${bufCheckPx}px"></span>` : '';
+          blockHtml += `<div class="print-buffer${kindCls}" style="height:${bh}px;--print-buf-colour:${bg}" title="${escapeAttr(kindLabel)} — ${seg.min} min">${checkbox}${label}</div>`;
+        });
+        // Clip each block to the window so blocks that start earlier/run later
+        // still render (trimmed) instead of vanishing.
+        const dur = b.durationMin || 0;
+        const segStart = Math.max(b.startMin, winStartMin);
+        const segEnd   = Math.min(b.startMin + dur, winEndMin);
+        if (segEnd <= segStart) return;
+        const startSlot = Math.round((segStart - winStartMin)/15);
+        if (startSlot!==s) return;
+        const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
+        const bh = slotSpan*slotPx - 1;
+        const pIcon = topic ? topic.icon : act.icon;
+        // Through the one owner — see the same change in renderFullWeek.
+        const pNamed = blockDisplayName(b, p).name;
+        const pName = act.isCompetition ? `${pNamed} 🏆` : pNamed;
+        const hasConflict = printConflicts[k] && printConflicts[k].has(b.id);
+        const titleFpt = printBlockFontPt(bh);
+        // Empty tick box so it can be checked off on the printed page — sized
+        // to the block's own height so a 15-min sliver and an hours-long
+        // session don't share one fixed box size.
+        const checkPx = printCheckboxPx(bh);
+        const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)};width:${checkPx}px;height:${checkPx}px"></span>` : '';
+        // List as much of "what this block is about" as the block's own height
+        // can hold, degrading to a one-line count and then to icon+name only on
+        // slivers too short for more. A training block leads with its four
+        // checks (TRAINING_CHECKS), which print as ⬜ boxes — on paper they are
+        // the point, since a printed sheet is something you tick with a pen.
+        const detailLines = blockDetailLines(b, act);
+        let sumHtml = '';
+        if (detailLines.length) {
+          const maxRows = printDetailCapacity(bh, titleFpt);
+          if (maxRows > 0) {
+            sumHtml = sliceDetailLines(detailLines, maxRows)
+              .map(r => `<div class="print-block-sum">${r.icon} ${escapeHtml(r.text)}</div>`)
+              .join('');
+          } else if (bh >= 26) {
+            sumHtml = `<div class="print-block-sum">${blockCountsSummary(detailLines)}</div>`;
+          }
+        }
+        const titleCls = sumHtml ? '' : ' print-block--titleonly';
+        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${titleFpt}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`; /* look: print sheet ignores the look (L12) */
+      });
+      html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
+    });
+  }
+  html += `</div>`;
+
+  // The print is the planning grid only — A4 landscape, one page. Summaries,
+  // free-time totals, sleep recommendations and notes are intentionally left
+  // off so the printed sheet stays a single-page plan (per request).
+
+  // Signature footer: the kid commits to the plan (carried over from the weekly
+  // view if already signed), with blank lines for a parent co-sign and the date.
+  const kidName = kidLabel(p).name;
+  const sig = getWeekSignature(keys, p);
+  // Named *Html because it is already escaped — the suffix is what stops it
+  // being escaped a second time, and stops the lint asking.
+  const sigNameHtml = sig ? escapeHtml(sig.name || kidName) : '';
+  html += `<div class="print-signature">
+      <div class="print-sig-block"><span class="print-sig-caption">${escapeHtml(kidName)} signs</span><span class="print-sig-line">${sigNameHtml ? `<span class="print-sig-name">${sigNameHtml}</span>` : ''}</span></div>
+      <div class="print-sig-block"><span class="print-sig-caption">Parent</span><span class="print-sig-line"></span></div>
+      <div class="print-sig-block print-sig-block--date"><span class="print-sig-caption">Date</span><span class="print-sig-line"></span></div>
+    </div>`;
+
+  el.innerHTML = html;
+}
+
+// Weekly time-per-category totals over the chosen window, plus unscheduled
+// (free) time and an age-based sleep recommendation.
+
+

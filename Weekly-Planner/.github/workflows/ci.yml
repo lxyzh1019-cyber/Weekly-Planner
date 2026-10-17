@@ -1,0 +1,318 @@
+name: CI
+
+on:
+  # One run per push, on every branch: the run reports on the pull request's
+  # head commit, so there is no separate pull_request trigger.
+  push:
+    branches: ['**']
+  schedule:
+    # Nightly, 07:00 UTC — catches drift in the pinned browser and toolchain
+    # even on weeks when nothing is pushed.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast gate: syntax + one-global-per-name + the merge-layer unit tests.
+  # No browser, runs in seconds.
+  checks:
+    name: Syntax, globals, merge tests
+    runs-on: ubuntu-latest
+    # Observed at ~15 seconds. Anything approaching this is stuck, not slow.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # node --check on every js/*.js, plus the duplicate top-level
+      # declaration guard. All 30 scripts share one global scope, so a
+      # duplicate name is a real defect — see tests/check-globals.js.
+      - name: Syntax and global-scope checks
+        run: npm run check
+
+      # Runs the real shipped merge functions, including the two-device harness.
+      - name: Merge-layer unit tests
+        run: npm run test:merge
+
+      # The buffer-clip arithmetic every surface reads to decide how much of a
+      # travel/get-ready window is real time. Listed here explicitly because
+      # this workflow enumerates the npm scripts rather than running `npm test`
+      # — a suite added to package.json and not to this file is a suite CI never
+      # runs, which is the same shape as the `|| break` loop CLAUDE.md records:
+      # a check that can never fail.
+      - name: Buffer-clip unit tests
+        run: npm run test:buffers
+
+      - name: Component kit unit tests (fmtMoney, fmtDay, pageHeader)
+        run: npm run test:helpers
+
+      # The money stream (js/40-stream.js): every dollar as a movement, with
+      # every balance derived from it. Holds the invariant the whole redesign
+      # rests on — opening + in - out === what is in hand — over a thousand
+      # randomly generated histories, in any arrival order, because a merge
+      # from another device delivers events shuffled. Listed here explicitly
+      # for the same reason as the step above: this workflow enumerates its
+      # scripts, so a suite in package.json and not here is a suite CI never
+      # runs (tests/check-ci-scripts.js fails the build on exactly that).
+      - name: Money-stream unit tests
+        run: npm run test:stream
+
+      # The Sunday ritual's pure core (js/43-sunday-core.js): 8–20 Sundays for
+      # both girls over random but valid choices, In = Out every week, and the
+      # handoff's edge cases. No browser. Listed here for the same reason as the
+      # steps above — tests/check-ci-scripts.js fails a suite CI never runs.
+      - name: Sunday core unit tests
+        run: npm run test:sunday
+
+      # The two calibrations. Node only, no browser, so they run here once
+      # rather than once per smoke date (they sat in the smoke job and ran four
+      # times). tools/money-calibrate.js promises that "changing a rate and not
+      # re-running shows up as a failing test rather than at a Sunday meeting"
+      # -- which only holds because CI runs this step.
+      - name: XP calibration
+        run: npm run test:xp
+
+      - name: Money calibration
+        run: npm run test:money
+
+  # Puts the browser on the runner ONCE per run and caches what it took, so the
+  # smoke jobs below do not each download it.
+  #
+  # Why (2026-10-08, runs 37671279692 and 37786454837): the slow smoke jobs
+  # were not slow tests. Their "Install Chromium" step took 14:04 and 5:31
+  # while the others took about 15 s. Chromium itself came from the cache every
+  # time; the time went on `--with-deps`, which downloads about 20-30 MB of
+  # system packages (fonts, mesa) from the Ubuntu mirror in every job, and that
+  # mirror sometimes serves at 40-70 kB/s. So this job keeps those packages
+  # (the .deb files) in a cache next to Chromium, and every smoke job installs
+  # them from the cache instead of the mirror. A runner image whose package
+  # list differs only fetches the packages the cache does not have.
+  #
+  # The cleanup tool is a page too, so it needs a browser: its test runs here,
+  # once, instead of in every smoke job.
+  browser:
+    name: Browser setup, cleanup-tool tests
+    runs-on: ubuntu-latest
+    # A cache miss on a slow mirror took 14 minutes in one job (above). That
+    # now happens here, at most once per runner image, so the limit leaves
+    # room for it; a cache hit takes about a minute.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # playwright-core ships no browsers and no installer, so fetch the
+      # browser with the matching playwright version. tests/smoke.js finds it
+      # under ~/.cache/ms-playwright with no SMOKE_CHROMIUM needed.
+      - name: Read pinned playwright-core version and runner image
+        id: pw
+        run: |
+          echo "version=$(node -p "require('./package.json').devDependencies['playwright-core']")" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Cache system packages
+        uses: actions/cache@v4
+        with:
+          path: ~/pw-debs
+          key: pw-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}
+          restore-keys: pw-debs-
+
+      # apt uses a .deb already in /var/cache/apt/archives when its version is
+      # the one it wants, and downloads only the rest. Keep what it downloads,
+      # then put the whole set back into the cache folder.
+      - name: Install system packages
+        run: |
+          echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99keep-debs
+          sudo rm -f /etc/apt/apt.conf.d/docker-clean
+          mkdir -p ~/pw-debs
+          sudo cp ~/pw-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          npx --yes playwright@${{ steps.pw.outputs.version }} install-deps chromium
+          cp /var/cache/apt/archives/*.deb ~/pw-debs/ 2>/dev/null || true
+          echo "$(ls ~/pw-debs | wc -l) packages in the cache folder"
+
+      - name: Install Chromium
+        run: npx --yes playwright@${{ steps.pw.outputs.version }} install chromium
+
+      # It reaches no network: every Firebase host is blocked and the test
+      # fails if the tool requests the database at all.
+      - name: Cleanup-tool tests
+        run: npm run test:cleanup
+
+  # Boots the app over file:// in headless Chromium and drives the main flows,
+  # including the chore -> money hand-off that is the most valuable join in the
+  # suite. Runs on every push; 2026-10-07 only off main: it is the only check that
+  # would catch a broken screen.
+  smoke:
+    name: Headless smoke test (${{ matrix.date }}, part ${{ matrix.part }})
+    runs-on: ubuntu-latest
+    needs: [checks, browser]
+    # The suite runs on a fixed date (SMOKE_DATE, noon Edmonton; tests/smoke.js)
+    # so its result cannot change with the calendar. Four dates: a regular
+    # weekday, a Sunday, the first of a month, and 2026-10-07, the Wednesday
+    # that first showed the Chores money door's tap-size failure. Each date's
+    # suite runs as three parts side by side (SMOKE_PART, the fixed lists in
+    # tests/smoke-parts/parts.js: every check in exactly one part,
+    # noConsoleErrors in every part), so 4 x 3 = 12 jobs on main and nightly;
+    # 1 date x 3 = 3 jobs on other branches.
+    strategy:
+      fail-fast: false
+      matrix:
+        # All four dates on main and nightly; 2026-10-07 only on other branches.
+        date: ${{ fromJSON((github.ref == 'refs/heads/main' || github.event_name == 'schedule') && '["2026-10-15","2026-10-11","2026-10-01","2026-10-07"]' || '["2026-10-07"]') }}
+        part: [1, 2, 3]
+    # A GitHub job with no timeout runs for SIX HOURS before the platform kills
+    # it (2026-08-19 needed a human to cancel one). One date as one job took
+    # about 8 minutes; a part is meant to stay under 5 with setup. 10 leaves
+    # room for a slow runner and still fails fast enough to be a signal.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read pinned playwright-core version and runner image
+        id: pw
+        run: |
+          echo "version=$(node -p "require('./package.json').devDependencies['playwright-core']")" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      # Restore only: the browser job above saved both caches.
+      - name: Restore Chromium
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Restore system packages
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/pw-debs
+          key: pw-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}
+          restore-keys: pw-debs-
+
+      # The packages come from the cache; apt downloads only one it lacks.
+      - name: Install system packages
+        run: |
+          sudo cp ~/pw-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          npx --yes playwright@${{ steps.pw.outputs.version }} install-deps chromium
+
+      # Nothing to download when the cache was restored; it fetches the
+      # browser only if the cache is missing.
+      - name: Install Chromium
+        run: npx --yes playwright@${{ steps.pw.outputs.version }} install chromium
+
+      - name: Smoke test
+        run: npm run test:smoke
+        env:
+          SMOKE_DATE: ${{ matrix.date }}
+          SMOKE_PART: ${{ matrix.part }}
+
+      # Screenshots make a layout regression visible in the run itself rather
+      # than only as a failed assertion. The folder also holds
+      # smoke-ran-<date>-part<N>.json, each check's result and time
+      # (tools/smoke-times.js).
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots-${{ matrix.date }}-p${{ matrix.part }}
+          path: tests/out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The picture test (tests/pictures.js): every screen and state at both sizes
+  # in both looks, pixel-compared with tests/reference/. References are made
+  # and compared only here, on this runner with the pinned browser; a local run
+  # reports but does not gate. Here an empty tests/reference/ fails ("no
+  # references in tests/reference/"); the fresh set is uploaded below either
+  # way, to be copied into tests/reference/.
+  #
+  # Its own job, not a step of a smoke job: the pictures set their own clock
+  # (Wed 2026-10-07 12:00 Edmonton) and do not read SMOKE_DATE, so they run once
+  # per run, side by side with the smoke jobs rather than after one of
+  # them. One job also keeps the artifact name `pictures` unique. It reuses the
+  # browser and system packages the `browser` job cached, as the smoke jobs do.
+  pictures:
+    name: Picture test (Wed 2026-10-07 12:00 Edmonton)
+    runs-on: ubuntu-latest
+    needs: [checks, browser]
+    # The picture step took 2:09-2:19 on 2026-10-07; with setup the job should
+    # take under 5 minutes. 15 leaves room for a slow runner.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read pinned playwright-core version and runner image
+        id: pw
+        run: |
+          echo "version=$(node -p "require('./package.json').devDependencies['playwright-core']")" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      # Restore only: the browser job above saved both caches.
+      - name: Restore Chromium
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Restore system packages
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/pw-debs
+          key: pw-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}
+          restore-keys: pw-debs-
+
+      - name: Install system packages
+        run: |
+          sudo cp ~/pw-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          npx --yes playwright@${{ steps.pw.outputs.version }} install-deps chromium
+
+      - name: Install Chromium
+        run: npx --yes playwright@${{ steps.pw.outputs.version }} install chromium
+
+      - name: Picture test
+        run: npm run test:pictures
+
+      - name: Upload pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pictures
+          path: |
+            tests/out/pictures-new/
+            tests/out/pictures-diff/
+          if-no-files-found: warn
+          retention-days: 14

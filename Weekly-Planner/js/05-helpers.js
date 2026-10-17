@@ -1,0 +1,1682 @@
+// Weekly-Planner — profile data accessors, rewards, tutorial, day/week keys, navigation.
+// Extracted verbatim from index.html (classic script, global scope).
+/* ════════════════════════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════════════════════════ */
+
+/* ── HTML escaping ─────────────────────────────────────────────────────────
+   Every user-supplied string interpolated into an innerHTML template must come
+   through one of these: escapeHtml for text position, escapeAttr inside a
+   double-quoted attribute. Activity names, block notes, chore names, goal
+   names and kid feedback are all user-editable.
+
+   These live here, not in a feature file, because js/05, js/06 and js/07 all
+   call them — they used to be declared in js/08-day-view.js, i.e. three files
+   depended on a primitive declared after them. It worked only because nothing
+   renders at load time.
+
+   escapeHtml used to build a throwaway <div> and read back its innerHTML. This
+   is the same transformation done directly: & < > become entities and quotes
+   are left alone, which is why attribute position needs escapeAttr instead.
+   A render can call this several hundred times, and this way it neither
+   allocates a DOM node per call nor needs a document at all. The equivalence
+   with the old implementation is asserted in tests/smoke.js
+   (escapingMatchesTheDomReference). */
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+// Escape a value for use inside a double-quoted HTML attribute (escapeHtml leaves quotes).
+function escapeAttr(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+/* For a value going inside a single-quoted JS string that is itself inside a
+   double-quoted inline handler — onclick="fn('HERE')".
+
+   escapeAttr is NOT enough there, and this is the subtle part: an inline handler
+   attribute is HTML-decoded *before* it is parsed as JavaScript, so escapeAttr's
+   &#39; decodes straight back to an apostrophe and closes the string literal
+   anyway. The quote has to be escaped for the JavaScript parser (backslash),
+   and only then escaped for the HTML parser.
+
+   This is not theoretical. Block ids reach these handlers, ensureBlockId used to
+   bake 24 characters of the user's note into an id, and ids also arrive straight
+   off a world-writable Firestore document — so a note or a synced id containing
+   an apostrophe ran as code on tap. Both ends are fixed: ids are slugged at the
+   source, and every id interpolated into a handler comes through here.
+
+   Better still is not to interpolate into handlers at all — data attributes plus
+   delegation, the way js/13-chores.js and the money pages already do it. Prefer
+   that for new code; this exists to make the ~40 handlers already written safe. */
+function escapeJsAttr(str) {
+  const js = String(str ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+  return js
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function getProfData(p=activeProfile()) {
+  if (!state.profiles[p]) state.profiles[p] = { weeks:{}, customActivities:[], dayMoods:{}, blockMoods:{}, activityCounts:{}, activityHours:{} };
+  const prof = state.profiles[p];
+  if (!prof.progress) {
+    /* unlockedActs, manualPlacedCount and unlockedThisWeek were seeded here and
+       existed ONLY to drive the placed-block milestone that gated nine
+       activities. That is retired, so they are no longer seeded — but a stored
+       document that still carries them is left exactly as it is. Deleting a
+       field from a device's copy is not something deepMergeObj can express:
+       the remote copy simply puts it back, so a "cleanup" would churn the
+       document on every sync and change nothing. Inert is the right state. */
+    prof.progress = {
+      pendingRewards: [],
+      streaks: {},
+      streakFreezeTokens: 1,
+      streakFreezeWeek: dateToLocalKey(getWeekStart(weekOffset)),
+    };
+  }
+  if (!Array.isArray(prof.progress.pendingRewards)) prof.progress.pendingRewards = [];
+  if (!prof.progress.unlockedChecklistItems) prof.progress.unlockedChecklistItems = {};
+  if (!prof.progress.streaks) prof.progress.streaks = {};
+  if (!Array.isArray(prof.progress.stickers)) prof.progress.stickers = [];      // unlocked collectible ids
+  if (prof.progress.tasksCompleted == null) prof.progress.tasksCompleted = 0;   // lifetime completions
+  if (!prof.progress.completedByCat) prof.progress.completedByCat = {};         // per-category completions
+  if (prof.progress.streakFreezeTokens == null) prof.progress.streakFreezeTokens = 1;
+  if (!prof.progress.restDays) prof.progress.restDays = {};                     // {[dayKey]:true} — kid-marked days off
+  if (!prof.progress.streakFreezeWeek) prof.progress.streakFreezeWeek = dateToLocalKey(getWeekStart(weekOffset));
+  const wk = dateToLocalKey(getWeekStart(weekOffset));
+  if (prof.progress.streakFreezeWeek !== wk) {
+    prof.progress.streakFreezeWeek = wk;
+    prof.progress.streakFreezeTokens = 1;
+  }
+  return state.profiles[p];
+}
+function getDayBlocks(key, p=activeProfile()) { return getProfData(p).weeks[key] || []; }
+function setDayBlocks(key, blocks, p=activeProfile()) {
+  if (!getProfData(p).weeks) getProfData(p).weeks = {};
+  getProfData(p).weeks[key] = blocks;
+  saveAll();
+}
+/* ── ONE rule for how much a block says ──
+   A block's height is decided by its duration, not by how much there is to
+   say about it, so every view has to answer "what fits?" — and each of them
+   used to answer it differently, with its own thresholds. A 7am routine could
+   be legible in the week and a scramble in the day.
+
+   Five tiers, shared by the day timeline, the week cards and the print sheet:
+
+     icon    too short for a word at all
+     name    icon + a short name
+     meta    + the time and duration, and at most two badges
+     detail  + as many goal lines as fit
+     full    + the four training checks
+
+   Anything past two badges folds into a "+N" chip: a strip of eight emoji is
+   not information, it is texture. */
+const BLOCK_TIERS = [
+  { id: 'icon',   min: 0 },
+  { id: 'name',   min: 20 },
+  { id: 'meta',   min: 34 },
+  { id: 'detail', min: 64 },
+  { id: 'full',   min: 130 },   // measured: name + duration + the 2×2 checks
+];
+/* The ladder above answers "how much may this block SAY at this height". This
+   answers a different question: at what height can the day view afford to STACK
+   what it says on two lines instead of one.
+
+   They had been conflated, and the day view stacked anything past the `meta`
+   tier's 34px. A 30-minute block is 40px tall; take off 10px of padding and two
+   lines need name (~19px) + meta (~15px) = 34px in a 30px box, so a half-hour
+   Breakfast rendered with its own title sliced in half. Measured: 46px is where
+   both lines fit. The CSS comment on .placed-block.compact already said "<45px"
+   — the ladder had drifted from the layout it was driving.
+
+   Day view only: the week cards and the print sheet lay a block out their own
+   way and keep reading the ladder unchanged. */
+const BLOCK_STACK_MIN = 46;
+function blockContentTier(pxHeight) {
+  const h = Number(pxHeight) || 0;
+  let id = 'icon';
+  BLOCK_TIERS.forEach(t => { if (h >= t.min) id = t.id; });
+  return id;
+}
+function blockTierAtLeast(tier, min) {
+  const order = BLOCK_TIERS.map(t => t.id);
+  return order.indexOf(tier) >= order.indexOf(min);
+}
+
+/* ── What a repeat actually means ──
+   A repeat is MATERIALISED here, not stored as a rule and evaluated later:
+   placeBlock drops a real block on every day the series covers. That is the
+   shape the app already had, and changing it would mean every reader of a day —
+   the week grid, Today, print, the chore join, the merge layer — learning about
+   recurrence. So this function is the one place that answers "which days", and
+   the horizon is capped, because one press must not write a year of blocks into
+   a document that uploads whole on every change.
+
+   `anchorKey` is the day the block was placed on, and its Monday sets the PHASE
+   for "every N weeks" — so a fortnightly swim placed on a Tuesday recurs on the
+   Tuesdays of that week, that week + 2, and so on, whatever start date is
+   typed. Anchoring on the start date instead would let a start of "next Monday"
+   silently shift which weeks are on.
+
+   `startKey`/`endKey` bound it. With neither, the caller wants this week only
+   and does not come here. */
+const SERIES_MAX_WEEKS = 26;     // half a year: a term, not a lifetime
+const SERIES_MAX_BLOCKS = 120;   // a hard stop, whatever the dates say
+const SERIES_EVERY_CHOICES = [
+  [1, 'Every week'], [2, 'Every 2 weeks'], [3, 'Every 3 weeks'], [4, 'Every 4 weeks'],
+];
+
+function seriesEveryWeeks(n) {
+  const v = Math.round(Number(n) || 1);
+  return Math.max(1, Math.min(4, v));
+}
+
+function seriesDayKeys(spec) {
+  const days = [...new Set((spec.days || []).map(Number))]
+    .filter(i => Number.isInteger(i) && i >= 0 && i <= 6).sort((a, b) => a - b);
+  if (!days.length || !spec.anchorKey) return [];
+  const every = seriesEveryWeeks(spec.everyWeeks);
+  const anchorMon = ctMondayOf(formatDayKey(spec.anchorKey));
+  const start = spec.startKey ? formatDayKey(spec.startKey) : new Date(anchorMon);
+  let end = spec.endKey ? formatDayKey(spec.endKey) : null;
+  const cap = new Date(anchorMon);
+  cap.setDate(cap.getDate() + SERIES_MAX_WEEKS * 7 - 1);
+  if (!end || end > cap) end = cap;
+  if (end < start) return [];
+
+  /* Begin at the in-phase week at or before the start, so a start date earlier
+     than the day the block was placed on is still covered. Whole weeks across a
+     DST boundary differ by an hour, which the round absorbs. */
+  const startMon = ctMondayOf(start);
+  const wk = Math.round((startMon - anchorMon) / (7 * 24 * 3600 * 1000));
+  const first = new Date(anchorMon);
+  first.setDate(anchorMon.getDate() + Math.floor(wk / every) * every * 7);
+
+  const out = [];
+  for (let mon = new Date(first); mon <= end && out.length < SERIES_MAX_BLOCKS;
+       mon.setDate(mon.getDate() + 7 * every)) {
+    for (const i of days) {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      if (d < start || d > end) continue;
+      if (out.length >= SERIES_MAX_BLOCKS) break;
+      out.push(dateToLocalKey(d));
+    }
+  }
+  return out;
+}
+
+/* What the repeat says, in words, for a block that carries one. The edit sheet
+   read back "part of a series of 12" and nothing else, so the one thing a
+   series is actually about — which days, how often, until when — was the one
+   thing it could not tell you. */
+function seriesSpecText(b) {
+  if (!b || !b.seriesId) return '';
+  const parts = [];
+  const days = (b.seriesDays || []).filter(i => i >= 0 && i <= 6);
+  if (days.length === 7) parts.push('every day');
+  else if (days.length) parts.push(days.map(i => DAY_LONG[i] + 's').join(', '));
+  const every = seriesEveryWeeks(b.seriesEvery);
+  if (every > 1) parts.push(`every ${every} weeks`);
+  if (b.seriesEnd) {
+    const d = formatDayKey(b.seriesEnd);
+    parts.push(`until ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`);
+  }
+  return parts.join(', ');
+}
+
+/* First letter up, the rest left alone. Not title case: "50m freestyle kick"
+   becoming "50m Freestyle Kick" is a different string from the one that was
+   typed, and a name that starts with a digit has no first letter to raise.
+   Applied where a name is SAVED rather than where it is drawn, because the
+   value is stored and read back on half a dozen surfaces. */
+function capitaliseFirst(str) {
+  const s = String(str == null ? '' : str);
+  const i = s.search(/\S/);
+  if (i < 0) return s;
+  const c = s[i];
+  const up = c.toUpperCase();
+  return up === c ? s : s.slice(0, i) + up + s.slice(i + 1);
+}
+
+/* The zone labels, shortened for a vertical axis 18px wide. Two surfaces draw
+   that axis — the Full week's sideband and the print sheet's — and both need
+   the same short form, so it is written once. */
+const ZONE_SHORT = {
+  '🌅 Before school': '🌅 Before', '🏫 School': '🏫 School', '🥪 Lunch recess': '🥪 Lunch',
+  '🎒 After school': '🎒 After', '🌙 Evening': '🌙 Evening', '🎉 Free time': '🎉 Free',
+};
+
+/* Every activity id the destination child can actually resolve. Only consulted
+   for a CROSS-CHILD copy: a block naming an activity that is private to Jenn
+   renders as nothing at all on Jess's day, which is the same invisible failure
+   the archive rule exists to stop (CLAUDE.md, "History is a record"). Archived
+   entries count as resolvable for exactly that reason — findActivity sees them,
+   so a block that names one still draws.
+
+   Same-child copies are deliberately NOT filtered: her own blocks already
+   resolve however they resolve, and dropping one there would be a screen
+   quietly deciding a block was wrong. */
+function placeableActivityIds(kid) {
+  return new Set(getAllActivities(kid, { includeArchived: true }).map(a => a.id));
+}
+
+/* ── How much of a buffer window is real, unoccupied time ──
+   A block's travel/get-ready needs minutes that nothing else is using. When the
+   next activity starts inside that window the plan is not workable, and three
+   surfaces used to say so by painting the whole red strip straight THROUGH the
+   neighbouring card — so neither the strip nor the card's own name could be
+   read, which is the defect this exists to fix.
+
+   Pure numbers, deliberately: it takes the window and the day's other blocks
+   rather than a block plus getTravelBufMin, so js/03-sync.js, the week grid,
+   the day view and the print sheet all reach one answer, and a Node unit test
+   can hold it (tests/buffers.test.js) without loading a browser.
+
+   `others` is every OTHER block on that day — not just the ones sharing a
+   column. A strip must not paint over any card, and computeBufferConflicts
+   already sweeps all of them, so clipping against a subset would draw a full
+   red strip beside a card the app has just called impossible.
+
+   What it measures is the CONTIGUOUS free stretch touching the block, which is
+   the honest question: a ten-minute snack in the middle of a 45-minute
+   get-ready does not leave you 35 usable minutes, it leaves you the run before
+   it and the run after it, and only the one against the block is the one you
+   can actually use. So the minutes before that snack count as short. */
+function bufferClip(startMin, endMin, preBuf, postBuf, others) {
+  const list = Array.isArray(others) ? others : [];
+  let preFrom = startMin - Math.max(0, preBuf || 0);
+  let postTo  = endMin + Math.max(0, postBuf || 0);
+  list.forEach(o => {
+    if (!o) return;
+    const oStart = o.startMin;
+    const oEnd = o.startMin + (o.durationMin || 0);
+    if (!(oEnd > oStart)) return;
+    // Anything overlapping the pre-window pushes its start forward; the latest
+    // such end wins, which is what makes the result contiguous with the block.
+    if (oEnd > preFrom && oStart < startMin) preFrom = Math.max(preFrom, Math.min(oEnd, startMin));
+    if (oStart < postTo && oEnd > endMin)    postTo  = Math.min(postTo,  Math.max(oStart, endMin));
+  });
+  const preWant = Math.max(0, preBuf || 0);
+  const postWant = Math.max(0, postBuf || 0);
+  return {
+    preFrom, postTo,
+    preShort:  Math.max(0, preWant  - (startMin - preFrom)),
+    postShort: Math.max(0, postWant - (postTo - endMin)),
+  };
+}
+
+/* The one place a buffer strip's DRAWN extent is decided. Takes the segments
+   wfBufferSegments already computes (which stay unclipped — Today reads them
+   for "leave by 7:40", and that time is still 7:40 whether or not the plan
+   fits) and trims each to the clipped window, dropping any left with nothing.
+
+   Every segment is relative to START_MIN, like its caller. */
+function bufferDrawSegments(segs, startMin, endMin, preBuf, postBuf, others) {
+  const clip = bufferClip(startMin, endMin, preBuf, postBuf, others);
+  const preFromRel = clip.preFrom - START_MIN;
+  const postToRel  = clip.postTo  - START_MIN;
+  const out = [];
+  (segs || []).forEach(s => {
+    const drawStartRel = s.side === 'pre' ? Math.max(s.startRel, preFromRel) : s.startRel;
+    const drawEndRel   = s.side === 'pre' ? s.endRel : Math.min(s.endRel, postToRel);
+    if (drawEndRel - drawStartRel <= 0) return;
+    out.push(Object.assign({}, s, { drawStartRel, drawEndRel, drawDur: drawEndRel - drawStartRel }));
+  });
+  return { segs: out, preShort: clip.preShort, postShort: clip.postShort };
+}
+
+/* ── HOW DIFFERENT DO TWO COLOURS LOOK ──
+   CIEDE2000, and the metric is the whole point. The subgroup palette was first
+   separated with CIE76, which overstates the distance between saturated greens
+   by roughly double: it scored Helping hands against Play at 49 where this says
+   19. Every threshold passed and two DIFFERENT categories still read as one
+   colour on an iPad — the arithmetic disagreed with an eye, and the eye was
+   right.
+
+   Used by `everySubgroupTellsItselfApart` (tests/smoke.js) rather than by any
+   rendering path: nothing on screen needs to compute this at runtime, and the
+   table it guards is a constant. It lives here so the check measures the same
+   way the palette was chosen, instead of carrying its own copy. */
+function colourDistance(hexA, hexB) {
+  const srgb = h => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim());
+    if (!m) return null;
+    return [0, 2, 4].map(i => parseInt(m[1].substr(i, 2), 16));
+  };
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const toLab = h => {
+    const v = srgb(h);
+    if (!v) return null;
+    const [r, g, b] = v.map(lin);
+    const X = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+    const Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const Z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+    const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+    return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+  };
+  const A = toLab(hexA), B = toLab(hexB);
+  if (!A || !B) return 0;
+  const [L1, a1, b1] = A, [L2, a2, b2] = B;
+  const rad = Math.PI / 180, deg = 180 / Math.PI;
+  const C1 = Math.hypot(a1, b1), C2 = Math.hypot(a2, b2), Cb = (C1 + C2) / 2;
+  const G = 0.5 * (1 - Math.sqrt(Math.pow(Cb, 7) / (Math.pow(Cb, 7) + Math.pow(25, 7))));
+  const ap1 = (1 + G) * a1, ap2 = (1 + G) * a2;
+  const Cp1 = Math.hypot(ap1, b1), Cp2 = Math.hypot(ap2, b2);
+  const hp = (bb, ap) => { if (bb === 0 && ap === 0) return 0; const h = Math.atan2(bb, ap) * deg; return h < 0 ? h + 360 : h; };
+  const hp1 = hp(b1, ap1), hp2 = hp(b2, ap2);
+  const dLp = L2 - L1, dCp = Cp2 - Cp1;
+  let dhp = 0;
+  if (Cp1 * Cp2 !== 0) { dhp = hp2 - hp1; if (dhp > 180) dhp -= 360; else if (dhp < -180) dhp += 360; }
+  const dHp = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin(dhp / 2 * rad);
+  const Lp = (L1 + L2) / 2, Cp = (Cp1 + Cp2) / 2;
+  let Hp;
+  if (Cp1 * Cp2 === 0) Hp = hp1 + hp2;
+  else { Hp = (hp1 + hp2) / 2; if (Math.abs(hp1 - hp2) > 180) Hp += (hp1 + hp2 < 360) ? 180 : -180; }
+  const T = 1 - 0.17 * Math.cos((Hp - 30) * rad) + 0.24 * Math.cos(2 * Hp * rad)
+          + 0.32 * Math.cos((3 * Hp + 6) * rad) - 0.20 * Math.cos((4 * Hp - 63) * rad);
+  const dTh = 30 * Math.exp(-Math.pow((Hp - 275) / 25, 2));
+  const Rc = 2 * Math.sqrt(Math.pow(Cp, 7) / (Math.pow(Cp, 7) + Math.pow(25, 7)));
+  const Sl = 1 + (0.015 * Math.pow(Lp - 50, 2)) / Math.sqrt(20 + Math.pow(Lp - 50, 2));
+  const Sc = 1 + 0.045 * Cp, Sh = 1 + 0.015 * Cp * T;
+  const Rt = -Math.sin(2 * dTh * rad) * Rc;
+  return Math.sqrt(Math.pow(dLp / Sl, 2) + Math.pow(dCp / Sc, 2) + Math.pow(dHp / Sh, 2)
+    + Rt * (dCp / Sc) * (dHp / Sh));
+}
+
+/* ── A CATEGORY'S WASH ──
+   The pale tint a list row is filled with when it wears its category (Pop's
+   rows, docs/handoff/looks-calm-pop.md §7). ONE rule rather than a second
+   table of hexes: 18% of the fill mixed into white, in sRGB — the same as CSS
+   `color-mix(in srgb, <fill> 18%, white)`, and within a few units of each wash
+   the handoff drew. A rule reaches every colour a block can wear — twelve
+   subgroups, a sport's colour, one picked off the sheet's dots — where a table
+   would reach only the colours somebody remembered to list.
+   everySubgroupTellsItselfApart (tests/smoke.js) holds the ink and Pop's
+   secondary text to 4.5:1 on every subgroup's wash. `#rrggbb` in, `#rrggbb`
+   out; anything else comes back unchanged. */
+function colourWash(hex) { return colourTint(hex, 0.18); }
+
+/* `share` (0–1) of a colour mixed into white, in sRGB — CSS
+   `color-mix(in srgb, <hex> share, white)` worked out here, because the colour
+   maths (isLightColour) has to read the colour that is actually DRAWN. The
+   wash above is share 0.18; a Full-week block wears the look's --block-fill
+   (lookBlockFill, js/07-week-view.js). A share of 1 or more is the colour
+   itself, returned exactly as given. */
+function colourTint(hex, share) {
+  if (!(share < 1)) return hex;
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return hex;
+  return '#' + [0, 2, 4].map(i => {
+    const c = parseInt(m[1].substr(i, 2), 16);
+    return Math.round(255 - (255 - c) * share).toString(16).padStart(2, '0');
+  }).join('');
+}
+
+/* ── How far a block is run INTO, and by what ──
+   A clash has two sides: the block whose travel does not fit, and the block
+   that travel runs into. `computeBufferConflicts` records the shortfall against
+   the FIRST — it is that block's window that is short — so a card asking "how
+   far am I run into" has to read its PARTNERS' figures, not its own.
+
+   These lived in js/07-week-view.js, where the week grid was the only surface
+   that could say how many minutes a clash was or which activity it ran into.
+   The day view drew the same finding as a red outline and a ⚠️ whose tooltip
+   named nothing and counted nothing — the same defect in the other direction
+   from the six copies this file's rules keep recording: not two answers that
+   disagree, but one answer that only one screen was allowed to give. Here so
+   both ask it, and the week banner and Today's note stay in step with both. */
+function clashWorstShort(conflicts, id, blocks) {
+  if (!conflicts || !conflicts.shortMin) return 0;
+  const me = (blocks || []).find(x => x.id === id);
+  if (!me) return 0;
+  const myStart = me.startMin;
+  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
+  let worst = 0;
+  partners.forEach(pid => {
+    const sh = conflicts.shortMin.get(pid);
+    const other = (blocks || []).find(x => x.id === pid);
+    if (!sh || !other) return;
+    /* Which side of the partner am I on? A block that sits AFTER it is run into
+       by its post buffer; one before it, by its pre buffer. */
+    const side = myStart >= other.startMin ? sh.post : sh.pre;
+    if (side > worst) worst = side;
+  });
+  return worst;
+}
+
+/* The sentence a clash says, wherever it is said. Names the activity this one
+   runs into and by how much, so "overlaps another activity" — which named
+   nothing and quantified nothing — is gone from every surface at once. */
+function clashTitle(conflicts, id, blocks, acts) {
+  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
+  const list = [...partners].map(pid => {
+    const other = (blocks || []).find(x => x.id === pid);
+    if (!other) return null;
+    const act = (acts || []).find(a => a.id === other.actId);
+    const topic = act && act.isTraining ? getTrainingTopic(other.tag) : null;
+    return act ? (topic ? topic.name : act.name) : 'another activity';
+  }).filter(Boolean);
+  const names = [...new Set(list)];
+  const short = Math.max(clashWorstShort(conflicts, id, blocks),
+    (() => { const s = conflicts.shortMin && conflicts.shortMin.get(id); return s ? Math.max(s.pre, s.post) : 0; })());
+  return (names.length ? 'Overlaps ' + names.join(' and ') : 'Time clash')
+    + (short ? ` · ${short}m short` : '') + ' — not enough travel/get-ready time';
+}
+
+/* ── One owner for the :00 / :30 rules ──
+   Three surfaces draw a day against a clock — the day view, the week's Day
+   Blocks lanes and the Full week — at three different scales, and they each
+   drew their own grid or none at all. The Day Blocks lane drew a decorative
+   24px stripe, which at 0.85px/min is neither an hour (51px) nor a half-hour
+   (25.5px): it went out of phase with its own gutter labels at the first hour
+   and never came back.
+
+   The grid returned here is meant to be appended LAST, over the blocks. Under
+   them it says nothing the moment a day is actually planned — which is exactly
+   when a child needs to know where nine o'clock is. It takes no pointer events,
+   so nothing it covers becomes harder to tap.
+
+   `spanMin` is how much of the day the surface draws (DAY_MIN_SPAN everywhere
+   today) and `pxPerMin` its own scale. Half-hour rules are dropped below
+   `halfMin` px an hour, where they would sit on top of the hour rule. */
+/* ── The schedule's background, in two layers ─────────────────────
+   Print reads well because it is a grid of 15-minute ROWS: the text of a block
+   sits in a cell, so a rule can never cross it. The day view and the week are
+   absolutely-positioned canvases, where the rules were DOM nodes drawn over the
+   top — which read well on an empty morning and hatched a planned afternoon.
+
+   Both surfaces now put every full-width rule BEHIND the cards, so a card
+   covers any line running through it, exactly as a block covers the cell
+   borders on the printed sheet. That leaves "where is four o'clock" to answer,
+   which is why the hour keeps a mark ABOVE the cards — but only the short one
+   at the gutter edge, never the rule across the day. The two used to be one
+   element with the mark as its ::before, which is why the rule could not go
+   behind without taking the mark with it.
+
+   Two builders because the surfaces are drawn at different scales. The day view
+   is 1.4px per minute, so a 15-minute row is 21px and 64 of them tile its
+   1344px canvas exactly — Print's own mechanism, with no rounding to manage.
+   The Full week is 0.72, where the same row is under 11px and four rules an
+   hour read as hatching rather than as a scale; it keeps rules at the half
+   hour. */
+
+/* Print's mechanism: real rows, sized by the browser rather than by us.
+   grid-template-rows with 1fr hands subpixel distribution to the layout engine,
+   so the boundaries land where the absolutely-positioned blocks expect them
+   even when the row height is not a whole number. */
+function buildSlotGrid(spanMin, opts) {
+  const o = opts || {};
+  const slot = o.slotMin || 15;
+  const rows = Math.round(spanMin / slot);
+  const grid = document.createElement('div');
+  grid.className = 'slot-grid' + (o.cls ? ' ' + o.cls : '');
+  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  for (let r = 0; r < rows; r++) {
+    const min = r * slot;
+    const cell = document.createElement('div');
+    // The boundary this row STARTS on — the same three weights Print uses.
+    cell.className = 'slot-row'
+      + (min % 60 === 0 ? ' slot-row--hour' : (min % 30 === 0 ? ' slot-row--half' : ' slot-row--quarter'));
+    grid.appendChild(cell);
+  }
+  return grid;
+}
+
+/* The week's mechanism, kept: positioned rules at the hour and half hour.
+   `layer: 'lines'` is every full-width rule and goes behind the cards;
+   `layer: 'ticks'` is the short gutter-edge mark for each hour and goes above
+   them. Nothing is drawn full-width above a card on either layer. */
+function buildHourGrid(pxPerMin, spanMin, opts) {
+  const o = opts || {};
+  const layer = o.layer || 'both';
+  const grid = document.createElement('div');
+  grid.className = 'hour-grid'
+    + (layer === 'lines' ? ' hour-grid--behind' : '')
+    + (o.cls ? ' ' + o.cls : '');
+  const span = spanMin != null ? spanMin : DAY_MIN_SPAN;
+  const firstHour = Math.ceil(START_MIN / 60);
+  const lastHour = Math.floor((START_MIN + span) / 60);
+  const showHalf = o.halves !== false && 60 * pxPerMin >= (o.halfMin || 34);
+  for (let h = firstHour; h <= lastHour; h++) {
+    const rel = h * 60 - START_MIN;
+    if (rel >= 0 && rel <= span) {
+      const el = document.createElement('div');
+      // Above the cards it is a mark; behind them it is a rule.
+      el.className = layer === 'ticks'
+        ? 'hour-grid-tick'
+        : 'hour-grid-line hour-grid-line--hour';
+      el.style.top = (rel * pxPerMin) + 'px';
+      grid.appendChild(el);
+    }
+    if (!showHalf || layer === 'ticks') continue;
+    const half = rel + 30;
+    if (half > 0 && half < span) {
+      const line = document.createElement('div');
+      line.className = 'hour-grid-line hour-grid-line--half';
+      line.style.top = (half * pxPerMin) + 'px';
+      grid.appendChild(line);
+    }
+  }
+  return grid;
+}
+
+/* At most `max` badges, with the overflow folded into one chip. */
+function foldBadges(badges, max = 2) {
+  const list = (badges || []).filter(Boolean);
+  if (list.length <= max) return list.join('');
+  return list.slice(0, max).join('') + `<span class="badge badge-more">+${list.length - max}</span>`;
+}
+
+/* The four training checks for a block, as detail lines. */
+function trainingCheckLines(b) {
+  const st = (b && b.trainingCheck) || {};
+  return TRAINING_CHECKS.map(c => ({
+    icon: st[c.id] ? '✅' : '⬜', text: c.label, group: 'check',
+  }));
+}
+
+/* What this block is actually about, as a flat ordered list of individual
+   items — one line each, not folded into "+N" — so a view with room to spare
+   can list as much of it as fits. Order: the training checks first (they are
+   the review), then objectives/goals, then chores, then the routine checklist
+   tally and the note. A view with only a little room slices this down with
+   sliceDetailLines, or folds it to a one-line count with blockCountsSummary.
+   Returns [{icon, text, group}]. */
+function blockDetailLines(b, act) {
+  const lines = [];
+
+  // Training blocks carry the same four checks everywhere, in place of the
+  // packing list they used to spill onto every surface (see TRAINING_CHECKS).
+  if (act && act.isTraining) trainingCheckLines(b).forEach(l => lines.push(l));
+
+  (Array.isArray(b.objectives) ? b.objectives.filter(Boolean) : []).forEach(o => {
+    lines.push({ icon: '🎯', text: o, group: 'objective' });
+  });
+
+  (Array.isArray(b.choreTags) ? b.choreTags.filter(Boolean) : []).forEach(c => {
+    lines.push({ icon: '🧹', text: c, group: 'chore' });
+  });
+
+  if (act && act.isRoutine) {
+    const total = countChecklistTotal(b, act);
+    if (total > 0) {
+      const done = countChecklistDone(b, act);
+      lines.push({ icon: '✓', text: `${done}/${total} done`, group: 'checklist' });
+    }
+  }
+
+  const note = (b.note && String(b.note).trim()) || '';
+  if (note) lines.push({ icon: '📝', text: note, group: 'note' });
+
+  return lines;
+}
+
+/* Slice a detail-line list down to what maxRows can hold, appending a
+   "+N more" tail line instead of silently dropping the overflow when it
+   doesn't all fit. maxRows <= 0 returns nothing (caller should fall back to
+   blockCountsSummary instead). */
+function sliceDetailLines(lines, maxRows) {
+  if (maxRows <= 0 || !lines.length) return [];
+  if (lines.length <= maxRows) return lines;
+  // With only one row to spare, a "+N more" tail would show zero real content
+  // (all budget spent on the tail itself) — show the one real item instead
+  // and drop the count rather than reserve a slot for it.
+  if (maxRows === 1) return [lines[0]];
+  const shown = lines.slice(0, maxRows - 1);
+  const hidden = lines.length - shown.length;
+  return [...shown, { icon: '➕', text: `${hidden} more`, group: 'more' }];
+}
+
+/* One-line fold of a detail-line list for a block too short to list anything
+   individually — e.g. "🎒4 · 🎯3 · 📝" — same idea as the old blockSummaryRows
+   counts string. */
+function blockCountsSummary(lines) {
+  const counts = {};
+  lines.forEach(l => { counts[l.group] = (counts[l.group] || 0) + 1; });
+  const order = [
+    ['check', '🏋️'], ['objective', '🎯'], ['chore', '🧹'], ['checklist', '✓'], ['note', '📝'],
+  ];
+  return order.filter(([g]) => counts[g])
+    .map(([g, icon]) => g === 'note' ? icon : `${icon}${counts[g]}`)
+    .join(' · ');
+}
+
+function getCustomActivities(p=activeProfile()) { return getProfData(p).customActivities || []; }
+function getSharedActivities() { return (state.shared && state.shared.sharedActivities) || []; }
+
+/* Everything a child can PICK. Archived activities are absent by design: a
+   parent took them off the list, and the list is what this answers.
+
+   Anything that has to READ an existing block must go through findActivity
+   below instead — a block placed in March under an activity retired in June
+   still has to render as what it was. `opts.includeArchived` is how this
+   function serves that. */
+function getAllActivities(p=activeProfile(), opts) {
+  const season = getCurrentSeason();
+  const keep = a => (opts && opts.includeArchived) ? true : !a.archived;
+  /* `keep` used to be applied to the custom and shared lists ONLY, so
+     `archived: true` written onto a built-in was read by nothing — the archive
+     rule covered half the catalog and silently ignored the other half. It is
+     applied to all four now, which is what lets a shipped activity be retired
+     from the pickers while every block that ever named it still renders:
+     findActivity passes includeArchived, so the read-back half already worked.
+     Same pick-vs-read-back split getTrainingTags/getTrainingTopic already uses
+     for a sport the family has dropped.
+
+     On the seasonal line the filter goes BEFORE the map, so a retired entry is
+     never cloned just to be thrown away — and `_locked` keeps being written by
+     the map, because that flag is what keeps Beach Day out of January. */
+  const base = [
+    ...DEFAULT_ACTIVITIES.filter(keep),
+    ...getCustomActivities(p).filter(keep),
+    ...getSharedActivities().filter(keep),
+    ...SEASONAL_ACTIVITIES.filter(keep).map(a=>({...a,_seasonal:true, _locked: !inSeason(a, season)})),
+  ];
+  // apply level-ups
+  const rules = state.shared.levelRules || [];
+  const profd = getProfData(p);
+  /* A `rewardLocked` branch stood here and set _rewardLocked/_locked from
+     progress.unlockedActs. Nothing carries rewardLocked any more, so the ONLY
+     writer of _locked is the seasonal line above — which is the one that must
+     keep working, or Beach Day turns up in January. The two were always
+     disjoint sets; retiring one leaves the other exactly as it was. */
+  return base.map(act => {
+    const rule = rules.find(r => r.activityId===act.id);
+    if (!rule) return act;
+    const cur = rule.type==='count' ? (profd.activityCounts?.[act.id]||0) : (profd.activityHours?.[act.id]||0);
+    if (cur >= rule.target) {
+      return { ...act, name: rule.name||act.name, icon: rule.newIcon||act.icon, _levelled:true };
+    }
+    return act;
+  });
+}
+
+/* Resolve the activity a placed block names — including one that has been
+   retired. Every renderer uses this: the day blocks, the week cards, the print
+   sheet, Today's quest cards. Picking from a list is getAllActivities' job;
+   reading back what was already picked is this one's, and conflating them is
+   how retiring an activity used to blank out its own history.
+
+   Falls back to a neutral record rather than returning undefined, because the
+   alternative — a caller bailing out on a missing activity — is a block that
+   silently does not render at all. */
+function findActivity(actId, p=activeProfile()) {
+  if (!actId) return null;
+  return getAllActivities(p, { includeArchived: true }).find(a => a.id === actId) || null;
+}
+
+/* ── What a placed block is called, and the only place that decides it ──
+   This lived twice: tdBlockLabel on Today and baseName in the day view, the
+   same training/competition unwrapping written out character for character.
+   Numbering repeats in one and not the other would be how the hero comes to
+   call a session one thing while its own card calls it another — which is the
+   defect that put the unwrapping in one function in the first place.
+
+   findActivity rather than getAllActivities: this names a block that already
+   exists, so an archived activity must still resolve — a retired piano teacher
+   must not blank out last term's piano.
+
+   ── And the number ──
+   Five homework blocks in one day drew five identical cards. A block is
+   numbered only when the same thing genuinely repeats WITHIN THAT DAY: one
+   Homework stays "Homework", five become Block 1…5.
+
+   Numbered by startMin, never by the order the caller happens to hold them in.
+   Today sorts its list by tdActionableStart and the day view lays blocks out by
+   position; if the number followed either, Block 2 would be a different block
+   on the two screens, which is the whole thing this helper exists to stop.
+
+   Grouped by actId AND tag, because Skating and Swimming are both cat
+   'training' with different topics — they are not repeats of each other. */
+function blockGroupKey(b) {
+  return (b.actId || '') + '|' + (b.tag || '');
+}
+function blockDisplayName(b, p=activeProfile(), dayKey) {
+  const act = findActivity(b.actId, p) || {};
+  const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+  const icon = topic ? topic.icon : (act.icon || '📌');
+  /* A competition that was given a name is called by it, everywhere — the day,
+     both week views, Today and print all come through here. Without this every
+     meet read "Skating Comp." and the one thing that told two of them apart
+     lived only in a note. */
+  const named = act.isCompetition && b && typeof b.compName === 'string' && b.compName.trim();
+  /* A sister who came to WATCH is not in the meet, and her card must not say
+     she is. This reads act.isCompetition rather than blockIsCompetition — which
+     now answers false for a watch block on purpose — so it is the one surface
+     that still has to ask the question itself, and that is why it is asked
+     here first. A meet nobody named falls back to what the block is, so it
+     reads "👀 Watching — Skating Comp." rather than trailing off after a dash. */
+  const watching = b && b.watching;
+  const meetName = named ? b.compName.trim()
+    : topic
+      ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+      : (act.name || 'Something');
+  const name = watching ? `👀 Watching — ${meetName}` : meetName;
+  if (!dayKey) return { icon, name, n: 0, of: 1 };
+  const key = blockGroupKey(b);
+  const sameThing = (getDayBlocks(dayKey, p) || [])
+    .filter(o => o && blockGroupKey(o) === key)
+    .sort((x, y) => (x.startMin || 0) - (y.startMin || 0));
+  if (sameThing.length < 2) return { icon, name, n: 0, of: sameThing.length || 1 };
+  const n = sameThing.findIndex(o => o.id === b.id) + 1;
+  // A block that is not in the day it claims to be in gets no number rather
+  // than a wrong one: findIndex returning -1 would otherwise read as "Block 0".
+  if (n < 1) return { icon, name, n: 0, of: sameThing.length };
+  return { icon, name, n, of: sameThing.length };
+}
+
+function getUnlockedRoutineRewards(routineId, p=activeProfile()) {
+  const pr = getProfData(p).progress || {};
+  const map = pr.unlockedChecklistItems || {};
+  return map[routineId] || [];
+}
+
+function queueChecklistReward(routineId, item, reason) {
+  const p = getProfData();
+  const pr = p.progress;
+  if (!routineId || !item || !item.id) return;
+  const key = `${routineId}:${item.id}`;
+  const hasPending = (pr.pendingRewards || []).some(r => r.type==='checklist' && `${r.routineId}:${r.item?.id}` === key);
+  const unlocked = ((pr.unlockedChecklistItems[routineId] || []).some(x=>x.id===item.id));
+  if (hasPending || unlocked) return;
+  pr.pendingRewards.push({
+    id:'rw-'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    type:'checklist',
+    routineId,
+    item: { ...item },
+    reason: reason || 'progress',
+  });
+}
+
+/* unlockRewardAct, pickLockedReward and enqueueMilestoneRewards stood here.
+   Together they were the whole grant: place 10, 15 or 20 blocks and the app
+   handed back one activity from academic, then health, then culture. The
+   answer to "you have planned ten things" should not be the right to plan an
+   eleventh KIND of thing. queueChecklistReward below is the surviving half —
+   a different feature that earns an extra checklist item off a real streak. */
+
+function maybeShowRewardPrompt() {
+  if (isParent()) return;
+  const p = getProfData();
+  const pr = p.progress;
+  const box = document.getElementById('dayRewardPrompt');
+  const txt = document.getElementById('dayRewardText');
+  if (!box || !txt) return;
+  if (!pr.pendingRewards.length) {
+    box.style.display = 'none';
+    window._currentRewardPrompt = null;
+    return;
+  }
+  const first = pr.pendingRewards[0];
+  window._currentRewardPrompt = first;
+  if (first.type === 'checklist') {
+    txt.textContent = `Reward unlocked: ${first.item.text} (${first.reason})`;
+  } else {
+    /* An ACTIVITY reward queued by a bundle that still had the milestone — a
+       device can be serving one out of a Pages cache, and the entry syncs. It
+       names something she can already use, so there is nothing left to grant:
+       drain it rather than leave a prompt that cannot be answered. Same shape
+       as the "activity not found" path this replaces. */
+    pr.pendingRewards.shift();
+    saveAll();
+    maybeShowRewardPrompt();
+    return;
+  }
+  box.style.display = 'flex';
+}
+
+function acceptRewardPrompt() {
+  const p = getProfData();
+  const pr = p.progress;
+  const rw = window._currentRewardPrompt;
+  if (!rw) return;
+  if (rw.type === 'checklist') {
+    if (!pr.unlockedChecklistItems[rw.routineId]) pr.unlockedChecklistItems[rw.routineId] = [];
+    if (!pr.unlockedChecklistItems[rw.routineId].some(x=>x.id===rw.item.id)) {
+      pr.unlockedChecklistItems[rw.routineId].push({ ...rw.item });
+      showToast(`Unlocked checklist reward ✨`);
+    }
+  }
+  // Only a checklist reward can reach here: maybeShowRewardPrompt drains any
+  // other kind before it is ever shown.
+  pr.pendingRewards = pr.pendingRewards.filter(x=>x.id!==rw.id);
+  saveAll();
+  maybeShowRewardPrompt();
+}
+
+function skipRewardPrompt() {
+  const p = getProfData();
+  const pr = p.progress;
+  const rw = window._currentRewardPrompt;
+  if (!rw) return;
+  pr.pendingRewards = pr.pendingRewards.filter(x=>x.id!==rw.id);
+  pr.pendingRewards.push(rw);
+  saveAll();
+  showToast('No problem — you can choose it later 💫');
+  maybeShowRewardPrompt();
+}
+
+
+/* ── Rest days: a kid can mark a day as "off". Rest days are celebrated (rest is
+   part of the plan) and never count against a streak — the gap logic below
+   subtracts them so a planned day off doesn't break the streak. ── */
+/* Is this a school day, and is the calendar still telling the truth?
+   Returns { school, reason } — reason is 'weekend' | 'holiday' | 'summer' |
+   'unknown' when school is false. 'unknown' means the date is past the school
+   year this build was told about: the honest answer is that we no longer know,
+   so callers fall back to weekday shape and the parent gets told to update it
+   rather than the app quietly inventing a calendar. */
+/* ── The school year, as the family actually has it ──
+   js/01-config.js ships a calendar because a calendar is the same on every
+   device and the repo can carry dates safely. What it could never carry is a
+   family's own answer: which hours, when lunch is, and the days a district adds
+   or drops after August. Those live in state.shared.schoolCal, set in the
+   parent portal, and every question about school goes through these three so
+   there is one place that decides whether the shipped value or the set one wins.
+
+   Synced state, never committed: the repo stays dates-only, and the portal says
+   so where a parent types. */
+function schoolCal() {
+  return (typeof state === 'object' && state && state.shared && state.shared.schoolCal) || {};
+}
+
+/* Minutes are offsets from START_MIN (6AM), the unit every block uses.
+   lunchMin of 0 means the family has not told us there is a recess, which is
+   the shipped calendar's position too — it never had one. */
+function schoolHours() {
+  const h = schoolCal().hours || {};
+  const num = (v, fallback) => (typeof v === 'number' && isFinite(v) ? v : fallback);
+  const startMin = Math.max(0, Math.min(DAY_MIN_SPAN, num(h.startMin, SCHOOL_HOURS.startMin)));
+  const endMin = Math.max(startMin, Math.min(DAY_MIN_SPAN, num(h.endMin, SCHOOL_HOURS.endMin)));
+  const lunchMin = Math.max(0, Math.min(180, num(h.lunchMin, 0)));
+  let lunchStartMin = num(h.lunchStartMin, null);
+  // A recess outside the school day is not a recess; drop it rather than
+  // drawing a band hanging off the end of the afternoon.
+  if (lunchMin <= 0 || lunchStartMin == null
+      || lunchStartMin < startMin || lunchStartMin + lunchMin > endMin) {
+    lunchStartMin = null;
+  }
+  const days = Array.isArray(h.days) && h.days.length ? h.days : SCHOOL_HOURS.days;
+  return { startMin, endMin, lunchStartMin, lunchMin: lunchStartMin == null ? 0 : lunchMin, days };
+}
+
+/* How long a block of this activity should default to when somebody picks it
+   by hand. Everything is its own durationMin except School Day, whose length is
+   the family's actual school day — every path that PLACES a school card already
+   computed it from schoolHours(), but the picker read the shipped 420 and so
+   handed out a seven-hour card to a family whose day is 6h40. A top-level const
+   cannot ask: js/01-config.js runs before there is any state to read, which is
+   why schoolHours() is a function too. */
+function activityDefaultDuration(act) {
+  if (!act) return 60;
+  if (act.id === 'school_day') {
+    const h = schoolHours();
+    const span = h.endMin - h.startMin;
+    if (span > 0) return span;
+  }
+  return act.durationMin;
+}
+
+function schoolTerm() {
+  const c = schoolCal();
+  return {
+    start: c.termStart || SCHOOL_TERM.start,
+    end: c.termEnd || SCHOOL_TERM.end,
+    nextStart: c.nextStart || SCHOOL_TERM.nextStart,
+  };
+}
+
+/* Days off: the shipped list plus anything the family added, minus nothing —
+   removing a shipped statutory holiday is not something a district does. */
+function schoolOffDays() {
+  const extra = (schoolCal().offDays || []).map(d => (d && d.date) || d).filter(Boolean);
+  return extra.length ? [...new Set([...NO_SCHOOL_DAYS, ...extra])] : NO_SCHOOL_DAYS;
+}
+
+function schoolDayInfo(dayKey) {
+  const d = formatDayKey(dayKey);
+  const dow = d.getDay();
+  // Through the accessors, so a term a parent has typed in — or a day off an
+  // .ics brought — is the answer everything downstream gets.
+  const term = schoolTerm();
+  const isWeekday = schoolHours().days.includes(dow);
+  if (dayKey > term.nextStart) {
+    return { school: isWeekday, reason: isWeekday ? null : 'weekend', stale: true };
+  }
+  if (!isWeekday) return { school: false, reason: 'weekend' };
+  if (dayKey < term.start || dayKey > term.end) {
+    return { school: false, reason: 'summer' };
+  }
+  if (schoolOffDays().includes(dayKey)) return { school: false, reason: 'holiday' };
+  return { school: true, reason: null };
+}
+
+/* HH:MM for an <input type="time">, and back. Minutes are from START_MIN, so a
+   parent typing 08:00 gets 120 and never has to know that. */
+function relMinToTimeStr(rel) {
+  const abs = Math.max(0, Math.min(24 * 60 - 1, START_MIN + (Number(rel) || 0)));
+  return `${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
+}
+function timeStrToRelMin(str) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(str || '').trim());
+  if (!m) return null;
+  const abs = (+m[1]) * 60 + (+m[2]);
+  if (abs < START_MIN || abs > START_MIN + DAY_MIN_SPAN) return null;
+  return abs - START_MIN;
+}
+function isSchoolDay(dayKey) { return schoolDayInfo(dayKey).school; }
+/* True once the shipped calendar has run out — a parent-facing prompt, not a
+   kid-facing one. A child should never be told the app's data is old. */
+function schoolCalendarIsStale(dayKey) { return !!schoolDayInfo(dayKey).stale; }
+
+function isRestDay(dayKey, kid = activeProfile()) {
+  const pd = getProfData(kid);
+  return !!(pd && pd.progress && pd.progress.restDays && pd.progress.restDays[dayKey]);
+}
+function toggleRestDay(dayKey) {
+  const pd = getProfData();
+  if (!pd.progress.restDays) pd.progress.restDays = {};
+  const on = !pd.progress.restDays[dayKey];
+  if (on) pd.progress.restDays[dayKey] = true;
+  else delete pd.progress.restDays[dayKey];
+  saveAll();
+  showToast(on ? 'Rest day set — rest is part of the plan 💛' : 'Rest day removed');
+  if (typeof buildTimeline === 'function') buildTimeline();
+  refreshRestDayButton();
+}
+// Reflect the current day's rest state on the day-view toggle button.
+function refreshRestDayButton() {
+  const btn = document.getElementById('restDayBtn');
+  if (!btn || !currentDayKey) return;
+  const on = isRestDay(currentDayKey);
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? '😌 Today is a rest day — tap to undo' : '😌 Mark today a rest day';
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+// Count kid-marked rest days strictly between two day keys (exclusive both ends).
+function countRestDaysBetween(fromKey, toKey, kid = activeProfile()) {
+  let n = 0;
+  const d = formatDayKey(fromKey);
+  const end = formatDayKey(toKey);
+  d.setDate(d.getDate() + 1);
+  while (d < end) {
+    if (isRestDay(dateToLocalKey(d), kid)) n++;
+    d.setDate(d.getDate() + 1);
+  }
+  return n;
+}
+
+/* `kid` used to be missing: this read the ACTIVE profile and stamped the
+   streak on it, so a parent ticking Jenn's routine while viewing her advanced
+   the PARENT profile's streak. */
+function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total, kid) {
+  if (!act?.isRoutine || !total) return;
+  const rid0 = act.routineId;
+  const who = kid || activeProfile();
+  /* Falling back out of complete has to be handled here too — it is the one
+     path the day view takes, and until now nothing on it could undo the day's
+     "routine kept" mark. Streaks are left alone deliberately: a streak is a
+     record of days that happened, and re-walking it backwards from a mis-tap
+     would lose real history. */
+  if (rid0 && prevDone >= total && nextDone < total) {
+    ctSyncMandatoryFromRoutine(rid0, who, currentDayKey, false);
+    return;
+  }
+  if (prevDone >= total || nextDone < total) return;
+  const p = getProfData(who);
+  const pr = p.progress;
+  const rid = act.routineId;
+  if (!rid) return;
+  if (!pr.streaks[rid]) pr.streaks[rid] = { count: 0, lastDay: null };
+  const st = pr.streaks[rid];
+  const today = currentDayKey;
+  if (st.lastDay === today) return;
+  if (!st.lastDay) st.count = 1;
+  else {
+    const rawGap = Math.round((formatDayKey(today) - formatDayKey(st.lastDay)) / (24*60*60*1000));
+    // Planned rest days between the two active days don't count against the
+    // streak, so a kid who marks a day off keeps their progress.
+    const gapDays = rawGap - countRestDaysBetween(st.lastDay, today);
+    if (gapDays <= 1) st.count += 1;
+    else if (gapDays === 2) {
+      // Forgiving streak: one missed day is always forgiven, so a single
+      // off-day never wipes out the child's progress.
+      st.count += 1;
+      showToast('Grace day — your streak is safe 💛');
+    }
+    else if (gapDays > 2 && pr.streakFreezeTokens > 0) {
+      pr.streakFreezeTokens -= 1;
+      st.count += 1;
+      showToast('Streak freeze used — nice recovery ⭐');
+    } else st.count = 1;
+  }
+  st.lastDay = today;
+  if (rid === 'morning' && st.count >= 5) {
+    queueChecklistReward('morning', MORNING_LOCKED_REWARD, '5-day morning streak');
+  }
+  if (rid === 'afterschool' && st.count >= 10) {
+    const unlocked = p.progress.unlockedChecklistItems.afterschool || [];
+    const pendingIds = (p.progress.pendingRewards || [])
+      .filter(r=>r.type==='checklist' && r.routineId==='afterschool')
+      .map(r=>r.item?.id);
+    const next = AFTERSCHOOL_CHECKLIST_REWARDS.find(it => !unlocked.some(u=>u.id===it.id) && !pendingIds.includes(it.id));
+    if (next) queueChecklistReward('afterschool', next, '10-day after-school streak');
+  }
+  // Award chore point from routine completion
+  ctSyncMandatoryFromRoutine(rid, who, today, true);
+  saveAll();
+  maybeShowRewardPrompt();
+}
+
+const CT_ROUTINE_SESSION_MAP = { morning: 'Morning', afterschool: 'Afternoon', evening: 'Evening' };
+
+/* ── The day-level "routine kept" mark follows the checklist, both ways ──
+   This used to be one-way and permanent — "sticky: once tracked, don't unset
+   even if routine is later unchecked". That single early-return is why
+   unticking an item could not make anything go back to incomplete: the block
+   said not-done while the week, the streak and the meeting all still said kept.
+
+   It clears now, but ONLY a mark the app set itself. ctSetMandatoryAuto stamps
+   that provenance, and a parent's own tick in the meeting has none — she is
+   asserting the day from memory, and a child unticking an item afterwards must
+   not silently overrule her.
+
+   Routines are tracked (heatmap, streaks, goal points) and pay NO money. */
+function ctSyncMandatoryFromRoutine(routineId, kid, dayKey, complete) {
+  const session = CT_ROUTINE_SESSION_MAP[routineId];
+  if (!session) return;
+  const wk = ctWeekKeyForDate(dayKey);
+  const mon = formatDayKey(wk);
+  const day = formatDayKey(dayKey);
+  const dayIdx = Math.round((day - mon) / (24*60*60*1000));
+  if (dayIdx < 0 || dayIdx > 6) return;
+  const p = getProfData(kid);
+  ctEnsureProfile(p);
+  const on = ctGetMandatory(wk, dayIdx, session, kid);
+  if (complete) {
+    if (on) return;
+    ctSetMandatory(wk, dayIdx, session, kid, true);
+    ctSetMandatoryAuto(wk, dayIdx, session, kid);
+    ctMaybeFireGoalBonus(wk, kid);
+    showToast(`✅ ${session} routine complete`);
+    return;
+  }
+  // Going back to incomplete: only undo what this function put there.
+  if (!on) return;
+  if (!ctGetMandatoryAuto(wk, dayIdx, session, kid)) return;
+  ctSetMandatory(wk, dayIdx, session, kid, false);
+  ctSetMandatoryAuto(wk, dayIdx, session, kid, false);
+}
+/* Kept as the name every existing caller uses. Completing is all it ever did. */
+function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
+  ctSyncMandatoryFromRoutine(routineId, kid, dayKey, true);
+}
+
+/* ── An icon for a routine checklist item ──────────────────────────
+   The presets carry their own. Everything else has to be guessed at, and
+   there is a lot of "everything else": a parent who overrode a built-in
+   routine before icons existed has a stored copy without them, custom
+   routines are whatever a parent typed, and kid-added extras are whatever a
+   nine-year-old typed. A blank where an icon belongs is worse than an
+   approximate one, so the text picks the icon when the item doesn't carry it.
+
+   Order matters — the first match wins, so the specific patterns sit above
+   the general ones ("wash hands" must beat "wash", "bottle" must beat
+   "water"). */
+const ROUTINE_ITEM_ICONS = [
+  [/\bteeth|toothbrush|brush(ing)? your teeth\b/i, '🪥'],
+  [/\bhands?\b/i,                                  '🧼'],
+  [/\bface|skincare|shower|bath(e|ing)?\b/i,       '🧼'],
+  [/\bhair\b/i,                                    '💇'],
+  [/\bbed\b/i,                                     '🛏️'],
+  [/\bbedroom|tidy|room\b/i,                       '🧸'],
+  [/\bgarbage|rubbish|bin\b/i,                     '🗑️'],
+  [/\blight/i,                                      '💡'],
+  [/\bclothes|dress|uniform|weather\b/i,           '👕'],
+  [/\bbreakfast|vitamin|eat|snack\b/i,             '🥣'],
+  [/\blunchbox|lunch\b/i,                          '🍱'],
+  [/\bbottle|drink\b/i,                            '🚰'],
+  [/\bschool ?bag|backpack|bag\b/i,                '🎒'],
+  [/\bhome ?work|school ?work|reading|read\b/i,    '✏️'],
+  [/\bpractice|piano|music|instrument\b/i,         '🎹'],
+  [/\btraining|gear|sport|exercise|stretch\b/i,    '🏋️'],
+  [/\bcar seat|car\b/i,                            '🚗'],
+  [/\bwater\b/i,                                   '🚰'],
+  [/\btoys?|books?\b/i,                            '🧸'],
+  [/\btable|dish|kitchen|sink\b/i,                 '🍽️'],
+  [/\bpack|put (everything )?(back|away)|tidy|spot\b/i, '📦'],
+  [/\bcharge|battery\b/i,                          '🔋'],
+  [/\bpet|dog|cat|fish\b/i,                        '🐾'],
+  [/\bwash|clean|wipe\b/i,                         '🧽'],
+];
+function routineItemIcon(item) {
+  if (item && item.icon) return item.icon;
+  const text = String((item && item.text) || '');
+  for (const [re, icon] of ROUTINE_ITEM_ICONS) if (re.test(text)) return icon;
+  return '•';
+}
+
+/* Track celebration toasts so we do not spam on every re-render */
+const routineCompleteToasted = new Set();
+const stopwatchGoalToasted = new Set();
+
+function blocksOverlap(aStart, aDur, bStart, bDur) {
+  const aEnd = aStart + aDur;
+  const bEnd = bStart + bDur;
+  return aStart < bEnd && bStart < aEnd;
+}
+
+/** Next gap of at least minGap minutes inside [START_MIN, END_MIN), or null */
+function findNextGapForBreak(dayKey, minGap, fromMinAbs) {
+  const blocks = getDayBlocks(dayKey).filter(b => b && b.startMin != null && b.durationMin != null);
+  const startSearch = Math.max(START_MIN, Math.min(END_MIN - minGap, fromMinAbs));
+  for (let t = startSearch; t <= END_MIN - minGap; t += 5) {
+    const ok = !blocks.some(b => blocksOverlap(t, minGap, b.startMin, b.durationMin));
+    if (ok) return t;
+  }
+  return null;
+}
+
+/* Every unplanned stretch of a day, in time order.
+   A different question from findNextGapForBreak above, which answers "where can
+   I put a 20-minute break" and stops at the first slot that fits. This answers
+   "what is free today" — which is what a child is really asking when she looks
+   at an afternoon — so Today can name a gap as a thing on the list rather than
+   as the absence of things.
+
+   Absolute minutes from midnight, the unit blocks use, clipped to the app's
+   6am–10pm window. `fromMin` lets a caller ask about the rest of the day only.
+   Reads, never writes; overlapping blocks are merged, so two things booked on
+   top of each other do not conjure a gap between them. */
+function dayGaps(dayKey, kid = activeProfile(), minGapMin = 30, fromMin = START_MIN) {
+  const from = Math.max(START_MIN, fromMin);
+  const spans = (getDayBlocks(dayKey, kid) || [])
+    .filter(b => b && b.startMin != null && (b.durationMin || 0) > 0)
+    .map(b => [b.startMin, b.startMin + b.durationMin])
+    .sort((a, b) => a[0] - b[0]);
+  const gaps = [];
+  let cursor = from;
+  spans.forEach(([s, e]) => {
+    if (e <= cursor) return;              // already behind us, or fully covered
+    if (s > cursor) gaps.push([cursor, Math.min(s, END_MIN)]);
+    cursor = Math.max(cursor, e);
+  });
+  if (cursor < END_MIN) gaps.push([cursor, END_MIN]);
+  return gaps
+    .map(([s, e]) => ({ startMin: s, endMin: Math.min(e, END_MIN), durationMin: Math.min(e, END_MIN) - s }))
+    .filter(g => g.durationMin >= minGapMin && g.startMin < END_MIN);
+}
+
+function addQuickBreak(durationMin) {
+  if (isParent()) {
+    showToast('Switch to your profile to add a break 👤');
+    return;
+  }
+  const nowAbs = nowMinutesInZone();
+  let start = findNextGapForBreak(currentDayKey, durationMin, nowAbs);
+  if (start == null) {
+    start = findNextGapForBreak(currentDayKey, durationMin, START_MIN);
+  }
+  if (start == null) {
+    showToast('No empty slot big enough — try editing the day 📋');
+    return;
+  }
+  const act = getAllActivities().find(a => a.id === 'break_quick');
+  /* Seeded from the SUBGROUP, so the value lands inside SEEDED_HEX_VALUES and
+     blockColour keeps deriving it. Seeding from CAT_HEX wrote a hex the
+     subgroup table does not own, which reads as a colour somebody chose and
+     would freeze this block at the old hue on the next recolour. */
+  const colour = act ? (activitySub(act).hex || CAT_HEX[act.cat] || '#7fca79') : '#7fca79'; /* look: stored on the block as data; must stay a seeded hex (SEEDED_HEX_VALUES) */
+  placeBlock('break_quick', start, durationMin, colour, [], 'Quick break', { travelBuffer: false });
+  showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
+}
+
+function updateStopwatchGoalToasts(blocks) {
+  blocks.forEach(b => {
+    const sw = b.stopwatch;
+    if (!sw || !sw.enabled || !sw.running) {
+      stopwatchGoalToasted.delete(b.id);
+      return;
+    }
+    const goal = sw.goalSec != null ? sw.goalSec : Math.max(60, (b.durationMin | 0) * 60);
+    const used = stopwatchDisplayElapsed(sw);
+    if (used >= goal) {
+      if (!stopwatchGoalToasted.has(b.id)) {
+        stopwatchGoalToasted.add(b.id);
+        showToast('🎉 You hit your stopwatch goal — amazing!');
+      }
+    } else {
+      stopwatchGoalToasted.delete(b.id);
+    }
+  });
+}
+
+function getSisterVisibilityState() {
+  const mode = (state.shared && state.shared.sisterVisibilityMode) || 'public';
+  const hideDetails = mode === 'busy-only';
+  return { mode, hideDetails };
+}
+
+/* Week utils */
+const APP_TIMEZONE = 'America/Edmonton';
+function toDayKeyInZone(date, timeZone = APP_TIMEZONE) {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return fmt.format(date);
+}
+/* What time is it, for this family?
+
+   The companion to toDayKeyInZone, and it exists because the two halves of
+   "now" used to come from different clocks: the DATE was Edmonton, fixed, while
+   the TIME OF DAY was whatever the device's clock said. On an iPad at home
+   those agree and nothing shows. They come apart in exactly the cases that
+   matter — a device with its timezone set wrong, a laptop left on another zone,
+   or the family away at a competition — and then the app would show tomorrow's
+   date against today's time of day, or draw the "now" line on the timeline
+   hours from where the child actually is in her day.
+
+   The date is the anchor: the day boundary is Edmonton, so the hours inside
+   that day have to be Edmonton too, or the two disagree at every midnight.
+
+   Returns minutes since midnight, which is the unit blocks are stored in. */
+function nowMinutesInZone(date = new Date(), timeZone = APP_TIMEZONE) {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone, hour12: false, hour: '2-digit', minute: '2-digit',
+  }).formatToParts(date).reduce((o, x) => (o[x.type] = x.value, o), {});
+  // hour12:false yields "24" for midnight in some engines.
+  return (Number(p.hour) % 24) * 60 + Number(p.minute);
+}
+
+function dateToLocalKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2,'0');
+  const d = String(date.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+function getWeekStart(offset=0) {
+  const now = formatDayKey(toDayKeyInZone(new Date()));
+  const day = now.getDay();
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - (day===0?6:day-1) + offset*7);
+  mon.setHours(0,0,0,0);
+  return mon;
+}
+function getDayKeys(offset=0) {
+  const mon = getWeekStart(offset);
+  return Array.from({length:7}, (_,i)=>{
+    const d = new Date(mon); d.setDate(mon.getDate()+i);
+    return dateToLocalKey(d);
+  });
+}
+function formatDayKey(key) { const [y,m,d]=key.split('-'); return new Date(+y,+m-1,+d); }
+function todayKey() { return toDayKeyInZone(new Date()); }
+/* The day before `key`, as a key. Calendar arithmetic on local midnight, like
+   getDayKeys, so a daylight-saving night cannot skip or repeat a day. */
+function dayKeyBefore(key) {
+  const d = formatDayKey(key);
+  d.setDate(d.getDate() - 1);
+  return dateToLocalKey(d);
+}
+
+/* ── Age, never asked for ──
+   The year of the most recent birthday-season rollover: this calendar year once
+   August has arrived, last year before it. School years turn over in August
+   here, which is when a child's answer to "how old are you" changes in the way
+   that matters to her. */
+function ageRolloverYear(d = new Date()) {
+  return d.getMonth() >= AGE_ROLLOVER_MONTH ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+/* Her age today. Seeds DEFAULT_KID_AGE the first time it is read and carries it
+   forward one year per August since, so nothing ever has to prompt for it and it
+   cannot go stale. Stored as {age, ageYear} on the profile — the pair is the
+   whole point: an age on its own is only true for one year, and a birth date is
+   not something this repo should hold.
+
+   Writes, so it must not run at load: every caller is inside a render. */
+function currentAge(p = activeProfile()) {
+  const pd = getProfData(p);
+  if (!pd) return null;
+  const nowYear = ageRolloverYear();
+  const stored = Number(pd.age);
+  if (!Number.isFinite(stored) || stored <= 0) {
+    pd.age = DEFAULT_KID_AGE;
+    pd.ageYear = nowYear;
+    saveAll();
+    return pd.age;
+  }
+  const wasYear = Number(pd.ageYear);
+  if (!Number.isFinite(wasYear)) {
+    // An age set before this existed: take it as true for the current year
+    // rather than guessing how many Augusts it has already missed.
+    pd.ageYear = nowYear;
+    saveAll();
+    return stored;
+  }
+  if (nowYear > wasYear) {
+    pd.age = stored + (nowYear - wasYear);
+    pd.ageYear = nowYear;
+    saveAll();
+  }
+  return pd.age;
+}
+
+/* A grown-up correcting it. Re-stamps the year, so the correction is "she is N
+   now" and the next August moves it on from there. */
+function setKidAge(age, p = activeProfile()) {
+  const pd = getProfData(p);
+  if (!pd) return null;
+  const n = Math.max(1, Math.min(18, parseInt(age, 10) || 0));
+  pd.age = n;
+  pd.ageYear = ageRolloverYear();
+  saveAll();
+  return n;
+}
+const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DAY_LONG  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const MOODS = ['😄','🙂','😐','😕','😴'];
+
+/* ════════════════════════════════════════════════════════════════
+   SCREENS / NAVIGATION
+════════════════════════════════════════════════════════════════ */
+function showScreen(id) {
+  const targetScreen = document.getElementById('screen-'+id);
+  // Never throw on an unknown/removed screen id — that would leave no screen
+  // active and, because every nav button routes through here, freeze the app.
+  if (!targetScreen) { console.error('showScreen: no screen for id', id); return; }
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  targetScreen.classList.add('active');
+  // Auxiliary hooks are isolated so a failure in one can't stop the screen from
+  // actually showing (and can't lock navigation across the whole app).
+  try { enhanceAccessibility(targetScreen); } catch(e){ console.error('enhanceAccessibility failed', e); }
+  try { if (typeof refreshMascotButton === 'function') refreshMascotButton(); } catch(e){ console.error('refreshMascotButton failed', e); }
+  // The kid nav follows whatever screen is now active, and hides itself outside
+  // a child's screens. Isolated like the hooks above: a nav that throws must not
+  // be able to stop a screen from showing.
+  try { if (typeof tdRenderNav === 'function') tdRenderNav(); } catch(e){ console.error('tdRenderNav failed', e); }
+  // The parent's bar follows the same rule and hides itself off the portal.
+  try { if (typeof parentRenderNav === 'function') parentRenderNav(); } catch(e){ console.error('parentRenderNav failed', e); }
+  if (id === 'day') {
+    try {
+      maybeShowRewardPrompt();
+    } catch(e){ console.error('day-screen init failed', e); }
+  }
+}
+
+/* ── The one back stack (Consistency PR 4) ──
+   Every header ◀ goes back through here: the screen that opened this one is
+   pushed as it opens, and ◀ pops it and opens it again. Money school's own
+   return (mnySchoolReturn) was generalised into it and is gone. Module state
+   on this device only — never in `state`, which every write uploads whole.
+   An entry is { screen, scrollY }: each screen's own open() puts it back as
+   it draws, and a scrollY above 0 (My money under the '?' explainer, js/22)
+   is scrolled back to after it; a screen this table does not name is not
+   pushed, and an empty stack goes to the caller's fallback. Opening the
+   screen already on top of the stack — My money's tab from Money school,
+   which My money opened — takes it off instead: that is going back, and
+   ◀ there must not lead to the page itself. NAV_RETURN_MAX keeps a long
+   session from growing it without end. */
+const NAV_RETURN_MAX = 8;
+const NAV_RETURN_SCREENS = {
+  today: { name: 'Today', open: () => goToday() },
+  week: { name: 'Week', open: () => goWeek() },
+  sync: { name: 'Sister Sync', open: () => openSisterSync() },
+  mymoney: { name: 'My money', open: () => mnyOpenMyMoney(mnyViewKid()) },
+  /* A Day opened from the sitting (mmOpenDayForBlocks) left a return behind:
+     going back through it restores the step, the day and the scroll, and
+     lifts the sitting's lock. Money school from the meeting leaves none. */
+  meeting: { name: 'the meeting', open: () => {
+    if (typeof mmHasReturn === 'function' && mmHasReturn()) mmReturnToMeeting();
+    else { showScreen('meeting'); renderMeetingMode(); }
+  } },
+  parent: { name: 'Hub', open: () => showScreen('parent') },
+  'parent-monthly': { name: 'Monthly', open: () => openParentMonthly(parentMonthlyKid) },
+};
+let navReturnStack = [];
+
+/* The screen on show now, as showScreen names it ('week', not 'screen-week'). */
+function navActiveScreen() {
+  const active = document.querySelector('.screen.active');
+  return active ? active.id.replace(/^screen-/, '') : '';
+}
+/* Remember where ◀ goes: `from` (default: the screen on show) unless it is
+   the screen being opened, or a screen the table cannot reopen. */
+function navReturnPush(opening, from, scrollY) {
+  const top = navReturnPeek();
+  if (top && top.screen === opening) { navReturnStack.pop(); return; }
+  const screen = from || navActiveScreen();
+  if (!screen || screen === opening || !NAV_RETURN_SCREENS[screen]) return;
+  navReturnStack.push({ screen, scrollY: Number(scrollY) > 0 ? Number(scrollY) : 0 });
+  if (navReturnStack.length > NAV_RETURN_MAX) navReturnStack.shift();
+}
+function navReturnPeek() {
+  return navReturnStack.length ? navReturnStack[navReturnStack.length - 1] : null;
+}
+/* The name a ◀ says it goes back to — its aria-label is "Back to <this>". */
+function navReturnTo(fallback) {
+  const top = navReturnPeek();
+  const screen = top ? top.screen : fallback;
+  return (NAV_RETURN_SCREENS[screen] || NAV_RETURN_SCREENS.week).name;
+}
+function navReturnBack(fallback) {
+  const top = navReturnStack.pop() || { screen: fallback };
+  const dest = NAV_RETURN_SCREENS[top.screen] || NAV_RETURN_SCREENS.week;
+  dest.open();
+  if (top.scrollY > 0) { try { window.scrollTo(0, top.scrollY); } catch (e) {} }
+}
+
+/* Parent PIN — a *soft* child-lock, not real security (anyone reading the
+   source or the synced state can see it). Stored per-family in shared state so a
+   parent can change it; defaults to '1234'. A real gate needs Firebase Auth +
+   scoped Firestore rules (see SECURITY_TODO.md). */
+function getParentPin() {
+  const pin = state.shared && state.shared.parentPin;
+  return (pin != null && String(pin).length) ? String(pin) : '1234';
+}
+function setParentPin(newPin) {
+  if (!state.shared) state.shared = {};
+  state.shared.parentPin = String(newPin);
+  saveAll();
+}
+// Parent-hub control: change the family PIN (verifies the current one first).
+async function changeParentPin() {
+  const cur = ((await showPrompt('Enter your current PIN 🔒', { type:'password' })) || '').trim();
+  if (cur !== getParentPin()) { showToast('Incorrect PIN'); return; }
+  const next = ((await showPrompt('New PIN (numbers work best):', { type:'password' })) || '').trim();
+  if (!next) { showToast('PIN unchanged'); return; }
+  const confirm2 = ((await showPrompt('Re-enter the new PIN:', { type:'password' })) || '').trim();
+  if (next !== confirm2) { showToast('PINs didn\'t match — unchanged'); return; }
+  setParentPin(next);
+  showToast('✅ Parent PIN updated');
+}
+let parentUnlockedThisSession = false;
+
+/* ════════════════════════════════════════════════════════════════
+   LOOKS — Pop and Calm (docs/handoff/looks-calm-pop.md L4–L7)
+   The two looks differ only in the values of css/app.css's two
+   `:root[data-look="…"]` blocks; which one shows is the `data-look` on
+   <html>, and applyLook is the one thing that sets it.
+
+   Remembered per person, per device: wp_look_jenn, wp_look_jess,
+   wp_look_parent, plus wp_look_last (the look this device showed last, which
+   the profile picker opens in). localStorage and never synced state — every
+   state write uploads the whole document, and Jenn's choice on the iPad is not
+   Jess's, or the phone's. Storage can be missing or throw (private mode); then
+   every read answers Pop (L6) and the app works the same, it just forgets. */
+const LOOKS = ['pop', 'calm'];
+const LOOK_DEFAULT = 'pop';
+const LOOK_LS_PREFIX = 'wp_look_';
+const LOOK_NAMES = { pop: 'Pop', calm: 'Calm' };
+/* Calm's fonts, fetched the first time Calm is applied and never for a device
+   that stays on Pop. Cross-origin, so sw.js does not keep them: offline the
+   stacks' system sans draws Calm (tests: sisterSyncTabFitsInTheFallbackFont). */
+const LOOK_CALM_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lexend:wght@400;500;600&display=swap';
+
+/* who: 'jenn' | 'jess' | 'parent' | 'last'. */
+function lookStored(who) {
+  try {
+    const v = localStorage.getItem(LOOK_LS_PREFIX + who);
+    return LOOKS.includes(v) ? v : LOOK_DEFAULT;
+  } catch (e) { return LOOK_DEFAULT; }
+}
+function lookStore(who, look) {
+  try { localStorage.setItem(LOOK_LS_PREFIX + who, look); } catch (e) {}
+}
+function lookOther(look) { return look === 'calm' ? 'pop' : 'calm'; }
+
+function lookLoadCalmFonts() {
+  if (document.getElementById('lookCalmFonts')) return;
+  const link = document.createElement('link');
+  link.id = 'lookCalmFonts';
+  link.rel = 'stylesheet';
+  link.href = LOOK_CALM_FONTS_URL;
+  document.head.appendChild(link);
+}
+
+/* THE one way a look is put on screen. Instant, no reload: the values are CSS,
+   so the attribute alone repaints everything drawn from them. What is WORKED
+   OUT in script from the look is redone here — the Full week's measured type
+   (wfTypeInvalidate; the fonts arriving later re-measure through the
+   document.fonts listeners in js/99-main.js) and its block fills
+   (lookBlockFill), by drawing the screen on show again. The status bar follows
+   the page colour (theme-color), and the parent's header button says which
+   look it switches to. */
+function applyLook(look) {
+  if (!LOOKS.includes(look)) look = LOOK_DEFAULT;
+  const root = document.documentElement;
+  const changed = root.getAttribute('data-look') !== look;
+  if (look === 'calm') lookLoadCalmFonts();
+  root.setAttribute('data-look', look);
+  lookStore('last', look);
+  const page = getComputedStyle(root).getPropertyValue('--bg').trim();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && page) meta.setAttribute('content', page);
+  const btn = document.getElementById('parentLookBtn');
+  if (btn) {
+    const to = LOOK_NAMES[lookOther(look)];
+    btn.textContent = `🎨 ${to}`;
+    btn.setAttribute('aria-label', `Switch to the ${to} look`);
+    btn.title = `Switch to the ${to} look`;
+  }
+  if (!changed) return;
+  wfTypeInvalidate();
+  refreshCurrentScreen();
+}
+
+/* Flip one person's look on this device and show it. who: 'jenn' | 'jess' |
+   'parent' — the kid's 🎨 tile in ⋯ More (tdGoMore) and the parent's 🎨 in
+   the portal header. */
+function lookToggle(who) {
+  const next = lookOther(lookStored(who));
+  lookStore(who, next);
+  applyLook(next);
+  return next;
+}
+
+async function selectProfile(p) {
+  if (p === 'parent' && !parentUnlockedThisSession) {
+    const pin = ((await showPrompt('Enter parent PIN 🔒', { type:'password' })) || '').trim();
+    if (pin !== getParentPin()) {
+      showToast('Incorrect PIN');
+      return;
+    }
+    parentUnlockedThisSession = true;
+  }
+  /* Her look, or the parent's (L4, L5). Applied before `profile` changes, so a
+     re-draw it causes is of the screen still on show, as it stands; the
+     navigation below then draws the new one. */
+  applyLook(lookStored(p));
+  profile = p;
+  /* The way back belongs to the one who walked it: a new profile starts with
+     an empty stack, so her ◀ cannot lead to a page the last one opened. */
+  navReturnStack = [];
+  if (p === 'parent') {
+    parentViewing = 'jenn';
+    showScreen('parent');
+    renderParentHome();
+  } else {
+    /* Today is the front door. A child opening this app was landing on either the
+       Quest Board or the week grid, and both answer "what is my week" rather than
+       "what now" — see js/31-today.js. The Hero Mode fallbacks that used to sit
+       here were unreachable: goToday is always defined. */
+    goToday();
+  }
+}
+
+
+/* Node reach for the buffer arithmetic only. tests/buffers.test.js requires this
+   file to hold bufferClip to the numbers, the way tests/merge.test.js holds the
+   merge layer — a rule reachable only from a browser is a rule no unit test can
+   hold, which is why the week grid, the day view, print and the conflict sweep
+   all read ONE function for how much of a buffer window is real.
+
+   Same guard as 04-merge, 18-rules, 21-money-data, 36-status and 37-reflection.
+   START_MIN is declared in js/01-config.js, so a bare `require` of this file
+   would not resolve it: bufferClip takes plain numbers and needs nothing, and
+   bufferDrawSegments is exported for completeness but is only ever called from
+   the browser, where 01 has already loaded. */
+
+/* ── One money format, one day format (Consistency PR 3, decision D2) ──
+   The app wrote money and days with some eighteen local formatters that
+   disagreed ("$-3.00" beside "−$3"). These two are the one answer: PR 6 moved
+   every caller onto them and deleted the rest, and tests/check-money-words.js
+   fails on a new local money, day or kid-name formatter outside this file.
+   Both read only their arguments — no state, no browser; only fmtDay's
+   'dated' form reads the clock — so tests/helpers.test.js holds them in Node.
+
+   fmtMoney: "$3" for whole dollars, "$2.50" otherwise; a negative is "−$3"
+   (U+2212, the minus sign, not a hyphen); { signed: true } adds "+" to a
+   positive amount ("+$3"), zero stays "$0". Rounded to the cent first, the
+   way money2 rounds (js/14-money.js); anything not a finite number reads
+   "$0" (a wrong zero beats "$NaN" on a child's earnings, js/26's old rule). */
+function fmtMoney(v, opts) {
+  const x = Number(v);
+  const n = Number.isFinite(x) ? Math.round(x * 100) / 100 : 0;   // never "$NaN" or "$Infinity
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '−' : (opts && opts.signed && n > 0 ? '+' : '');
+  return sign + '$' + (abs % 1 ? abs.toFixed(2) : String(abs));
+}
+/* fmtDay: a "YYYY-MM-DD" key as 'short' "27 Sep", 'long' "Sat 3 Oct",
+   'weekday' "Sat", 'month' "Oct 2026" (a far date: a loan's free-by month),
+   or 'dated' — "27 Sep" this year, "27 Sep 2027" in any other, so a date
+   years away never reads as next week. No key reads "—". Calendar
+   arithmetic on the key's own local date (formatDayKey), so the device's
+   time zone cannot move it a day. */
+function fmtDay(key, form) {
+  if (!key) return '—';
+  const d = formatDayKey(String(key));
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  const dayMonth = d.getDate() + ' ' + MONTH_SHORT[d.getMonth()];
+  if (form === 'weekday') return day;
+  if (form === 'long') return day + ' ' + dayMonth;
+  if (form === 'month') return MONTH_SHORT[d.getMonth()] + ' ' + d.getFullYear();
+  if (form === 'dated') return d.getFullYear() === formatDayKey(todayKey()).getFullYear() ? dayMonth : dayMonth + ' ' + d.getFullYear();
+  return dayMonth;
+}
+
+/* fmtMoney, fmtDay and the two text escapers join the guard for
+   tests/helpers.test.js, which also renders js/47-header.js's pageHeader in
+   Node and needs escapeHtml and escapeAttr as globals to do it. */
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { bufferClip, fmtMoney, fmtDay, escapeHtml, escapeAttr };
+}
