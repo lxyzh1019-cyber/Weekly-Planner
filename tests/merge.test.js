@@ -869,6 +869,32 @@ function sync(a, b) {
     ids(ipad) === 'calA' && ids(phone) === 'calA');
 }
 
+/* A practice removed by hand on one device stays removed. The removal is a key
+   in the calendar's skipKeys; the record merges whole by stamp, so a phone that
+   wrote its own copy of the calendar later (its own check, a key it saved)
+   used to win and drop the iPad's key — and the next check offered the
+   practice again, ticked. And a check one device recorded must not be undone by
+   a newer copy that never saw it, or every portal opening checks again. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const feed = { id: 'calA', name: 'Swim club', lastChecked: 100, skipKeys: ['mon|2026-10-19'], updatedAt: 100 };
+  on(ipad, st => { st.shared.calFeeds = [JSON.parse(JSON.stringify(feed))]; });
+  on(phone, st => { st.shared.calFeeds = [JSON.parse(JSON.stringify(feed))]; });
+  // The iPad: a practice removed by hand, and a check recorded.
+  on(ipad, st => { const f = st.shared.calFeeds[0]; f.skipKeys.push('mon|2026-11-16'); f.lastChecked = 500; f.updatedAt = 500; });
+  // The phone, offline: its own write to the same calendar, stamped later.
+  on(phone, st => { const f = st.shared.calFeeds[0]; f.skipKeys.push('fri|2026-11-20'); f.key = 'KEY2'; f.updatedAt = 600; });
+  sync(ipad, phone);
+  const keys = (dev) => (dev.state.shared.calFeeds[0].skipKeys || []).slice().sort().join(',');
+  const want = 'fri|2026-11-20,mon|2026-10-19,mon|2026-11-16';
+  check('calFeeds: a practice removed by hand on one device stays removed after the other syncs a newer copy',
+    keys(ipad) === want && keys(phone) === want);
+  check('calFeeds: the newer copy still wins its own fields',
+    ipad.state.shared.calFeeds[0].key === 'KEY2' && phone.state.shared.calFeeds[0].key === 'KEY2');
+  check('calFeeds: a recorded check is not undone by a newer copy that never saw it',
+    ipad.state.shared.calFeeds[0].lastChecked === 500 && phone.state.shared.calFeeds[0].lastChecked === 500);
+}
+
 // A restore from backup is the one write that is not a merge. Replace bumps
 // dataEpoch, and a higher epoch is taken whole — otherwise the other device's
 // newer-stamped records win arbitration and go straight back up, which is
