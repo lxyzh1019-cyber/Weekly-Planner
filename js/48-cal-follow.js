@@ -151,8 +151,9 @@ function fcalPlaceName(location) {
 }
 
 /* .ics text → occurrences. Timed ones become practices; all-day ones clear a day. */
-function fcalOccurrencesFromIcs(text) {
-  const { events } = icsParse(text);
+function fcalOccurrencesFromIcs(text, today) {
+  const days = fcalDayList(today || todayKey(), FCAL_HORIZON_DAYS);
+  const { events } = icsParse(text, { from: days[0], to: days[days.length - 1] });
   return events.map(e => ({
     key: (e.series || 'nouid') + '|' + (e.origDay || e.dayKey) + (e.series ? '' : '|' + (e.startMin == null ? 'day' : e.startMin)),
     dayKey: e.dayKey,
@@ -305,25 +306,32 @@ function fcalBuildRows(feed, occs, today) {
     const said = { day: b.calDay, start: b.calStart, len: b.calLen };
     const plan = { day: cur.dayKey, start: b.startMin, len: b.durationMin };
     const same = (x, y) => x.day === y.day && x.start === y.start && x.len === y.len;
-    if (why) {
+    // calHeld: a parent placed it on that day anyway, or kept it when asked
+    // to remove it — asked once, not again at every check.
+    if (why && !b.calHeld) {
       rows.push({ type: 'remove', on: true, key, why, block: b, blockDay: cur.dayKey, dayKey: cur.dayKey, occ: o });
     } else if (!same(club, said)) {
       if (same(plan, said)) rows.push({ type: 'move', on: true, key, occ: o, block: b, blockDay: cur.dayKey, dayKey: o.dayKey });
       else rows.push({ type: 'conflict', on: true, choice: 'mine', key, occ: o, block: b, blockDay: cur.dayKey, dayKey: o.dayKey });
     }
   });
+  const gone = [];
   have.forEach((cur, key) => {
-    if (want.has(key)) return;
+    if (want.has(key) || cur.b.calHeld) return;
     const edited = !(cur.dayKey === cur.b.calDay && cur.b.startMin === cur.b.calStart && cur.b.durationMin === cur.b.calLen);
-    rows.push({ type: 'remove', on: true, key, why: 'no longer in the calendar', edited, block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
+    gone.push({ type: 'remove', on: true, key, why: 'no longer in the calendar', edited, block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
   });
+  // Many removals at once is more often a calendar read gone wrong than a
+  // season changing: they are shown unticked, for a parent to tick on purpose.
+  if (gone.length > 5) gone.forEach(r => { r.on = false; });
+  rows.push(...gone);
   extra.forEach(cur => {
-    if (finished.has(cur.b.calKey)) return;
+    if (finished.has(cur.b.calKey) || cur.b.calHeld) return;
     rows.push({ type: 'remove', on: true, key: cur.b.calKey, why: 'a second copy of the same practice', block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
   });
   rows.sort((a, b) => (a.dayKey < b.dayKey ? -1 : a.dayKey > b.dayKey ? 1
     : ((a.occ ? a.occ.startMin : a.block.startMin) - (b.occ ? b.occ.startMin : b.block.startMin))));
-  return { rows, leftOut };
+  return { rows, leftOut, wanted: want.size, placed: have.size };
 }
 
 /* ── Checking ── */
@@ -342,36 +350,50 @@ async function fcalCheck(feedId, auto) {
   fcalBusy = feedId;
   fcalRender();
   let result = null;
+  let failure = '';
   try {
     result = await fcalRead(feed);
   } catch (err) {
-    feed.lastError = String((err && err.message) || err).slice(0, 120);
-    feed.lastTried = syncNow();
-    fcalTouch(feed);
-    saveAll();
-    fcalBusy = '';
-    fcalRender();
-    showToast(`🔄 Could not check ${feed.name} — ${feed.lastError}`);
-    return;
+    failure = String((err && err.message) || err);
   }
   fcalBusy = '';
-  feed.lastError = '';
-  const { rows, leftOut } = fcalBuildRows(feed, result.occs);
+  // A sync during the read may have replaced the list: write to the record
+  // that is there now, or the check is lost and runs again at every load.
+  const live = fcalFeed(feedId);
+  if (!live) { fcalRender(); return; }
+  let built = null;
+  if (!failure) {
+    built = fcalBuildRows(live, result.occs);
+    // An empty answer (a server sending an empty or HTML page) would make
+    // every placed practice a removal; it is a failed read, not a change.
+    if (!built.wanted && built.placed) failure = 'the calendar came back empty';
+  }
+  if (failure) {
+    live.lastError = failure.slice(0, 120);
+    live.lastTried = syncNow();
+    fcalTouch(live);
+    saveAll();
+    fcalRender();
+    showToast(`🔄 Could not check ${live.name} — ${live.lastError}`);
+    return;
+  }
+  live.lastError = '';
+  const { rows, leftOut } = built;
   const changes = rows.filter(r => r.type !== 'skip');
   if (!changes.length) {
-    feed.lastChecked = syncNow();
-    fcalTouch(feed);
+    live.lastChecked = syncNow();
+    fcalTouch(live);
     saveAll();
     if (fcalDraft && fcalDraft.feedId === feedId) fcalDraft = null;
     fcalRender();
-    if (!auto) showToast(`🔄 ${feed.name}: no changes`);
+    if (!auto) showToast(`🔄 ${live.name}: no changes`);
     return;
   }
   fcalDraft = { feedId, rows, leftOut };
-  fcalTouch(feed);
+  fcalTouch(live);
   saveAll();
   fcalRender();
-  showToast(`🔄 ${feed.name}: ${changes.length} change${changes.length === 1 ? '' : 's'} to review — App › Follow a calendar`);
+  showToast(`🔄 ${live.name}: ${changes.length} change${changes.length === 1 ? '' : 's'} to review — App › Follow a calendar`);
 }
 
 /* The every-14-days check, from renderParentHome. Once per app load, one
@@ -435,12 +457,22 @@ function fcalApply() {
 
   fcalDraft.rows.forEach(r => {
     if (r.type === 'add' || r.type === 'skip') {
-      if (r.on) { day(r.dayKey).push(fcalNewBlock(feed, r.occ)); added++; }
-      else if (r.type === 'add') skips.add(r.key);
+      if (r.on) {
+        const nb = fcalNewBlock(feed, r.occ);
+        // Placed on a held-back day on purpose: not offered for removal later.
+        if (r.type === 'skip' && feed.id !== 'file') nb.calHeld = true;
+        day(r.dayKey).push(nb);
+        added++;
+      } else if (r.type === 'add') skips.add(r.key);
       return;
     }
     if (r.type === 'remove') {
       if (r.on) { drop(r.blockDay, r.block.id); removed++; }
+      else {
+        // Kept on purpose: the same removal is not asked again.
+        const b = day(r.blockDay).find(x => x.id === r.block.id);
+        if (b && !b.calHeld) { b.calHeld = true; b.updatedAt = syncNow(); }
+      }
       return;
     }
     // A move, or a club change to a practice changed by hand.
@@ -463,7 +495,9 @@ function fcalApply() {
     } else {
       // Another day: the old copy is deleted (with its tombstone, so another
       // device cannot bring it back) and a new one is placed.
-      const old = day(r.blockDay).find(x => x.id === r.block.id) || r.block;
+      // Gone already (deleted on another device during the review): left gone.
+      const old = day(r.blockDay).find(x => x.id === r.block.id);
+      if (!old) return;
       drop(r.blockDay, r.block.id);
       const nb = fcalNewBlock(feed, r.occ);
       ['objectives', 'note', 'gearState', 'travelBuffer', 'travelBufMin', 'getReadyBuffer', 'getReadyBufMin',

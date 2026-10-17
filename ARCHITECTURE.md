@@ -3201,10 +3201,14 @@ matches the day it claims to describe.
 (`js/35-school-calendar.js`) takes days off and term dates only; timed events
 belong here, placed for one child as one activity and read again later.
 
-- **Storage.** `state.shared.calFeeds`, id-keyed records merged with
-  `mergeArrayById(…, 'feed:')`; stopping one tombstones `feed:<id>`. A placed
+- **Storage.** `state.shared.calFeeds`, id-keyed records merged by
+  `mergeCalFeeds`: `mergeArrayById(…, 'feed:')`, newest stamp wins, except
+  `skipKeys`, which is a union of both sides (a later stamp with an older list
+  brought a removed practice back); stopping one tombstones `feed:<id>`. A placed
   block carries `calFeed`, `calKey` (`<event id>|<day first set for>`) and what
-  the club last said: `calDay`, `calStart`, `calLen`. The file and Google's
+  the club last said: `calDay`, `calStart`, `calLen`; `calHeld` when a parent
+  placed it on a held-back day or kept it when asked to remove it (not asked
+  again). A copy (`weekCloneBlock`) drops all of these. The file and Google's
   service name an event the same way (`icsSeriesId`), so either read
   recognises the other's blocks. (checked by tests/merge.test.js calFeeds; smoke: aFollowedCalendarStaysInStep)
 - **Reading.** A Google calendar is read through the Calendar API
@@ -3213,6 +3217,14 @@ belong here, placed for one child as one activity and read again later.
   file from another site. Any other link is fetched as .ics and fails where the
   server sends no CORS header. The .ics parser now applies `EXDATE`,
   `RECURRENCE-ID` and `STATUS:CANCELLED`, which the school import also gets.
+  The follow read passes a window (`icsParse(text, { from, to })`, today …
+  12 weeks): only events in it are kept and counted against the caps, and a
+  repeat with no end date runs to the window's end. The school import passes
+  none and is unchanged. An empty answer while practices are placed is a
+  failed read ("the calendar came back empty"), not a list of removals; more
+  than 5 removals at once are shown unticked. A check writes its result to the
+  record that is there after the read (`fcalFeed(feedId)` again), since a sync
+  may replace the list mid-read.
 - **Nothing changes until a parent applies.** A check builds rows (add, move,
   remove, conflict, skip); Apply writes only the ticked ones. A finished block
   is never moved and never placed twice. A block whose day or time no longer

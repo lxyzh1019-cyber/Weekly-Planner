@@ -867,6 +867,18 @@ function sync(a, b) {
   sync(ipad, phone);
   check('calFeeds: a calendar removed on one device does not come back from the other',
     ids(ipad) === 'calA' && ids(phone) === 'calA');
+  /* A practice removed by hand on the iPad is remembered in skipKeys. The
+     phone, not yet synced, then checks the same calendar and stamps it later
+     with its older list. Whole-record arbitration kept the phone's copy and
+     the removed practice was offered again; the lists are a union. */
+  on(ipad, st => { const f = st.shared.calFeeds.find(x => x.id === 'calA'); f.skipKeys = ['s1|2026-10-20']; f.updatedAt = 700; });
+  on(phone, st => { const f = st.shared.calFeeds.find(x => x.id === 'calA'); f.skipKeys = ['s1|2026-10-27']; f.lastChecked = 710; f.updatedAt = 710; });
+  sync(ipad, phone);
+  const skips = (dev) => ((dev.state.shared.calFeeds.find(x => x.id === 'calA') || {}).skipKeys || []).slice().sort().join(',');
+  check('calFeeds: a practice left out on either device stays left out on both',
+    skips(ipad) === 's1|2026-10-20,s1|2026-10-27' && skips(phone) === 's1|2026-10-20,s1|2026-10-27');
+  check('calFeeds: the newer stamp still wins the rest of the record',
+    checked(ipad) === 710 && checked(phone) === 710);
 }
 
 // A restore from backup is the one write that is not a merge. Replace bumps

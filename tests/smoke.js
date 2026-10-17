@@ -820,7 +820,7 @@ function findChromium() {
     ].join('\r\n');
 
     // 1 · Reading: a skipped date stays empty, a moved practice lands once.
-    const occs = fcalOccurrencesFromIcs(ics);
+    const occs = fcalOccurrencesFromIcs(ics, T);
     if (occs.some(o => o.key === 'mon|2026-10-12')) bad.push('a skipped date (Thanksgiving) came back as a practice');
     const oct23 = occs.filter(o => o.dayKey === '2026-10-23' && !o.allDay);
     if (oct23.length !== 1 || oct23[0].startMin !== 15 * 60 + 45 || oct23[0].key !== 'fri|2026-10-23') {
@@ -911,6 +911,77 @@ function findChromium() {
     built = fcalBuildRows(feed, club2, T);
     if (built.rows.filter(r => r.key === 'mon|2026-11-23' && r.type === 'remove').length !== 1) bad.push('a second copy of one practice was not offered for removal');
     setDayBlocks('2026-11-23', getDayBlocksForProfile('2026-11-23', 'jess').filter(b => b.id !== b23.id + 'x'), 'jess');
+
+    // 8c · Placed on a held-back day on purpose, or kept when asked: not asked again.
+    built = fcalBuildRows(feed, club2, T);
+    const meetRow = row('sat|2026-10-24');
+    fcalDraft = { feedId: feed.id, rows: [{ ...meetRow, on: true }], leftOut: 0 };
+    fcalApply();
+    if (on('2026-10-24').length !== 1) bad.push('a ticked held-back practice was not placed');
+    built = fcalBuildRows(feed, club2, T);
+    if (row('sat|2026-10-24')) bad.push('a practice placed on a meet day on purpose was offered for removal again');
+    const club4 = club2.filter(o => o.key !== 'mon|2026-11-30');
+    built = fcalBuildRows(feed, club4, T);
+    const keepRow = row('mon|2026-11-30');
+    if (!keepRow || keepRow.type !== 'remove' || !keepRow.on) bad.push('one practice no longer in the calendar was not offered for removal, ticked');
+    else {
+      fcalDraft = { feedId: feed.id, rows: [{ ...keepRow, on: false }], leftOut: 0 };
+      fcalApply();
+      built = fcalBuildRows(feed, club4, T);
+      if (row('mon|2026-11-30') || !on('2026-11-30').length) bad.push('a practice kept when asked to remove it was asked again');
+    }
+
+    // 8d · Many removals at once are shown unticked.
+    const club5 = club4.filter(o => !/^wed\|/.test(o.key));
+    built = fcalBuildRows(feed, club5, T);
+    const wedGone = built.rows.filter(r => r.type === 'remove' && /^wed\|/.test(r.key));
+    if (wedGone.length <= 5 || wedGone.some(r => r.on)) bad.push(`${wedGone.length} removals at once, ${wedGone.filter(r => r.on).length} ticked — expected more than 5, none ticked`);
+
+    // 8e · An empty answer changes nothing; a sync during the read does not lose the result.
+    fcalDraft = null;
+    fcalFeed(feed.id).icsUrl = 'https://example.org/club.ics';
+    window.fetch = async () => ({ ok: true, status: 200, text: async () => '<html></html>' });
+    await fcalCheck(feed.id, false);
+    if (!/came back empty/.test(fcalFeed(feed.id).lastError || '') || fcalDraft || !on('2026-10-19').length) bad.push('an empty calendar read was treated as a change');
+    window.fetch = async () => {
+      state.shared.calFeeds = state.shared.calFeeds.map(f => ({ ...f }));   // a sync lands mid-read
+      return { ok: false, status: 500 };
+    };
+    await fcalCheck(feed.id, false);
+    if (!/answered 500/.test(fcalFeed(feed.id).lastError || '')) bad.push('a check during a sync wrote its result to the replaced record');
+    window.fetch = wasFetch;
+    delete fcalFeed(feed.id).icsUrl;
+    fcalFeed(feed.id).lastError = '';
+
+    // 8f · A long club file: years of history, and a repeat with no end date.
+    const filler = [];
+    for (let i = 0; i < 900; i++) {
+      const dd = new Date(Date.UTC(2019, 0, 1 + i));
+      const ds = dd.toISOString().slice(0, 10).replace(/-/g, '');
+      filler.push('BEGIN:VEVENT', `UID:old${i}@google.com`, `DTSTART;TZID=America/Edmonton:${ds}T170000`,
+        `DTEND;TZID=America/Edmonton:${ds}T180000`, 'SUMMARY:Old practice', 'END:VEVENT');
+    }
+    const ics2 = ['BEGIN:VCALENDAR', 'VERSION:2.0', ...filler,
+      'BEGIN:VEVENT', 'UID:tue@google.com', 'DTSTART;TZID=America/Edmonton:20200107T170000',
+      'DTEND;TZID=America/Edmonton:20200107T180000', 'RRULE:FREQ=WEEKLY;BYDAY=TU', 'SUMMARY:Practice', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:one@google.com', 'DTSTART;TZID=America/Edmonton:20261105T170000',
+      'DTEND;TZID=America/Edmonton:20261105T180000', 'SUMMARY:Extra practice', 'END:VEVENT',
+      'END:VCALENDAR'].join('\r\n');
+    const occs2 = fcalOccurrencesFromIcs(ics2, T);
+    if (!occs2.some(o => o.key === 'tue|2026-10-13') || !occs2.some(o => o.key === 'tue|2026-12-22')) bad.push('a repeat with no end date was not placed in the 12 weeks');
+    if (!occs2.some(o => o.summary === 'Extra practice')) bad.push('a practice after years of history in the file was lost');
+    if (occs2.some(o => o.dayKey < T)) bad.push('a practice before today was read');
+    const endless = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:tue@google.com', 'DTSTART;TZID=America/Edmonton:20200107T170000',
+      'RRULE:FREQ=WEEKLY;BYDAY=TU', 'SUMMARY:Practice', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    if (icsParse(endless).skipped !== 1) bad.push('the school import now reads an endless repeat');
+
+    // 8g · A copied day does not carry the calendar mark; a move whose practice is gone is left gone.
+    const copy = weekCloneBlock(on('2026-10-19')[0]);
+    if (copy.calFeed || copy.calKey || copy.calDay) bad.push('a copied practice kept the calendar mark');
+    const o8 = { key: 'gone|2026-12-08', dayKey: '2026-12-08', startMin: 17 * 60, durationMin: 60, summary: 'X', place: '' };
+    fcalDraft = { feedId: feed.id, rows: [{ type: 'move', on: true, key: o8.key, occ: o8, block: { id: 'nope' }, blockDay: '2026-12-07', dayKey: '2026-12-08' }], leftOut: 0 };
+    fcalApply();
+    if ((getDayBlocksForProfile('2026-12-08', 'jess') || []).some(b => b.calKey === o8.key)) bad.push('a move brought back a practice deleted on another device');
 
     // 9 · Links, holidays, the 14-day rhythm.
     const L = (x) => JSON.stringify(fcalReadLink(x));
