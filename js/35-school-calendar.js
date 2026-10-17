@@ -117,7 +117,12 @@ function icsDateValue(value, params) {
 /* Walk the VEVENTs. Returns { events, skipped } — skipped counts the ones with
    a recurrence rule this does not understand, so the preview can say so rather
    than quietly dropping them. */
-function icsParse(text) {
+/* `win` ({ from, to } day keys) is the Follow-a-calendar read: only events in
+   those days are kept and counted, and a repeat with no end runs to `to`. A
+   club file holding years of history otherwise hit the caps before today.
+   Without it (the school import) nothing changes. */
+function icsParse(text, win) {
+  const inWin = (k) => !win || (k >= win.from && k <= win.to);
   const lines = icsUnfold(text).split('\n');
   const events = [];
   /* A changed copy of one repeat (RECURRENCE-ID) and the dates a repeat skips
@@ -142,18 +147,18 @@ function icsParse(text) {
           if (cur.status === 'CANCELLED') cancelledCopies.add(series + '|' + orig);
           else {
             const one = icsExpand(Object.assign({}, cur, { rrule: null }));
-            if (one && one.length) overrides.push(Object.assign(one[0], { series, origDay: orig }));
+            if (one && one.length && inWin(one[0].dayKey)) overrides.push(Object.assign(one[0], { series, origDay: orig }));
             cancelledCopies.add(series + '|' + orig);
           }
         } else if (cur.status !== 'CANCELLED') {
-          const expanded = icsExpand(cur);
+          const expanded = icsExpand(cur, win);
           if (expanded === null) skipped++;
           else {
             const skip = new Set(cur.exdates);
             expanded.forEach(e => {
               e.series = series;
               e.origDay = e.dayKey;
-              if (!skip.has(e.dayKey)) events.push(e);
+              if (!skip.has(e.dayKey) && inWin(e.dayKey)) events.push(e);
             });
           }
         }
@@ -197,7 +202,7 @@ function icsSeriesId(uid) {
 
 /* One VEVENT → the occurrences it actually covers. null means "this has a rule
    I do not understand", which is reported rather than guessed at. */
-function icsExpand(ev) {
+function icsExpand(ev, win) {
   const one = (start) => {
     const out = { dayKey: start.dayKey, allDay: start.allDay, summary: ev.summary, place: ev.place || '' };
     if (!start.allDay) {
@@ -236,29 +241,42 @@ function icsExpand(ev) {
   const interval = Math.max(1, parseInt(parts.INTERVAL, 10) || 1);
   const count = parts.COUNT ? Math.max(1, parseInt(parts.COUNT, 10)) : null;
   const until = parts.UNTIL ? (icsDateValue(parts.UNTIL, {}) || {}).dayKey : null;
-  if (!count && !until) return null;   // an endless rule is not something to materialise
+  // An endless rule is not something to materialise — except up to the end
+  // of a window, which is how a club writes "every Tuesday this season".
+  if (!count && !until && !win) return null;
 
   const DOW = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0 };
+  // A weekly rule with no BYDAY repeats on the start's own weekday (RFC 5545),
+  // not on every day of the week.
   const byDay = parts.BYDAY
     ? parts.BYDAY.split(',').map(x => DOW[x.trim().slice(-2).toUpperCase()]).filter(n => n != null)
-    : null;
+    : (freq === 'WEEKLY' ? [formatDayKey(ev.start.dayKey).getDay()] : null);
 
   const out = [];
   const d = formatDayKey(ev.start.dayKey);
   const stepDays = freq === 'DAILY' ? interval : 1;
   let weeksIn = 0;
   const weekStart = ctMondayOf(new Date(d));
-  for (let guard = 0; guard < SC_MAX_REPEATS * 8 && out.length < SC_MAX_REPEATS; guard++) {
+  /* With a window, copies before it are walked (COUNT counts them) but not
+     kept, and the walk may cover every day from the repeat's start to the
+     window's end — years of history are a few thousand cheap steps. */
+  const maxSteps = win
+    ? Math.round((formatDayKey(win.to) - formatDayKey(ev.start.dayKey)) / (24 * 3600 * 1000)) + 1
+    : SC_MAX_REPEATS * 8;
+  let seen = 0;
+  for (let guard = 0; guard < maxSteps && out.length < SC_MAX_REPEATS; guard++) {
     const key = dateToLocalKey(d);
     if (until && key > until) break;
+    if (win && key > win.to) break;
     let take = true;
     if (freq === 'WEEKLY') {
       weeksIn = Math.round((ctMondayOf(new Date(d)) - weekStart) / (7 * 24 * 3600 * 1000));
       take = (weeksIn % interval === 0) && (!byDay || byDay.includes(d.getDay()));
     }
     if (take) {
-      out.push(Object.assign(one(ev.start), { dayKey: key }));
-      if (count && out.length >= count) break;
+      seen++;
+      if (!win || key >= win.from) out.push(Object.assign(one(ev.start), { dayKey: key }));
+      if (count && seen >= count) break;
     }
     d.setDate(d.getDate() + stepDays);
   }

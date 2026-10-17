@@ -45,6 +45,25 @@ function mergeArrayById(localArr, remoteArr, tombScope) {
   return out;
 }
 
+/* The calendars a family follows (js/48-cal-follow.js): id-keyed records with a
+   'feed:' tombstone, newest stamp wins — except skipKeys, the practices a
+   parent left out, which are a union of both sides. Otherwise a device that
+   stamped the record later with its older list brought a removed practice back. */
+function mergeCalFeeds(localArr, remoteArr) {
+  const skipsById = new Map();
+  [localArr, remoteArr].forEach(arr => (arr || []).forEach(f => {
+    if (!f || f.id == null || !Array.isArray(f.skipKeys)) return;
+    const s = skipsById.get(f.id) || new Set();
+    f.skipKeys.forEach(k => s.add(k));
+    skipsById.set(f.id, s);
+  }));
+  return mergeArrayById(localArr, remoteArr, 'feed:').map(f => {
+    const s = skipsById.get(f.id);
+    if (!s || (Array.isArray(f.skipKeys) && f.skipKeys.length === s.size)) return f;
+    return Object.assign({}, f, { skipKeys: [...s].slice(-400) });
+  });
+}
+
 /* ── A conflict is two people editing one thing without seeing each other ──
 
    Whole-record arbitration keeps the higher stamp and drops the other outright.
@@ -674,8 +693,9 @@ function mergeSharedState(localShared, remoteShared) {
     // archived sport must keep resolving for the blocks that still name it.
     customSports: mergeArrayById(ls.customSports, rs.customSports),
     // The calendars a family follows (js/48-cal-follow.js). Id-keyed records
-    // with a stamp; stopping one records a 'feed:' tombstone so it stays gone.
-    calFeeds: mergeArrayById(ls.calFeeds, rs.calFeeds, 'feed:'),
+    // with a stamp; stopping one records a 'feed:' tombstone so it stays gone,
+    // and the practices left out (skipKeys) are a union — see mergeCalFeeds.
+    calFeeds: mergeCalFeeds(ls.calFeeds, rs.calFeeds),
     // Which days a grown-up has reviewed. A union per kid per day — see
     // mergeParentDayConfirm. Unarbitrated until now, which meant two adults
     // working through one Sunday meeting on two devices lost one set of

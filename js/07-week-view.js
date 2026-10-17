@@ -94,6 +94,9 @@ function weekCloneBlock(b) {
   if (!isParent()) delete c.parentPinned;
   // Nor was the copy shared: the 💌 badge and its invite link stay on the original.
   delete c.invitedTo; delete c.sentInviteIds;
+  // Nor does a copy belong to a followed calendar (js/48-cal-follow.js): with
+  // the marks kept, the next check offered it for removal as a second copy.
+  ['calFeed', 'calKey', 'calDay', 'calStart', 'calLen', 'calHeld'].forEach(f => delete c[f]);
   if (Array.isArray(b.objectives)) c.objectives = b.objectives.slice();
   if (b.stopwatch) c.stopwatch = Object.assign({}, b.stopwatch, {
     elapsedSec: 0, running: false, startedAt: null,
