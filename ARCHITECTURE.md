@@ -3206,9 +3206,11 @@ belong here, placed for one child as one activity and read again later.
   `skipKeys`, which is a union of both sides (a later stamp with an older list
   brought a removed practice back); stopping one tombstones `feed:<id>`. A placed
   block carries `calFeed`, `calKey` (`<event id>|<day first set for>`) and what
-  the club last said: `calDay`, `calStart`, `calLen`; `calHeld` when a parent
-  placed it on a held-back day or kept it when asked to remove it (not asked
-  again). A copy (`weekCloneBlock`) drops all of these. The file and Google's
+  the club last said: `calDay`, `calStart`, `calLen`; `calHeld` names a
+  question a parent already answered — `'day'` (placed on a held-back day, or
+  kept when asked), `'gone'` (kept after the club dropped it), `'copy'` (a
+  second copy kept) — and silences only that one; a re-stamp to another day
+  drops it. A copy (`weekCloneBlock`) drops all of these. The file and Google's
   service name an event the same way (`icsSeriesId`), so either read
   recognises the other's blocks. (checked by tests/merge.test.js calFeeds; smoke: aFollowedCalendarStaysInStep)
 - **Reading.** A Google calendar is read through the Calendar API
@@ -3222,7 +3224,10 @@ belong here, placed for one child as one activity and read again later.
   repeat with no end date runs to the window's end. The school import passes
   none and is unchanged. An empty answer while practices are placed is a
   failed read ("the calendar came back empty"), not a list of removals; more
-  than 5 removals at once are shown unticked. A check writes its result to the
+  than 5 removals at once are shown unticked, and left unticked they hold
+  nothing. Known limit: when a season really ends with practices still
+  placed, every check says "came back empty" until a parent removes those
+  practices by hand or stops following the calendar. A check writes its result to the
   record that is there after the read (`fcalFeed(feedId)` again), since a sync
   may replace the list mid-read.
 - **Nothing changes until a parent applies.** A check builds rows (add, move,

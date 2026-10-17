@@ -920,6 +920,8 @@ function findChromium() {
     if (on('2026-10-24').length !== 1) bad.push('a ticked held-back practice was not placed');
     built = fcalBuildRows(feed, club2, T);
     if (row('sat|2026-10-24')) bad.push('a practice placed on a meet day on purpose was offered for removal again');
+    built = fcalBuildRows(feed, club2.filter(o => o.key !== 'sat|2026-10-24'), T);
+    if (!row('sat|2026-10-24') || row('sat|2026-10-24').type !== 'remove') bad.push('a practice placed on a meet day was not offered for removal once the club dropped it');
     const club4 = club2.filter(o => o.key !== 'mon|2026-11-30');
     built = fcalBuildRows(feed, club4, T);
     const keepRow = row('mon|2026-11-30');
@@ -936,6 +938,11 @@ function findChromium() {
     built = fcalBuildRows(feed, club5, T);
     const wedGone = built.rows.filter(r => r.type === 'remove' && /^wed\|/.test(r.key));
     if (wedGone.length <= 5 || wedGone.some(r => r.on)) bad.push(`${wedGone.length} removals at once, ${wedGone.filter(r => r.on).length} ticked — expected more than 5, none ticked`);
+    // Left unticked by the app and applied as they are: nothing is held, they are asked again.
+    fcalDraft = { feedId: feed.id, rows: wedGone, leftOut: 0 };
+    fcalApply();
+    built = fcalBuildRows(feed, club5, T);
+    if (built.rows.filter(r => r.type === 'remove' && /^wed\|/.test(r.key)).length !== wedGone.length) bad.push('removals the app left unticked were held for good');
 
     // 8e · An empty answer changes nothing; a sync during the read does not lose the result.
     fcalDraft = null;
@@ -974,6 +981,8 @@ function findChromium() {
     const endless = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:tue@google.com', 'DTSTART;TZID=America/Edmonton:20200107T170000',
       'RRULE:FREQ=WEEKLY;BYDAY=TU', 'SUMMARY:Practice', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
     if (icsParse(endless).skipped !== 1) bad.push('the school import now reads an endless repeat');
+    const noByDay = fcalOccurrencesFromIcs(endless.replace('FREQ=WEEKLY;BYDAY=TU', 'FREQ=WEEKLY'), T);
+    if (noByDay.length !== 12 || noByDay.some(o => formatDayKey(o.dayKey).getDay() !== 2)) bad.push(`a weekly repeat with no weekday gave ${noByDay.length} practices, expected 12 Tuesdays`);
 
     // 8g · A copied day does not carry the calendar mark; a move whose practice is gone is left gone.
     const copy = weekCloneBlock(on('2026-10-19')[0]);

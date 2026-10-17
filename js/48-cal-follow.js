@@ -306,9 +306,11 @@ function fcalBuildRows(feed, occs, today) {
     const said = { day: b.calDay, start: b.calStart, len: b.calLen };
     const plan = { day: cur.dayKey, start: b.startMin, len: b.durationMin };
     const same = (x, y) => x.day === y.day && x.start === y.start && x.len === y.len;
-    // calHeld: a parent placed it on that day anyway, or kept it when asked
-    // to remove it — asked once, not again at every check.
-    if (why && !b.calHeld) {
+    // calHeld names what a parent already answered: 'day' (placed on a
+    // held-back day anyway, or kept when asked), 'gone' (kept after the club
+    // dropped it), 'copy' (a second copy kept). Each is asked once, not at
+    // every check, and only that question is silenced.
+    if (why && b.calHeld !== 'day') {
       rows.push({ type: 'remove', on: true, key, why, block: b, blockDay: cur.dayKey, dayKey: cur.dayKey, occ: o });
     } else if (!same(club, said)) {
       if (same(plan, said)) rows.push({ type: 'move', on: true, key, occ: o, block: b, blockDay: cur.dayKey, dayKey: o.dayKey });
@@ -317,16 +319,18 @@ function fcalBuildRows(feed, occs, today) {
   });
   const gone = [];
   have.forEach((cur, key) => {
-    if (want.has(key) || cur.b.calHeld) return;
+    if (want.has(key) || cur.b.calHeld === 'gone') return;
     const edited = !(cur.dayKey === cur.b.calDay && cur.b.startMin === cur.b.calStart && cur.b.durationMin === cur.b.calLen);
     gone.push({ type: 'remove', on: true, key, why: 'no longer in the calendar', edited, block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
   });
   // Many removals at once is more often a calendar read gone wrong than a
   // season changing: they are shown unticked, for a parent to tick on purpose.
-  if (gone.length > 5) gone.forEach(r => { r.on = false; });
+  // `bulk`: left unticked by the app, not by a parent, so leaving it
+  // unticked answers nothing.
+  if (gone.length > 5) gone.forEach(r => { r.on = false; r.bulk = true; });
   rows.push(...gone);
   extra.forEach(cur => {
-    if (finished.has(cur.b.calKey) || cur.b.calHeld) return;
+    if (finished.has(cur.b.calKey) || cur.b.calHeld === 'copy') return;
     rows.push({ type: 'remove', on: true, key: cur.b.calKey, why: 'a second copy of the same practice', block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
   });
   rows.sort((a, b) => (a.dayKey < b.dayKey ? -1 : a.dayKey > b.dayKey ? 1
@@ -443,6 +447,12 @@ function fcalNewBlock(feed, o) {
 function fcalStamp(feed, o) {
   return { calFeed: feed.id, calKey: o.key, calDay: o.dayKey, calStart: o.startMin, calLen: o.durationMin };
 }
+/* Re-stamps a placed block with what the club now says. A different day is a
+   new question, so an answer given for the old day (calHeld) is dropped. */
+function fcalRestamp(b, feed, o) {
+  if (b.calDay !== o.dayKey) delete b.calHeld;
+  Object.assign(b, fcalStamp(feed, o));
+}
 
 function fcalApply() {
   if (!fcalDraft || !isParent()) return;
@@ -460,18 +470,21 @@ function fcalApply() {
       if (r.on) {
         const nb = fcalNewBlock(feed, r.occ);
         // Placed on a held-back day on purpose: not offered for removal later.
-        if (r.type === 'skip' && feed.id !== 'file') nb.calHeld = true;
+        if (r.type === 'skip' && feed.id !== 'file') nb.calHeld = 'day';
         day(r.dayKey).push(nb);
         added++;
       } else if (r.type === 'add') skips.add(r.key);
       return;
     }
     if (r.type === 'remove') {
+      const b = day(r.blockDay).find(x => x.id === r.block.id);
+      if (!b) return;
       if (r.on) { drop(r.blockDay, r.block.id); removed++; }
-      else {
+      else if (!r.bulk) {
         // Kept on purpose: the same removal is not asked again.
-        const b = day(r.blockDay).find(x => x.id === r.block.id);
-        if (b && !b.calHeld) { b.calHeld = true; b.updatedAt = syncNow(); }
+        const held = r.why === 'no longer in the calendar' ? 'gone'
+          : r.why === 'a second copy of the same practice' ? 'copy' : 'day';
+        if (b.calHeld !== held) { b.calHeld = held; b.updatedAt = syncNow(); }
       }
       return;
     }
@@ -481,17 +494,16 @@ function fcalApply() {
       // Keep the plan as it is, but remember what the club now says, so the
       // same change is not asked again.
       const b = day(r.blockDay).find(x => x.id === r.block.id);
-      if (b) { Object.assign(b, fcalStamp(feed, r.occ)); b.updatedAt = syncNow(); kept++; }
+      if (b) { fcalRestamp(b, feed, r.occ); b.updatedAt = syncNow(); kept++; }
       return;
     }
     if (r.blockDay === r.dayKey) {
       const b = day(r.blockDay).find(x => x.id === r.block.id);
-      if (b) {
-        b.startMin = r.occ.startMin;
-        b.durationMin = r.occ.durationMin;
-        Object.assign(b, fcalStamp(feed, r.occ));
-        b.updatedAt = syncNow();
-      }
+      if (!b) return;
+      b.startMin = r.occ.startMin;
+      b.durationMin = r.occ.durationMin;
+      fcalRestamp(b, feed, r.occ);
+      b.updatedAt = syncNow();
     } else {
       // Another day: the old copy is deleted (with its tombstone, so another
       // device cannot bring it back) and a new one is placed.

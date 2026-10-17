@@ -246,9 +246,11 @@ function icsExpand(ev, win) {
   if (!count && !until && !win) return null;
 
   const DOW = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0 };
+  // A weekly rule with no BYDAY repeats on the start's own weekday (RFC 5545),
+  // not on every day of the week.
   const byDay = parts.BYDAY
     ? parts.BYDAY.split(',').map(x => DOW[x.trim().slice(-2).toUpperCase()]).filter(n => n != null)
-    : null;
+    : (freq === 'WEEKLY' ? [formatDayKey(ev.start.dayKey).getDay()] : null);
 
   const out = [];
   const d = formatDayKey(ev.start.dayKey);
