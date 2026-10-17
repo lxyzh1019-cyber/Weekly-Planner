@@ -2415,6 +2415,8 @@ async function removeBlock() {
     }
   }
   tombstoneBlockIds([editingBlockId]);
+  // A practice from a followed calendar, removed by hand, is not offered again.
+  fcalForget(blk);
   setDayBlocks(currentDayKey, blocks.filter(b=>b.id!==editingBlockId));
   closeSheet('editOverlay');
   buildTimeline();

@@ -56,6 +56,7 @@ const PARTS = {
     'everyWeekViewFollowsTheSchoolCalendar',
     'schoolHoursAreTheParentsToSet',
     'anIcsFileBecomesDaysOffOnlyAfterReview',
+    'aFollowedCalendarStaysInStep',
     'aBlankWeekOffersItsSchoolDays',
     'theSchoolOfferIsAboveTheWeekGrid',
     'oneSchoolDayCanBeAddedOnItsOwn',

@@ -840,6 +840,35 @@ function sync(a, b) {
     (phone.state.shared.conflicts || []).length === 1);
 }
 
+/* ── The calendars a family follows (App › Follow a calendar) ──
+   state.shared.calFeeds is a list of records, each with an id and a stamp, and
+   a parent can stop following one. Without a decision the spread in
+   mergeSharedState replaced the whole list with the remote copy on every
+   snapshot: a calendar added on the iPad vanished when the phone's document
+   arrived, and a removed one came back. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => { st.shared.calFeeds = [{ id: 'calA', name: 'Swim club', lastChecked: 0, updatedAt: 100 }]; });
+  on(phone, st => { st.shared.calFeeds = [{ id: 'calB', name: 'Skating', updatedAt: 110 }]; });
+  sync(ipad, phone);
+  const ids = (dev) => (dev.state.shared.calFeeds || []).map(f => f.id).sort().join(',');
+  check('calFeeds: a calendar added on each device is on both after a sync',
+    ids(ipad) === 'calA,calB' && ids(phone) === 'calA,calB');
+  // The iPad checks the swim club (a newer stamp); the phone's older copy does not undo it.
+  on(ipad, st => { const f = st.shared.calFeeds.find(x => x.id === 'calA'); f.lastChecked = 500; f.updatedAt = 500; });
+  sync(ipad, phone);
+  const checked = (dev) => (dev.state.shared.calFeeds.find(x => x.id === 'calA') || {}).lastChecked;
+  check('calFeeds: the newer copy of one calendar wins on both devices', checked(ipad) === 500 && checked(phone) === 500);
+  // The phone stops following Skating; the iPad still holds it, and it stays gone.
+  on(phone, st => {
+    st.shared.calFeeds = st.shared.calFeeds.filter(f => f.id !== 'calB');
+    st.shared.tombstones['feed:calB'] = 600;
+  });
+  sync(ipad, phone);
+  check('calFeeds: a calendar removed on one device does not come back from the other',
+    ids(ipad) === 'calA' && ids(phone) === 'calA');
+}
+
 // A restore from backup is the one write that is not a merge. Replace bumps
 // dataEpoch, and a higher epoch is taken whole — otherwise the other device's
 // newer-stamped records win arbitration and go straight back up, which is
