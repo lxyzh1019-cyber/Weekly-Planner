@@ -615,6 +615,28 @@ function mergeRoutineOverrides(local, remote) {
   return out;
 }
 
+/* ── The calendars a family follows (js/48-cal-follow.js) ──
+   Id-keyed records, newer stamp wins whole — except two fields that only ever
+   grow. skipKeys is the list of practices a grown-up said no to or removed by
+   hand: a newer copy from a device that never saw a removal must not bring the
+   practice back as a ticked row. lastChecked is a forward-only watermark: losing
+   it makes the next portal opening check again. Both are taken from both
+   copies. skipKeys is kept sorted by the day in its key (`series|YYYY-MM-DD`)
+   and capped at the latest 400, so both devices end with the same list. */
+function mergeCalFeeds(localArr, remoteArr) {
+  const byId = (arr) => new Map((arr || []).filter(f => f && f.id != null).map(f => [f.id, f]));
+  const l = byId(localArr), r = byId(remoteArr);
+  return mergeArrayById(localArr, remoteArr, 'feed:').map(f => {
+    const a = l.get(f.id) || {}, b = r.get(f.id) || {};
+    const day = (k) => String(k).slice(String(k).lastIndexOf('|') + 1);
+    const keys = [...new Set([...(a.skipKeys || []), ...(b.skipKeys || [])])]
+      .sort((x, y) => (day(x) < day(y) ? -1 : day(x) > day(y) ? 1 : (x < y ? -1 : x > y ? 1 : 0)))
+      .slice(-400);
+    const lastChecked = Math.max(Number(a.lastChecked) || 0, Number(b.lastChecked) || 0);
+    return Object.assign({}, f, { skipKeys: keys, lastChecked });
+  });
+}
+
 /* ── The family's own school calendar ──
    A nested record (hours, term, days off) that a parent imports or types, and
    that overrides the shipped fallback. Also unarbitrated, so a remote copy
@@ -675,7 +697,8 @@ function mergeSharedState(localShared, remoteShared) {
     customSports: mergeArrayById(ls.customSports, rs.customSports),
     // The calendars a family follows (js/48-cal-follow.js). Id-keyed records
     // with a stamp; stopping one records a 'feed:' tombstone so it stays gone.
-    calFeeds: mergeArrayById(ls.calFeeds, rs.calFeeds, 'feed:'),
+    // skipKeys and lastChecked are taken from both copies — see mergeCalFeeds.
+    calFeeds: mergeCalFeeds(ls.calFeeds, rs.calFeeds),
     // Which days a grown-up has reviewed. A union per kid per day — see
     // mergeParentDayConfirm. Unarbitrated until now, which meant two adults
     // working through one Sunday meeting on two devices lost one set of
@@ -729,7 +752,7 @@ if (typeof module !== 'undefined' && module.exports) {
     tombstoneIds, mergeTombstones, isPlainObject, deepMergeObj, mergeChoreState,
     mergeEarnings, mergeSharedChore, mergeWeeks, mergeProfileState,
     mergePickNewer, pruneTombstones, TOMBSTONE_MAX, CHORE_WEEK_STATE_MAPS,
-    mergeParentDayConfirm, mergeSchoolCal, mergeRoutineOverrides,
+    mergeParentDayConfirm, mergeSchoolCal, mergeRoutineOverrides, mergeCalFeeds,
     mergeSharedState, recordsDiverged, mergeWholeRecord, conflictId,
     openConflicts, conflictIsOpen, CONFLICT_MAX };
 }

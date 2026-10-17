@@ -20,7 +20,14 @@
 //     break, a long weekend) clears practices that day, and so does an Alberta
 //     statutory holiday — the club's own calendar left a Victoria Day Monday and
 //     a Good Friday in. Those rows arrive unticked, so a club that does train
-//     that day is one tick away.
+//     that day is one tick away. A practice a grown-up keeps on such a day
+//     (calDayOff) is not offered for removal again.
+//   - A BROKEN READ CHANGES NOTHING. A read that returns no calendar, no
+//     practices against a plan that has some, or a calendar cut off at the
+//     parser's cap is a failed check, not a list of ticked removals.
+//   - EDMONTON TIME, AND ONLY THE PLANNER'S DAY. Times are read in Edmonton
+//     (APP_TIMEZONE), whatever zone the device is set to. A practice not wholly
+//     inside 6:00 AM–10:00 PM is not placed (fcalInDay), never cut to fit.
 //
 // How the calendar is read. A Google calendar is read through Google's calendar
 // service (the Calendar API) with a key the family makes once: browsers are not
@@ -150,9 +157,17 @@ function fcalPlaceName(location) {
   return String(location || '').split(',')[0].trim().slice(0, 40);
 }
 
-/* .ics text → occurrences. Timed ones become practices; all-day ones clear a day. */
-function fcalOccurrencesFromIcs(text) {
-  const { events } = icsParse(text);
+/* .ics text → { occs, skipped, skippedSeries, truncated }, read for the days a
+   check places (today … FCAL_HORIZON_DAYS): a repeat with no end is read up to
+   there, and the parser's cap counts only those days, not a club's history.
+   Timed occurrences become practices; all-day ones clear a day. */
+function fcalReadIcs(text, today) {
+  const t = today || todayKey();
+  const r = icsParse(text, { from: t, until: fcalDayList(t, FCAL_HORIZON_DAYS).pop() });
+  return { occs: fcalIcsOccs(r.events), skipped: r.skipped, skippedSeries: r.skippedSeries, truncated: r.truncated };
+}
+function fcalOccurrencesFromIcs(text, today) { return fcalReadIcs(text, today).occs; }
+function fcalIcsOccs(events) {
   return events.map(e => ({
     key: (e.series || 'nouid') + '|' + (e.origDay || e.dayKey) + (e.series ? '' : '|' + (e.startMin == null ? 'day' : e.startMin)),
     dayKey: e.dayKey,
@@ -166,8 +181,9 @@ function fcalOccurrencesFromIcs(text) {
 
 /* Google's calendar service → the same occurrences. singleEvents=true gives
    every practice on its own, with moved ones at their new time and cancelled
-   ones left out; timeZone gives times in the family's zone, so the day and the
-   minutes are read straight off the string. */
+   ones left out; timeZone gives times in Edmonton (APP_TIMEZONE), whatever zone
+   the device is set to, so the day and the minutes are read straight off the
+   string. */
 function fcalOccurrencesFromGoogle(items) {
   const out = [];
   (items || []).forEach(it => {
@@ -200,12 +216,10 @@ function fcalOccurrencesFromGoogle(items) {
   return out;
 }
 
-function fcalZone() {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Edmonton'; }
-  catch (e) { return 'America/Edmonton'; }
-}
-
-/* Reads one feed. Resolves to { occs } or rejects with a reason a parent can read. */
+/* Reads one feed. Resolves to { occs, skipped, skippedSeries } or rejects with
+   a reason a parent can read. A read that is not a whole calendar (an error
+   page, a calendar cut off at the cap) is a failure, never a calendar with
+   fewer practices: those missing would arrive as ticked removals. */
 async function fcalRead(feed) {
   const from = formatDayKey(todayKey());
   const to = formatDayKey(todayKey());
@@ -216,7 +230,7 @@ async function fcalRead(feed) {
     for (let n = 0; n < 10; n++) {
       const q = `key=${encodeURIComponent(feed.key)}&singleEvents=true&orderBy=startTime&maxResults=2500`
         + `&timeMin=${encodeURIComponent(from.toISOString())}&timeMax=${encodeURIComponent(to.toISOString())}`
-        + `&timeZone=${encodeURIComponent(fcalZone())}` + (page ? `&pageToken=${encodeURIComponent(page)}` : '');
+        + `&timeZone=${encodeURIComponent(APP_TIMEZONE)}` + (page ? `&pageToken=${encodeURIComponent(page)}` : '');
       let res;
       try { res = await fetch(`${FCAL_GOOGLE_API}${encodeURIComponent(feed.calId)}/events?${q}`, { credentials: 'omit' }); }
       catch (e) { throw new Error('no connection to Google'); }
@@ -228,7 +242,8 @@ async function fcalRead(feed) {
       page = body.nextPageToken || '';
       if (!page) break;
     }
-    return { occs: fcalOccurrencesFromGoogle(items) };
+    if (page) throw new Error('the calendar is too long to read — nothing was changed');
+    return { occs: fcalOccurrencesFromGoogle(items), skipped: 0, skippedSeries: [] };
   }
   if (feed.icsUrl) {
     let res;
@@ -237,7 +252,11 @@ async function fcalRead(feed) {
       throw new Error(feed.calId ? 'a Google calendar needs a Google key' : 'this server does not let a browser read its calendar');
     }
     if (!res.ok) throw new Error(`the calendar server answered ${res.status}`);
-    return { occs: fcalOccurrencesFromIcs(await res.text()) };
+    const text = await res.text();
+    if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error('the link did not return a calendar');
+    const read = fcalReadIcs(text);
+    if (read.truncated) throw new Error('the calendar is too long to read — nothing was changed');
+    return read;
   }
   throw new Error('this calendar has no link');
 }
@@ -251,9 +270,22 @@ function fcalDayList(fromKey, days) {
   return out;
 }
 
+/* The planner's day is 6:00 AM–10:00 PM (START_MIN–END_MIN). A practice that is
+   not wholly inside it is not placed: one cut to fit would no longer match what
+   the club said, and would read as changed by hand at every check. */
+function fcalInDay(o) {
+  return o.startMin >= START_MIN && o.startMin + (o.durationMin || 0) <= END_MIN;
+}
+const FCAL_OUTSIDE_WHY = "outside the planner's 6:00 AM–10:00 PM day";
+
 /* Everything that differs between the calendar and the plan, as rows a parent
-   ticks. `feed` is a saved calendar, or a one-time file read ({ id:'file', … }). */
-function fcalBuildRows(feed, occs, today) {
+   ticks. `feed` is a saved calendar, or a one-time file read ({ id:'file', … }).
+   `read` is what the read could not read (skippedSeries): a placed practice of
+   such a series is left alone, never offered for removal.
+   Also returns `outside` (practices not placed, see fcalInDay), and `placed` /
+   `wanted` — the practices in the plan and in the calendar — for fcalCheck's
+   empty-read guard. */
+function fcalBuildRows(feed, occs, today, read) {
   const t = today || todayKey();
   const days = fcalDayList(t, FCAL_HORIZON_DAYS);
   const last = days[days.length - 1];
@@ -285,8 +317,10 @@ function fcalBuildRows(feed, occs, today) {
     });
   }
   const skipped = new Set(feed.skipKeys || []);
+  const unread = new Set((read && read.skippedSeries) || []);
   const rows = [];
-  let leftOut = 0;
+  let leftOut = 0, outside = 0;
+  const editedBlock = (cur) => !(cur.dayKey === cur.b.calDay && cur.b.startMin === cur.b.calStart && cur.b.durationMin === cur.b.calLen);
 
   want.forEach((o, key) => {
     if (finished.has(key)) return;
@@ -294,6 +328,7 @@ function fcalBuildRows(feed, occs, today) {
     const cur = have.get(key);
     if (!cur) {
       if (skipped.has(key)) { leftOut++; return; }
+      if (!fcalInDay(o)) { outside++; return; }
       // A one-time file read places beside what is there, never twice.
       if (feed.id === 'file' && (getDayBlocksForProfile(o.dayKey, feed.kid) || [])
         .some(b => b && b.actId === feed.actId && b.startMin === o.startMin)) return;
@@ -301,12 +336,18 @@ function fcalBuildRows(feed, occs, today) {
       return;
     }
     const b = cur.b;
+    if (!fcalInDay(o)) {
+      // Moved outside the planner's day, or placed cut short by an earlier build.
+      rows.push({ type: 'remove', on: true, key, why: FCAL_OUTSIDE_WHY, edited: editedBlock(cur), block: b, blockDay: cur.dayKey, dayKey: cur.dayKey });
+      return;
+    }
     const club = { day: o.dayKey, start: o.startMin, len: o.durationMin };
     const said = { day: b.calDay, start: b.calStart, len: b.calLen };
     const plan = { day: cur.dayKey, start: b.startMin, len: b.durationMin };
     const same = (x, y) => x.day === y.day && x.start === y.start && x.len === y.len;
-    if (why) {
-      rows.push({ type: 'remove', on: true, key, why, block: b, blockDay: cur.dayKey, dayKey: cur.dayKey, occ: o });
+    // A practice a grown-up kept on a marked day (calDayOff) is not asked about again.
+    if (why && b.calDayOff !== cur.dayKey) {
+      rows.push({ type: 'remove', on: true, dayOff: true, key, why, block: b, blockDay: cur.dayKey, dayKey: cur.dayKey, occ: o });
     } else if (!same(club, said)) {
       if (same(plan, said)) rows.push({ type: 'move', on: true, key, occ: o, block: b, blockDay: cur.dayKey, dayKey: o.dayKey });
       else rows.push({ type: 'conflict', on: true, choice: 'mine', key, occ: o, block: b, blockDay: cur.dayKey, dayKey: o.dayKey });
@@ -314,8 +355,9 @@ function fcalBuildRows(feed, occs, today) {
   });
   have.forEach((cur, key) => {
     if (want.has(key)) return;
-    const edited = !(cur.dayKey === cur.b.calDay && cur.b.startMin === cur.b.calStart && cur.b.durationMin === cur.b.calLen);
-    rows.push({ type: 'remove', on: true, key, why: 'no longer in the calendar', edited, block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
+    // A series this read could not read is not "gone": leave its practices be.
+    if (unread.has(key.slice(0, key.lastIndexOf('|')))) return;
+    rows.push({ type: 'remove', on: true, key, why: 'no longer in the calendar', edited: editedBlock(cur), block: cur.b, blockDay: cur.dayKey, dayKey: cur.dayKey });
   });
   extra.forEach(cur => {
     if (finished.has(cur.b.calKey)) return;
@@ -323,7 +365,7 @@ function fcalBuildRows(feed, occs, today) {
   });
   rows.sort((a, b) => (a.dayKey < b.dayKey ? -1 : a.dayKey > b.dayKey ? 1
     : ((a.occ ? a.occ.startMin : a.block.startMin) - (b.occ ? b.occ.startMin : b.block.startMin))));
-  return { rows, leftOut };
+  return { rows, leftOut, outside, placed: have.size, wanted: want.size };
 }
 
 /* ── Checking ── */
@@ -337,26 +379,42 @@ function fcalIsDue(feed, now) {
    it says nothing when nothing changed. */
 async function fcalCheck(feedId, auto) {
   if (!isParent()) return;
-  const feed = fcalFeed(feedId);
-  if (!feed || fcalBusy) return;
+  const asked = fcalFeed(feedId);
+  if (!asked || fcalBusy) return;
   fcalBusy = feedId;
   fcalRender();
-  let result = null;
+  let result = null, failure = '';
   try {
-    result = await fcalRead(feed);
+    result = await fcalRead(asked);
   } catch (err) {
-    feed.lastError = String((err && err.message) || err).slice(0, 120);
+    failure = String((err && err.message) || err).slice(0, 120);
+  }
+  fcalBusy = '';
+  /* A sync during the read may have replaced the calendar's record with a new
+     object: what this check learned is written to the one in the list NOW, or
+     it is lost with the old object and the next portal opening checks again.
+     A calendar stopped meanwhile is left stopped. */
+  const feed = fcalFeed(feedId);
+  if (!feed) { fcalRender(); return; }
+  let built = null;
+  if (!failure) {
+    built = fcalBuildRows(feed, result.occs, null, result);
+    // A read with no practices at all, against a plan that has some, is a
+    // broken read — not a club that cancelled everything in one go.
+    if (!built.wanted && built.placed) failure = 'the calendar came back with no practices — nothing was changed';
+  }
+  if (failure) {
+    feed.lastError = failure;
     feed.lastTried = syncNow();
     fcalTouch(feed);
     saveAll();
-    fcalBusy = '';
     fcalRender();
     showToast(`🔄 Could not check ${feed.name} — ${feed.lastError}`);
     return;
   }
-  fcalBusy = '';
   feed.lastError = '';
-  const { rows, leftOut } = fcalBuildRows(feed, result.occs);
+  feed.lastUnread = result.skipped || 0;
+  const { rows, leftOut, outside } = built;
   const changes = rows.filter(r => r.type !== 'skip');
   if (!changes.length) {
     feed.lastChecked = syncNow();
@@ -364,10 +422,10 @@ async function fcalCheck(feedId, auto) {
     saveAll();
     if (fcalDraft && fcalDraft.feedId === feedId) fcalDraft = null;
     fcalRender();
-    if (!auto) showToast(`🔄 ${feed.name}: no changes`);
+    if (!auto) showToast(`🔄 ${feed.name}: no changes${fcalUnreadText(result.skipped) ? ` · ${fcalUnreadText(result.skipped)}` : ''}`);
     return;
   }
-  fcalDraft = { feedId, rows, leftOut };
+  fcalDraft = { feedId, rows, leftOut, outside, skipped: result.skipped || 0 };
   fcalTouch(feed);
   saveAll();
   fcalRender();
@@ -399,7 +457,8 @@ function fcalNewBlock(feed, o) {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     actId: feed.actId,
     startMin: o.startMin,
-    durationMin: Math.max(5, Math.min(o.durationMin || act.durationMin || 60, END_MIN - o.startMin)),
+    // Never cut to fit: only practices inside the planner's day are placed (fcalInDay).
+    durationMin: Math.max(5, o.durationMin || act.durationMin || 60),
     // The category's own hex: a training block then takes its sport's colour
     // (trainingBlockColour), as one placed from the Training sheet does.
     colour: CAT_HEX[act.cat] || CAT_HEX.training,
@@ -435,12 +494,23 @@ function fcalApply() {
 
   fcalDraft.rows.forEach(r => {
     if (r.type === 'add' || r.type === 'skip') {
-      if (r.on) { day(r.dayKey).push(fcalNewBlock(feed, r.occ)); added++; }
-      else if (r.type === 'add') skips.add(r.key);
+      if (r.on) {
+        const nb = fcalNewBlock(feed, r.occ);
+        // Placed on a club day off or a holiday on purpose: not offered for
+        // removal for that reason at the next check.
+        if (r.type === 'skip' && feed.id !== 'file') nb.calDayOff = r.dayKey;
+        day(r.dayKey).push(nb);
+        added++;
+      } else if (r.type === 'add') skips.add(r.key);
       return;
     }
     if (r.type === 'remove') {
       if (r.on) { drop(r.blockDay, r.block.id); removed++; }
+      else if (r.dayOff) {
+        // Kept on a marked day: remember it, so the same removal is not asked again.
+        const b = day(r.blockDay).find(x => x.id === r.block.id);
+        if (b) { b.calDayOff = r.blockDay; b.updatedAt = syncNow(); kept++; }
+      }
       return;
     }
     // A move, or a club change to a practice changed by hand.
@@ -599,10 +669,26 @@ function fcalOpenFile(text, name) {
   if (!act) { showToast('Pick what these are'); return; }
   const fileFeed = { id: 'file', name: name || 'file', kid: fcalForm.kid, actId: act.id,
     tag: act.isTraining ? fcalForm.tag : null, skipKeys: [] };
-  const { rows } = fcalBuildRows(fileFeed, fcalOccurrencesFromIcs(text));
-  if (!rows.length) { showToast('Nothing new to add from that file'); return; }
-  fcalDraft = { feedId: 'file', fileFeed, rows, leftOut: 0 };
+  const read = fcalReadIcs(text);
+  const { rows, outside } = fcalBuildRows(fileFeed, read.occs, null, read);
+  if (!rows.length) {
+    const notes = [fcalOutsideText(outside), fcalUnreadText(read.skipped), read.truncated ? fcalTruncatedText() : ''].filter(Boolean);
+    showToast(`Nothing new to add from that file${notes.length ? ` · ${notes.join(' · ')}` : ''}`);
+    return;
+  }
+  fcalDraft = { feedId: 'file', fileFeed, rows, leftOut: 0, outside, skipped: read.skipped || 0, truncated: !!read.truncated };
   fcalRender();
+}
+
+/* What a read left out, said plainly (the review card, the toasts, the calendar's card). */
+function fcalOutsideText(n) {
+  return n ? `${n} practice${n === 1 ? '' : 's'} ${FCAL_OUTSIDE_WHY.replace('outside', n === 1 ? 'is outside' : 'are outside')}, so not placed` : '';
+}
+function fcalUnreadText(n) {
+  return n ? `${n} repeating event${n === 1 ? '' : 's'} could not be read` : '';
+}
+function fcalTruncatedText() {
+  return `the file is too long to read whole — only its first ${SC_MAX_EVENTS} events were read`;
 }
 
 /* ── The screen ── */
@@ -656,7 +742,8 @@ function fcalDraftHtml() {
   return `<p class="pn-cap" style="margin-top:0.8rem">${d.feedId === 'file' ? 'From the file' : 'Changes'} — ${escapeHtml(feed.name)}
       → ${escapeHtml(kidLabel(feed.kid).name)}</p>
     <div class="ui-card pn-clear">${parts || 'Nothing to change'}.${d.leftOut ? ` ${d.leftOut} practice${d.leftOut === 1 ? '' : 's'} you said no to earlier ${d.leftOut === 1 ? 'is' : 'are'} left out.` : ''}
-      Finished practices are never changed.</div>
+      Finished practices are never changed.${[fcalOutsideText(d.outside), fcalUnreadText(d.skipped), d.truncated ? fcalTruncatedText() : '']
+        .filter(Boolean).map(t => `<br><span class="pn-note">⚠️ ${escapeHtml(t.charAt(0).toUpperCase() + t.slice(1))}.</span>`).join('')}</div>
     ${body}
     <div class="pn-toggle" style="margin-top:0.5rem">
       <button type="button" class="ui-btn ui-btn--primary" data-fcal-action="apply">Apply the ticked changes</button>
@@ -675,10 +762,13 @@ function fcalFeedHtml(f) {
   const err = f.lastError
     ? `<br><span class="pn-note">⚠️ Could not check: ${escapeHtml(f.lastError)}.${f.lastChecked ? ` Last check ${escapeHtml(fcalStampDay(f.lastChecked))}.` : ''} The practices in the plan stay as they are.</span>`
     : '';
+  const unread = !f.lastError && fcalUnreadText(f.lastUnread)
+    ? `<br><span class="pn-note">⚠️ ${escapeHtml(fcalUnreadText(f.lastUnread))} — those practices are not kept in step.</span>`
+    : '';
   const busy = fcalBusy === f.id;
   return `<div class="ui-card" style="margin-top:0.4rem">
       <b>${escapeHtml(f.name)}</b> → ${escapeHtml(kidLabel(f.kid).icon + ' ' + kidLabel(f.kid).name)} · ${escapeHtml(what)}
-      <br><span class="pn-note">${status}${f.calId && !f.key && !f.lastError ? ' · needs a Google key' : ''}</span>${err}
+      <br><span class="pn-note">${status}${f.calId && !f.key && !f.lastError ? ' · needs a Google key' : ''}</span>${err}${unread}
       ${f.calId && !f.key ? `<div class="pa-time-row" style="margin-top:0.4rem">
         <input type="text" data-fcal-key="${escapeAttr(f.id)}" maxlength="80" placeholder="Paste the Google key" aria-label="Google key for ${escapeAttr(f.name)}" autocomplete="off">
         <button type="button" class="ui-btn ui-btn--secondary" data-fcal-action="save-key" data-feed="${escapeAttr(f.id)}">Save key</button>

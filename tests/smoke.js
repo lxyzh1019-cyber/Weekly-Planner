@@ -820,7 +820,7 @@ function findChromium() {
     ].join('\r\n');
 
     // 1 · Reading: a skipped date stays empty, a moved practice lands once.
-    const occs = fcalOccurrencesFromIcs(ics);
+    const occs = fcalOccurrencesFromIcs(ics, T);
     if (occs.some(o => o.key === 'mon|2026-10-12')) bad.push('a skipped date (Thanksgiving) came back as a practice');
     const oct23 = occs.filter(o => o.dayKey === '2026-10-23' && !o.allDay);
     if (oct23.length !== 1 || oct23[0].startMin !== 15 * 60 + 45 || oct23[0].key !== 'fri|2026-10-23') {
@@ -961,6 +961,121 @@ function findChromium() {
     const before = calls;
     await fcalAutoCheck();
     if (calls !== before) bad.push('the automatic check read the same calendar twice in one app load');
+
+    // 12 · A broken read changes nothing: an empty Google answer, an error page,
+    //      an empty calendar — each against a plan that has practices.
+    const placedNow = () => days.reduce((n, k) => n + on(k).length, 0);
+    const placedBefore = placedNow(), checkedBefore = fcalFeed(feed.id).lastChecked;
+    fcalDraft = null;
+    Object.assign(fcalFeed(feed.id), { calId: id, key: 'KEY1' });
+    window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ items: [] }) });
+    await fcalCheck(feed.id, true);
+    if (!/no practices/.test(fcalFeed(feed.id).lastError || '')) bad.push('an empty Google read was not a failed check');
+    Object.assign(fcalFeed(feed.id), { calId: '', key: '', icsUrl: 'https://example.org/club.ics' });
+    for (const [body, said] of [['<html><body>Sign in</body></html>', /did not return a calendar/], ['BEGIN:VCALENDAR\r\nEND:VCALENDAR', /no practices/]]) {
+      window.fetch = async () => ({ ok: true, status: 200, text: async () => body });
+      await fcalCheck(feed.id, true);
+      if (!said.test(fcalFeed(feed.id).lastError || '')) bad.push(`a broken .ics read said "${fcalFeed(feed.id).lastError}"`);
+    }
+    if (fcalDraft) bad.push('a broken read opened a review');
+    if (placedNow() !== placedBefore) bad.push('a broken read changed the plan');
+    if (fcalFeed(feed.id).lastChecked !== checkedBefore) bad.push('a broken read was recorded as a check');
+    Object.assign(fcalFeed(feed.id), { icsUrl: '', lastError: '' });
+
+    // 13 · A practice kept on a holiday or a club day off is not asked about again.
+    built = fcalBuildRows(feed, club2, T);
+    const rem = row('wed|2026-11-11');
+    if (rem) {
+      rem.on = true;
+      fcalDraft = { feedId: feed.id, rows: [rem], leftOut: 0 };
+      fcalApply();
+    }
+    if (!on('2026-11-11').length) bad.push('a ticked holiday practice was not placed');
+    built = fcalBuildRows(feed, club2, T);
+    if (row('wed|2026-11-11')) bad.push('a practice placed on a holiday was offered again');
+    const closed = club2.concat([{ key: 'shut|2026-11-30', dayKey: '2026-11-30', allDay: true, startMin: null, durationMin: null, summary: 'Pool closed', place: '' },
+      { key: 'shut|2026-12-07', dayKey: '2026-12-07', allDay: true, startMin: null, durationMin: null, summary: 'Pool closed', place: '' }]);
+    built = fcalBuildRows(feed, closed, T);
+    const r30 = row('mon|2026-11-30');
+    if (!r30 || r30.type !== 'remove' || !r30.on) bad.push('a practice on a new club day off was not offered for removal, ticked');
+    else {
+      r30.on = false;
+      fcalDraft = { feedId: feed.id, rows: [r30], leftOut: 0 };
+      fcalApply();
+    }
+    built = fcalBuildRows(feed, closed, T);
+    if (!on('2026-11-30').length) bad.push('an unticked removal removed the practice');
+    if (row('mon|2026-11-30')) bad.push('a practice kept on a club day off was offered again');
+    if (!row('mon|2026-12-07') || !row('mon|2026-12-07').on) bad.push('another day off stopped being offered');
+
+    // 14 · Long and open-ended files: the 12 weeks are read, whatever came before.
+    const ymd = (d) => dateToLocalKey(d).replace(/-/g, '');
+    const old = Array.from({ length: 900 }, (_, i) => { const d = new Date(2025, 0, 1 + (i % 300)); return [
+      'BEGIN:VEVENT', `UID:old${i}@google.com`, `DTSTART;TZID=America/Edmonton:${ymd(d)}T170000`,
+      `DTEND;TZID=America/Edmonton:${ymd(d)}T180000`, 'SUMMARY:Old practice', 'END:VEVENT']; }).flat();
+    // The old events come last: without a window the walk stops at the cap there.
+    const open = ['BEGIN:VCALENDAR', 'VERSION:2.0',
+      'BEGIN:VEVENT', 'UID:tue@google.com', 'DTSTART;TZID=America/Edmonton:20240102T170000',
+        'DTEND;TZID=America/Edmonton:20240102T180000', 'RRULE:FREQ=WEEKLY;BYDAY=TU', 'SUMMARY:Dryland', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:thu@google.com', 'DTSTART;TZID=America/Edmonton:20261008T170000',
+        'DTEND;TZID=America/Edmonton:20261008T180000', 'RRULE:FREQ=WEEKLY', 'SUMMARY:Dryland', 'END:VEVENT',
+      'BEGIN:VEVENT', 'UID:month@google.com', 'DTSTART;TZID=America/Edmonton:20261006T190000',
+        'DTEND;TZID=America/Edmonton:20261006T200000', 'RRULE:FREQ=MONTHLY;BYMONTHDAY=6', 'SUMMARY:Club night', 'END:VEVENT',
+      ...old, 'END:VCALENDAR'].join('\r\n');
+    const rd = fcalReadIcs(open, T);
+    const last = fcalDayList(T, FCAL_HORIZON_DAYS).pop();
+    if (rd.truncated) bad.push('a file with 900 old events was cut off before the 12 weeks');
+    if (!rd.occs.some(o => o.key === 'tue|2026-10-06') || !rd.occs.some(o => o.key === 'tue|2026-12-22')) bad.push('an open-ended repeat begun in 2024 was not read for the 12 weeks');
+    if (rd.occs.some(o => o.dayKey < T || o.dayKey > last)) bad.push('a read kept days outside the 12 weeks');
+    const thu = rd.occs.filter(o => /^thu\|/.test(o.key));
+    if (!thu.length || thu.some(o => formatDayKey(o.dayKey).getDay() !== 4)) bad.push('a weekly repeat with no BYDAY did not keep its own weekday');
+    if (rd.skipped !== 1 || !rd.skippedSeries.includes('month')) bad.push(`an unreadable repeat was not reported (${rd.skipped})`);
+    if (icsParse(open).skipped !== 3) bad.push('the school import (no window) changed how it reads repeats with no end');
+    const fake = { id: 'fcalFakeMonth', actId: 'training', startMin: 1140, durationMin: 60, calFeed: feed.id, calKey: 'month|2026-11-06',
+      calDay: '2026-11-06', calStart: 1140, calLen: 60, completed: false };
+    setDayBlocks('2026-11-06', getDayBlocksForProfile('2026-11-06', 'jess').concat([fake]), 'jess');
+    built = fcalBuildRows(feed, club2, T, rd);
+    if (row('month|2026-11-06')) bad.push('a practice of a repeat that could not be read was offered for removal');
+    setDayBlocks('2026-11-06', getDayBlocksForProfile('2026-11-06', 'jess').filter(b => b.id !== fake.id), 'jess');
+
+    // 15 · Edmonton time, and only 6:00 AM–10:00 PM.
+    const zIcs = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:zmon@google.com', 'DTSTART:20261005T234500Z', 'DTEND:20261006T004500Z',
+      'RRULE:FREQ=WEEKLY;BYDAY=MO', 'SUMMARY:Practice', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    const z = fcalReadIcs(zIcs, T).occs;
+    /* Each repeat is its own UTC instant read in Edmonton. The expected value
+       comes from the browser's own zone data, not a hard-coded 16:45: Chrome
+       155's data keeps Edmonton on MDT past 1 Nov 2026, Node's 2026a does not. */
+    const zAt = (k) => (z.find(o => o.key === 'zmon|' + k) || {}).startMin;
+    const edm = (m, d) => nowMinutesInZone(new Date(Date.UTC(2026, m, d, 23, 45)));
+    if (zAt('2026-10-19') !== 17 * 60 + 45 || zAt('2026-11-09') !== edm(10, 9) || zAt('2026-12-14') !== edm(11, 14)) {
+      bad.push(`a UTC practice read as ${zAt('2026-10-19')} / ${zAt('2026-11-09')} / ${zAt('2026-12-14')}, expected 1065 / ${edm(10, 9)} / ${edm(11, 14)} (Edmonton on each date)`);
+    }
+    const fo = { id: 'calO', name: 'Early club', kid: 'jess', actId: 'training', tag: 'swimming', skipKeys: [], lastChecked: 0, createdAt: 1, updatedAt: 1 };
+    state.shared.calFeeds.push(fo);
+    const at = (key, startMin, durationMin) => ({ key: key + '|2026-10-20', dayKey: '2026-10-20', allDay: false, startMin, durationMin, summary: '', place: '' });
+    const dayOccs = [at('early', 330, 90), at('late', 1290, 90), at('night', 1350, 60), at('six', 360, 60), at('ten', 1260, 60)];
+    built = fcalBuildRows(fo, dayOccs, T);
+    if (built.outside !== 3 || built.rows.some(r => /early|late|night/.test(r.key))) bad.push(`practices outside 6:00 AM–10:00 PM were offered (${built.outside} counted)`);
+    if (!row('six|2026-10-20') || !row('ten|2026-10-20')) bad.push('a practice at 6:00 AM or ending at 10:00 PM was not offered');
+    const cut = { id: 'fcalCutLate', actId: 'training', startMin: 1290, durationMin: 30, calFeed: 'calO', calKey: 'late|2026-10-20',
+      calDay: '2026-10-20', calStart: 1290, calLen: 90, completed: false };
+    setDayBlocks('2026-10-20', getDayBlocksForProfile('2026-10-20', 'jess').concat([cut]), 'jess');
+    built = fcalBuildRows(fo, dayOccs, T);
+    if (!row('late|2026-10-20') || row('late|2026-10-20').type !== 'remove' || !/outside/.test(row('late|2026-10-20').why)) {
+      bad.push('a practice cut short at 10:00 PM by the old build was not offered for removal as outside the day');
+    }
+    setDayBlocks('2026-10-20', getDayBlocksForProfile('2026-10-20', 'jess').filter(b => b.id !== cut.id), 'jess');
+
+    // 16 · A sync during the read replaces the calendar's record: the check is still recorded.
+    const sFeed = { ...gFeed, id: 'calS', lastChecked: 0, lastError: '' };
+    state.shared.calFeeds.push(sFeed);
+    window.fetch = async () => {
+      state.shared.calFeeds = state.shared.calFeeds.map(f => ({ ...f }));
+      return { ok: true, status: 200, json: async () => ({ items: [] }) };
+    };
+    fcalDraft = null;
+    await fcalCheck('calS', false);
+    if (!fcalFeed('calS').lastChecked) bad.push('a sync during the read lost the check');
 
     // 11 · The screen: the row, the list, the review grouped by month.
     setParentTab('calendars');

@@ -3195,20 +3195,47 @@ four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis
 matches the day it claims to describe.
 
-## Follow a calendar — a club's practices, kept in step (build 2026-10-16a)
+## Follow a calendar — a club's practices, kept in step (build 2026-10-16a, review fixes 2026-10-17a)
 
 `js/48-cal-follow.js`, App › Follow a calendar. The school import
 (`js/35-school-calendar.js`) takes days off and term dates only; timed events
 belong here, placed for one child as one activity and read again later.
 
-- **Storage.** `state.shared.calFeeds`, id-keyed records merged with
-  `mergeArrayById(…, 'feed:')`; stopping one tombstones `feed:<id>`. A placed
+- **Storage.** `state.shared.calFeeds`, id-keyed records merged by
+  `mergeCalFeeds`: `mergeArrayById(…, 'feed:')`, then `skipKeys` is the union
+  of both copies (sorted by day, latest 400) and `lastChecked` the later of
+  both — a newer copy from a device that never saw a removal or a check must
+  not bring the practice back or check again. Stopping one tombstones
+  `feed:<id>`. A placed
   block carries `calFeed`, `calKey` (`<event id>|<day first set for>`) and what
   the club last said: `calDay`, `calStart`, `calLen`. The file and Google's
   service name an event the same way (`icsSeriesId`), so either read
   recognises the other's blocks. (checked by tests/merge.test.js calFeeds; smoke: aFollowedCalendarStaysInStep)
+- **Edmonton time, 6:00 AM–10:00 PM only.** Every time is read in
+  `APP_TIMEZONE` (Edmonton), never the device's zone: Google is asked for
+  Edmonton times, and an .ics UTC (`Z`) time is converted with
+  `toDayKeyInZone` / `nowMinutesInZone`, each repeat on its own date, so a UTC
+  repeat takes Edmonton's offset for that date from the browser's zone data
+  (Chrome 155's keeps Edmonton on MDT past 1 Nov 2026; Node's 2026a does not —
+  the smoke step reads the expected value from the browser). A practice not wholly
+  inside the planner's day (`START_MIN`–`END_MIN`, `fcalInDay`) is never placed
+  or cut to fit: it is counted and named on the review; a placed one that is
+  now outside (or was cut short by build 2026-10-16a) is offered for removal.
+- **A broken read changes nothing.** An .ics body with no `BEGIN:VCALENDAR`, a
+  read cut off at the parser's cap (or past Google's 10 pages), and a read with
+  no practices against a plan that has some are failed checks (`lastError`, no
+  `lastChecked`) — never ticked removals. After the read `fcalCheck` looks the
+  calendar up again, because a sync may have replaced the record meanwhile.
+- **The 12 weeks only.** `fcalReadIcs` parses with a window (`icsParse(text,
+  { from, until })`): a repeat with no `COUNT`/`UNTIL` is read up to the
+  window's end, a series begun years ago jumps to it, and `SC_MAX_EVENTS`
+  counts only the window's events. A rule the parser cannot read (MONTHLY…) is
+  counted on the review and the calendar's card (`lastUnread`), and its placed
+  practices are never offered for removal. The school import passes no window
+  and reads as before. (A WEEKLY rule with no `BYDAY` now repeats on
+  `DTSTART`'s weekday, as RFC 5545 says, for both.)
 - **Reading.** A Google calendar is read through the Calendar API
-  (`singleEvents=true`, the device's time zone) with a key the family makes,
+  (`singleEvents=true`, Edmonton time) with a key the family makes,
   restricted to the app's address: browsers may not read Google's calendar
   file from another site. Any other link is fetched as .ics and fails where the
   server sends no CORS header. The .ics parser now applies `EXDATE`,
@@ -3223,7 +3250,9 @@ belong here, placed for one child as one activity and read again later.
 - **Days with no practice.** A club all-day event (meet, break, long weekend)
   and Alberta's 9 general holidays (`fcalStatHolidays`, computed per year)
   hold practices back as unticked rows: the real club calendar left a Victoria
-  Day Monday and a Good Friday in.
+  Day Monday and a Good Friday in. A practice a grown-up keeps on such a day —
+  a held-back row ticked, or a removal unticked — is stamped `calDayOff:
+  <day>` and not offered for removal for that reason again.
 - **Rhythm and size.** Placed 12 weeks ahead (`FCAL_HORIZON_DAYS`), checked
   again every 14 days (`FCAL_CHECK_DAYS`) when a parent opens the portal
   (`renderParentHome` → `fcalAutoCheck`, once per app load). Rolling, not the

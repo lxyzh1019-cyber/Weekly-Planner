@@ -14,10 +14,12 @@
 //     resolved, so a TZID time is read as local wall-clock time. That is right
 //     for the case this serves (a local school's local calendar) and wrong for
 //     a calendar published in another zone; the preview shows the time it read,
-//     which is where a parent would notice.
-//   - Anything past FREQ=WEEKLY / FREQ=DAILY with UNTIL, COUNT and BYDAY.
-//     Everything else in RRULE is skipped rather than half-applied, and the
-//     preview says how many were skipped. Skipped dates (EXDATE), one moved or
+//     which is where a parent would notice. A UTC time (…Z) IS converted, to
+//     Edmonton (APP_TIMEZONE), never the device's zone.
+//   - Anything past FREQ=WEEKLY / FREQ=DAILY with UNTIL, COUNT and BYDAY. A
+//     rule with no end is read only inside a window (Follow a calendar's 12
+//     weeks). Everything else in RRULE is skipped rather than half-applied, and
+//     the preview says how many were skipped. Skipped dates (EXDATE), one moved or
 //     cancelled copy of a repeat (RECURRENCE-ID) and cancelled events ARE read:
 //     a club calendar cancels a holiday practice and moves another that way.
 //
@@ -102,10 +104,17 @@ function icsDateValue(value, params) {
   }
   let y = +m[1], mo = +m[2], d = +m[3], hh = +m[4], mm = +m[5];
   if (m[7]) {
-    // Zulu: shift into the device's zone, which is the family's zone.
-    const local = new Date(Date.UTC(y, mo - 1, d, hh, mm));
-    y = local.getFullYear(); mo = local.getMonth() + 1; d = local.getDate();
-    hh = local.getHours(); mm = local.getMinutes();
+    // Zulu: shift into the family's zone (APP_TIMEZONE, Edmonton), never the
+    // device's — an iPad set to another zone must read the same practice. The
+    // UTC fields are kept: a repeat of a UTC time is converted per date
+    // (icsExpand), because Edmonton's offset can differ from date to date.
+    const at = new Date(Date.UTC(y, mo - 1, d, hh, mm));
+    return {
+      dayKey: toDayKeyInZone(at),
+      minutes: nowMinutesInZone(at),
+      allDay: false,
+      utc: { dayKey: `${m[1]}-${m[2]}-${m[3]}`, minutes: hh * 60 + mm },
+    };
   }
   return {
     dayKey: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
@@ -114,10 +123,16 @@ function icsDateValue(value, params) {
   };
 }
 
-/* Walk the VEVENTs. Returns { events, skipped } — skipped counts the ones with
-   a recurrence rule this does not understand, so the preview can say so rather
-   than quietly dropping them. */
-function icsParse(text) {
+/* Walk the VEVENTs. Returns { events, skipped, skippedSeries, truncated } —
+   skipped counts the ones with a recurrence rule this does not understand (and
+   skippedSeries names them), so the preview can say so rather than quietly
+   dropping them; truncated says the walk stopped at SC_MAX_EVENTS.
+
+   `win` ({ from, until }, day keys) is how Follow a calendar reads: only the
+   days it places are kept, so the cap counts those and not a club's whole
+   history, and a repeat with no end (no COUNT, no UNTIL) is read up to `until`.
+   Without it — the school import — nothing changes. */
+function icsParse(text, win) {
   const lines = icsUnfold(text).split('\n');
   const events = [];
   /* A changed copy of one repeat (RECURRENCE-ID) and the dates a repeat skips
@@ -129,6 +144,8 @@ function icsParse(text) {
   const cancelledCopies = new Set();
   let cur = null;
   let skipped = 0;
+  let truncated = false;
+  const skippedSeries = [];
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
@@ -141,13 +158,13 @@ function icsParse(text) {
           const orig = cur.recurrenceId.dayKey;
           if (cur.status === 'CANCELLED') cancelledCopies.add(series + '|' + orig);
           else {
-            const one = icsExpand(Object.assign({}, cur, { rrule: null }));
+            const one = icsExpand(Object.assign({}, cur, { rrule: null }), win);
             if (one && one.length) overrides.push(Object.assign(one[0], { series, origDay: orig }));
             cancelledCopies.add(series + '|' + orig);
           }
         } else if (cur.status !== 'CANCELLED') {
-          const expanded = icsExpand(cur);
-          if (expanded === null) skipped++;
+          const expanded = icsExpand(cur, win);
+          if (expanded === null) { skipped++; skippedSeries.push(series); }
           else {
             const skip = new Set(cur.exdates);
             expanded.forEach(e => {
@@ -159,7 +176,7 @@ function icsParse(text) {
         }
       }
       cur = null;
-      if (events.length > SC_MAX_EVENTS) break;
+      if (events.length > SC_MAX_EVENTS) { truncated = true; break; }
       continue;
     }
     if (!cur) continue;
@@ -184,7 +201,7 @@ function icsParse(text) {
   const kept = events.filter(e => !(e.series && cancelledCopies.has(e.series + '|' + e.origDay)));
   kept.push(...overrides);
   kept.forEach(e => { if (e.place == null) e.place = ''; });
-  return { events: kept, skipped };
+  return { events: kept, skipped, skippedSeries, truncated };
 }
 
 /* The id a calendar gives one event or one repeat, the same way Google's own
@@ -197,17 +214,29 @@ function icsSeriesId(uid) {
 
 /* One VEVENT → the occurrences it actually covers. null means "this has a rule
    I do not understand", which is reported rather than guessed at. */
-function icsExpand(ev) {
-  const one = (start) => {
-    const out = { dayKey: start.dayKey, allDay: start.allDay, summary: ev.summary, place: ev.place || '' };
-    if (!start.allDay) {
-      out.startMin = start.minutes;
-      // DTEND on a timed event is exclusive of nothing — it is the end.
-      out.durationMin = (ev.end && !ev.end.allDay && ev.end.dayKey === start.dayKey)
-        ? Math.max(15, ev.end.minutes - start.minutes) : 60;
+function icsExpand(ev, win) {
+  const inWin = (k) => !win || ((!win.from || k >= win.from) && (!win.until || k <= win.until));
+  // DTEND on a timed event is exclusive of nothing — it is the end.
+  const len = (ev.end && !ev.end.allDay && ev.end.dayKey === ev.start.dayKey)
+    ? Math.max(15, ev.end.minutes - ev.start.minutes) : 60;
+  /* One occurrence on day `key` — in the rule's own days: for a UTC start
+     those are UTC days, and each one is converted to Edmonton on its own date,
+     so a 23:45Z practice is 17:45 in October and 16:45 after the clock change. */
+  const one = (key) => {
+    const out = { dayKey: key, allDay: ev.start.allDay, summary: ev.summary, place: ev.place || '' };
+    if (!ev.start.allDay) {
+      out.startMin = ev.start.minutes;
+      out.durationMin = len;
+      if (ev.start.utc) {
+        const [y, mo, d] = key.split('-').map(Number);
+        const at = new Date(Date.UTC(y, mo - 1, d, 0, ev.start.utc.minutes));
+        out.dayKey = toDayKeyInZone(at);
+        out.startMin = nowMinutesInZone(at);
+      }
     }
     return out;
   };
+  const firstKey = ev.start.utc ? ev.start.utc.dayKey : ev.start.dayKey;
   if (!ev.rrule) {
     /* An all-day event may span days, and its DTEND is EXCLUSIVE — a one-day
        holiday on the 25th ends on the 26th. Getting this wrong adds a day off
@@ -217,12 +246,14 @@ function icsExpand(ev) {
       const d = formatDayKey(ev.start.dayKey);
       const stop = formatDayKey(ev.end.dayKey);
       while (d < stop && out.length < SC_MAX_REPEATS) {
-        out.push({ dayKey: dateToLocalKey(d), allDay: true, summary: ev.summary, place: ev.place || '' });
+        const k = dateToLocalKey(d);
+        if (inWin(k)) out.push({ dayKey: k, allDay: true, summary: ev.summary, place: ev.place || '' });
         d.setDate(d.getDate() + 1);
       }
       return out;
     }
-    return [one(ev.start)];
+    const single = one(firstKey);
+    return inWin(single.dayKey) ? [single] : [];
   }
 
   const parts = {};
@@ -235,30 +266,60 @@ function icsExpand(ev) {
   if (parts.BYMONTHDAY || parts.BYSETPOS || parts.BYMONTH) return null;
   const interval = Math.max(1, parseInt(parts.INTERVAL, 10) || 1);
   const count = parts.COUNT ? Math.max(1, parseInt(parts.COUNT, 10)) : null;
-  const until = parts.UNTIL ? (icsDateValue(parts.UNTIL, {}) || {}).dayKey : null;
-  if (!count && !until) return null;   // an endless rule is not something to materialise
+  // UNTIL is compared in the rule's own days (UTC days for a UTC start).
+  const untilVal = parts.UNTIL ? (icsDateValue(parts.UNTIL, {}) || {}) : {};
+  let until = ev.start.utc ? ((untilVal.utc && untilVal.utc.dayKey) || untilVal.dayKey || null) : (untilVal.dayKey || null);
+  if (!count && !until) {
+    // An endless rule is read only inside a window, up to its last day (a day
+    // more for a UTC start, whose Edmonton evening is the next UTC day).
+    if (!win || !win.until) return null;
+    const stop = formatDayKey(win.until);
+    if (ev.start.utc) stop.setDate(stop.getDate() + 1);
+    until = dateToLocalKey(stop);
+  }
 
   const DOW = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0 };
+  // A weekly rule with no BYDAY repeats on DTSTART's own weekday (RFC 5545).
   const byDay = parts.BYDAY
     ? parts.BYDAY.split(',').map(x => DOW[x.trim().slice(-2).toUpperCase()]).filter(n => n != null)
-    : null;
+    : (freq === 'WEEKLY' ? [formatDayKey(firstKey).getDay()] : null);
 
   const out = [];
-  const d = formatDayKey(ev.start.dayKey);
+  const d = formatDayKey(firstKey);
   const stepDays = freq === 'DAILY' ? interval : 1;
   let weeksIn = 0;
   const weekStart = ctMondayOf(new Date(d));
+  const DAY_MS = 24 * 3600 * 1000;
+  /* With no COUNT, nothing before the window needs walking: jump to the first
+     aligned repeat near its start, so a series begun years ago is not used up
+     by SC_MAX_REPEATS before it reaches today. (COUNT must count every repeat.) */
+  if (win && win.from && !count) {
+    const target = formatDayKey(win.from);
+    target.setDate(target.getDate() - 1);
+    if (target > d) {
+      if (freq === 'DAILY') {
+        const n = Math.floor(Math.round((target - d) / DAY_MS) / interval) * interval;
+        d.setDate(d.getDate() + n);
+      } else {
+        const w = Math.floor(Math.round((ctMondayOf(new Date(target)) - weekStart) / (7 * DAY_MS)) / interval) * interval;
+        if (w > 0) { d.setTime(weekStart.getTime()); d.setDate(d.getDate() + 7 * w); }
+      }
+    }
+  }
+  let taken = 0;
   for (let guard = 0; guard < SC_MAX_REPEATS * 8 && out.length < SC_MAX_REPEATS; guard++) {
     const key = dateToLocalKey(d);
     if (until && key > until) break;
-    let take = true;
-    if (freq === 'WEEKLY') {
-      weeksIn = Math.round((ctMondayOf(new Date(d)) - weekStart) / (7 * 24 * 3600 * 1000));
-      take = (weeksIn % interval === 0) && (!byDay || byDay.includes(d.getDay()));
+    let take = key >= firstKey;
+    if (take && freq === 'WEEKLY') {
+      weeksIn = Math.round((ctMondayOf(new Date(d)) - weekStart) / (7 * DAY_MS));
+      take = (weeksIn % interval === 0) && byDay.includes(d.getDay());
     }
     if (take) {
-      out.push(Object.assign(one(ev.start), { dayKey: key }));
-      if (count && out.length >= count) break;
+      taken++;
+      const occ = one(key);
+      if (inWin(occ.dayKey)) out.push(occ);
+      if (count && taken >= count) break;
     }
     d.setDate(d.getDate() + stepDays);
   }
