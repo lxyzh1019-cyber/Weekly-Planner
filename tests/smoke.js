@@ -15937,8 +15937,19 @@ function findChromium() {
       showUndoLastCompletion('r6-mood-a', key, 'Piano Practice');
       if (document.getElementById('undoToast').hidden) bad.push('the undo toast did not come up, so the sheet was not measured under it');
       openReflectSheet(key);
-      await new Promise(r => setTimeout(r, 400)); // the sheet slides up (0.3s)
       const sheet = document.querySelector('#reflectOverlay .ui-sheet');
+      /* The sheet slides up from translateY(100%) (slideUp, 0.3s, css/app.css).
+         A fixed 400ms wait was not always enough on a loaded CI runner: the
+         slide started late, the moods were still below the screen, and every
+         probe "landed on nothing" (2026-10-01 part 3, run 41853929778; the same
+         job passed the night before). Wait for the slide itself to end. */
+      await Promise.race([
+        Promise.all((sheet ? sheet.getAnimations() : []).map(a => a.finished.catch(() => {}))),
+        new Promise(r => setTimeout(r, 3000)),
+      ]);
+      const still = sheet ? sheet.getAnimations().filter(a => a.playState === 'running') : [];
+      if (still.length) bad.push(`the sheet was still sliding after 3s (at ${Math.round(still[0].currentTime)}ms), so the moods were measured mid-slide`);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const overall = [...document.querySelectorAll('#reflectOverallMoods .vibe-mood')];
       const perBlock = [...document.querySelectorAll('#reflectBlockList .vibe-mood')];
       if (overall.length !== 5) bad.push(`${overall.length} overall mood buttons, expected 5`);

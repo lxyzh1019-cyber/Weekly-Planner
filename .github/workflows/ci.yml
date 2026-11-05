@@ -1,10 +1,11 @@
 name: CI
 
 on:
-  # One run per push, on every branch: the run reports on the pull request's
-  # head commit, so there is no separate pull_request trigger.
+  # A run on each pull request and on each push to main (a merge) — not on
+  # every branch push as well, which ran the suite twice per change.
+  pull_request:
   push:
-    branches: ['**']
+    branches: [main]
   schedule:
     # Nightly, 07:00 UTC — catches drift in the pinned browser and toolchain
     # even on weeks when nothing is pushed.
@@ -161,7 +162,7 @@ jobs:
 
   # Boots the app over file:// in headless Chromium and drives the main flows,
   # including the chore -> money hand-off that is the most valuable join in the
-  # suite. Runs on every push; 2026-10-07 only off main: it is the only check that
+  # suite. Runs in every run; only 2026-10-07 on a pull request: it is the only check that
   # would catch a broken screen.
   smoke:
     name: Headless smoke test (${{ matrix.date }}, part ${{ matrix.part }})
@@ -174,11 +175,11 @@ jobs:
     # suite runs as three parts side by side (SMOKE_PART, the fixed lists in
     # tests/smoke-parts/parts.js: every check in exactly one part,
     # noConsoleErrors in every part), so 4 x 3 = 12 jobs on main and nightly;
-    # 1 date x 3 = 3 jobs on other branches.
+    # 1 date x 3 = 3 jobs on a pull request.
     strategy:
       fail-fast: false
       matrix:
-        # All four dates on main and nightly; 2026-10-07 only on other branches.
+        # All four dates on main and nightly; 2026-10-07 only on a pull request.
         date: ${{ fromJSON((github.ref == 'refs/heads/main' || github.event_name == 'schedule') && '["2026-10-15","2026-10-11","2026-10-01","2026-10-07"]' || '["2026-10-07"]') }}
         part: [1, 2, 3]
     # A GitHub job with no timeout runs for SIX HOURS before the platform kills

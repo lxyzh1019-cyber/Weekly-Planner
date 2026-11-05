@@ -66,10 +66,15 @@ map gives for a screen (below) are optional and outside the 3-minute target:
 about half a minute when every check named is declared in `SETUP_NEEDS`, about
 two and a half minutes otherwise. (text only)
 
-**Before a pull request opens:** every push to a branch starts one GitHub run by
-itself: checks, browser, pictures and the smoke test for 2026-10-07 in three
-parts. Before a pull request opens, that run must be green on the branch head.
-All four dates (12 smoke jobs) run on main and nightly. A notes-only commit
+**On a pull request:** each pull request (and each push to it) starts one
+GitHub run: checks, browser, pictures and the smoke test for 2026-10-07 in three
+parts (GitHub tests the pull request merged into main; a pull request with a
+merge conflict starts no run). That run must be green before the merge. A push to a branch
+with no pull request starts no run (2026-11-05; before, every branch push ran
+too). All four dates (12 smoke jobs) run on main and nightly, so a smoke check
+that depends on the weekday must read `SMOKE_DATE`, never assume Wednesday:
+`thePortalKitHolds44px` did, passed on every pull request, and failed main and
+every nightly run from 2026-10-13 to 2026-11-04. A notes-only commit
 carries [skip ci]. Every job is under 5 minutes: a smoke job took 1:53-2:56 and
 the whole run 4:20 (run 38061502763, times in `tests/README.md`). (text only)
 
@@ -222,13 +227,12 @@ setup just before each check, prints both slowest first, and writes
 artifacts, lists the slowest checks and setup, and checks that a date's parts
 together ran every smoke check exactly once.
 
-CI (`.github/workflows/ci.yml`) runs once per push to any branch (it reports on
-the pull request's head commit; there is no separate pull-request trigger),
-plus nightly (a manual start also works but is never needed). Jobs: `checks` (no browser: `npm run check` and
+CI (`.github/workflows/ci.yml`) runs on each pull request and each push to
+`main`, plus nightly (a manual start also works but is never needed). Jobs: `checks` (no browser: `npm run check` and
 every unit suite), `browser` (installs Chromium and its system packages once,
 caches both, runs the cleanup-tool tests), then the smoke jobs: all four dates
-in three parts (12 jobs) on `main` and nightly, only 2026-10-07 (3 jobs) on any
-other branch (`Headless smoke test (<date>, part <n>)`),
+in three parts (12 jobs) on `main` and nightly, only 2026-10-07 (3 jobs) on a
+pull request (`Headless smoke test (<date>, part <n>)`),
 which install the browser from those caches and upload their screenshots as the
 artifact `smoke-screenshots-<date>-p<n>`. The browser job exists because the system packages came from the
 Ubuntu mirror in every smoke job, and a slow mirror made one job take 20 minutes
