@@ -103,13 +103,20 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
   const before = page.viewportSize();
   const problems = [];
   const was = await page.evaluate(() => ({ profile, unlocked: parentUnlockedThisSession, scope: parentScope, viewing: parentViewing, tab: parentTab, history: parentHistoryView, answerDay: pnAnswerDay, answerKid: pnAnswerKid }));
+  /* Which cell of a Monday-first seven-day row is today on the smoke date
+     (tests/smoke.js: SMOKE_DATE, noon Edmonton; 2026-10-07 is a Wednesday,
+     cell 3). It was fixed at Wednesday, so main and the nightly run — which
+     also run a Thursday and a Sunday — failed this check on every run from
+     2026-10-13 while every branch run (Wednesday only) passed. */
+  const [sy, sm, sd] = (process.env.SMOKE_DATE || '2026-10-07').split('-').map(Number);
+  const smokeToday = (new Date(Date.UTC(sy, sm - 1, sd)).getUTCDay() + 6) % 7;
   try {
     for (const look of ['pop', 'calm']) {
       await setLook(look);
       for (const [w, h, size] of [[1194, 834, 'iPad'], [390, 844, 'phone']]) {
         await page.setViewportSize({ width: w, height: h });
         await page.waitForTimeout(100);
-        problems.push(...await page.evaluate(async ([look, size]) => {
+        problems.push(...await page.evaluate(async ([look, size, smokeToday]) => {
           const out = [];
           const tag = `${look} ${size}`;
           const wait = (ms) => new Promise(r => setTimeout(r, ms));
@@ -134,10 +141,11 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           const daysCheck = (where, row, named, needOk = true, toCome = 'future') => {
             const cells = row ? [...row.children] : [];
             if (cells.length !== 7) { out.push(`${tag} ${where}: ${cells.length} day cells, want 7`); return; }
-            // Still to come (G2): the smoke date is Wed 2026-10-07, so Thu–Sun (cells 4–7) are dashed in the
-            // lighter ink. Now and the hub keep them tappable (.ui-day--future, pointer); the sheet's are :disabled.
+            // Still to come (G2): the cells after today (smokeToday, from the smoke date) are dashed in the
+            // lighter ink — Thu–Sun on Wed 2026-10-07, none on a Sunday. Now and the hub keep them tappable
+            // (.ui-day--future, pointer); the sheet's are :disabled.
             const todayIdx = cells.findIndex(c => c.getAttribute('aria-current') === 'date');
-            if (todayIdx === 2) {
+            if (todayIdx === smokeToday) {
               cells.forEach((c, i) => {
                 const cs = getComputedStyle(c), come = i > todayIdx;
                 if (come && cs.borderTopStyle !== 'dashed') out.push(`${tag} ${where}: to-come day cell ${i + 1} is drawn ${cs.borderTopStyle}, want dashed`);
@@ -148,7 +156,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
                 if (come && Number(cs.opacity) < 1) out.push(`${tag} ${where}: to-come day cell ${i + 1} has dropped opacity ${cs.opacity}`);
                 if (c.getAttribute('aria-pressed') === 'true' && cs.backgroundColor !== fillOf('--sel', row)) out.push(`${tag} ${where}: chosen day cell ${i + 1} is not its area's picked colour`);
               });
-            } else out.push(`${tag} ${where}: today is cell ${todayIdx + 1}, want 3 (Wed) on the smoke date, so to-come cells were not checked`);
+            } else out.push(`${tag} ${where}: today is cell ${todayIdx + 1}, want ${smokeToday + 1} on the smoke date, so to-come cells were not checked`);
             cells.forEach((c, i) => {
               const ok = c.classList.contains('ui-day--ok'), now = c.getAttribute('aria-current') === 'date';
               const want = (now ? '•' : '') + (now && ok ? ' ' : '') + (ok ? '✓' : '');
@@ -362,7 +370,7 @@ module.exports = async ({ page, want, checks, setLook, clearLooks }) => {
           if (leftPortal.length) out.push(`${tag} the portal: ${leftPortal.length} element(s) still wear a retired class (${OLD.join(' ')})`);
           return out;
           } finally { fx.remove(); state.shared.parentDayConfirm = confirmBefore; }
-        }, [look, size]));
+        }, [look, size, smokeToday]));
       }
     }
   } finally {

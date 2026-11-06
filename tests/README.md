@@ -190,7 +190,7 @@ clock runs on from there. CI runs the smoke suite once per date, in three parts
 (`SMOKE_PART`), in a matrix --
 `2026-10-15` (a weekday), `2026-10-11` (a Sunday), `2026-10-01` (the first of a
 month) and `2026-10-07` -- so a check that only passes on some days fails there.
-All four run on main and nightly; other branches run 2026-10-07 only.
+All four run on main and nightly; a pull request runs 2026-10-07 only.
 
 ## The picture test
 
@@ -261,11 +261,11 @@ whether it passes or fails.
 
 ## CI
 
-`.github/workflows/ci.yml` runs once per push to any branch (no separate
-pull-request run), plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
+`.github/workflows/ci.yml` runs on each pull request and each push to main,
+plus nightly and on demand. Jobs: `checks` (no browser: `npm run check` and every
 unit suite), `browser` (installs Chromium and its system packages once, caches
 both, runs the cleanup-tool tests), `smoke`, one job per date and part (4 x 3
-= 12 on `main` and nightly; only 2026-10-07, 3 jobs, on other branches;
+= 12 on `main` and nightly; only 2026-10-07, 3 jobs, on a pull request;
 `Headless smoke test (<date>, part <n>)`), which
 installs the browser from those caches and uploads `tests/out/` as an artifact
 (`smoke-screenshots-<date>-p<n>`) so a layout regression is visible in the run
