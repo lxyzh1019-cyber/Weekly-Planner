@@ -77,5 +77,6 @@
       }
     ]
   },
-  "plansDirectory": "./plans"
+  "plansDirectory": "./plans",
+  "showClearContextOnPlanAccept": true
 }
